@@ -1,0 +1,4 @@
+# 缓存压力测试 — 强制多轮工具调用以测试会话内缓存命中率
+prompt = "请依次完成以下 3 个独立任务（每个做完再做下一个）：\n1. 读取 internal/cache/compiler.go 文件，列出版本号和包名\n2. 搜索整个项目中所有包含 'Failed to' 的字符串，统计出现次数\n3. 检查 internal/cache/ 目录下有多少个 .go 文件\n\n完成所有任务后，总结你的发现。"
+max_steps = 30
+timeout_sec = 180

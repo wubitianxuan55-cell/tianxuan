@@ -1,0 +1,10 @@
+warning: bash sandbox requested but unavailable on this platform; running bash unconfined
+  · cache warm: L1 identity matches previous session
+[deepseek-pro · planning]
+[2m  ▎ thinking[0m
+  · 646 tok · in 70 (0 cached / 70 new) · out 576 (219 reasoning) · ¥0.0037
+
+[deepseek · executing]
+[2m  ▎ thinking[0m
+你好！有什么我可以帮你的吗？
+  · 7647 tok · in 7624 (7552 cached / 72 new) · out 23 (14 reasoning) · ¥0.0003

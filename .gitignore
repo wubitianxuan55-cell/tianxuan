@@ -1,0 +1,51 @@
+# Secret files (never commit)
+.env
+*.local
+
+# IDE / Editor
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.test
+*.out
+*.coverprofile
+coverage.out
+cpu.prof
+mem.prof
+/bin/
+/dist/
+/stage/
+/build/
+
+# Project runtime directories
+.tianxuan/
+.codegraph/
+.reasonix/
+
+# Desktop build outputs
+tianxuan/desktop/build/
+tianxuan/desktop/frontend/dist/
+tianxuan/desktop/frontend/wailsjs/
+tianxuan/desktop/frontend/package.json.md5
+tianxuan/desktop/frontend/node_modules/
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Design docs (speculative)
+/design.md
+
+# Logo source files (keep only the final)
+/logo.png
+/tianxuanlogo(1).png
+
+# Null file
+/nul
+
+# Misc
+/reasonix.toml

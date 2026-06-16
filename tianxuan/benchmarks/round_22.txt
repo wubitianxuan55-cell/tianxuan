@@ -1,0 +1,12 @@
+warning: bash sandbox requested but unavailable on this platform; running bash unconfined
+  · cache warm: L1 identity matches previous session
+[deepseek-pro · planning]
+[2m  ▎ thinking[0m
+  · 602 tok · in 68 (0 cached / 68 new) · out 534 (287 reasoning) · ¥0.0034
+
+[deepseek · executing]
+[2m  ▎ thinking[0m
+已加载项目记忆。tianxuan V3.0 项目，Go 语言，TCCA 四层上下文架构。
+
+请问有什么需要帮忙的？
+  · 6102 tok · in 5895 (5888 cached / 7 new) · out 207 (172 reasoning) · ¥0.0005

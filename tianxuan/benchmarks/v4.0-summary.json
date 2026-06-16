@@ -1,0 +1,11 @@
+{
+  "version": "4.0.0",
+  "model": "deepseek",
+  "total_cached": 656768,
+  "total_miss": 8486,
+  "avg_hit_rate": 98.7,
+  "total_cost": 0.17800000000000002,
+  "total_time_s": 801.62,
+  "rounds": 0,
+  "results": []
+}

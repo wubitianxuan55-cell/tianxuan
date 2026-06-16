@@ -1,0 +1,281 @@
+{
+  "results": [
+    {
+      "r": 1,
+      "task": "list files in current directory",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 2,
+      "task": "show go.mod content",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 3,
+      "task": "what is the project name and version",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 4,
+      "task": "list top-level directories",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 5,
+      "task": "show README content summary",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 6,
+      "task": "what does the agent package do",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 7,
+      "task": "explain AgentRunner structure",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 8,
+      "task": "what is TCCA architecture",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 9,
+      "task": "list all Go source files",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 10,
+      "task": "describe ContextManager responsibilities",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 11,
+      "task": "what are the four cache layers",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 12,
+      "task": "explain IdentityLayer purpose",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 13,
+      "task": "how does RuntimeLayer track edits",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 14,
+      "task": "what is SkillLayer version promotion",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 15,
+      "task": "describe FlowLayer compaction",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 16,
+      "task": "how does DetailRingBuffer work",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 17,
+      "task": "explain KnowledgeGraph data model",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 18,
+      "task": "what is HybridRetriever BM25 search",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 19,
+      "task": "how does ForkPool pre-warming work",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 20,
+      "task": "describe CompactQuality assessment",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 21,
+      "task": "what does AutoAnalyze do",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 22,
+      "task": "explain ProviderHint adapter",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 23,
+      "task": "how does DecisionLogger differ from AuditLogger",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.08
+    },
+    {
+      "r": 24,
+      "task": "what is MessageStore interface",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 25,
+      "task": "describe Fork file-lock EditEntry",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 26,
+      "task": "what new features in V3.1 to V4.0",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 27,
+      "task": "summarize architecture evolution V3 to V4",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 28,
+      "task": "list optimization opportunities for caching",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.06
+    },
+    {
+      "r": 29,
+      "task": "how to add a new TaskKind",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    },
+    {
+      "r": 30,
+      "task": "summarize tianxuan design principles",
+      "cached": 0,
+      "miss": 0,
+      "hit": 0,
+      "cost": 0.0,
+      "dur": 0.07
+    }
+  ],
+  "summary": {
+    "total_cached": 0,
+    "total_miss": 0,
+    "avg_hit": 0,
+    "total_cost": 0.0,
+    "total_time": 2.0800000000000005
+  }
+}

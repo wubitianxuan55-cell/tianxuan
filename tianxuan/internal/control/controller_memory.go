@@ -1,0 +1,107 @@
+package control
+
+import (
+	"fmt"
+	"strings"
+
+	"tianxuan/internal/memory"
+)
+
+// --- memory ---
+//
+// c.mem is treated as an immutable snapshot guarded by c.mu: reads take the lock
+// and return the pointer; writes mutate disk then swap in a freshly discovered
+// snapshot. A turn-tail note is queued for each write so the change applies this
+// session without disturbing the cache-stable system prefix (it folds into the
+// prefix on the next session). All of these are no-ops returning "" when memory
+// is disabled.
+
+// QuickAdd appends a one-line note to the doc-memory file for scope (project
+// TIANXUAN.md by default) — the write side of "#<note>". Returns the file written.
+func (c *Controller) QuickAdd(scope memory.Scope, note string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil {
+		return "", nil
+	}
+	path := c.mem.DocPath(scope)
+	if path == "" {
+		return "", fmt.Errorf("no target file for memory scope %q", scope)
+	}
+	if err := memory.AppendDoc(path, note); err != nil {
+		return "", err
+	}
+	c.pendingMemory = append(c.pendingMemory, note)
+	c.refreshMemoryLocked()
+	return path, nil
+}
+
+// SaveDoc overwrites a recognized memory doc with body — the save side of the
+// desktop panel's in-place editor. Returns the file written.
+func (c *Controller) SaveDoc(path, body string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil {
+		return "", nil
+	}
+	written, err := c.mem.WriteDoc(path, body)
+	if err != nil {
+		return "", err
+	}
+	// Inject the new content once on the next turn: the cached prefix still holds
+	// the pre-edit version this session, so handing the model the current text
+	// avoids a stale-guidance gap until the next session re-folds it into the
+	// prefix. Trimmed to a single tail note (drained by Compose), not per-turn.
+	c.pendingMemory = append(c.pendingMemory,
+		"Memory file "+written+" was just edited. Its current contents:\n"+strings.TrimSpace(body))
+	c.refreshMemoryLocked()
+	return written, nil
+}
+
+// ForgetMemory deletes a saved auto-memory by name — the panel/TUI delete action,
+// the manual counterpart to the model's `forget` tool. It queues a turn-tail note
+// so the deletion applies this session (the cached prefix still lists the fact
+// until the next session re-folds the index).
+func (c *Controller) ForgetMemory(name string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil {
+		return nil
+	}
+	if err := c.mem.Store.Delete(name); err != nil {
+		return err
+	}
+	c.pendingMemory = append(c.pendingMemory,
+		"Deleted memory \""+name+"\" — disregard its line still shown in the saved-memories index until next session.")
+	c.refreshMemoryLocked()
+	return nil
+}
+
+// QueueMemory implements memory.Queue: when the model runs the remember/forget
+// tool, the tool calls this with a note that rides the next turn so the change
+// applies this session without touching the cache-stable prefix. It also
+// refreshes the snapshot a memory panel reads.
+func (c *Controller) QueueMemory(note string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pendingMemory = append(c.pendingMemory, note)
+	c.refreshMemoryLocked()
+}
+
+// Memory returns the loaded memory snapshot (nil when memory is disabled), for
+// frontends that surface a memory panel or the /memory command. The returned
+// *Set is immutable — mutations go through QuickAdd / SaveDoc.
+func (c *Controller) Memory() *memory.Set {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.mem
+}
+
+// refreshMemoryLocked re-discovers memory from disk so a later Memory() reflects
+// a just-applied write. Caller holds c.mu.
+func (c *Controller) refreshMemoryLocked() {
+	if c.mem == nil {
+		return
+	}
+	c.mem = memory.Load(memory.Options{CWD: c.mem.CWD, UserDir: c.mem.UserDir})
+}

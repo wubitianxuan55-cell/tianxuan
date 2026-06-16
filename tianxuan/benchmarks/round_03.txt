@@ -1,0 +1,18 @@
+warning: bash sandbox requested but unavailable on this platform; running bash unconfined
+  · cache warm: L1 identity matches previous session
+[deepseek-pro · planning]
+[2m  ▎ thinking[0m
+  · 595 tok · in 70 (0 cached / 70 new) · out 525 (374 reasoning) · ¥0.0034
+
+[deepseek · executing]
+[2m  ▎ thinking[0m
+  · 6033 tok · in 5895 (5888 cached / 7 new) · out 138 (34 reasoning) · ¥0.0004
+  -> glob {"pattern": "**/*.go"}
+  -> grep {"pattern": "团队版", "path": "D:\\AI\\tianxuanX\\tianxuan"}
+[2m  ▎ thinking[0m
+你好！我是 tianxuan，一个缓存优先的编码助手。
+
+当前项目：**tianxuan** — 基于 Go 的缓存原生编码代理，采用 TCCA（四层上下文缓存架构）。
+
+我已经加载了项目记忆和 GitNexus 索引。有什么需要帮忙的吗？
+  · 6032 tok · in 5895 (5888 cached / 7 new) · out 137 (73 reasoning) · ¥0.0004

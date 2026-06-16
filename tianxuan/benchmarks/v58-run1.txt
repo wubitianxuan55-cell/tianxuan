@@ -1,0 +1,22 @@
+# V5.8 10轮缓存测试 — Run 1 (2026-06-08)
+# 二进制: tianxuan/bin/tianxuan.exe (V5.8.0)
+# 模型: deepseek-v4-flash
+# 每轮首调数据
+
+R1: 14,051 in | 13,952 hit (99.3%) | 99 miss | 62 out (16 reasoning) | ¥0.0005
+R2: 14,062 in | 13,952 hit (99.2%) | 110 miss | 75 out (23 reasoning) | ¥0.0005
+R3: 14,051 in | 13,952 hit (99.3%) | 99 miss | 115 out (29 reasoning) | ¥0.0006
+R4: 14,060 in | 13,952 hit (99.2%) | 108 miss | 129 out (62 reasoning) | ¥0.0006
+R5: 14,053 in | 13,952 hit (99.3%) | 101 miss | 81 out (35 reasoning) | ¥0.0005
+R6: 14,059 in | 13,952 hit (99.2%) | 107 miss | 116 out (42 reasoning) | ¥0.0006
+R7: 14,051 in | 13,952 hit (99.3%) | 99 miss | 64 out (19 reasoning) | ¥0.0005
+R8: 14,055 in | 13,952 hit (99.3%) | 103 miss | 99 out (58 reasoning) | ¥0.0006
+R9: 14,050 in | 13,952 hit (99.3%) | 98 miss | 116 out (54 reasoning) | ¥0.0006
+R10: 14,055 in | 13,952 hit (99.3%) | 103 miss | 160 out (23 reasoning) | ¥0.0007
+
+汇总:
+  Avg Input/轮:  14,055 tok
+  Avg Cache Rate: 99.27%
+  Sum Cache Hit:  139,520 tok
+  Sum Cache Miss: 1,027 tok
+  Cache 稳定性:   13,952 锁定（零波动）

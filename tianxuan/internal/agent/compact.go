@@ -382,6 +382,7 @@ func BuildCompactSummary(truncated []provider.Message) string {
 	var recentUserReqs []string    // 最近 3 条用户请求
 	var pendingItems []string      // 待办项（含 todo/next/pending/follow up）
 	var keyFiles []string          // 引用到的关键文件
+	var keyDecisions []string      // V8.0: 关键决策
 	seenKeyFiles := make(map[string]bool)
 
 	for _, msg := range truncated {
@@ -393,6 +394,10 @@ func BuildCompactSummary(truncated []provider.Message) string {
 				short := truncateText(msg.Content, 160)
 				if short != "" {
 					recentUserReqs = append(recentUserReqs, short)
+				}
+				// V8.0: extract key decisions from user messages
+				if d := extractDecision(msg.Content); d != "" {
+					keyDecisions = append(keyDecisions, d)
 				}
 			}
 		case provider.RoleAssistant:
@@ -483,6 +488,20 @@ func BuildCompactSummary(truncated []provider.Message) string {
 			sb.WriteString(", ...")
 		}
 		sb.WriteString("\n")
+	}
+
+	// V8.0: 关键决策
+	if len(keyDecisions) > 0 {
+		limit := len(keyDecisions)
+		if limit > 5 {
+			limit = 5
+		}
+		sb.WriteString("- Key decisions (keep these in mind):\n")
+		for _, d := range keyDecisions[:limit] {
+			sb.WriteString("  * ")
+			sb.WriteString(d)
+			sb.WriteString("\n")
+		}
 	}
 
 	// 工具使用
@@ -601,4 +620,55 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(buf[i:])
+}
+
+// decisionPatterns are regex-like patterns that signal a user making a
+// design/implementation choice. Each pattern maps to a readable label.
+var decisionPatterns = []struct {
+	pattern string
+	label   string
+}{
+	{"改用", "switched to"},
+	{"换成", "switched to"},
+	{"切换", "switched to"},
+	{"mongodb", "chose MongoDB"},
+	{"redis", "chose Redis"},
+	{"postgres", "chose PostgreSQL"},
+	{"mysql", "chose MySQL"},
+	{"sqlite", "chose SQLite"},
+	{"现在开始", "decided to start"},
+	{"不要用", "decided not to use"},
+	{"不要", "instructed not to"},
+	{"回退", "rolled back"},
+	{"重构", "decided to refactor"},
+	{"简化", "decided to simplify"},
+	{"删除", "decided to remove"},
+	{"迁移", "planned migration"},
+	{"接下来", "next step"},
+}
+
+// extractDecision scans a user message for key design decisions.
+// Returns a short label, or "" if none found.
+func extractDecision(msg string) string {
+	lower := strings.ToLower(msg)
+	for _, dp := range decisionPatterns {
+		if strings.Contains(lower, dp.pattern) {
+			// Extract a short snippet around the match (max 80 chars).
+			idx := strings.Index(lower, dp.pattern)
+			start := idx - 20
+			if start < 0 {
+				start = 0
+			}
+			end := idx + len(dp.pattern) + 40
+			if end > len(msg) {
+				end = len(msg)
+			}
+			snippet := strings.TrimSpace(msg[start:end])
+			if len(snippet) > 80 {
+				snippet = snippet[:80] + "…"
+			}
+			return dp.label + ": " + snippet
+		}
+	}
+	return ""
 }

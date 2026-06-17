@@ -61,9 +61,23 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	}
 	content := string(b)
 
-	switch strings.Count(content, p.OldString) {
+	switch c := strings.Count(content, p.OldString); c {
 	case 0:
-		return "", fmt.Errorf("old_string not found in %s", p.Path)
+		// Fuzzy: find the closest matches so the model can retry without a read_file round-trip.
+		candidates := findSimilar(content, p.OldString, 3)
+		if len(candidates) == 0 {
+			return "", fmt.Errorf("old_string not found in %s", p.Path)
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "old_string not found in %s. Closest matches:\n", p.Path)
+		for i, cand := range candidates {
+			fmt.Fprintf(&b, "\n  candidate %d (line %d-%d, score %d%%):\n", i+1, cand.StartLine, cand.EndLine, cand.Score)
+			for _, line := range cand.Lines {
+				fmt.Fprintf(&b, "    %s\n", line)
+			}
+		}
+		b.WriteString("\nChoose a candidate number and retry with its exact text as old_string.")
+		return b.String(), nil
 	case 1:
 		// ok
 	default:
@@ -75,4 +89,123 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("edited %s", p.Path), nil
+}
+
+// similarCandidate is a region of the file that resembles old_string.
+type similarCandidate struct {
+	StartLine int
+	EndLine   int
+	Lines     []string
+	Score     int // 0-100
+}
+
+// findSimilar scans content for the top-n regions most similar to query.
+// It tokenises query into words, scores each line by word overlap, and groups
+// consecutive scored lines into candidates.
+func findSimilar(content string, query string, n int) []similarCandidate {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return nil
+	}
+	// Tokenise query into words (min 2 chars).
+	queryWords := make(map[string]bool)
+	for _, w := range strings.Fields(query) {
+		if len(w) >= 2 {
+			queryWords[w] = true
+		}
+	}
+	if len(queryWords) == 0 {
+		return nil
+	}
+
+	// Score each line by word overlap.
+	scores := make([]int, len(lines))
+	totalWords := len(queryWords)
+	maxScore := 0
+	for i, line := range lines {
+		seen := make(map[string]bool)
+		for _, w := range strings.Fields(line) {
+			if queryWords[w] && !seen[w] {
+				seen[w] = true
+				scores[i]++
+			}
+		}
+		if scores[i] > maxScore {
+			maxScore = scores[i]
+		}
+	}
+	if maxScore == 0 {
+		return nil
+	}
+
+	// Group consecutive lines with score > 0 into candidates.
+	type rawCand struct {
+		start, end int
+		score      int
+	}
+	var raw []rawCand
+	for i := 0; i < len(lines); {
+		if scores[i] == 0 {
+			i++
+			continue
+		}
+		start := i
+		score := 0
+		for i < len(lines) && scores[i] > 0 {
+			score += scores[i]
+			i++
+		}
+		raw = append(raw, rawCand{start, i - 1, score})
+	}
+
+	// Sort by score descending, take top n.
+	// Simple selection: keep top n in a min-heap fashion.
+	type scored struct {
+		idx   int
+		score int
+	}
+	top := make([]scored, 0, n)
+	for i, c := range raw {
+		// Normalise to 0-100.
+		normalised := c.score * 100 / (totalWords * (c.end - c.start + 1))
+		if normalised > 100 {
+			normalised = 100
+		}
+		if len(top) < n {
+			top = append(top, scored{i, normalised})
+		} else {
+			// Replace lowest.
+			worst := 0
+			for j := 1; j < len(top); j++ {
+				if top[j].score < top[worst].score {
+					worst = j
+				}
+			}
+			if normalised > top[worst].score {
+				top[worst] = scored{i, normalised}
+			}
+		}
+	}
+
+	// Build result in original file order.
+	byStart := make(map[int]scored)
+	for _, s := range top {
+		byStart[raw[s.idx].start] = s
+	}
+	var out []similarCandidate
+	for i, c := range raw {
+		if s, ok := byStart[c.start]; ok {
+			out = append(out, similarCandidate{
+				StartLine: c.start + 1,
+				EndLine:   c.end + 1,
+				Lines:     lines[c.start : c.end+1],
+				Score:     s.score,
+			})
+			_ = i
+			if len(out) >= len(top) {
+				break
+			}
+		}
+	}
+	return out
 }

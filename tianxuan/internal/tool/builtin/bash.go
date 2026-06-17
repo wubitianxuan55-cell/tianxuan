@@ -154,9 +154,99 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	}
 	if err != nil {
 		// Non-zero exit: feed output and error back so the model can self-correct.
+		out = appendTestSummary(out)
 		return out, fmt.Errorf("command exited: %w", err)
 	}
-	return out, nil
+	return appendTestSummary(out), nil
+}
+
+// appendTestSummary scans command output for Go test failures and appends a
+// structured summary. The model sees this inline and can fix failures without
+// parsing raw test output.
+func appendTestSummary(out string) string {
+	// Match Go test failure pattern: --- FAIL: TestXxx (0.00s)
+	// or: FAIL: TestXxx (0.00s) / panic: test timed out
+	type fail struct {
+		name string
+		file string
+		line string
+	}
+	var fails []fail
+	seenName := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "--- FAIL:") && !strings.HasPrefix(line, "FAIL\t") {
+			continue
+		}
+		name := ""
+		if strings.HasPrefix(line, "--- FAIL:") {
+			name = strings.TrimPrefix(line, "--- FAIL:")
+		} else {
+			// "FAIL\t./pkg [build failed]" or "FAIL\t./pkg\t0.123s"
+			name = strings.TrimPrefix(line, "FAIL")
+		}
+		name = strings.TrimSpace(name)
+		if idx := strings.Index(name, " ("); idx >= 0 {
+			name = name[:idx]
+		}
+		if idx := strings.Index(name, "\t"); idx >= 0 {
+			name = name[:idx]
+		}
+		name = strings.TrimSpace(name)
+		if name == "" || seenName[name] {
+			continue
+		}
+		seenName[name] = true
+		fails = append(fails, fail{name: name})
+	}
+
+	if len(fails) == 0 {
+		return out
+	}
+
+	// Extract file:line from trace lines (e.g. "    foo_test.go:42: ...")
+	for i, f := range fails {
+		for _, line := range strings.Split(out, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, f.name) && strings.Contains(line, ".go:") {
+				// Try to find "file_test.go:42" pattern
+				rest := line
+				for {
+					idx := strings.Index(rest, ".go:")
+					if idx < 0 {
+						break
+					}
+					start := idx
+					for start > 0 && rest[start-1] != ' ' && rest[start-1] != '\t' && rest[start-1] != '/' {
+						start--
+					}
+					end := idx + 3
+					for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+						end++
+					}
+					if end > idx+3 {
+						fails[i].file = rest[start : idx+3]
+						fails[i].line = rest[idx+4 : end]
+						break
+					}
+					rest = rest[end:]
+				}
+			}
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(out)
+	sb.WriteString("\n\n[Test Failure Summary]\n")
+	sb.WriteString(fmt.Sprintf("Failed tests: %d\n", len(fails)))
+	for _, f := range fails {
+		sb.WriteString(fmt.Sprintf("  - %s", f.name))
+		if f.file != "" {
+			sb.WriteString(fmt.Sprintf(" (%s:%s)", f.file, f.line))
+		}
+		sb.WriteByte('\n')
+	}
+	return sb.String()
 }
 
 // hasUnquotedSeq reports whether seq appears in s outside any single- or

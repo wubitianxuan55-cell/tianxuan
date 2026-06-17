@@ -22,7 +22,6 @@ import (
 	"tianxuan/internal/i18n"
 	"tianxuan/internal/notify"
 	"tianxuan/internal/provider"
-	"tianxuan/internal/serve"
 
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
@@ -48,8 +47,6 @@ func Run(args []string, version string) int {
 		return runAgent(rest)
 	case "chat":
 		return chatREPL(rest)
-	case "serve":
-		return runServe(rest)
 	case "setup":
 		return setupConfig(rest)
 	case "init":
@@ -57,16 +54,10 @@ func Run(args []string, version string) int {
 		// the codebase analysis. This CLI entry just points there (and to `setup`
 		// for config), so `tianxuan init` isn't a dead end.
 		return initHint()
-	case "acp":
-		return acpCommand(rest, version)
 	case "mcp":
 		return mcpCommand(rest)
 	case "codegraph":
 		return codegraphCommand(rest)
-	case "update":
-		return updateCommand(rest, version)
-	case "doctor":
-		return doctorCommand(rest)
 	case "version", "--version", "-v":
 		fmt.Println("tianxuan", version)
 		return 0
@@ -166,52 +157,6 @@ func runAgent(args []string) int {
 	}
 	if runErr != nil {
 		fmt.Fprintln(os.Stderr, "\n"+i18n.M.ErrorPrefix, runErr)
-		return 1
-	}
-	return 0
-}
-
-// runServe exposes the controller over HTTP+SSE: events stream to the browser,
-// commands arrive as JSON POSTs. The Broadcaster is the controller's event sink,
-// so the same typed stream the chat TUI consumes reaches web clients — the
-// transport-agnostic controller driven by a second frontend.
-func runServe(args []string) int {
-	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	model := fs.String("model", "", "provider name (default: config default_model)")
-	maxSteps := fs.Int("max-steps", 0, "max tool-call rounds (0 = use config/default)")
-	addr := fs.String("addr", "127.0.0.1:8787", "listen address")
-	resume := fs.String("resume", "", "resume a saved session file")
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-
-	ctx := context.Background()
-	bc := serve.NewBroadcaster()
-	ctrl, err := setup(ctx, *model, *maxSteps, true, bc)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
-		return 1
-	}
-	defer ctrl.Close()
-
-	// Auto-save target: reuse the resumed file, else a fresh one — same as chat.
-	if *resume != "" {
-		loaded, err := agent.LoadSession(*resume)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
-			return 1
-		}
-		ctrl.Resume(loaded, *resume)
-	} else if ctrl.SessionDir() != "" {
-		ctrl.SetSessionPath(agent.NewSessionPath(ctrl.SessionDir(), ctrl.Label()))
-	}
-
-	fmt.Printf("tianxuan serve — %s on http://%s\n", ctrl.Label(), *addr)
-	// Use graceful shutdown so SIGINT/SIGTERM drain active connections.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-	if err := serve.New(ctrl, bc).RunGraceful(ctx, *addr); err != nil {
-		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 		return 1
 	}
 	return 0

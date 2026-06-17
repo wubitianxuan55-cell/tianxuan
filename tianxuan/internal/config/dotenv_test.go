@@ -46,9 +46,10 @@ func TestLoadDotEnvFallsBackToHome(t *testing.T) {
 	}
 }
 
-// TestLoadDotEnvDoesNotOverrideEnv confirms an already-set environment variable
-// beats both .env files (the documented first-wins contract).
-func TestLoadDotEnvDoesNotOverrideEnv(t *testing.T) {
+// TestLoadDotEnvAlwaysOverrides confirms .env values beat already-set
+// environment variables — deliberate: editing .env should reliably fix
+// stale keys without hunting down inherited env vars.
+func TestLoadDotEnvAlwaysOverrides(t *testing.T) {
 	cwd := t.TempDir()
 	if err := os.WriteFile(filepath.Join(cwd, ".env"), []byte("PINNED=from_file\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -61,7 +62,7 @@ func TestLoadDotEnvDoesNotOverrideEnv(t *testing.T) {
 
 	loadDotEnv()
 
-	if got := os.Getenv("PINNED"); got != "from_env" {
-		t.Errorf("env var must win over .env: PINNED=%q want from_env", got)
+	if got := os.Getenv("PINNED"); got != "from_file" {
+		t.Errorf(".env must override even existing env vars: PINNED=%q want from_file", got)
 	}
 }

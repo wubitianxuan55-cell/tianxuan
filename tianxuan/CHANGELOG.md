@@ -1,3 +1,62 @@
+## [7.6.0] — 2026-06-17
+
+### 大扫除：移除废弃子系统，为架构重构清场
+
+本轮是重构前的关键一步——删除 ~12 个已废弃/不再需要的模块，减少代码库表面积以便后续大刀阔斧的架构调整。
+
+#### 删除的模块（`git rm`，共 ~6500 行）
+
+| 模块 | 文件数 | 原因 |
+|------|:------:|------|
+| `internal/acp/` | 9 | Agent Communication Protocol — 未完成的实验 |
+| `internal/serve/` | 7 | HTTP/SSE 服务 — 未使用，桌面端已替代 |
+| `internal/doctor/` | 2 | 会话诊断 — 功能由 `/dream` 覆盖 |
+| `internal/crash/` | 1 | 崩溃处理器 — 未集成 |
+| `internal/inspect/` | 2 | 检查工具 — 未使用 |
+| `internal/update/` | 1 | 自更新 — 桌面端 updater 已覆盖 |
+| `internal/provider/anthropic/` | 2 | Anthropic 提供商 — 当前仅使用 OpenAI/DeepSeek |
+| `internal/agent/auto_router*.go` | 3 | AutoRoute — 由 GoalRouter 替代 |
+| `internal/cli/acp.go` | 1 | ACP CLI 子命令 — 随 ACP 删除 |
+| `internal/cli/doctor.go` | 1 | Doctor CLI 子命令 — 随 doctor 删除 |
+| `internal/cli/update.go` | 1 | Update CLI 子命令 — 随 update 删除 |
+| `internal/tool/builtin/doctor.go` | 1 | Doctor 工具 — 随 doctor 删除 |
+
+#### 核心修改
+
+- **agent.go**: 清理 dead import + 字段注释修正 + 缓存检测精简（+98 -10 行）
+- **compact.go**: DSR 卡死检测增强，force 降级路径加固（+70 行）
+- **judge.go**: 目标判断门控逻辑微调
+- **bash.go**: Windows PowerShell 超时处理增强 + 后台任务管理改进（+92 行）
+- **editfile.go**: 编辑验证优化 + 错误消息更精准（+137 行）
+- **multiedit.go**: 批编辑原子化改进（+16 行）
+- **cli.go**: 移除 acp/doctor/update 子命令路由
+- **dotenv.go**: 扩展 API 密钥供应商支持
+- **openai.go**: DeepSeek 兼容性微调
+- **tianxuan.example.toml**: 移除 Anthropic 示例配置，精简文档
+
+#### 桌面端
+
+- **Transcript.tsx**: 新增跳转栏支持（+29 行）
+- **JumpBar.tsx**: 新组件——Ctrl+J 快速跳转到工具调用/文件引用
+- **styles.css**: 跳转栏样式 + 暗色主题优化（+69 行）
+
+#### 上游参考
+
+- 新增 `_upstream-reasonix/` 目录——保留原始 Reasonix 代码库作为同步参考基准
+
+#### 变更统计
+
+```
+51 files changed, 510 insertions(+), 6581 deletions(-)
+```
+
+#### 发布
+
+- CLI: `bin/tianxuan.exe`
+- 桌面端: `desktop/build/bin/tianxuan-desktop.exe`
+
+---
+
 ## [7.5.0] — 2026-06-14
 
 ### 缓存架构收敛（前缀稳定性优化）

@@ -7,22 +7,24 @@ import (
 	"strings"
 )
 
-// loadDotEnv loads .env files into the process environment without overriding
-// variables that are already set. The working-directory .env is read first, so a
-// project-local key takes precedence; then ~/.env is read as a fallback. This
-// unifies the key source across frontends: the desktop app's working dir is
-// $HOME so it writes ~/.env, and the CLI — run from any project directory — now
-// picks up that same key instead of needing a copy in every project's .env.
-// Existing environment variables always win over both files.
+// loadDotEnv loads .env files into the process environment. Priority:
+//   ./.env (project-local) wins over ~/.env (global).
+// Each file unconditionally sets its keys — stale env vars do not block
+// fresh .env values. This is deliberate: the user edits .env to fix keys,
+// and a leftover env var from a previous run must not override that choice.
 func loadDotEnv() {
-	loadDotEnvFile(".env")
+	// Global ~/.env first (fills in defaults).
 	if home, err := os.UserHomeDir(); err == nil {
 		loadDotEnvFile(filepath.Join(home, ".env"))
 	}
+	// Project ./.env last (overrides global for this workspace).
+	loadDotEnvFile(".env")
 }
 
-// loadDotEnvFile reads one .env file (if present) and sets any keys not already
-// present in the environment. Lenient, zero-dependency parsing.
+// loadDotEnvFile reads one .env file (if present) and sets every key it
+// declares, overwriting any previously-set value. Lenient, zero-dependency
+// parsing. This always-override behaviour means editing .env reliably fixes
+// stale keys without needing to hunt down inherited env vars.
 func loadDotEnvFile(path string) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -46,8 +48,6 @@ func loadDotEnvFile(path string) {
 		if key == "" {
 			continue
 		}
-		if _, exists := os.LookupEnv(key); !exists {
-			os.Setenv(key, val)
-		}
+		os.Setenv(key, val)
 	}
 }

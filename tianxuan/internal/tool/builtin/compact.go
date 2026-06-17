@@ -22,7 +22,6 @@ var compactDesc = map[string]string{
 	"wait":           "阻塞等待后台任务结束(可设超时)",
 	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全)",
 	"web_search":     "搜索公开网页(通过DuckDuckGo)，返回标题/URL/摘要",
-	"doctor":         "运行系统诊断(Go环境/项目结构/OS)，返回结构化报告",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
 	"complete_step":  "完成计划步骤(附验证证据,空证据拒绝)",
 	"notebook_edit":  "编辑Jupyter Notebook单元格(.ipynb)",
@@ -66,8 +65,6 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}`),
 	"web_search": json.RawMessage(
 		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer"}},"required":["query"]}`),
-	"doctor": json.RawMessage(
-		`{"type":"object","properties":{},"required":[]}`),
 	"todo_write": json.RawMessage(
 		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string"},"activeForm":{"type":"string"},"level":{"type":"integer"}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(

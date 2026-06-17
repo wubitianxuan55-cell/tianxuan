@@ -18,7 +18,6 @@ import (
 
 	// Blank imports wire compile-time built-ins into their registries, exactly as
 	// cmd/tianxuan does — boot.Build resolves providers/tools from these registries.
-	_ "tianxuan/internal/provider/anthropic"
 	_ "tianxuan/internal/provider/openai"
 	_ "tianxuan/internal/tool/builtin"
 )

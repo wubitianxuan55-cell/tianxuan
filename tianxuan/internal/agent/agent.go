@@ -271,20 +271,10 @@ type AgentRunner struct {
 
 	// V5.13: �������籩��·���������ͬ turn ���ظ����ã���ǰԤ����
 	paramStorm *ParamStormBreaker
-
-	// V5.14: �Զ�ģ��·�ɡ���flash ģ�� provider��nil=�����Զ�·�ɣ���
-	flashProv provider.Provider
-	routeHistory *RouteHistory
-	// V5.14: ��ǰ turn ʹ�õ� provider��·�ɺ�ѡ������
-	activeProv provider.Provider
-
-	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ�������
-	// ÿ�� runDirect ���´˱�־������� AutoRouteProvider��
-	autoRouteLocked    bool
-	autoRouteDecision provider.Provider
-
-	// V5.15: Ԥ���ſء���׷�ٻỰ�ۼƷ��ã�80%����/100%��ϡ�
 	budgetGate *BudgetGate
+	// V8.0: consecutive edit failures counter for self-healing hints.
+	consecutiveEditFails int
+	pendingEditHint     string
 	// lspManager runs LSP diagnostics on files modified by writer tools
 	// and injects results so the model can fix compilation errors.
 	lspManager interface {
@@ -347,9 +337,6 @@ func (a *AgentRunner) MergeRuntimePrompt(content string) {
 	a.session.Messages[0].Content += "\n\n" + content
 }
 
-// SetFlashProvider ��װ flash ģ�� provider �����Զ�·�� (V5.14)��
-// �� nil �����Զ�·�ɡ�
-func (a *AgentRunner) SetFlashProvider(p provider.Provider) { a.flashProv = p }
 
 // SetGoal sets the session-level stopping condition (V6.0 P7).
 // When non-empty, the stop gate checks whether the model's final answer
@@ -662,9 +649,6 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	if opts.ParamStorm != nil {
 		r.paramStorm = NewParamStormBreaker(*opts.ParamStorm)
 	}
-	r.routeHistory = NewRouteHistory()
-	r.activeProv = prov // Ĭ��ʹ���� provider
-	// V5.15: Ԥ���ſ�
 	if opts.BudgetLimit > 0 {
 		r.budgetGate = NewBudgetGate(opts.BudgetLimit)
 	}
@@ -691,38 +675,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	}
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
-
-	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ����
-	if a.flashProv != nil {
-		if !a.autoRouteLocked {
-						// V7.4: history-aware routing (heuristic + learned)
-			heuristic := AutoRouteProvider(input, a.prov, a.flashProv)
-			useFlash := heuristic == a.flashProv
-			if a.routeHistory != nil {
-				useFlash = a.routeHistory.ShouldRouteToFlash(input, useFlash)
-			}
-			if useFlash && a.flashProv != nil {
-				a.activeProv = a.flashProv
-			} else {
-				a.activeProv = a.prov
-			}
-			modelName := "pro"
-			if a.activeProv == a.flashProv {
-				modelName = "flash"
-			}
-			defer func() {
-				if a.routeHistory != nil {
-					a.routeHistory.Record(input, modelName, false)
-				}
-			}()
-			a.autoRouteLocked = true
-			a.autoRouteDecision = a.activeProv
-		} else {
-			a.activeProv = a.autoRouteDecision
-		}
-	} else {
-		a.activeProv = a.prov
-	}
 
 	// V4.2: reset pre-execution cache and tool result cache for new turn
 	a.preMu.Lock()
@@ -920,10 +872,24 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	a.activeSchemasMu.RUnlock()
 	msgs := a.session.Messages
 
+	// V8.0: self-healing — inject edit failure recovery hint before latest user message.
+	if a.pendingEditHint != "" {
+		hint := a.pendingEditHint
+		a.pendingEditHint = ""
+		// Insert hint as system message just before the last (user) message,
+		// so it doesn't shift the cache-stable prefix.
+		last := len(msgs) - 1
+		if last >= 0 && msgs[last].Role == provider.RoleUser {
+			msgs = append(msgs[:last], append([]provider.Message{
+				{Role: provider.RoleSystem, Content: hint},
+			}, msgs[last:]...)...)
+		}
+	}
+
 	// V5.10: ImmutablePrefix 校验——验证前缀指纹，确保缓存稳定。
 	a.verifyPrefix(msgs, tools)
 
-	ch, err := a.activeProv.Stream(ctx, provider.Request{
+	ch, err := a.prov.Stream(ctx, provider.Request{
 		Messages:    msgs,
 		Tools:       tools,
 		Temperature: a.temperature,
@@ -1144,6 +1110,34 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 		if o.truncated && o.truncMsg != "" {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: o.truncMsg})
 		}
+	}
+
+	// Self-healing: inject recovery hints when edit tools fail repeatedly.
+	editNames := map[string]bool{"edit_file": true, "multi_edit": true, "write_file": true}
+	hasEditErr := false
+	hasEditOk := false
+	for i, c := range calls {
+		if !editNames[c.Name] {
+			continue
+		}
+		if outcomes[i].errMsg != "" {
+			hasEditErr = true
+		} else {
+			hasEditOk = true
+		}
+	}
+	if hasEditErr && !hasEditOk {
+		a.consecutiveEditFails++
+	} else {
+		a.consecutiveEditFails = 0
+	}
+	if a.consecutiveEditFails >= 2 {
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+			Text: fmt.Sprintf("⚠ %d consecutive edit failures. Try read_file first to confirm current file content before editing.", a.consecutiveEditFails)})
+	}
+	if a.consecutiveEditFails >= 3 {
+		// Inject a stronger hint into the next user message via the session
+		a.pendingEditHint = fmt.Sprintf("[System hint: %d consecutive file edits have failed. Use read_file to check current file contents before your next edit attempt.]\n", a.consecutiveEditFails)
 	}
 	a.applyStormBreaker(calls, outcomes, results)
 	return results

@@ -5,6 +5,8 @@ import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
 import { ToolGroup, scanGroups } from "./ToolGroup";
+import { JumpBar } from "./JumpBar";
+import type { JumpEntry } from "./JumpBar";
 import { Welcome } from "./Welcome";
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -139,6 +141,20 @@ export function Transcript({
     if (it.kind === "user") userTurn.set(it.id, nt++);
   }
 
+  // 构建跳转条目：grouped 中的每条用户消息对应一条跳转标记
+  const jumpEntries: JumpEntry[] = useMemo(() => {
+    const entries: JumpEntry[] = [];
+    let turn = 0;
+    for (let vi = 0; vi < grouped.length; vi++) {
+      const g = grouped[vi];
+      if (g.kind === "item" && g.item.kind === "user") {
+        entries.push({ id: g.item.id, text: g.item.text, virtualIndex: vi, turn });
+        turn++;
+      }
+    }
+    return entries;
+  }, [grouped]);
+
   // 折叠/展开时保持滚动位置稳定。
   // ResizeObserver（measureElement ref）会自动追踪内容尺寸变化并更新虚拟列表，
   // 手动调用 measure() 反而会在 CSS 过渡期间与 ResizeObserver 冲突导致布局混乱。
@@ -206,6 +222,19 @@ export function Transcript({
 
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          float: "right",
+          width: 0,
+          height: 0,
+        }}
+      >
+        <JumpBar entries={jumpEntries} totalItems={grouped.length} virtualizer={virtualizer} />
+      </div>
+
       {items.length === 0 && <Welcome onPrompt={onPrompt} />}
       <StreamingIndicator running={running} items={items} />
 

@@ -43,6 +43,7 @@ func getSharedClient(baseURL string) *http.Client {
 			ResponseHeaderTimeout: 120 * time.Second,
 			MaxIdleConns:          100,
 			MaxIdleConnsPerHost:   10,
+			MaxConnsPerHost:       10,  // prevent TCP port exhaustion (WSAENOBUFS) on Windows
 			IdleConnTimeout:       90 * time.Second,
 		},
 	}

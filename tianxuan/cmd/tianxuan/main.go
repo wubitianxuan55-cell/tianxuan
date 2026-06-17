@@ -2,13 +2,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 
 	"tianxuan/internal/cli"
-	"tianxuan/internal/crash"
 
 	// Blank imports wire compile-time built-ins into their registries.
-	_ "tianxuan/internal/provider/anthropic"
 	_ "tianxuan/internal/provider/openai"
 	_ "tianxuan/internal/tool/builtin"
 )
@@ -17,6 +17,10 @@ import (
 var version = "dev"
 
 func main() {
-	defer crash.Handle()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "panic: %v\n%s\n", r, debug.Stack())
+		}
+	}()
 	os.Exit(cli.Run(os.Args[1:], version))
 }

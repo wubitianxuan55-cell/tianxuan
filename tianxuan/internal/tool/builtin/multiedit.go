@@ -110,7 +110,21 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 		}
 		switch strings.Count(content, step.OldString) {
 		case 0:
-			return "", fmt.Errorf("edit %d: old_string not found", i+1)
+			// Fuzzy fallback: find closest matches so the model can retry.
+			candidates := findSimilar(content, step.OldString, 3)
+			if len(candidates) == 0 {
+				return "", fmt.Errorf("edit %d: old_string not found in %s", i+1, p.Path)
+			}
+			var b strings.Builder
+			fmt.Fprintf(&b, "edit %d: old_string not found in %s. Closest matches:\n", i+1, p.Path)
+			for i, cand := range candidates {
+				fmt.Fprintf(&b, "\n  candidate %d (line %d-%d, score %d%%):\n", i+1, cand.StartLine, cand.EndLine, cand.Score)
+				for _, line := range cand.Lines {
+					fmt.Fprintf(&b, "    %s\n", line)
+				}
+			}
+			b.WriteString("\nChoose a candidate and retry with its exact text as that edit's old_string.")
+			return b.String(), nil
 		case 1:
 			content = strings.Replace(content, step.OldString, step.NewString, 1)
 			applied++

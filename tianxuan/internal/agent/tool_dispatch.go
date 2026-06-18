@@ -53,6 +53,21 @@ type CheckResult struct {
 
 // Check runs plan-mode, gate, and hook checks for a single tool call.
 func (d *ToolDispatcher) Check(ctx context.Context, name string, args json.RawMessage, readOnly bool) CheckResult {
+	// 0. PermissionRequest hooks — run before any gate, can modify args. V8.0 P2-12.
+	if d.hooks != nil {
+		allow, modifiedArgs, reason := d.hooks.PermissionRequest(ctx, name, args)
+		if !allow {
+			return CheckResult{
+				Allowed: false,
+				Blocked: true,
+				Reason:  "blocked by PermissionRequest hook: " + reason,
+			}
+		}
+		if len(modifiedArgs) > 0 {
+			args = modifiedArgs
+		}
+	}
+
 	// 1. Plan mode (read-only gate)
 	if d.planMode != nil && d.planMode.Load() && !readOnly {
 		return CheckResult{

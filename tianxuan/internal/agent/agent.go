@@ -696,9 +696,9 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
-	// V8.0 P0-1: reset tool filter from previous turn.
+	// V8.0 P0-1: apply tool filter based on input context.
 	a.activeSchemasMu.Lock()
-	a.activeSchemas = nil
+	a.activeSchemas = a.filteredSchemas(input)
 	a.activeSchemasMu.Unlock()
 
 
@@ -739,6 +739,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
 		a.dedupHashes = nil // V8.0 P0-2: reset dedup hashes each turn
+		a.steerCount = 0 // V8.0 P0-3: reset steer counter each turn
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	// V5.13: ���ò������籩��·������ turn = ����ͼ��
@@ -1540,6 +1541,20 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 	} else {
 		// Inline fallback �� same as original, for backward compatibility.
+		// V8.0 P2-12: PermissionRequest hooks run before plan mode gate.
+		if a.hooks != nil {
+			allow, modifiedArgs, reason := a.hooks.PermissionRequest(ctx, call.Name, json.RawMessage(call.Arguments))
+			if !allow {
+				return toolOutcome{
+					output:  "blocked by PermissionRequest hook: " + reason,
+					blocked: true,
+					errMsg:  "blocked by PermissionRequest hook",
+				}
+			}
+			if len(modifiedArgs) > 0 {
+				call.Arguments = string(modifiedArgs)
+			}
+		}
 		if a.planMode.Load() && !t.ReadOnly() {
 			return toolOutcome{
 				output:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply �� the user will be asked to approve it before any changes are made.", call.Name),

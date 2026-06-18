@@ -211,7 +211,7 @@ func appendResolved(out *[]ResolvedHook, s *Settings, scope Scope, source string
 // anchored regex; non-tool events always match. A malformed regex never fires
 // (safer than firing on everything).
 func MatchesTool(h ResolvedHook, toolName string) bool {
-	if h.Event != PreToolUse && h.Event != PostToolUse {
+	if h.Event != PermissionRequest && h.Event != PreToolUse && h.Event != PostToolUse {
 		return true
 	}
 	m := h.Match

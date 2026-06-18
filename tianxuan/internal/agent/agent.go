@@ -1555,13 +1555,26 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 				call.Arguments = string(modifiedArgs)
 			}
 		}
+		// V8.0.3: plan-mode bash safety — allow safe commands through.
+		if a.planMode.Load() && call.Name == "bash" {
+			reason := planBashCheck(json.RawMessage(call.Arguments))
+			if reason == "" {
+				goto planBashAllowed
+			}
+			return toolOutcome{
+				output:  "blocked: " + reason,
+				blocked: true,
+				errMsg:  "blocked: unsafe bash in plan mode",
+			}
+		}
 		if a.planMode.Load() && !t.ReadOnly() {
 			return toolOutcome{
-				output:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply �� the user will be asked to approve it before any changes are made.", call.Name),
+				output:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", call.Name),
 				blocked: true,
 				errMsg:  "blocked: plan mode is read-only",
 			}
 		}
+	planBashAllowed:
 		if a.gate != nil {
 			allow, reason, err := a.gate.Check(ctx, call.Name, json.RawMessage(call.Arguments), t.ReadOnly())
 			if err != nil {

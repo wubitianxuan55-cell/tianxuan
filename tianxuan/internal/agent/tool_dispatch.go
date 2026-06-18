@@ -70,12 +70,21 @@ func (d *ToolDispatcher) Check(ctx context.Context, name string, args json.RawMe
 
 	// 1. Plan mode (read-only gate)
 	if d.planMode != nil && d.planMode.Load() && !readOnly {
+		// V8.0.3: plan-mode bash safety — allow safe commands through.
+		if name == "bash" {
+			if reason := planBashCheck(args); reason == "" {
+				goto planBashAllowed
+			} else {
+				return CheckResult{Allowed: false, Blocked: true, Reason: "blocked: " + reason}
+			}
+		}
 		return CheckResult{
 			Allowed: false,
 			Blocked: true,
-			Reason:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply — the user will be asked to approve it before any changes are made.", name),
+			Reason:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", name),
 		}
 	}
+planBashAllowed:
 
 	// 2. Permission gate
 	if d.gate != nil {

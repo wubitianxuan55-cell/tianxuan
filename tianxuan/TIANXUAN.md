@@ -1,6 +1,6 @@
 # tianxuan project memory
 
-> V8.0.6 — 8 新特性 + 6 补丁 · Plan bash 安全 · Mid-turn Steer · 确定性剪枝 · 全量审计通过 · 2026-06-18
+> V8.2.0 — 文件拆分 + Mock UI + Logo 重设计 + 桌面端布局升级 · 缓存红线固化 · 2026-06-18
 
 ## Project
 

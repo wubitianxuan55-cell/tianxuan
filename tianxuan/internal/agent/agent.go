@@ -957,17 +957,23 @@ func (a *AgentRunner) shouldMidTurnSteer(calls []provider.ToolCall, results []st
 		return false
 	}
 
-	// Count tool failures (results starting with "error:", "blocked:", or tool panic).
 	failed := 0
+	blockedCount := 0
 	for _, r := range results {
-		if strings.HasPrefix(r, "error:") || strings.HasPrefix(r, "blocked:") ||
-			strings.HasPrefix(r, "tool panic:") || strings.HasPrefix(r, "suppressed:") {
+		if strings.HasPrefix(r, "blocked:") {
+			blockedCount++ // V8.0.5: plan-mode blocks are normal, not failures
+		} else if strings.HasPrefix(r, "error:") || strings.HasPrefix(r, "tool panic:") ||
+			strings.HasPrefix(r, "suppressed:") {
 			failed++
 		}
 	}
-
-	// All calls failed → likely wrong approach or tool misuse.
-	if failed == len(calls) && failed >= 2 {
+	// If all calls were blocked by plan mode, that is normal.
+	if blockedCount == len(results) {
+		a.steerCount = 0
+		return false
+	}
+	// All non-blocked calls failed → likely wrong approach.
+	if failed == len(results)-blockedCount && failed >= 2 {
 		a.steerCount++
 	} else {
 		a.steerCount = 0

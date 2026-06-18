@@ -1,3 +1,71 @@
+## [7.7.1] — 2026-06-18
+
+### 架构优化
+
+- **双重 JSON Repair 消除** (`agent.go`): 提取 `repairArguments` 辅助函数，executeBatch 开头统一 repair，executeOne 不再重复 — 每轮节省 N×2 次 JSON marshal/unmarshal
+- **toolcache O(1) 路径失效** (`toolcache.go`): `invalidatePath` 从线性扫描改为 `pathKeys map[string]map[string]struct{}` 路径索引，消除写入密集型工作流 O(n²) 退化
+
+### Bug 修复
+
+| Bug | 级别 | 文件 | 修复 |
+|-----|:----:|------|------|
+| serve_test nil deref | 🔴 | `serve_test.go` | `http.Post` 失败时 resp2 为 nil，加 err2 检查 |
+| serve_test 端口耗尽 | 🔴 | `csrf_test.go` | `http.DefaultClient` → `srv.Client()` |
+| debug skill 未注册 | 🟡 | `builtins.go` | body 已定义但未注册到 `builtinSkills()` |
+
+### 测试
+
+- `skill_test.go`: 新增 `TestBuiltinDebugIsInlineSkill`
+
+### 发布
+
+- CLI: `tianxuan.exe` (13.3 MB)
+- 桌面端: `tianxuan-desktop.exe` (16.7 MB, Wails v2.12.0)
+
+---
+
+## [7.7.0] — 2026-06-17
+
+### 内置技能全面升级
+
+从零散的 Agent 技能集 → 8 个深度整合 tianxuan 独特能力的技能。
+
+| 技能 | 变化 | 关键提升 |
+|------|:--:|----------|
+| **`explore`** | 升级 | 融合 CodeGraph 工具选择表 + 7 个 codegraph 工具 + 3 个 LSP 查询工具，Agent 不再盲目 grep |
+| **`research`** | 升级 | 同 explore + web_search/web_fetch |
+| **`review`** | 升级 | 用 `git_status/git_diff/git_log` 替换 `bash git`，加入 `codegraph_impact` 影响分析 + `lsp_diagnostics` 编译检查 |
+| **`security-review`** | 升级 | 同 review + `codegraph_trace` 追踪输入路径 |
+| **`tdd`** | 重写 | 吸收 debug 的隔离阶段：RED（隔离+写失败测试）→ GREEN（最小修复+影响分析）→ REFACTOR（回归测试+清理） |
+| **`lsp`** | 新增 | 诊断→理解→修复→验证完整工作流 |
+| **`debug`** | 新增 | 4 阶段系统化调试：Reproduce → Isolate (lsp_diagnostics/git_diff/codegraph_trace) → Fix (含影响分析) → Prevent (单元测试+回归) |
+| ~~`karpathy-guidelines`~~ | 移除 | 内容已在系统 prompt，冗余 |
+| ~~`test`~~ | 移除 | 升级为 `tdd` |
+
+### 发布
+
+- CLI: `tianxuan.exe` (13 MB)
+- 桌面端: `tianxuan-desktop.exe` (16 MB, Wails v2.12.0)
+
+---
+
+## [7.6.0] — 2026-06-17
+
+### 代码清理与空间瘦身
+
+- **删除 ~452MB 构建产物**: `bin/`, `dist/`, `build/`, `release/` 历史版本
+- **删除死代码 `internal/inspect/`**: 零引用，任何非测试代码均未导入
+- **删除无关脚本**: `dashboard_healthcheck.py`（属于外部项目 hermes）、`cache-bench.ps1`（引用不存在的标签）
+- **benchmark 脚本修复**: `cache-bench-tools/*.go` 添加 `//go:build ignore`，消除 `go build ./...` 报错
+- **.gitignore 增强**: 新增 `/build/` 和 `/release/` 忽略规则
+
+### 发布
+
+- CLI: `tianxuan.exe` (13 MB)
+- 桌面端: `tianxuan-desktop.exe` (16 MB, Wails v2.12.0)
+
+---
+
 ## [7.5.0] — 2026-06-14
 
 ### 缓存架构收敛（前缀稳定性优化）

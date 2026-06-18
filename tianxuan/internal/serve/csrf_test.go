@@ -25,7 +25,7 @@ func TestServeRejectsNonJSONPost(t *testing.T) {
 		if ct != "" {
 			req.Header.Set("Content-Type", ct)
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := srv.Client().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,3 +1,5 @@
+//go:build ignore
+
 // long_session_bench 测量单次长会话（20+ 步）的缓存命中率曲线
 // 用法: go run long_session_bench.go --v14 <bin> --v15 <bin>
 package main

@@ -121,7 +121,10 @@ func TestServeApproveMissingID(t *testing.T) {
 	}
 
 	// Malformed JSON should return 400.
-	resp2, _ := http.Post(srv.URL+"/approve", "application/json", strings.NewReader(`{bad`))
+	resp2, err2 := http.Post(srv.URL+"/approve", "application/json", strings.NewReader(`{bad`))
+	if err2 != nil {
+		t.Fatalf("approve bad json post: %v", err2)
+	}
 	resp2.Body.Close()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Errorf("approve bad json = %d, want 400", resp2.StatusCode)

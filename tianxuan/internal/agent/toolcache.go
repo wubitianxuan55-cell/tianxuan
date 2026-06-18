@@ -11,9 +11,10 @@ import (
 // within a turn. Write operations invalidate related entries. Thread-safe.
 // Cache keys include path + offset so different read ranges have separate entries.
 type toolCache struct {
-	mu    sync.RWMutex
-	items map[string]*cacheItem
-	ttl   time.Duration
+	mu       sync.RWMutex
+	items    map[string]*cacheItem
+	pathKeys map[string]map[string]struct{} // path → set of cache keys (O(1) invalidate)
+	ttl      time.Duration
 }
 
 type cacheItem struct {
@@ -26,8 +27,9 @@ type cacheItem struct {
 // no expiry (entries live until invalidated by a write or clear).
 func newToolCache(ttl time.Duration) *toolCache {
 	return &toolCache{
-		items: make(map[string]*cacheItem),
-		ttl:   ttl,
+		items:    make(map[string]*cacheItem),
+		pathKeys: make(map[string]map[string]struct{}),
+		ttl:      ttl,
 	}
 }
 
@@ -84,18 +86,20 @@ func (c *toolCache) set(path string, offset int, content string) {
 		mtime:   mtime,
 		cached:  time.Now(),
 	}
+	if c.pathKeys[path] == nil {
+		c.pathKeys[path] = make(map[string]struct{})
+	}
+	c.pathKeys[path][key] = struct{}{}
 	c.mu.Unlock()
 }
 
-// invalidatePath removes all cache entries for a given file path.
+// invalidatePath removes all cache entries for a given file path. O(keys-per-path).
 func (c *toolCache) invalidatePath(path string) {
 	c.mu.Lock()
-	prefix := path
-	for k := range c.items {
-		if k == prefix || (len(k) > len(prefix) && k[:len(prefix)] == prefix && k[len(prefix)] == '@') {
-			delete(c.items, k)
-		}
+	for k := range c.pathKeys[path] {
+		delete(c.items, k)
 	}
+	delete(c.pathKeys, path)
 	c.mu.Unlock()
 }
 
@@ -103,5 +107,6 @@ func (c *toolCache) invalidatePath(path string) {
 func (c *toolCache) clear() {
 	c.mu.Lock()
 	clear(c.items)
+	clear(c.pathKeys)
 	c.mu.Unlock()
 }

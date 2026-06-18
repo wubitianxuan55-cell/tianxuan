@@ -147,13 +147,70 @@ func TestBuiltinInitIsInlineSkill(t *testing.T) {
 	}
 }
 
+func TestBuiltinDebugIsInlineSkill(t *testing.T) {
+	// /debug must resolve to a built-in inline skill (4-phase systematic debug),
+	// present even with no project/user skills on disk.
+	st := New(Options{HomeDir: t.TempDir()})
+	sk, ok := st.Read("debug")
+	if !ok {
+		t.Fatal("built-in debug skill not found")
+	}
+	if sk.Scope != ScopeBuiltin || sk.RunAs != RunInline {
+		t.Errorf("debug should be a builtin inline skill, got scope=%s runAs=%s", sk.Scope, sk.RunAs)
+	}
+	if _, listed := find(st.List(), "debug"); !listed {
+		t.Error("debug should appear in List() so it reaches the slash menu")
+	}
+}
+
 func TestBuiltinSubagentSkillsDeclareAllowedTools(t *testing.T) {
 	st := New(Options{HomeDir: t.TempDir()})
 	cases := map[string][]string{
-		"explore":         {"read_file", "ls", "glob", "grep"},
-		"research":        {"read_file", "ls", "glob", "grep", "web_fetch", "web_search"},
-		"review":          {"read_file", "ls", "glob", "grep", "bash"},
-		"security-review": {"read_file", "ls", "glob", "grep", "bash"},
+		"explore": {
+			"read_file", "ls", "glob", "grep",
+			"mcp__codegraph__codegraph_context",
+			"mcp__codegraph__codegraph_trace",
+			"mcp__codegraph__codegraph_impact",
+			"mcp__codegraph__codegraph_search",
+			"mcp__codegraph__codegraph_explore",
+			"mcp__codegraph__codegraph_node",
+			"mcp__codegraph__codegraph_files",
+			"lsp_definition", "lsp_references", "lsp_hover",
+		},
+		"research": {
+			"read_file", "ls", "glob", "grep",
+			"mcp__codegraph__codegraph_context",
+			"mcp__codegraph__codegraph_trace",
+			"mcp__codegraph__codegraph_impact",
+			"mcp__codegraph__codegraph_search",
+			"mcp__codegraph__codegraph_explore",
+			"mcp__codegraph__codegraph_node",
+			"mcp__codegraph__codegraph_files",
+			"lsp_definition", "lsp_references", "lsp_hover",
+			"web_fetch", "web_search",
+		},
+		"review": {
+			"read_file", "grep",
+			"mcp__codegraph__codegraph_context",
+			"mcp__codegraph__codegraph_trace",
+			"mcp__codegraph__codegraph_impact",
+			"mcp__codegraph__codegraph_search",
+			"mcp__codegraph__codegraph_explore",
+			"mcp__codegraph__codegraph_node",
+			"git_status", "git_diff", "git_log",
+			"lsp_diagnostics", "lsp_definition", "lsp_references", "lsp_hover",
+		},
+		"security-review": {
+			"read_file", "grep",
+			"mcp__codegraph__codegraph_context",
+			"mcp__codegraph__codegraph_trace",
+			"mcp__codegraph__codegraph_impact",
+			"mcp__codegraph__codegraph_search",
+			"mcp__codegraph__codegraph_explore",
+			"mcp__codegraph__codegraph_node",
+			"git_status", "git_diff", "git_log",
+			"lsp_diagnostics", "lsp_definition", "lsp_references", "lsp_hover",
+		},
 	}
 	for name, want := range cases {
 		sk, ok := st.Read(name)

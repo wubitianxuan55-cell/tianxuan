@@ -1,3 +1,5 @@
+//go:build ignore
+
 // cross_session_bench 测量同一目录下两次 tianxuan run 的跨会话缓存命中率
 // 用法: go run cross_session_bench.go --v14 <v14-bin> --v15 <v15-bin>
 package main

@@ -1,6 +1,6 @@
 # tianxuan project memory
 
-> V7.3.0+ — 统计面板修复 · DSR 收敛 · 新增 Git 工具 · LSP 扩展 · /undo · 2026-06-14
+> V7.7.1 — 8个内置技能 · 双重 JSON Repair 消除 · toolcache O(1) · 2026-06-18
 
 ## Project
 

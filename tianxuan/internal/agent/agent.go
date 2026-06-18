@@ -1024,37 +1024,43 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	return text.String(), stored, signature, calls, usage, nil
 }
 
-// executeBatch dispatches one model turn's tool calls. A ToolDispatch event is
-// emitted for every call up front, in call order, so a frontend can show the
-// timeline chronologically. Contiguous known ReadOnly calls fan out across
-// goroutines; unknown and writer calls run as single-call serial segments so
-// write/read ordering stays provider-ordered. ToolResult events are emitted
-// after the batch in call order, so emission stays serial even when execution
-// parallelised.
+// repairArguments applies Tool-Call-Repair fixes (flatten wrappers, scavenge
+// JSON strings, truncate oversized strings) to a tool call's arguments in-place.
+// Called once per call in executeBatch; executeOne no longer repeats it.
+func repairArguments(args *string, readOnly bool) {
+	if *args == "" {
+		return
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(*args), &raw); err != nil {
+		return
+	}
+	opts := ToolArgumentRepairOptions{PreserveLongStrings: !readOnly}
+	repaired := RepairDispatchToolArguments(raw, opts)
+	if len(repaired.Notes) > 0 {
+		if fixed, err := json.Marshal(repaired.Arguments); err == nil {
+			*args = string(fixed)
+		}
+	}
+}
+
+// executeBatch runs a set of tool calls, parallelising read-only calls (all
+// writers serialised). Repair runs first (once per call), then paramStorm
+// detection, then execution. executeOne no longer repeats repair.
+// ToolResult events are emitted after the batch in call order.
 func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCall) []string {
-	// V5.13: �������籩��·�������ڷַ�ǰ����ظ����á�
-	// �����Ƶĵ��ñ��Ϊ��������������ִ�У�����ȫ����������batch����
-	// V5.17 fix: �ȶԲ����� repair���� executeOne һ�£��������޸��������⡣
+	// V7.7.1: repair always runs first — executeOne no longer repeats it.
+	for i := range calls {
+		t, ok := a.tools.Get(calls[i].Name)
+		repairArguments(&calls[i].Arguments, ok && !t.ReadOnly())
+	}
+
+	// V5.13: param storm breaker — after repair, inspect for duplicate patterns.
 	suppressed := make([]bool, len(calls))
 	if a.paramStorm != nil {
 		for i := range calls {
 			c := &calls[i]
 			t, ok := a.tools.Get(c.Name)
-			// �� repair �������� executeOne ����һ��
-			if c.Arguments != "" {
-				var raw map[string]any
-				if err := json.Unmarshal([]byte(c.Arguments), &raw); err == nil {
-					opts := ToolArgumentRepairOptions{
-						PreserveLongStrings: ok && !t.ReadOnly(),
-					}
-					repaired := RepairDispatchToolArguments(raw, opts)
-					if len(repaired.Notes) > 0 {
-						if fixed, err := json.Marshal(repaired.Arguments); err == nil {
-							c.Arguments = string(fixed)
-						}
-					}
-				}
-			}
 			readOnly := ok && t.ReadOnly()
 			res := a.paramStorm.Inspect(c.Name, c.Arguments, readOnly)
 			if res.Suppress {
@@ -1065,7 +1071,7 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 		}
 	}
 
-	// V5.17 fix: executeOne �в����ظ� repair������������ɣ�
+	// V7.7.1: repair already done above; executeOne skips it.
 
 	for i, c := range calls {
 		if suppressed[i] {
@@ -1366,24 +1372,6 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 	}
 
-	// V5.12: Tool-Call-Repair �� ��ִ��ǰ�޸�������չƽ��װ������ȡ JSON �ַ�����
-	// �ضϳ�������������� Kun tool-call-repair.ts �� Go ��ֲ��
-	// �޸���� args �滻 call.Arguments������ gate/dispatcher/execute ��ʹ���޸��档
-	if call.Arguments != "" {
-		var raw map[string]any
-		if err := json.Unmarshal([]byte(call.Arguments), &raw); err == nil {
-			opts := ToolArgumentRepairOptions{
-				PreserveLongStrings: !t.ReadOnly(), // t �����Ϸ� !ok ����֤�� nil
-			}
-			repaired := RepairDispatchToolArguments(raw, opts)
-			if len(repaired.Notes) > 0 {
-				// �������л��޸���Ĳ���
-				if fixed, err := json.Marshal(repaired.Arguments); err == nil {
-					call.Arguments = string(fixed)
-				}
-			}
-		}
-	}
 
 	// V2.4: centralized pre-execution checks via dispatcher (or inline fallback)
 	if a.dispatcher != nil {

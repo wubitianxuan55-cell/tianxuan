@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/*
+ * tianxuan desktop — Tailwind-powered design system.
+ * Replaces the 121KB hand-written styles.css with utility classes
+ * and a thin custom theme layer (~500 lines).
+ *
+ * Multi-platform notes:
+ *  - System font stack only; no web-font fetches (offline-first, consistent).
+ *  - No backdrop-filter / blur (slow & inconsistent on Linux WebKitGTK).
+ *  - Colors via Tailwind theme tokens + prefers-color-scheme media query.
+ */
+
+@theme {
+  /* ── surfaces ── */
+  --color-bg: #090a0c;
+  --color-bg-soft: #111319;
+  --color-bg-elev: #191b22;
+  --color-bg-elev-2: #222631;
+  --color-sidebar-bg: #0c0e12;
+  --color-sidebar-hover: #181c24;
+  --color-sidebar-active: rgba(217, 119, 87, 0.13);
+  --color-border: #343945;
+  --color-border-soft: #252a34;
+
+  /* ── text ── */
+  --color-fg: #f4f5f7;
+  --color-fg-dim: #c0c4cc;
+  --color-fg-faint: #858b96;
+
+  /* ── brand accent (warm clay) ── */
+  --color-accent: #d97757;
+  --color-accent-soft: rgba(217, 119, 87, 0.18);
+  --color-accent-glow: rgba(217, 119, 87, 0.08);
+
+  /* ── semantic ── */
+  --color-success: #9ece6a;
+  --color-warning: #e0af68;
+  --color-error: #f28b82;
+  --color-info: #7aa2f7;
+
+  /* ── code / terminal ── */
+  --color-code-bg: #0f1119;
+  --color-code-border: #343945;
+  --color-code-syntax: #a9b1d6;
+  --color-code-comment: #565f89;
+  --color-code-keyword: #bb9af7;
+  --color-code-string: #9ece6a;
+  --color-code-number: #ff9e64;
+
+  /* ── scrollbar ── */
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #343945;
+  --color-scrollbar-thumb-hover: #444956;
+}
+
+/* ── base layer ── */
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-fg);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Wails titlebar drag region */
+  [data-wails-draggable] {
+    -webkit-app-region: drag;
+  }
+  [data-wails-no-drag] {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--color-scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-thumb-hover); }
+
+  /* Remove default button styling */
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Focus ring */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Selection */
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+}
+
+/* ── component utilities (keep for complex patterns not easily expressed in Tailwind) ── */
+@utility scrollbar-thin {
+  &::-webkit-scrollbar { width: 4px; height: 4px; }
+}
+@utility scrollbar-hidden {
+  &::-webkit-scrollbar { display: none; }
+}
+@utility drag-region {
+  -webkit-app-region: drag;
+}
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="tianxuan icon">
+  <title>tianxuan</title>
+  <defs>
+    <!-- Warm clay gradient: #d97757 → #e8a87c → #c45d3a -->
+    <linearGradient id="tx-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97757"/>
+      <stop offset="40%" stop-color="#e8a87c"/>
+      <stop offset="100%" stop-color="#c45d3a"/>
+    </linearGradient>
+    <!-- Subtle glow for dark backgrounds -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background: deep charcoal with rounded corners -->
+  <rect width="1024" height="1024" rx="192" fill="#0f1117"/>
+
+  <!-- Outer subtle ring -->
+  <circle cx="512" cy="512" r="420" fill="none" stroke="#d97757" stroke-width="2" opacity="0.15"/>
+
+  <!-- Core geometric mark: a diamond-within-diamond abstract "T" and "X" -->
+  <g transform="translate(512, 512)" filter="url(#glow)">
+    <!-- Outer diamond (thin stroke) -->
+    <polygon points="0,-280 180,0 0,280 -180,0" fill="none" stroke="url(#tx-grad)" stroke-width="3" opacity="0.5"/>
+
+    <!-- Inner diamond (filled, gradient) -->
+    <polygon points="0,-160 120,0 0,160 -120,0" fill="url(#tx-grad)" opacity="0.85"/>
+
+    <!-- Center horizontal accent bar -->
+    <rect x="-120" y="-28" width="240" height="8" rx="4" fill="#0f1117" opacity="0.7"/>
+
+    <!-- Vertical center line -->
+    <line x1="0" y1="-120" x2="0" y2="120" stroke="#0f1117" stroke-width="6" opacity="0.35"/>
+
+    <!-- Top accent dot -->
+    <circle cx="0" cy="-200" r="8" fill="url(#tx-grad)"/>
+    <line x1="0" y1="-192" x2="0" y2="-168" stroke="url(#tx-grad)" stroke-width="2" opacity="0.4"/>
+
+    <!-- Bottom accent dot -->
+    <circle cx="0" cy="200" r="6" fill="url(#tx-grad)" opacity="0.6"/>
+  </g>
+
+  <!-- Corner decorative triangles -->
+  <polygon points="64,64 144,64 64,144" fill="url(#tx-grad)" opacity="0.08"/>
+  <polygon points="960,64 880,64 960,144" fill="url(#tx-grad)" opacity="0.08"/>
+  <polygon points="64,960 144,960 64,880" fill="url(#tx-grad)" opacity="0.08"/>
+  <polygon points="960,960 880,960 960,880" fill="url(#tx-grad)" opacity="0.08"/>
+</svg>

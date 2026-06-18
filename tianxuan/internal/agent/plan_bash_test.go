@@ -57,6 +57,9 @@ func TestHasShellRedirectAllowsStderr(t *testing.T) {
 	if reason := hasShellRedirect("go test 2>&1"); reason != "" {
 		t.Errorf("2>&1 should be allowed: %s", reason)
 	}
+	if reason := hasShellRedirect("go test ./... 2>>test.log"); reason != "" {
+		t.Errorf("2>> should be allowed (append stderr): %s", reason)
+	}
 	if reason := hasShellRedirect("go build -o x > /dev/null"); reason == "" {
 		t.Error("file redirect should be blocked")
 	}

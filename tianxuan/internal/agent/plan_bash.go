@@ -77,10 +77,11 @@ func planBashCheck(args json.RawMessage) string {
 }
 
 // hasShellRedirect checks for unquoted write redirects. Returns "" if safe,
-// or a block reason. Allows 2> (stderr redirect) — V8.0.4 fix.
+// or a block reason. Allows 2> and 2>> (stderr redirect) — V8.0.6 fix.
 func hasShellRedirect(cmd string) string {
 	var quote rune
 	var prev rune
+	inSafeRedirect := false // inside a 2> or 2>> prefix
 	for _, r := range cmd {
 		if quote != 0 {
 			if r == quote { quote = 0 }
@@ -94,11 +95,18 @@ func hasShellRedirect(cmd string) string {
 		}
 		if r == '>' {
 			if prev == '2' {
+				inSafeRedirect = true
 				prev = r
-				continue // 2> is stderr redirect, safe
+				continue // 2> stderr redirect
 			}
+			if inSafeRedirect && prev == '>' {
+				prev = r
+				continue // second > of 2>>, safe
+			}
+			inSafeRedirect = false
 			return "bash with file redirect (>) is unsafe in plan mode — use write_file after plan approval"
 		}
+		inSafeRedirect = false
 		prev = r
 	}
 	return ""

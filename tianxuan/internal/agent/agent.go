@@ -894,7 +894,9 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 
 
 // filteredSchemas returns a reduced tool schema list for analysis-only
-// inputs. When the input suggests code review/reading/explaining (no write
+// inputs. IMPORTANT: intentionally NOT called in runDirect() — DeepSeek prefix
+// cache requires immutable tools across a session. Available for session-level use.
+// When the input suggests code review/reading/explaining (no write
 // intent), writer tools are omitted to save prompt tokens (~15-25% savings).
 // Returns nil when no filtering is needed (full tool set).
 func (a *AgentRunner) filteredSchemas(input string) []provider.ToolSchema {

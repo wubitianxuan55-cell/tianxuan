@@ -102,6 +102,7 @@ type Gate interface {
 // user (it can't block). It is interface-shaped so the agent stays independent
 // of the hook package �� a nil hooks field disables hook firing entirely.
 type ToolHooks interface {
+	PermissionRequest(ctx context.Context, name string, args json.RawMessage) (allow bool, modifiedArgs json.RawMessage, reason string)
 	PreToolUse(ctx context.Context, name string, args json.RawMessage) (block bool, message string)
 	PostToolUse(ctx context.Context, name string, args json.RawMessage, result string)
 	// PostLLMCall fires after each model turn completes (streaming finishes)
@@ -164,6 +165,8 @@ type AgentRunner struct {
 	// V5.31: 重复检测（repeat_detect.go）
 	repeatSig   string
 	repeatCount int
+	steerCount   int    // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
+	dedupHashes  map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
 
 	// V6.0: 回忆提醒开关（recall_reminder.go）
 	recallReminderFired bool
@@ -430,6 +433,7 @@ func (a *AgentRunner) runPostToolDiffPreview(ctx context.Context) {
 }
 
 // runPostToolDiagnostics runs LSP diagnostics on files modified by writer tools
+
 // in the current batch and injects results into the session. The model sees
 // compilation errors before the next turn, reducing fix cycles.
 func (a *AgentRunner) runPostToolDiagnostics(ctx context.Context, calls []provider.ToolCall) {
@@ -692,6 +696,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
+	// V8.0 P0-1: reset tool filter from previous turn.
+	a.activeSchemasMu.Lock()
+	a.activeSchemas = nil
+	a.activeSchemasMu.Unlock()
+
+
+
 	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ����
 	if a.flashProv != nil {
 		if !a.autoRouteLocked {
@@ -727,6 +738,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	// V4.2: reset pre-execution cache and tool result cache for new turn
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
+		a.dedupHashes = nil // V8.0 P0-2: reset dedup hashes each turn
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	// V5.13: ���ò������籩��·������ turn = ����ͼ��
@@ -820,15 +832,47 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		// dispatching the full batch �� avoids races and double-execution.
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
+		// V8.0 P0-2: deterministic pruning — skip duplicate tool results.
+		// Hash (toolName + args + result) to detect identical outcomes.
 		for i, call := range calls {
-			a.session.Add(provider.Message{
-				Role:       provider.RoleTool,
-				Content:    results[i],
-				ToolCallID: call.ID,
-				Name:       call.Name,
-			})
+			// Skip suppressed calls (already have placeholder result).
+			if strings.HasPrefix(results[i], "suppressed:") {
+				a.session.Add(provider.Message{
+					Role:       provider.RoleTool,
+					Content:    results[i],
+					ToolCallID: call.ID,
+					Name:       call.Name,
+				})
+				continue
+			}
+			// Compute dedup key: toolName | first 64 chars of args | first 64 chars of result
+			dk := call.Name + "|" + truncateStr(call.Arguments, 64) + "|" + truncateStr(results[i], 64)
+			if a.dedupHashes == nil {
+				a.dedupHashes = make(map[string]bool)
+			}
+			if a.dedupHashes[dk] {
+				// Same tool + args + result already seen — skip full result.
+				a.session.Add(provider.Message{
+					Role:       provider.RoleTool,
+					Content:    "[cached — same as previous " + call.Name + " call]",
+					ToolCallID: call.ID,
+					Name:       call.Name,
+				})
+			} else {
+				a.dedupHashes[dk] = true
+				a.session.Add(provider.Message{
+					Role:       provider.RoleTool,
+					Content:    results[i],
+					ToolCallID: call.ID,
+					Name:       call.Name,
+				})
+			}
 		}
-		a.runPostToolDiagnostics(ctx, calls)
+
+		// V8.0 P0-3: mid-turn steer — detect error patterns and inject corrective hints.
+		if a.shouldMidTurnSteer(calls, results) {
+			continue // steer injected, skip compaction and continue loop
+		}
 
 
 		// V6.0 P2: �ظ������⡪������ 3 ����ͬ���ߵ���ʱע�� nudge
@@ -846,6 +890,109 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 
 // SetDispatcherPlanMode wires the planMode atomic into the dispatcher so
 // plan-mode gating is consistent. Call after construction.
+
+
+// filteredSchemas returns a reduced tool schema list for analysis-only
+// inputs. When the input suggests code review/reading/explaining (no write
+// intent), writer tools are omitted to save prompt tokens (~15-25% savings).
+// Returns nil when no filtering is needed (full tool set).
+func (a *AgentRunner) filteredSchemas(input string) []provider.ToolSchema {
+	// Only filter for substantial inputs (>25 chars) — single words/commands
+	// like "explore" or "review" should not trigger filtering (too ambiguous).
+	if len(input) <= 25 {
+		return nil
+	}
+
+	lower := strings.ToLower(input)
+
+	// Development patterns: create, write, implement, fix, refactor, build
+	devKeywords := []string{
+		"create", "write", "implement", "fix", "refactor", "change",
+		"add", "remove", "delete", "update", "modify", "build",
+		"optimize", "migrate", "convert", "deploy",
+		"实现", "修复", "重构", "创建", "添加", "删除",
+		"修改", "优化", "迁移", "构建",
+	}
+	for _, kw := range devKeywords {
+		if strings.Contains(lower, kw) {
+			return nil // full tool set for development tasks
+		}
+	}
+
+	// Analysis-only patterns (must have at least one match)
+	analysisKeywords := []string{
+		"review", "explain", "analyze", "analyse",
+		"审查", "分析", "解释",
+	}
+	hasAnalysis := false
+	for _, kw := range analysisKeywords {
+		if strings.Contains(lower, kw) {
+			hasAnalysis = true
+			break
+		}
+	}
+	if !hasAnalysis {
+		return nil
+	}
+
+	// Filter to read-only + meta tools for analysis tasks.
+	return a.tools.FilteredSchemas([]string{
+		"read_file", "ls", "glob", "grep",
+		"git_status", "git_diff", "git_log",
+		"lsp_definition", "lsp_references", "lsp_hover", "lsp_diagnostics",
+		"web_search", "web_fetch",
+		"todo_write", "complete_step",
+		"task", "ask",
+	})
+}
+
+// shouldMidTurnSteer detects error spirals during tool execution and injects
+// a corrective hint. Returns true if a steer was injected (caller should
+// continue the loop to let the model respond to the hint).
+func (a *AgentRunner) shouldMidTurnSteer(calls []provider.ToolCall, results []string) bool {
+	if len(calls) == 0 {
+		return false
+	}
+
+	// Count tool failures (results starting with "error:", "blocked:", or tool panic).
+	failed := 0
+	for _, r := range results {
+		if strings.HasPrefix(r, "error:") || strings.HasPrefix(r, "blocked:") ||
+			strings.HasPrefix(r, "tool panic:") || strings.HasPrefix(r, "suppressed:") {
+			failed++
+		}
+	}
+
+	// All calls failed → likely wrong approach or tool misuse.
+	if failed == len(calls) && failed >= 2 {
+		a.steerCount++
+	} else {
+		a.steerCount = 0
+		return false
+	}
+
+	// Inject steer after 1st all-fail batch (gentle) or 3rd (firm).
+	if a.steerCount == 1 {
+		a.session.Add(provider.Message{Role: provider.RoleUser,
+			Content: "[System note: all tool calls in the last batch failed. " +
+				"Try a different approach — use read-only tools first to understand " +
+				"the situation, break the task into smaller steps, or ask the user " +
+				"for clarification if you are unsure. Do NOT retry the same calls.]"})
+		return true
+	}
+	if a.steerCount >= 3 {
+		a.session.Add(provider.Message{Role: provider.RoleUser,
+			Content: "[System note: you have been stuck for several rounds. " +
+				"STOP and re-assess. Read relevant files with read_file first. " +
+				"Ask the user a clarifying question with the ask tool. " +
+				"Do NOT continue the current approach.]"})
+		a.steerCount = 0 // reset after firm steer
+		return true
+	}
+
+	return false
+}
+
 func (a *AgentRunner) SetDispatcherPlanMode() {
 	if a.dispatcher != nil {
 		a.dispatcher.planMode = &a.planMode
@@ -868,6 +1015,14 @@ type StormBreaker struct {
 
 // extractFilePath extracts a file path from tool call arguments for edit tools.
 // Returns "" if no path can be extracted.
+
+// truncateStr returns s truncated to maxLen chars. Used for dedup key building.
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
 func extractFilePath(name string, args string) string {
 	// Common keys for file paths in tool arguments.
 	keys := []string{`"path"`, `"file_path"`, `"source"`, `"destination"`}

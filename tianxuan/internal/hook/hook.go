@@ -31,7 +31,8 @@ import (
 type Event string
 
 const (
-	PreToolUse       Event = "PreToolUse"
+	PermissionRequest Event = "PermissionRequest" // V8.0 P2-12
+	PreToolUse        Event = "PreToolUse"
 	PostToolUse      Event = "PostToolUse"
 	UserPromptSubmit Event = "UserPromptSubmit"
 	Stop             Event = "Stop"
@@ -63,7 +64,7 @@ var Events = []Event{
 // IsBlocking reports whether a non-zero/exit-2 (or timed-out) hook on this event
 // can block the loop. Only the gating events qualify. (PreCompact does not block;
 // it only contributes guidance via stdout.)
-func IsBlocking(e Event) bool { return e == PreToolUse || e == UserPromptSubmit }
+func IsBlocking(e Event) bool { return e == PermissionRequest || e == PreToolUse || e == UserPromptSubmit }
 
 // defaultTimeout is the per-event timeout when a hook sets none. Tool/prompt
 // hooks gate progress, so they're tight; post/stop hooks get more room.

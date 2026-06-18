@@ -24,6 +24,10 @@ type stubHooks struct {
 	postLLMTurns  []int    // turn number each PostLLMCall received
 }
 
+func (h *stubHooks) PermissionRequest(_ context.Context, _ string, _ json.RawMessage) (bool, json.RawMessage, string) {
+	return true, nil, ""
+}
+
 func (h *stubHooks) PreToolUse(_ context.Context, name string, _ json.RawMessage) (bool, string) {
 	h.preSeen = append(h.preSeen, name)
 	if h.blockPre[name] {

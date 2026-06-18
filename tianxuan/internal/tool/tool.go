@@ -190,13 +190,34 @@ func (r *Registry) Names() []string {
 // When a tool implements CompactDescriptor, the compact versions are used
 // instead of the full Description + Schema, reducing per-turn prompt tokens.
 // V6.0 P8: hidden tools are excluded from the schema list.
+// V6.0 P8: hidden tools are excluded from the schema list.
 func (r *Registry) Schemas() []provider.ToolSchema {
-	names := r.Names()
-	sort.Strings(names)
-	out := make([]provider.ToolSchema, 0, len(names))
-	for _, name := range names {
+	return r.FilteredSchemas(nil)
+}
+
+// FilteredSchemas is like Schemas but only includes tools whose names appear
+// in the names slice. When names is nil or empty, all non-hidden tools are
+// included (equivalent to Schemas()). Tools not found in the registry are
+// silently skipped.
+func (r *Registry) FilteredSchemas(names []string) []provider.ToolSchema {
+	allNames := r.Names()
+	sort.Strings(allNames)
+
+	var filter map[string]bool
+	if len(names) > 0 {
+		filter = make(map[string]bool, len(names))
+		for _, n := range names {
+			filter[n] = true
+		}
+	}
+
+	out := make([]provider.ToolSchema, 0, len(allNames))
+	for _, name := range allNames {
 		if r.hidden[name] {
-			continue // V6.0 P8: hidden tools not shown to model
+			continue
+		}
+		if filter != nil && !filter[name] {
+			continue
 		}
 		t := r.tools[name]
 		desc := t.Description()

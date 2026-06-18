@@ -352,6 +352,10 @@ func (c *Controller) runTurn(ctx context.Context, input string) error {
 
 func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) error {
 	c.maybeSessionStart(ctx)
+	// V8.0 P1-4: plan mode smart clarification — prompt the user when input is too vague.
+	if c.isPlanMode() && c.maybeClarifyVagueInput(raw) {
+		return nil // question emitted, wait for user response
+	}
 	c.maybeAutoPlan(ctx, raw)
 
 	// V3.0 Phase 5: ContextManager handles first-turn orchestration.

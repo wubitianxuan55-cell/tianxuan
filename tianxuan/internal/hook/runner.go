@@ -57,6 +57,18 @@ func (r *Runner) HasPostLLMCall() bool { return r.Has(PostLLMCall) }
 
 // PreToolUse fires before a tool call. block=true means the call must be
 // refused; message is the reason (fed back to the model and shown to the user).
+
+// PermissionRequest fires before any tool gate, allowing custom approval
+// logic and argument modification. V8.0 P2-12.
+func (r *Runner) PermissionRequest(ctx context.Context, name string, args json.RawMessage) (bool, json.RawMessage, string) {
+	if !r.Enabled() {
+		return true, args, ""
+	}
+	rep := Run(ctx, Payload{Event: PermissionRequest, Cwd: r.cwd, ToolName: name, ToolArgs: args}, r.hooks, r.spawner)
+	block, msg := r.handle(rep)
+	// For now, args pass through unchanged. Future: parse modified args from rep output.
+	return !block, args, msg
+}
 func (r *Runner) PreToolUse(ctx context.Context, name string, args json.RawMessage) (block bool, message string) {
 	if !r.Enabled() {
 		return false, ""

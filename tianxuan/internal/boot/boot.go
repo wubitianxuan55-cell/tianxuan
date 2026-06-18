@@ -141,6 +141,15 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	skills := skillStore.List()
 	sysPrompt = skill.ApplyIndex(sysPrompt, skills)
 
+	// V8.0 P1-5: wire read_skill resolver so the agent can read skill bodies.
+	builtin.WireReadSkillResolver(func(name string) (string, error) {
+		sk, ok := skillStore.Read(name)
+		if !ok {
+			return "", fmt.Errorf("skill %q not found", name)
+		}
+		return sk.Body, nil
+	})
+
 	// Phase 2: scan project structure once for Gather mode and Context domain.
 	projectProfile := &cache.Profile{}
 	projectProfile.Scan(cwd)
@@ -204,6 +213,16 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
 				Text: "codegraph: not installed — run `tianxuan codegraph install` to enable symbol-graph tools"})
 		}
+	}
+
+	// V8.0 P2-8: Context7 MCP for library documentation.
+	if key := os.Getenv("CONTEXT7_API_KEY"); key != "" {
+		specs = append(specs, plugin.Spec{
+			Name:    "context7",
+			Type:    "http",
+			URL:     "https://mcp.context7.com/mcp",
+			Headers: map[string]string{"Authorization": "Bearer " + key},
+		})
 	}
 	if len(specs) > 0 {
 		// Apply caller-supplied stderr override to all plugin specs.

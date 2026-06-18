@@ -246,6 +246,17 @@ func (c *Controller) Submit(input string) {
 			}
 			c.notice(fmt.Sprintf("undo: rewound to turn %d (%d turn(s))", turn, n))
 			return
+
+		// V8.0 P2-10: /goal — decompose a large goal into sub-tasks.
+		case "/goal":
+			goalInput := strings.TrimSpace(strings.TrimPrefix(trimmed, "/goal"))
+			if goalInput == "" {
+				c.notice("usage: /goal <description>")
+				return
+			}
+			c.SetPlanMode(true)
+			c.Submit("Break this goal into numbered sub-tasks: "+goalInput)
+			return
 		}
 		if c.managementNotice(trimmed) {
 			return

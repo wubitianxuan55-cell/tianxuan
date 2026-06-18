@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"tianxuan/internal/event"
 )
 
 const (
@@ -141,4 +143,33 @@ var multiSurfaceTerms = []string{
 var docsAndIssueTerms = []string{
 	"prd", "issue", "requirements", "spec", "proposal", "roadmap",
 	"需求", "产品文档", "接口文档", "方案", "规划",
+}
+
+// isPlanMode reports whether the controller is currently in plan mode.
+func (c *Controller) isPlanMode() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.planMode
+}
+
+// maybeClarifyVagueInput checks if the user input is too vague for plan mode
+// and emits a clarifying question. Returns true if a question was emitted.
+// V8.0 P1-4: plan mode smart clarification.
+func (c *Controller) maybeClarifyVagueInput(input string) bool {
+	if len(input) >= 30 {
+		return false
+	}
+	goalVerbs := []string{"implement", "fix", "refactor", "add", "create",
+		"write", "build", "deploy", "optimize", "remove", "delete",
+		"实现", "修复", "重构", "创建", "添加", "删除", "优化", "构建"}
+	lower := strings.ToLower(input)
+	for _, v := range goalVerbs {
+		if strings.Contains(lower, v) {
+			return false
+		}
+	}
+	c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+		Text: "[Clarify] Your request is brief. What exactly do you want to achieve? " +
+			"You can use read_file/ls/grep to explore — plan mode is read-only."})
+	return true
 }

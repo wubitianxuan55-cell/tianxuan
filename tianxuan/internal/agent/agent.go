@@ -696,9 +696,9 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
-	// V8.0 P0-1: apply tool filter based on input context.
+	// V8.0 P0-1: reset tool filter from previous turn (prefix must be immutable).
 	a.activeSchemasMu.Lock()
-	a.activeSchemas = a.filteredSchemas(input)
+	a.activeSchemas = nil
 	a.activeSchemasMu.Unlock()
 
 

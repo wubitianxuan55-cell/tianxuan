@@ -5,6 +5,7 @@ import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
 import { ToolGroup, scanGroups } from "./ToolGroup";
+import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -64,13 +65,20 @@ export function Transcript({
   onPrompt,
   onRewind,
   running,
+  onThreadEl,
 }: {
   items: Item[];
   onPrompt: (text: string) => void;
   onRewind?: (turn: number, scope: string) => void;
   running: boolean;
+  onThreadEl?: (el: HTMLElement | null) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onThreadEl?.(scrollRef.current);
+    return () => onThreadEl?.(null);
+  }, [onThreadEl]);
   // stick tracks whether the view is pinned to the bottom; once the user scrolls
   // up to read, we stop yanking them back down.
   const stick = useRef(true);
@@ -120,6 +128,7 @@ export function Transcript({
 
   // The rewind menu's open state is lifted here so at most one is open at a time;
   // a mousedown outside any .rewind closes it.
+  const [dismissedErrors, setDismissedErrors] = useState(new Set<string>());
   const [openTurn, setOpenTurn] = useState<number | null>(null);
   useEffect(() => {
     if (openTurn === null) return;
@@ -167,6 +176,7 @@ export function Transcript({
       case "user": {
         const tn = userTurn.get(it.id);
         return (
+          <div key={it.id} data-turn={tn != null ? tn : undefined}>
           <UserMessage
             key={it.id}
             text={it.text}
@@ -178,6 +188,7 @@ export function Transcript({
               setOpenTurn(null);
             }}
           />
+          </div>
         );
       }
       case "assistant":
@@ -194,8 +205,12 @@ export function Transcript({
           </div>
         );
       case "notice":
+        if (it.level === "warn") {
+          if (dismissedErrors.has(it.id)) return null;
+          return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
+        }
         return (
-          <div key={it.id} className={`notice notice--${it.level}`}>
+          <div key={it.id} className="notice">
             {it.text}
           </div>
         );

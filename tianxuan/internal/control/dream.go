@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"tianxuan/internal/agent"
 )
 
 // DreamResult holds the output of a dream analysis pass.
@@ -303,6 +306,102 @@ func (c *Controller) createSkillTemplates(patterns []string) int {
 		created++
 	}
 	return created
+}
+
+// Dream extracts knowledge from the current session into project memory.
+// Uses deterministic session summary (no LLM call). V6.0 Feature.
+func (c *Controller) Dream(ctx context.Context) error {
+	if c.executor == nil {
+		return nil
+	}
+	msgs := c.executor.Session().Snapshot()
+	if len(msgs) < 2 {
+		return nil
+	}
+	summary := agent.BuildCompactSummary(msgs[1:])
+	if summary == "" {
+		return nil
+	}
+	date := time.Now().Format("2006-01-02")
+	// Search past memories related to this session and merge insights
+	related := ""
+	if mem := c.Memory(); mem != nil && mem.Search != nil {
+		matches := mem.Search.Search("project architecture code design")
+		if len(matches) > 0 {
+			var sb strings.Builder
+			sb.WriteString("\nRelated past memories:\n")
+			limit := 3
+			if len(matches) < limit {
+				limit = len(matches)
+			}
+			for i, m := range matches[:limit] {
+				fmt.Fprintf(&sb, "  %d. %s\n", i+1, m.Name)
+			}
+			related = sb.String()
+		}
+	}
+	entry := "/dream (" + date + "):\n" + summary + "\n" + related
+	c.QueueMemory(entry)
+	c.notice("dream: knowledge extracted (" + fmt.Sprintf("%d", len(summary)/4) + " tok" + related + ")")
+	return nil
+}
+
+// Distill analyzes session patterns and suggests skills. V6.0 Feature.
+func (c *Controller) Distill(ctx context.Context) error {
+	if c.executor == nil {
+		return nil
+	}
+	msgs := c.executor.Session().Snapshot()
+	toolSeq := []string{}
+	for _, m := range msgs {
+		if m.Role == "assistant" {
+			for _, tc := range m.ToolCalls {
+				toolSeq = append(toolSeq, tc.Name)
+			}
+		}
+	}
+	if len(toolSeq) < 3 {
+		return nil
+	}
+	patterns := findRepeatedPatterns(toolSeq, 2)
+	if len(patterns) == 0 {
+		c.notice("distill: no repeated patterns found")
+		return nil
+	}
+	var sb strings.Builder
+	sb.WriteString("/distill (" + time.Now().Format("2006-01-02") + "):\n")
+	sb.WriteString("Detected repeated tool patterns:\n")
+	for _, p := range patterns {
+		sb.WriteString("  - " + p + "\n")
+	}
+	c.QueueMemory(sb.String())
+	c.notice("distill: " + fmt.Sprintf("%d", len(patterns)) + " patterns found")
+	return nil
+}
+
+func findRepeatedPatterns(seq []string, minLen int) []string {
+	seen := map[string]int{}
+	for i := 0; i <= len(seq)-minLen; i++ {
+		for j := i + minLen; j <= len(seq); j++ {
+			pat := ""
+			for k := i; k < j; k++ {
+				if k > i {
+					pat += " -> "
+				}
+				pat += seq[k]
+			}
+			if len(strings.Fields(pat)) >= minLen {
+				seen[pat]++
+			}
+		}
+	}
+	var out []string
+	for pat, count := range seen {
+		if count >= 2 {
+			out = append(out, pat+" (repeated "+fmt.Sprintf("%d", count)+"x)")
+		}
+	}
+	return out
 }
 
 func itoaForSkill(n int) string {

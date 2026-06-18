@@ -66,6 +66,7 @@ type chatTUI struct {
 	// turnTokens accumulates this turn's output tokens (summed from per-step Usage
 	// events) for the live "↓N" readout in the running status line.
 	turnTokens int
+	turnCostUSD float64
 
 	// balance is the last-fetched wallet-balance readout (e.g. "¥110.00"), "" when
 	// the provider declares no balance_url or a fetch failed. Refreshed async on
@@ -1503,6 +1504,7 @@ func (m *chatTUI) startTurnWithRaw(sent, displayed, restore, raw string, attachm
 	m.runStart = time.Now()
 	m.elapsed = 0
 	m.turnTokens = 0
+	m.turnCostUSD = 0
 	// The controller owns the run goroutine, its context, and cancellation; it
 	// streams events to eventCh and emits TurnDone when the turn settles.
 	m.ctrl.SendWithRaw(sent, raw)
@@ -1613,6 +1615,9 @@ func (m *chatTUI) ingestEvent(e event.Event) {
 	case event.Usage:
 		if e.Usage != nil {
 			m.turnTokens += e.Usage.CompletionTokens
+			if e.Pricing != nil {
+				m.turnCostUSD += e.Pricing.Cost(e.Usage)
+			}
 		}
 		if line := agent.FormatUsageLine(e.Usage, e.Pricing); line != "" {
 			m.finalizeStreamed()

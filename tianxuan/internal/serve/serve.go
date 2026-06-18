@@ -21,6 +21,12 @@ import (
 //go:embed index.html
 var indexHTML []byte
 
+//go:embed app.css
+var appCSS []byte
+
+//go:embed app.js
+var appJS []byte
+
 // Server wires a controller to its HTTP surface. The Broadcaster must be the
 // same sink the controller was constructed with, so events reach SSE clients.
 type Server struct {
@@ -33,10 +39,9 @@ func New(ctrl *control.Controller, bc *Broadcaster) *Server {
 	return &Server{ctrl: ctrl, bc: bc}
 }
 
-// Handler returns the HTTP routes: GET / (a minimal browser client), GET /events
-// (SSE), GET /history, GET /context, and POST command endpoints.
-// CORS is NOT applied by default — same-origin policy protects the unauthenticated
-// agent endpoints. Call HandlerWithCORS to opt in for local development.
+// Handler returns the HTTP routes: GET / (browser client), GET /app.css, GET
+// /app.js, GET /events (SSE), GET /history, GET /context, GET /health, and POST
+// command endpoints.
 func (s *Server) Handler() http.Handler {
 	return s.handler()
 }
@@ -51,9 +56,12 @@ func (s *Server) HandlerWithCORS(origin string) http.Handler {
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", s.index)
+	mux.HandleFunc("GET /app.css", s.staticCSS)
+	mux.HandleFunc("GET /app.js", s.staticJS)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /history", s.history)
 	mux.HandleFunc("GET /context", s.context)
+	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("POST /submit", s.submit)
 	mux.HandleFunc("POST /cancel", s.cancel)
 	mux.HandleFunc("POST /approve", s.approve)
@@ -125,6 +133,24 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(indexHTML)
+}
+
+// staticCSS serves the client stylesheet.
+func (s *Server) staticCSS(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	_, _ = w.Write(appCSS)
+}
+
+// staticJS serves the client script.
+func (s *Server) staticJS(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	_, _ = w.Write(appJS)
+}
+
+// health returns 200 with a JSON heartbeat so the frontend can detect liveness
+// independently of the SSE stream (which may reconnect).
+func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]any{"ok": true, "time": time.Now().UnixMilli()})
 }
 
 // events streams the controller's event flow as SSE until the client
@@ -234,10 +260,19 @@ func (s *Server) history(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, out)
 }
 
-// context returns the prompt-vs-window gauge numbers.
+// context returns the prompt-vs-window gauge numbers plus a percent so the
+// frontend can draw a context-window meter without computing it client-side.
 func (s *Server) context(w http.ResponseWriter, _ *http.Request) {
 	used, window := s.ctrl.ContextSnapshot()
-	writeJSON(w, map[string]int{"used": used, "window": window})
+	pct := 0
+	if window > 0 {
+		pct = used * 100 / window
+	}
+	writeJSON(w, map[string]any{
+		"used":    used,
+		"window":  window,
+		"percent": pct,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

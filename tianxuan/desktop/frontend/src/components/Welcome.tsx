@@ -36,42 +36,50 @@ export function Welcome({ onPrompt }: { onPrompt: (text: string) => void }) {
   ];
 
   return (
-    <div className="welcome">
-      <img src={logo} className="welcome__logo" alt="tianxuan" />
-      <div className="welcome__title">tianxuan</div>
-      <div className="welcome__tag">{t("welcome.tagline")}</div>
+    <div className="h-full flex flex-col items-center justify-center max-w-lg mx-auto px-4 overflow-y-auto">
+      <img src={logo} className="w-[54px] h-[54px] mb-4 rounded-[13px]" alt="tianxuan" />
+      <div className="text-[22px] font-semibold tracking-[0.3px] text-(--color-fg)">tianxuan</div>
+      <div className="mt-1.5 text-[13.5px] text-(--color-fg-dim)">{t("welcome.tagline")}</div>
 
-      <div className="welcome__hints">
-        <span>
-          <kbd>/</kbd> {t("welcome.hintCommands")}
+      {/* Hints */}
+      <div className="flex gap-4 mt-[18px] text-[12.5px]">
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="font-mono text-[11px] text-(--color-fg-dim) bg-(--color-bg-elev-2) border border-(--color-border) rounded px-1.5 py-px">/</kbd>
+          {t("welcome.hintCommands")}
         </span>
-        <span>
-          <kbd>@</kbd> {t("welcome.hintFiles")}
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="font-mono text-[11px] text-(--color-fg-dim) bg-(--color-bg-elev-2) border border-(--color-border) rounded px-1.5 py-px">@</kbd>
+          {t("welcome.hintFiles")}
         </span>
-        <span>
-          <kbd>⏎</kbd> {t("welcome.hintSend")}
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="font-mono text-[11px] text-(--color-fg-dim) bg-(--color-bg-elev-2) border border-(--color-border) rounded px-1.5 py-px">⏎</kbd>
+          {t("welcome.hintSend")}
         </span>
       </div>
 
-      {/* V5.16: 快捷任务卡片网格 */}
-      <div className="welcome__cards">
+      {/* Starter cards grid */}
+      <div className="grid grid-cols-3 gap-2.5 mt-[22px] w-full">
         {cards.map((card) => (
           <button
             key={card.title}
-            className="welcome__card"
+            className="flex flex-col items-start gap-2 text-left font-[inherit] text-[13px] bg-(--color-bg-soft) border border-(--color-border-soft) text-(--color-fg-dim) rounded-lg p-3 hover:text-(--color-fg) hover:border-(--color-accent-soft) hover:bg-(--color-bg-elev) transition-colors"
             onClick={() => onPrompt(card.prompt)}
           >
-            <span className="welcome__card-icon">{card.icon}</span>
-            <span className="welcome__card-body">
-              <span className="welcome__card-title">{card.title}</span>
-              <span className="welcome__card-desc">{card.desc}</span>
+            <span className="text-(--color-fg-dim)">{card.icon}</span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] font-medium text-(--color-fg)">{card.title}</span>
+              <span className="text-[12px] text-(--color-fg-faint) leading-snug">{card.desc}</span>
             </span>
           </button>
         ))}
       </div>
 
-      <div className="welcome__examples">
-        <button className="welcome__ex" onClick={() => onPrompt(t("welcome.ex1"))}>
+      {/* Examples */}
+      <div className="flex flex-col gap-2 mt-[26px] w-full">
+        <button
+          className="text-left bg-(--color-bg-soft) border border-(--color-border-soft) text-(--color-fg-dim) font-[inherit] text-[13px] rounded-lg px-3 py-2 hover:text-(--color-fg) hover:border-(--color-accent-soft) hover:bg-(--color-bg-elev) transition-colors"
+          onClick={() => onPrompt(t("welcome.ex1"))}
+        >
           {t("welcome.ex1")}
         </button>
       </div>

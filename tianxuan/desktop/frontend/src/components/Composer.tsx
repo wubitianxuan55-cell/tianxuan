@@ -784,15 +784,23 @@ export function Composer({
               </button>
             </div>
           )}
-          <button
-            className={`composer__mode composer__mode--${mode}`}
-            onClick={onCycleMode}
-            title={t("composer.modeTitle")}
-          >
-            <span className="composer__mode-dot" />
-            {mode === "yolo" ? t("composer.modeYolo") : mode === "plan" ? t("composer.modePlan") : t("composer.modeNormal")}
-            <span className="composer__mode-hint">{t("composer.modeHint")}</span>
-          </button>
+          <div className="composer__modes">
+            {(['normal','plan','yolo'] as Mode[]).map(m => (
+              <button
+                key={m}
+                type="button"
+                className={`composer__modebtn ${mode === m ? 'composer__modebtn--active' : ''}`}
+                onClick={() => {
+                  let count = 0;
+                  while (mode !== m && count < 3) { onCycleMode(); count++; }
+                }}
+                title={m === 'plan' ? t('composer.modePlan') : m === 'yolo' ? t('composer.modeYolo') : t('composer.modeNormal')}
+              >
+                <span className={`composer__modebtn-dot composer__modebtn-dot--${m}`} />
+                {m === 'normal' ? t('composer.modeNormal') : m === 'plan' ? t('composer.modePlan') : t('composer.modeYolo')}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

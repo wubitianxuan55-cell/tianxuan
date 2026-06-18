@@ -234,8 +234,8 @@ function delay(ms: number): Promise<void> {
 
 function makeMockApp(): AppBindings {
   let cancelled = false;
-  let cwd = "~/projects/reasonix"; // mutable so PickWorkspace is visible in dev
-  let workspaces = ["~/projects/reasonix", "~/projects/blade", "~/projects/deepseek-forge", "~/projects/cc-switch-light", "~/projects/SuperRig"];
+  let cwd = "~/projects/tianxuan"; // mutable so PickWorkspace is visible in dev
+  let workspaces = ["~/projects/tianxuan", "~/projects/blade", "~/projects/deepseek-forge", "~/projects/cc-switch-light", "~/projects/SuperRig"];
   const day = 86_400_000;
   const t0 = Date.now();
   // Mutable so MCP add/remove/retry are observable in browser dev.
@@ -284,8 +284,8 @@ function makeMockApp(): AppBindings {
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
-    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are Reasonix, a coding agent." },
-    configPath: "~/projects/reasonix/reasonix.toml",
+    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent." },
+    configPath: "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
   };
@@ -376,7 +376,7 @@ function makeMockApp(): AppBindings {
     async PickWorkspace() {
       // Browser dev has no native dialog; simulate picking a folder and re-root so
       // the topbar folder chip visibly changes.
-      return mockSwitchWorkspace(cwd.endsWith("another-project") ? "~/projects/reasonix" : "~/projects/another-project");
+      return mockSwitchWorkspace(cwd.endsWith("another-project") ? "~/projects/tianxuan" : "~/projects/another-project");
     },
     async SwitchWorkspace(path: string) {
       return mockSwitchWorkspace(path);
@@ -507,8 +507,8 @@ function makeMockApp(): AppBindings {
     },
     async ReadFile(rel: string) {
       const samples: Record<string, string> = {
-        "README.md": "# Reasonix\n\nBrowser-dev workspace preview.\n\n- Chat in the center\n- Browse files on the right\n- Keep sessions on the left\n",
-        "go.mod": "module reasonix\n\ngo 1.23\n",
+        "README.md": "# tianxuan\n\nBrowser-dev workspace preview.\n\n- Chat in the center\n- Browse files on the right\n- Keep sessions on the left\n",
+        "go.mod": "module tianxuan\n\ngo 1.23\n",
         "desktop/file.go": "package desktop\n\nfunc main() {\n\tprintln(\"workspace preview\")\n}\n",
         "internal/event.go": "package internal\n\n// mock file used by the browser dev seam\n",
       };
@@ -527,7 +527,7 @@ function makeMockApp(): AppBindings {
       console.info("mock RevealWorkspacePath", rel);
     },
     async SavePastedImage(_dataUrl: string) {
-      return ".reasonix/attachments/mock.png";
+      return ".tianxuan/attachments/mock.png";
     },
     async AttachmentDataURL(_path: string) {
       return "data:image/png;base64,iVBORw0KGgo=";
@@ -542,15 +542,15 @@ function makeMockApp(): AppBindings {
     async Memory() {
       return {
         available: true,
-        storeDir: "~/.config/reasonix/projects/-mock/memory",
+        storeDir: "~/.config/tianxuan/projects/-mock/memory",
         docs: [
           {
             path: "REASONIX.md",
             scope: "project",
-            body: "# Reasonix project memory\n\nMock doc shown in the browser dev seam.\n\n## Notes\n\n- prefers concise replies",
+            body: "# tianxuan project memory\n\nMock doc shown in the browser dev seam.\n\n## Notes\n\n- prefers concise replies",
           },
           {
-            path: "~/.config/reasonix/REASONIX.md",
+            path: "~/.config/tianxuan/REASONIX.md",
             scope: "user",
             body: "# User memory\n\nAlways respond in 中文.",
           },
@@ -564,7 +564,7 @@ function makeMockApp(): AppBindings {
           },
         ],
         scopes: [
-          { scope: "user", path: "~/.config/reasonix/REASONIX.md" },
+          { scope: "user", path: "~/.config/tianxuan/REASONIX.md" },
           { scope: "project", path: "REASONIX.md" },
           { scope: "local", path: "REASONIX.local.md" },
         ],
@@ -632,7 +632,7 @@ function makeMockApp(): AppBindings {
         latest: "v1.1.0",
         notes: "- Mock release notes\n- The **Update now** button streams a fake download here.",
         canSelfUpdate: true,
-        downloadUrl: "https://github.com/esengine/reasonix/releases/latest",
+        downloadUrl: "https://github.com/esengine/tianxuan/releases/latest",
         assetSize: 12_345_678,
       };
     },
@@ -651,7 +651,7 @@ function makeMockApp(): AppBindings {
     },
     async OpenDownloadPage() {
       if (typeof window !== "undefined") {
-        window.open("https://github.com/esengine/reasonix/releases/latest", "_blank", "noopener");
+        window.open("https://github.com/esengine/tianxuan/releases/latest", "_blank", "noopener");
       }
     },
   };

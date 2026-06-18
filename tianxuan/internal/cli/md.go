@@ -37,12 +37,6 @@ func newMarkdownRenderer(width int) *mdRenderer {
 	}
 }
 
-func italic(s string) string {
-	if !colorEnabled {
-		return s
-	}
-	return "\033[3m" + s + "\033[0m"
-}
 
 // SetDiffFold controls whether diff fenced code blocks fold their context lines
 // (showing only +/− hunks). Called by the /diff-fold slash command.

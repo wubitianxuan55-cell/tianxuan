@@ -11,16 +11,16 @@ type LayoutPreferences = {
   sizes?: Partial<Record<LayoutSizeKey, number>>;
 };
 
-const STORAGE_KEY = "reasonix.layoutPreferences.v1";
+const STORAGE_KEY = "tianxuan.layoutPreferences.v1";
 
 const LEGACY_SIZE_KEYS: Record<LayoutSizeKey, string[]> = {
-  sidebarWidth: ["reasonix.sidebar.width"],
-  workspacePanelWidth: ["reasonix.workspacePanel.width"],
+  sidebarWidth: ["tianxuan.sidebar.width"],
+  workspacePanelWidth: ["tianxuan.workspacePanel.width"],
   workspaceFileTreePanelWidth: [],
-  workspaceTreeWidth: ["reasonix.workspaceTree.width"],
-  composerHeight: ["reasonix.composerHeight"],
-  drawerWidth: ["reasonix.drawer.width"],
-  settingsDrawerWidth: ["reasonix.settingsDrawer.width"],
+  workspaceTreeWidth: ["tianxuan.workspaceTree.width"],
+  composerHeight: ["tianxuan.composerHeight"],
+  drawerWidth: ["tianxuan.drawer.width"],
+  settingsDrawerWidth: ["tianxuan.settingsDrawer.width"],
 };
 
 type ClampSize = (value: number) => number;

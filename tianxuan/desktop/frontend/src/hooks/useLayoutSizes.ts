@@ -3,7 +3,7 @@
 
 import { loadLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
 
-export const SIDEBAR_COLLAPSED_KEY = "reasonix.sidebar.collapsed";
+export const SIDEBAR_COLLAPSED_KEY = "tianxuan.sidebar.collapsed";
 export const SIDEBAR_COLLAPSED_WIDTH = 68;
 export const SIDEBAR_DEFAULT_WIDTH = 264;
 export const SIDEBAR_MIN_WIDTH = 228;

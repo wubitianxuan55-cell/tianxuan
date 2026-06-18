@@ -20,7 +20,7 @@ export type Locale = "en" | "zh" | "zh-TW";
 export type LangPref = "" | "en" | "zh" | "zh-TW";
 
 const DICTS: Record<Locale, Record<DictKey, string>> = { en, zh, "zh-TW": zhTW };
-const STORAGE_KEY = "reasonix-lang";
+const STORAGE_KEY = "tianxuan-lang";
 
 // currentLocale mirrors the active locale for callers outside React (lib/tools.ts).
 let currentLocale: Locale = "en";

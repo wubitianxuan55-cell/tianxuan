@@ -128,7 +128,7 @@ export const en = {
   "welcome.ex3": "Where is the agent run loop, and what does it do?",
 
   // composer
-  "composer.placeholder": "Message Reasonix…  ( / commands · @ files )",
+  "composer.placeholder": "Message tianxuan…  ( / commands · @ files )",
   "composer.placeholderRunning": "Replying… keep typing to queue",
   "composer.queue": "Queue send",
   "composer.planMode": "plan mode",

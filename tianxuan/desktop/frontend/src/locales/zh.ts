@@ -129,7 +129,7 @@ export const zh: Record<DictKey, string> = {
   "welcome.ex3": "智能体的运行主循环在哪，它做了什么？",
 
   // 输入框
-  "composer.placeholder": "给 Reasonix 发消息…  ( / 命令 · @ 文件 )",
+  "composer.placeholder": "给 tianxuan 发消息…  ( / 命令 · @ 文件 )",
   "composer.placeholderRunning": "回复中… 继续输入可排队发送",
   "composer.queue": "排队发送",
   "composer.planMode": "计划模式",

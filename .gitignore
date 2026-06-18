@@ -27,7 +27,11 @@ mem.prof
 .reasonix/
 
 # Desktop build outputs
-tianxuan/desktop/build/
+tianxuan/desktop/build/*
+!tianxuan/desktop/build/appicon.png
+!tianxuan/desktop/build/windows/icon.ico
+tianxuan/desktop/build/windows/*
+!tianxuan/desktop/build/windows/installer/project.nsi
 tianxuan/desktop/frontend/dist/
 tianxuan/desktop/frontend/wailsjs/
 tianxuan/desktop/frontend/package.json.md5

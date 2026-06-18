@@ -5,7 +5,7 @@
 
 export type Theme = "auto" | "light" | "dark" | "warm" | "ice";
 
-const KEY = "reasonix-theme";
+const KEY = "tianxuan-theme";
 
 function normalizeTheme(value: unknown): Theme | null {
   if (typeof value === "object" && value !== null) {

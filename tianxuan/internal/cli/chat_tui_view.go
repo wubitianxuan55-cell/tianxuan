@@ -46,6 +46,9 @@ func (m chatTUI) View() tea.View {
 		if m.turnTokens > 0 {
 			status += " · ↓" + shortTokens(m.turnTokens)
 		}
+		if m.turnCostUSD > 0 {
+			status += fmt.Sprintf(" · ¥%.4f", m.turnCostUSD*7.25)
+		}
 	default:
 		status = "  " + modeTag + " · " + i18n.M.ChatStatusIdle
 	}
@@ -164,24 +167,36 @@ func (m chatTUI) contextTag() string {
 }
 func (m chatTUI) cacheTag() string {
 	now := ""
+	nowPct := 0
 	if u := m.ctrl.LastUsage(); u != nil {
 		d := u.CacheHitTokens + u.CacheMissTokens
 		if d == 0 {
 			d = u.PromptTokens
 		}
 		if d > 0 {
-			now = fmt.Sprintf("cache %d%%", u.CacheHitTokens*100/d)
+			nowPct = u.CacheHitTokens * 100 / d
+			now = fmt.Sprintf("cache %d%%", nowPct)
 		}
 	}
 	avg := ""
 	if hit, miss := m.ctrl.SessionCache(); hit+miss > 0 {
 		avg = fmt.Sprintf("avg %d%%", hit*100/(hit+miss))
 	}
+	cacheStyle := func(s string) string {
+		switch {
+		case nowPct >= 80:
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(s)
+		case nowPct >= 50:
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Render(s)
+		default:
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(s)
+		}
+	}
 	switch {
 	case now != "" && avg != "":
-		return dim(now + " · " + avg)
+		return cacheStyle(now) + " · " + dim(avg)
 	case now != "":
-		return dim(now)
+		return cacheStyle(now)
 	case avg != "":
 		return dim(avg)
 	}

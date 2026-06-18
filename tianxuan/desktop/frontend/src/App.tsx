@@ -11,6 +11,8 @@ import { useController } from "./lib/store";
 import { applyTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import { Transcript } from "./components/Transcript";
+import { JumpBar } from "./components/JumpBar";
+import { ToastProvider, useToast } from "./components/Toast";
 import { Composer } from "./components/Composer";
 import { TodoPanel } from "./components/TodoPanel";
 import { ApprovalModal } from "./components/ApprovalModal";
@@ -52,6 +54,12 @@ function sessionTime(ms: number): string {
   return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function NewSessionToast({ done }: { done: boolean }) {
+  const toast = useToast();
+  useEffect(() => { if (done) toast.show("新会话已创建", "info"); }, [done]);
+  return null;
+}
+
 export default function App() {
   const {
     state,
@@ -86,6 +94,7 @@ export default function App() {
   const [showPlan, setShowPlan] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("files");
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
+  const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
 
   const {
@@ -287,6 +296,7 @@ export default function App() {
     [effectiveWorkspacePanelWidth, sidebarWidth],
   );
   return (
+    <ToastProvider>
     <div className="app">
       <div
         className={[
@@ -469,12 +479,15 @@ export default function App() {
           )}
 
           <UpdateBanner />
-          {newSessionDone && <div className="new-session-toast">新会话已创建</div>}
+          <NewSessionToast done={newSessionDone} />
           <main className="main">
             {(state.meta?.ready === false && !state.meta?.startupErr) || switchingModel ? (
               <Skeleton />
             ) : (
-              <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} />
+              <>
+                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} />
+                {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} />}
+              </>
             )}
           </main>
 
@@ -652,5 +665,6 @@ export default function App() {
         )}
       </Suspense>
     </div>
+    </ToastProvider>
   );
 }

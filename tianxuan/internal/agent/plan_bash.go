@@ -8,7 +8,7 @@ import (
 
 // planModeSafeBashCommands lists bash command prefixes safe in plan mode.
 // Matched as a prefix against the trimmed, lowercased command with word-boundary.
-// V8.0.3: Reasonix-inspired plan mode bash safety.
+// V8.0.3: tianxuan-inspired plan mode bash safety.
 var planModeSafeBashCommands = []string{
 	"git status", "git diff", "git log", "git show",
 	"git ls-files", "git grep", "git blame",

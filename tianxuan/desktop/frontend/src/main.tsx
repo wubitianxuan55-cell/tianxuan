@@ -4,6 +4,7 @@ import App from "./App";
 import { LocaleProvider } from "./lib/i18n";
 import { initTheme } from "./lib/theme";
 import "./styles.css";
+import "./tailwind.css";
 
 // Apply the saved appearance (auto/light/dark) before the first paint.
 initTheme();

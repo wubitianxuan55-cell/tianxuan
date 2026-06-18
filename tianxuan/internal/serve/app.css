@@ -1,0 +1,147 @@
+/* tianxuan HTTP client — minimal, zero-dependency stylesheet */
+
+:root { color-scheme: light dark; }
+
+body {
+  font: 14px/1.5 ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  margin: 0;
+  color: #1a1a1a;
+  background: #f5f5f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  body { color: #e0e0e0; background: #1a1a2e; }
+  .user { color: #9fc5f8; }
+  .err  { color: #f28b82; }
+  .thinking { color: #8892a4; border-left-color: #444; }
+  #bar { border-top-color: #444; }
+  .tool { color: #7aa2f7; }
+  .tool-ok { color: #9ece6a; }
+  .tool-sep { color: #444; }
+}
+
+/* ---------- log area ---------- */
+#log {
+  padding: 1rem;
+  height: calc(100vh - 5rem);
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* ---------- message kinds ---------- */
+.user {
+  font-weight: 600;
+  margin-top: .75rem;
+}
+.thinking {
+  opacity: .6;
+  border-left: 2px solid #ccc;
+  padding-left: .5rem;
+  margin: .25rem 0;
+}
+.thinking summary {
+  cursor: pointer;
+  user-select: none;
+  color: inherit;
+  opacity: .7;
+  font-size: 12px;
+}
+.thinking summary:hover { opacity: 1; }
+
+.tool {
+  color: #2563eb;
+  font-size: 13px;
+}
+.tool-ok {
+  color: #16a34a;
+  font-size: 13px;
+  margin-bottom: .25rem;
+}
+.tool-err {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: .25rem;
+}
+.tool-sep {
+  color: #999;
+  font-size: 11px;
+}
+.notice { opacity: .7; }
+.err    { color: #dc2626; }
+
+.usage {
+  opacity: .55;
+  font-size: 12px;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.usage .ctx-gauge {
+  display: inline-block;
+  width: 80px;
+  height: 8px;
+  background: #4444;
+  border-radius: 4px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.usage .ctx-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .3s;
+}
+
+/* ---------- bar ---------- */
+#bar {
+  display: flex;
+  gap: .5rem;
+  padding: .5rem;
+  border-top: 1px solid #8884;
+}
+#in {
+  flex: 1;
+  padding: .4rem;
+  font: inherit;
+  border: 1px solid #8884;
+  border-radius: 4px;
+  background: inherit;
+  color: inherit;
+}
+button {
+  font: inherit;
+  padding: .4rem .7rem;
+  border: 1px solid #8884;
+  border-radius: 4px;
+  cursor: pointer;
+  background: inherit;
+  color: inherit;
+}
+button:hover { background: #8882; }
+
+/* ---------- approval ---------- */
+#approval {
+  display: none;
+  padding: .5rem 1rem;
+  background: #fde68a44;
+  border-bottom: 1px solid #fde68a88;
+}
+#approval kbd {
+  border: 1px solid #8888;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #8882;
+}
+
+/* ---------- status line ---------- */
+#status {
+  display: flex;
+  gap: 1rem;
+  padding: .25rem 1rem .25rem 1rem;
+  font-size: 12px;
+  opacity: .55;
+}
+#status .metric { white-space: nowrap; }
+#status .ctx-gauge { display: inline-block; width: 60px; height: 6px; background: #4444; border-radius: 3px; overflow: hidden; vertical-align: middle; }
+#status .ctx-fill { height: 100%; border-radius: 3px; transition: width .5s; }

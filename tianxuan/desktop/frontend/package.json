@@ -1,5 +1,5 @@
 {
-  "name": "reasonix-desktop-frontend",
+  "name": "tianxuan-desktop-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-virtual": "^3.14.2",
     "highlight.js": "^11.10.0",
     "katex": "^0.17.0",
@@ -20,6 +21,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
+    "tailwindcss": "^4.3.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

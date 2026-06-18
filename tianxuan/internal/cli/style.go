@@ -25,6 +25,7 @@ const (
 	ansiReset   = "\033[0m"
 	ansiBold    = "\033[1m"
 	ansiDim     = "\033[2m"
+	ansiItalic  = "\033[3m"
 	ansiGreen   = "\033[32m"
 	ansiYellow  = "\033[33m"
 	ansiRed     = "\033[31m"
@@ -44,6 +45,7 @@ func sgr(code, s string) string {
 
 func bold(s string) string    { return sgr(ansiBold, s) }
 func dim(s string) string     { return sgr(ansiDim, s) }
+func italic(s string) string  { return sgr(ansiItalic, s) }
 func green(s string) string   { return sgr(ansiGreen, s) }
 func red(s string) string     { return sgr(ansiRed, s) }
 func yellow(s string) string  { return sgr(ansiYellow, s) }

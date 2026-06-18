@@ -1,3 +1,34 @@
+## [8.0.6] — 2026-06-18
+
+### V8.0 系列稳定版 — 8 新特性 + 6 补丁 + 全量审计
+
+| 特性 | 说明 |
+|------|------|
+| 确定性结果剪枝 | 相同工具+参数+结果不重复发 token |
+| Mid-turn Steer | 检测错误螺旋，注入纠偏提示（blocked≠failed） |
+| Plan 智能澄清 | 模糊输入主动追问 |
+| read_skill 工具 | Agent 按需读取技能 body |
+| Plan bash 安全白名单 | 20+ 安全命令 + 元字符/重定向/危险参数检测 |
+| Context7 MCP | `CONTEXT7_API_KEY` 自动启用 |
+| /goal 命令 | 大目标分解为子任务 |
+| PermissionRequest Hook | 自定义审批策略 + 参数修改 |
+
+### 补丁链 (V8.0.1–V8.0.6)
+
+- V8.0.1: 死代码 + 状态泄漏 + 接口遗漏 (4 Bug)
+- V8.0.2: 🔴 致命 — filteredSchemas 破坏缓存前缀不变性
+- V8.0.3: Plan bash 安全白名单
+- V8.0.4: `2>&1` 误拦 + `go test` + find/go 危险参数
+- V8.0.5: steer blocked≠failed 误判修复
+- V8.0.6: `2>>` 误拦 + steer 全面测试
+
+### 发布
+
+- CLI: `tianxuan.exe` (13.4 MB)
+- 桌面端: `tianxuan-desktop.exe` (16.7 MB, Wails v2.12.0)
+
+---
+
 ## [7.7.1] — 2026-06-18
 
 ### 架构优化

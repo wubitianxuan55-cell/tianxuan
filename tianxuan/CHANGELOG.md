@@ -1,3 +1,57 @@
+## [8.2.0] — 2026-06-18
+
+### Go 核心优化
+
+| 优化 | 说明 |
+|------|------|
+| 大文件拆分 | `agent.go` 2085→1260行 (-40%), `controller.go` 1472→911行 (-38%) |
+| 空方法修复 | 删除 `SetTaskKind`，文档化 `CompactNow`/`SummarizeFrom`/`SummarizeUpTo` |
+| 测试补充 | `learning` 包 13 用例 + `archive` 包 9 用例 |
+| 重复逻辑消除 | `executeOne` 内联 fallback 精简，dispatcher 路径统一 |
+| 并发安全文档化 | `gate`/`hooks`/`asker`/`onPreEdit` 加 happens-before 注释 |
+
+### 🔴 缓存保护红线
+
+| 规则 | 说明 |
+|------|------|
+| L1 Identity 字节不变 | `verifyPrefix` SHA-256 守卫 |
+| tools 列表 session 不变 | V8.0.2 filteredSchemas 教训 |
+| L2 Runtime 首轮锁定 | 缓存 key 含 L2 |
+| 禁止动态系统提示词注入 | 破坏 L1→user 前缀结构 |
+| 工具描述不可热更新 | CompactDescriptor 是缓存前缀一部分 |
+
+### HTTP/SSE 前端重写
+
+- `index.html` 拆为 3 文件 (HTML/CSS/JS)，SSE 指数退避重连
+- thinking 折叠块 + tool 耗时显示 + `/health` 端点
+
+### TUI 增强
+
+- 状态栏：实时 ¥ 成本 + cache 命中率颜色编码 (绿/黄/红)
+- md.go: ANSI 转义 → 统一 `style.go` 常量体系
+
+### 桌面端 UI
+
+| 特性 | 说明 |
+|------|------|
+| Logo 重设计 | 4 变体，暖铜色渐变统一品牌色 |
+| Tailwind CSS | 主题 tokens + 3 组件迁移 + styles.css -10% |
+| JumpBar | 右侧圆点轮次导航 + hover 预览 + 点击跳转 |
+| 状态栏增强 | 连接状态灯 + 上下文用量四段色条 |
+| Composer 模式按钮 | 3 按钮并排 (auto/plan/yolo) |
+| ErrorCard + Toast | turn_done 错误可视化 + 全局通知系统 |
+
+### 品牌清理
+
+`reasonix → tianxuan`: 26 文件全局替换
+
+### 发布
+
+- CLI: `tianxuan.exe`
+- 桌面端: `tianxuan-desktop.exe` (Wails v2.12.0)
+
+---
+
 ## [8.0.6] — 2026-06-18
 
 ### V8.0 系列稳定版 — 8 新特性 + 6 补丁 + 全量审计

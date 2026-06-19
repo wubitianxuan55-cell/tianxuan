@@ -24,11 +24,11 @@ export const UserMessage = memo(function UserMessage({
   const rewind = (scope: string) => onRewind?.(turn as number, scope);
   const displayText = text.replace(/@\.tianxuan\/attachments\/[^\s]+/g, "[image]");
   return (
-    <div className="relative flex items-center gap-2 px-4 py-2.5 group">
+    <div className="relative flex flex-row-reverse items-center gap-2 px-4 py-2.5 group">
       <span className="text-accent font-mono font-semibold text-lg leading-none shrink-0">›</span>
-      <div className="bg-accent-soft text-fg rounded-xl rounded-bl-md px-4 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words max-w-[85%]">{displayText}</div>
+      <div className="bg-accent-soft text-fg rounded-xl rounded-br-md px-4 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words max-w-[85%]">{displayText}</div>
       {canRewind && (
-        <div className="relative ml-auto shrink-0">
+        <div className="relative shrink-0 ml-auto">
           <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-opacity" title={t("rewind.label")} onClick={onToggle}>
             ⟲
           </button>
@@ -48,30 +48,39 @@ export const UserMessage = memo(function UserMessage({
   );
 });
 
-export const AssistantMessage = memo(function AssistantMessage({ item, onCollapse }: { item: AssistantItem; onCollapse?: () => void }) {
+export const AssistantMessage = memo(function AssistantMessage({ item }: { item: AssistantItem; onCollapse?: () => void }) {
   const t = useT();
   const thinkOnly = !!item.reasoning && !item.text;
   const [open, setOpen] = useState(false);
-  // 默认折叠，用户手动切换后保持状态
-  const effectiveOpen = open;
+  const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
 
   return (
     <div className={`relative py-1 ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
       {item.reasoning && (
         <div className="mb-1">
           <button
-            className="flex items-center gap-1 text-fg-faint text-[11px] font-medium bg-transparent border-0 cursor-pointer py-0.5 hover:text-fg-dim"
-            onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
+            className="flex items-center gap-1.5 text-fg-faint text-[11px] font-medium bg-transparent border-0 cursor-pointer py-0.5 hover:text-fg-dim select-none"
+            onClick={() => setOpen((v) => !v)}
           >
             <ChevronRight
-              className={`shrink-0 transition-transform duration-150 ${effectiveOpen ? "rotate-90" : ""}`}
+              className={`shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
               size={12}
             />
-            {item.streaming
-              ? `💭 ${t("msg.thinking")}…`
-              : `💭 ${t("msg.thinking")} (${item.reasoning.split("\n").filter(l => l.trim()).length} 段)`}
+            <span className="text-fg-faint/70">
+              {item.streaming ? `${t("msg.thinking")}…` : `${t("msg.thinking")} (${reasoningLines} 段)`}
+            </span>
           </button>
-          {effectiveOpen && <div className="mt-1.5 ml-4 text-fg-dim text-xs leading-relaxed whitespace-pre-wrap opacity-80">{item.reasoning}</div>}
+          <div
+            className={`grid transition-all duration-300 ease-in-out ${
+              open ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="pl-3 border-l-2 border-border-soft text-fg-dim text-xs leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+                {item.reasoning}
+              </div>
+            </div>
+          </div>
         </div>
       )}
       {item.text && (

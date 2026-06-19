@@ -68,48 +68,48 @@ export function ApprovalModal({
       <div className="plan-approval-dock" aria-live="polite">
         <div
           ref={cardRef}
-          className="plan-approval-card"
+          className="border border-border rounded-[10px] bg-bg-elev shadow-[0_12px_30px_rgba(0,0,0,0.18)] p-3 outline-none focus-visible:border-accent"
           role="dialog"
           aria-modal="false"
           aria-labelledby="plan-approval-title"
           tabIndex={-1}
         >
-          <div className="plan-approval-card__header">
+          <div className="flex items-start justify-between gap-3 mb-2.5">
             <div>
-              <div id="plan-approval-title" className="plan-approval-card__title">
+              <div id="plan-approval-title" className="text-fg font-semibold leading-[1.35]">
                 {t("approval.planTitle")}
               </div>
-              <div className="plan-approval-card__note">{t("approval.planNote")}</div>
+              <div className="text-fg-dim text-[12.5px] leading-[1.45] mt-0.5">{t("approval.planNote")}</div>
             </div>
           </div>
-          <div className="plan-approval-card__choices">
-            <button className="plan-choice" onClick={() => onAnswer(false, false)}>
-              <span className="plan-choice__key">1</span>
-              <span className="plan-choice__copy">
-                <span className="plan-choice__label">{t("approval.keepPlanning")}</span>
-                <span className="plan-choice__hint">{t("approval.keepPlanningHint")}</span>
+          <div className="grid grid-cols-1 gap-1.5">
+            <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border border-border-soft rounded-lg bg-bg-soft text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px" onClick={() => onAnswer(false, false)}>
+              <span className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border rounded-[7px] text-fg-dim bg-bg font-mono text-xs font-bold">1</span>
+              <span className="flex min-w-0 flex-col gap-px">
+                <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.keepPlanning")}</span>
+                <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.keepPlanningHint")}</span>
               </span>
             </button>
-            <button className="plan-choice plan-choice--primary" onClick={() => onAnswer(true, false)}>
-              <span className="plan-choice__key">2</span>
-              <span className="plan-choice__copy">
-                <span className="plan-choice__label">{t("approval.startExecution")}</span>
-                <span className="plan-choice__hint">{t("approval.startExecutionHint")}</span>
+            <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border rounded-lg text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-accent-soft" onClick={() => onAnswer(true, false)}>
+              <span className="inline-flex items-center justify-center w-[26px] h-[26px] border rounded-[7px] font-mono text-xs font-bold border-accent bg-accent text-accent-fg">2</span>
+              <span className="flex min-w-0 flex-col gap-px">
+                <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.startExecution")}</span>
+                <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.startExecutionHint")}</span>
               </span>
             </button>
-            <button className="plan-choice" onClick={() => setRevisionOpen((open) => !open)}>
-              <span className="plan-choice__key">3</span>
-              <span className="plan-choice__copy">
-                <span className="plan-choice__label">{t("approval.revisePlan")}</span>
-                <span className="plan-choice__hint">{t("approval.revisePlanHint")}</span>
+            <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border border-border-soft rounded-lg bg-bg-soft text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px" onClick={() => setRevisionOpen((open) => !open)}>
+              <span className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border rounded-[7px] text-fg-dim bg-bg font-mono text-xs font-bold">3</span>
+              <span className="flex min-w-0 flex-col gap-px">
+                <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.revisePlan")}</span>
+                <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.revisePlanHint")}</span>
               </span>
             </button>
           </div>
           {revisionOpen && (
-            <div className="plan-revision">
+            <div className="mt-2.5 border-t border-border-soft pt-2.5">
               <textarea
                 ref={inputRef}
-                className="plan-revision__input"
+                className="w-full min-h-[72px] resize-y border border-border rounded-lg bg-bg text-fg text-[13px] leading-[1.45] px-2.5 py-[9px] focus:border-accent outline-none placeholder:text-fg-faint"
                 value={revisionText}
                 rows={3}
                 placeholder={t("approval.revisePlanPlaceholder")}
@@ -119,11 +119,11 @@ export function ApprovalModal({
                   event.stopPropagation();
                 }}
               />
-              <div className="plan-revision__actions">
-                <button className="btn" onClick={() => setRevisionOpen(false)}>
+              <div className="flex justify-end gap-2 mt-2 flex-wrap">
+                <button onClick={() => setRevisionOpen(false)}>
                   {t("common.cancel")}
                 </button>
-                <button className="btn btn--primary" onClick={submitRevision}>
+                <button onClick={submitRevision}>
                   {t("approval.sendRevision")}
                 </button>
               </div>
@@ -138,45 +138,45 @@ export function ApprovalModal({
     <div className="plan-approval-dock" aria-live="polite">
       <div
         ref={cardRef}
-        className="plan-approval-card"
+        className="border border-border rounded-[10px] bg-bg-elev shadow-[0_12px_30px_rgba(0,0,0,0.18)] p-3 outline-none focus-visible:border-accent"
         role="dialog"
         aria-modal="false"
         aria-labelledby="tool-approval-title"
         tabIndex={-1}
       >
-        <div className="plan-approval-card__header">
+        <div className="flex items-start justify-between gap-3 mb-2.5">
           <div>
-            <div id="tool-approval-title" className="plan-approval-card__title">
+            <div id="tool-approval-title" className="text-fg font-semibold leading-[1.35]">
               {t("approval.toolTitle")}
             </div>
-            <div className="plan-approval-card__note">{t("approval.toolNote")}</div>
+            <div className="text-fg-dim text-[12.5px] leading-[1.45] mt-0.5">{t("approval.toolNote")}</div>
           </div>
         </div>
-        <div className="approval-tool">
-          <span className="approval-tool__label">{t("approval.toolLabel")}</span>
+        <div className="flex items-center gap-2 min-h-[34px] mx-0 mb-2 mt-0 border border-border-soft rounded-lg bg-bg-soft py-[5px] px-2">
+          <span className="shrink-0 text-fg-faint font-mono text-[11px] uppercase tracking-[0.04em]">{t("approval.toolLabel")}</span>
           <span className="font-mono text-xs font-medium text-fg">{approval.tool}</span>
         </div>
-        {approval.subject && <pre className="approval-subject">{approval.subject}</pre>}
-        <div className="plan-approval-card__choices">
-          <button className="plan-choice" onClick={() => onAnswer(false, false)}>
-            <span className="plan-choice__key">1</span>
-            <span className="plan-choice__copy">
-              <span className="plan-choice__label">{t("approval.deny")}</span>
-              <span className="plan-choice__hint">{t("approval.denyHint")}</span>
+        {approval.subject && <pre className="m-0 mb-2.5 px-[11px] py-[9px] bg-bg-soft border border-border-soft rounded-lg font-mono text-[12.5px] whitespace-pre-wrap break-words max-h-[140px] overflow-auto">{approval.subject}</pre>}
+        <div className="grid grid-cols-1 gap-1.5">
+          <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border border-border-soft rounded-lg bg-bg-soft text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px" onClick={() => onAnswer(false, false)}>
+            <span className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border rounded-[7px] text-fg-dim bg-bg font-mono text-xs font-bold">1</span>
+            <span className="flex min-w-0 flex-col gap-px">
+              <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.deny")}</span>
+              <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.denyHint")}</span>
             </span>
           </button>
-          <button className="plan-choice plan-choice--primary" onClick={() => onAnswer(true, false)}>
-            <span className="plan-choice__key">2</span>
-            <span className="plan-choice__copy">
-              <span className="plan-choice__label">{t("approval.allowOnce")}</span>
-              <span className="plan-choice__hint">{t("approval.allowOnceHint")}</span>
+          <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border rounded-lg text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-accent-soft" onClick={() => onAnswer(true, false)}>
+            <span className="inline-flex items-center justify-center w-[26px] h-[26px] border rounded-[7px] font-mono text-xs font-bold border-accent bg-accent text-accent-fg">2</span>
+            <span className="flex min-w-0 flex-col gap-px">
+              <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.allowOnce")}</span>
+              <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.allowOnceHint")}</span>
             </span>
           </button>
-          <button className="plan-choice" onClick={() => onAnswer(true, true)}>
-            <span className="plan-choice__key">3</span>
-            <span className="plan-choice__copy">
-              <span className="plan-choice__label">{t("approval.allowSession")}</span>
-              <span className="plan-choice__hint">{t("approval.allowSessionHint")}</span>
+          <button className="grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] border border-border-soft rounded-lg bg-bg-soft text-fg p-[7px_9px] text-left cursor-pointer transition-[border-color,background,transform] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev-2 hover:-translate-y-px" onClick={() => onAnswer(true, true)}>
+            <span className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border rounded-[7px] text-fg-dim bg-bg font-mono text-xs font-bold">3</span>
+            <span className="flex min-w-0 flex-col gap-px">
+              <span className="text-fg text-[13px] font-semibold leading-[1.25]">{t("approval.allowSession")}</span>
+              <span className="text-fg-faint text-[11.5px] leading-[1.3]">{t("approval.allowSessionHint")}</span>
             </span>
           </button>
         </div>

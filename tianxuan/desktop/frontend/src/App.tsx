@@ -460,7 +460,7 @@ export default function App() {
               <span className="font-mono text-[11px] text-fg-dim truncate">{state.meta?.label ?? "…"}</span>
             </div>
             <div className="flex items-center gap-2 px-3">
-              {cwd && (<button className="chip flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
+              {cwd && (<button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
               <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
@@ -479,13 +479,13 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
-              <button className="chip" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
-              <button className="chip" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
-              <button className="chip" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>
                 {themeNow==="dark"?"深色":themeNow==="light"?"浅色":themeNow==="warm"?"暖护眼":"冰蓝"}
               </button>
               <button
-                className="chip chip--icon"
+                className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag px-2"
                 onClick={() => void openHistory()}
                 disabled={state.running}
                 title={state.running ? t("common.busyHint") : t("topbar.history")}
@@ -494,7 +494,7 @@ export default function App() {
               </button>
 
               <button
-                className="chip chip--icon"
+                className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag px-2"
                 onClick={() => void startNewSession()}
                 disabled={state.running}
                 title={state.running ? t("common.busyHint") : t("topbar.newSession")}
@@ -505,7 +505,7 @@ export default function App() {
           </header>
 
           {state.meta?.startupErr && (
-            <div className="banner banner--error">{t("topbar.startupError", { msg: state.meta.startupErr })}</div>
+            <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("topbar.startupError", { msg: state.meta.startupErr })}</div>
           )}
 
           <UpdateBanner />
@@ -521,7 +521,7 @@ export default function App() {
             )}
           </main>
 
-          <footer className="footer">
+          <footer className="shrink-0 border-t border-border-soft bg-bg pt-3 pb-1 px-8">
             {showTodos && <TodoPanel todos={todos} onDismiss={() => setDismissedTodo(todoItem!.id)} />}
             <Composer
               running={state.running}
@@ -572,38 +572,38 @@ export default function App() {
         )}
 
         {workspacePanelOpen && (
-        <div className="right-panel">
-          <div className="right-panel__tabs">
+        <div className="flex flex-col min-w-0 overflow-hidden border-l border-border-soft bg-bg">
+          <div className="flex items-center border-b border-border-soft overflow-hidden shrink">
             <button
-              className={`right-panel__tab ${rightTab === "files" ? "right-panel__tab--active" : ""}`}
+              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "files" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("files")}
             >
               <FolderTree size={13} />
               <span>文件</span>
             </button>
             <button
-              className={`right-panel__tab ${rightTab === "runtime" ? "right-panel__tab--active" : ""}`}
+              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "runtime" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("runtime")}
             >
               <Cpu size={13} />
               <span>工具</span>
             </button>
             <button
-              className={`right-panel__tab ${rightTab === "skills" ? "right-panel__tab--active" : ""}`}
+              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "skills" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("skills")}
             >
               <Blocks size={13} />
               <span>技能</span>
             </button>
             <button
-              className={`right-panel__tab ${rightTab === "stats" ? "right-panel__tab--active" : ""}`}
+              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("stats")}
             >
               <BarChart3 size={13} />
               <span>统计</span>
             </button>
           </div>
-          <div className="right-panel__body">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {rightTab === "files" ? (
               <WorkspacePanel
                 open={workspacePanelOpen}

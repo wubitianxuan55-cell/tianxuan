@@ -108,12 +108,14 @@ export function Transcript({
     const el = scrollRef.current;
     if (!el) return;
     // 虚拟滚动模式下，虚拟列表总高度变化时也要滚动到底部
-    virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
+    if (grouped.length > 0) {
+      virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
+    }
     const id = requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
     return () => cancelAnimationFrame(id);
-  }, [contentVersion]);
+  }, [contentVersion, grouped.length, virtualizer]);
 
   // Sub-agent calls carry a parentId; collect them under their parent `task`
   // call so the parent card can render them nested, and skip them at top level.
@@ -221,34 +223,36 @@ export function Transcript({
 
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
-      {items.length === 0 && <Welcome onPrompt={onPrompt} />}
-      <StreamingIndicator running={running} items={items} />
+      <div className="px-[100px]">
+        {items.length === 0 && <Welcome onPrompt={onPrompt} />}
+        <StreamingIndicator running={running} items={items} />
 
-      <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          width: "100%",
-          position: "relative",
-        }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => (
-          <div
-            key={virtualItem.key}
-            data-index={virtualItem.index}
-            ref={virtualizer.measureElement}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              transform: `translateY(${virtualItem.start}px)`,
-            }}
-          >
-            {renderItem(grouped[virtualItem.index])}
-          </div>
-        ))}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {renderItem(grouped[virtualItem.index])}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -264,22 +268,22 @@ function CompactionCard({ item }: { item: CompactionItem }) {
   const [open, setOpen] = useState(false);
   if (item.pending) {
     return (
-      <div className="compaction compaction--pending">
-        <span className="compaction__spinner">⋯</span> Compacting conversation…
+      <div className="flex items-center gap-2 my-1 mx-2 px-3 py-2 border border-border-soft rounded-lg bg-bg-soft text-fg-faint text-xs animate-pulse">
+        <span className="text-accent font-bold">⋯</span> Compacting conversation…
       </div>
     );
   }
   return (
-    <div className="compaction">
-      <button className="compaction__head" onClick={() => setOpen((v) => !v)}>
-        <span className="compaction__icon">◆</span>
-        <span className="compaction__title">Context compacted</span>
-        <span className="compaction__meta">
+    <div className="my-1 mx-2 border border-border-soft rounded-lg bg-bg-soft overflow-hidden">
+      <button className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-0 text-fg-dim text-[12.5px] cursor-pointer hover:bg-bg-elev" onClick={() => setOpen((v) => !v)}>
+        <span className="text-accent text-xs shrink-0">◆</span>
+        <span className="font-medium text-fg">Context compacted</span>
+        <span className="text-fg-faint text-[11px] ml-auto">
           {item.messages} messages · {item.trigger}
         </span>
-        <span className="compaction__toggle">{open ? "hide summary" : "show summary"}</span>
+        <span className="text-fg-faint text-[10.5px] underline shrink-0">{open ? "hide summary" : "show summary"}</span>
       </button>
-      {open && <pre className="compaction__summary">{item.summary}</pre>}
+      {open && <pre className="m-0 p-3 bg-bg text-fg-dim text-[11.5px] leading-relaxed whitespace-pre-wrap border-t border-border-soft">{item.summary}</pre>}
     </div>
   );
 }

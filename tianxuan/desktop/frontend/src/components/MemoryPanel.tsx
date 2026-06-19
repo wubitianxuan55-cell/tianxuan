@@ -115,7 +115,7 @@ export function MemoryPanel({
       const target = m[1].trim();
       out.push(
         factNames.has(target) ? (
-          <button key={k++} type="button" className="mem-link" onClick={() => jumpTo(target)}>
+          <button key={k++} type="button" className="inline-flex items-center gap-1 px-1.5 py-px border border-border-soft rounded text-fg-faint text-[11px] cursor-pointer hover:text-fg hover:border-fg-faint" onClick={() => jumpTo(target)}>
             {target}
           </button>
         ) : (
@@ -181,16 +181,16 @@ export function MemoryPanel({
 
   return (
     <ResizableDrawer onClose={onClose}>
-        <header className="drawer__head">
+        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
           <div>
-            <div className="drawer__title">{t("memory.title")}</div>
+            <div className="text-[15px] font-semibold text-fg">{t("memory.title")}</div>
             {view?.available && (
-              <div className="drawer__summary">
+              <div className="mt-[3px] text-fg-faint text-[11px]">
                 {t("memory.summary", { facts: facts.length, docs: view.docs.length })}
               </div>
             )}
           </div>
-          <button className="chip" onClick={onClose} title={t("common.close")}>
+          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={t("common.close")}>
             ✕
           </button>
         </header>
@@ -198,7 +198,7 @@ export function MemoryPanel({
         {!view?.available ? (
           <div className="py-5 text-fg-faint text-sm text-center">{t("memory.unavailable")}</div>
         ) : (
-          <div className="drawer__body">
+          <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]">
             <section className="mb-3">
               <div className="flex items-center justify-between px-2 pb-1.5">
                 <div>
@@ -236,7 +236,7 @@ export function MemoryPanel({
                   </button>
                 </div>
               ) : (
-                <div className="mem-facts">
+                <div className="flex flex-col gap-2.5 min-w-0">
                   {filteredFacts.map((f) => {
                     const isOpen = expanded === f.name;
                     const links = uniqueLinks(f.body, factNames);
@@ -295,11 +295,11 @@ export function MemoryPanel({
                               <span className="text-fg-faint text-[10px]">{t("memory.appliesNow")}</span>
                               {confirmForget === f.name ? (
                                 <div className="flex items-center gap-1.5">
-                                  <button className="btn btn--small" onClick={() => setConfirmForget(null)} disabled={busy} type="button">{t("common.cancel")}</button>
-                                  <button className="btn btn--small mem-danger" onClick={() => void forgetFact(f.name)} disabled={busy} type="button">{t("memory.confirmForget")}</button>
+                                  <button className="px-2.5 py-1 text-xs" onClick={() => setConfirmForget(null)} disabled={busy} type="button">{t("common.cancel")}</button>
+                                  <button className="px-2.5 py-1 text-xs text-[#d66] border-[color-mix(in_srgb,#d66_34%,transparent)] bg-[color-mix(in_srgb,#d66_10%,transparent)] hover:text-[#d66] hover:border-[color-mix(in_srgb,#d66_52%,transparent)]" onClick={() => void forgetFact(f.name)} disabled={busy} type="button">{t("memory.confirmForget")}</button>
                                 </div>
                               ) : (
-                                <button className="btn btn--small mem-fact__forget" onClick={() => setConfirmForget(f.name)} disabled={busy} type="button"><Trash2 size={13} />{t("memory.forget")}</button>
+                                <button className="px-2.5 py-1 text-xs inline-flex items-center gap-[5px] text-fg-dim hover:text-[#d66] hover:border-[color-mix(in_srgb,#d66_36%,transparent)]" onClick={() => setConfirmForget(f.name)} disabled={busy} type="button"><Trash2 size={13} />{t("memory.forget")}</button>
                               )}
                             </div>
                           </div>
@@ -336,7 +336,7 @@ export function MemoryPanel({
                   onKeyDown={(e) => { if (e.key === "Enter") void submitNote(); }}
                 />
                 <button
-                  className="btn btn--primary btn--small"
+                  className="btn--primary"
                   onClick={() => void submitNote()}
                   disabled={busy || !note.trim()}
                 >
@@ -362,7 +362,7 @@ export function MemoryPanel({
                       <span className={`badge badge--${d.scope}`}>{d.scope}</span>
                       <span className="flex-1 text-fg-dim font-mono text-[11px] truncate" title={d.path}>{d.path}</span>
                       {!editing && (
-                        <button className="btn btn--small" onClick={() => startEdit(d.path, d.body)}>{t("common.edit")}</button>
+                        <button className="px-2.5 py-1 text-xs" onClick={() => startEdit(d.path, d.body)}>{t("common.edit")}</button>
                       )}
                     </div>
                     {editing ? (
@@ -374,8 +374,8 @@ export function MemoryPanel({
                           spellCheck={false}
                         />
                         <div className="flex justify-end gap-2 mt-1.5">
-                          <button className="btn btn--small" onClick={() => setEditingPath(null)} disabled={busy}>{t("common.cancel")}</button>
-                          <button className="btn btn--primary btn--small" onClick={() => void saveEdit()} disabled={busy}>{t("common.save")}</button>
+                          <button className="px-2.5 py-1 text-xs" onClick={() => setEditingPath(null)} disabled={busy}>{t("common.cancel")}</button>
+                          <button className="btn--primary" onClick={() => void saveEdit()} disabled={busy}>{t("common.save")}</button>
                         </div>
                       </div>
                     ) : (

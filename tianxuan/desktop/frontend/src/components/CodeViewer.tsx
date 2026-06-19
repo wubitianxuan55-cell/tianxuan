@@ -23,11 +23,11 @@ const Impl = lazy(() => import("./editors/HljsCode"));
 
 export function CodeViewer(props: EditorProps) {
   return (
-    <div className="code-block">
-      <CopyButton text={props.value} className="code-block__copy" />
+    <div className="relative group/code">
+      <CopyButton text={props.value} className="absolute top-[7px] right-[7px] z-[2] opacity-0 group-hover/code:opacity-100 transition-opacity duration-[0.12s]" />
       <Suspense
         fallback={
-          <pre className="code code--loading">
+          <pre className="my-2.5 px-[13px] py-[11px] bg-bg-soft border border-border-soft rounded-lg font-mono text-[12.5px] leading-[1.55] overflow-auto whitespace-pre text-fg opacity-55">
             <code>{props.value}</code>
           </pre>
         }

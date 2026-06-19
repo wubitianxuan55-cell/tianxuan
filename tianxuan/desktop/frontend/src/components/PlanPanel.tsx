@@ -18,16 +18,16 @@ export function PlanPanel({
   if (!planContent.trim()) {
     return (
       <ResizableDrawer onClose={onClose}>
-        <header className="drawer__head">
-          <div className="drawer__title">
+        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
+          <div className="text-[15px] font-semibold text-fg">
             <FileText size={15} />
             <span>{tr("plan.title")}</span>
           </div>
-          <button className="chip" onClick={onClose} title={tr("common.close")}>
+          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={tr("common.close")}>
             ✕
           </button>
         </header>
-        <div className="drawer__body" style={{ padding: "16px", color: "var(--fg-faint)", fontSize: "13px" }}>
+        <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]" style={{ padding: "16px", color: "var(--fg-faint)", fontSize: "13px" }}>
           {tr("plan.empty")}
         </div>
       </ResizableDrawer>
@@ -36,16 +36,16 @@ export function PlanPanel({
 
   return (
     <ResizableDrawer onClose={onClose}>
-      <header className="drawer__head">
-        <div className="drawer__title">
+      <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
+        <div className="text-[15px] font-semibold text-fg">
           <FileText size={15} />
           <span>{tr("plan.title")}</span>
         </div>
-        <button className="chip" onClick={onClose} title={tr("common.close")}>
+        <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={tr("common.close")}>
           ✕
         </button>
       </header>
-      <div className="drawer__body plan-panel__body">
+      <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px] plan-panel__body">
         <MemoMarkdown text={planContent} streaming={false} />
       </div>
     </ResizableDrawer>

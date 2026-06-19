@@ -59,9 +59,9 @@ export function HistoryPanel({
 
   return (
     <ResizableDrawer onClose={onClose}>
-        <header className="drawer__head">
-          <div className="drawer__title">{tr("history.title")}</div>
-          <button className="chip" onClick={onClose} title={tr("common.close")}>
+        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
+          <div className="text-[15px] font-semibold text-fg">{tr("history.title")}</div>
+          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={tr("common.close")}>
             ✕
           </button>
         </header>
@@ -77,7 +77,7 @@ export function HistoryPanel({
           />
         </div>
 
-        <div className="drawer__body">
+        <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]">
           {sessions.length === 0 ? (
             <div className="py-5 text-fg-faint text-xs text-center">{tr("history.empty")}</div>
           ) : filtered.length === 0 ? (

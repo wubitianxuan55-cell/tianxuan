@@ -29,7 +29,7 @@ export const MemoMarkdown = memo(function MemoMarkdown({ text, streaming }: Memo
   // 非流式：完整渲染
   if (!streaming) {
     return (
-      <div className="msg__body">
+      <div className="bg-bg-elev rounded-md max-w-full px-3.5 py-2 break-words overflow-wrap-break-word [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
         <Markdown text={text} />
       </div>
     );
@@ -37,10 +37,10 @@ export const MemoMarkdown = memo(function MemoMarkdown({ text, streaming }: Memo
 
   // 流式：缓存主体 + 尾部纯文本（避免频繁 re-parse）+ 光标
   return (
-    <div className="msg__body">
+    <div className="bg-bg-elev rounded-md max-w-full px-3.5 py-2 break-words overflow-wrap-break-word [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
       {cached}
       {tail && <span>{tail}</span>}
-      <span className="cursor" />
+      <span className="inline-block w-[7px] h-[1.05em] ml-0.5 bg-accent align-text-bottom" />
     </div>
   );
 });

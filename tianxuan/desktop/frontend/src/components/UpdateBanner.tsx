@@ -25,14 +25,14 @@ export function UpdateBanner() {
       const info = status.info;
       if (info.latest === dismissed) return null;
       return (
-        <div className="banner banner--update">
-          <span className="banner__msg">{t("updater.available", { v: info.latest })}</span>
-          {!info.canSelfUpdate && <span className="banner__hint">{t("updater.macHint")}</span>}
-          <span className="banner__spacer" />
-          <button className="btn btn--small btn--primary" onClick={() => apply(info)}>
+        <div className="shrink-0 px-4 py-2 text-[12.5px] flex items-center gap-2.5 bg-accent-soft text-fg border-b border-border-soft">
+          <span className="font-medium">{t("updater.available", { v: info.latest })}</span>
+          {!info.canSelfUpdate && <span className="text-fg-dim text-[11.5px]">{t("updater.macHint")}</span>}
+          <span className="flex-1" />
+          <button className="px-2.5 py-1 text-xs" onClick={() => apply(info)}>
             {info.canSelfUpdate ? t("updater.installNow") : t("updater.goToDownload")}
           </button>
-          <button className="btn btn--small" onClick={() => setDismissed(info.latest)}>
+          <button className="px-2.5 py-1 text-xs" onClick={() => setDismissed(info.latest)}>
             {t("updater.dismiss")}
           </button>
         </div>
@@ -41,21 +41,21 @@ export function UpdateBanner() {
     case "downloading": {
       const pct = status.total > 0 ? Math.round((status.received / status.total) * 100) : 0;
       return (
-        <div className="banner banner--update">
-          <span className="banner__msg">
+        <div className="shrink-0 px-4 py-2 text-[12.5px] flex items-center gap-2.5 bg-accent-soft text-fg border-b border-border-soft">
+          <span className="font-medium">
             {t("updater.downloading", { done: mb(status.received), total: mb(status.total), pct })}
           </span>
-          <span className="banner__spacer" />
-          <progress className="banner__progress" value={status.received} max={status.total || undefined} />
+          <span className="flex-1" />
+          <progress className="w-[180px] h-2 accent-accent" value={status.received} max={status.total || undefined} />
         </div>
       );
     }
     case "verifying":
-      return <div className="banner banner--update">{t("updater.verifying")}</div>;
+      return <div className="shrink-0 px-4 py-2 text-[12.5px] flex items-center gap-2.5 bg-accent-soft text-fg border-b border-border-soft">{t("updater.verifying")}</div>;
     case "applying":
-      return <div className="banner banner--update">{t("updater.applying")}</div>;
+      return <div className="shrink-0 px-4 py-2 text-[12.5px] flex items-center gap-2.5 bg-accent-soft text-fg border-b border-border-soft">{t("updater.applying")}</div>;
     case "done":
-      return <div className="banner banner--update">{t("updater.done")}</div>;
+      return <div className="shrink-0 px-4 py-2 text-[12.5px] flex items-center gap-2.5 bg-accent-soft text-fg border-b border-border-soft">{t("updater.done")}</div>;
     case "error":
       // 自动更新检查失败时静默（网络波动不打扰用户），手动检查在 Settings 面板中显示错误。
       return null;

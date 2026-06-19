@@ -72,7 +72,7 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
   return (
     <div
       ref={barRef}
-      className="absolute right-0 top-0 bottom-0 w-2.5 hover:w-3.5 flex flex-col items-center gap-0.5 py-1 z-10 transition-[width]"
+      className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 z-10"
       onMouseMove={onMove}
       onMouseLeave={() => { setHovered(null); setShowPreview(false); }}
     >

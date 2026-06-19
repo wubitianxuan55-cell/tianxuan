@@ -45,9 +45,9 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
 
   return (
     <ResizableDrawer onClose={onClose} wide>
-        <header className="drawer__head">
-          <div className="drawer__title">{t("settings.title")}</div>
-          <button className="chip" onClick={onClose} title={t("common.close")}>
+        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
+          <div className="text-[15px] font-semibold text-fg">{t("settings.title")}</div>
+          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={t("common.close")}>
             ✕
           </button>
         </header>
@@ -55,7 +55,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
         {!s ? (
           <div className="empty">{t("settings.loading")}</div>
         ) : (
-          <div className="drawer__body drawer__body--settings">
+          <div className="flex-1 min-h-0 flex h-full overflow-y-auto">
             <div className="flex h-full">
               <nav className="flex flex-col gap-1 w-[180px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0" aria-label={t("settings.title")}>
                 {SETTINGS_TABS.map((id) => (
@@ -72,7 +72,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
                 ))}
               </nav>
               <main className="flex-1 min-w-0 overflow-y-auto px-5 py-2.5">
-                {err && <div className="banner banner--error">{err}</div>}
+                {err && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{err}</div>}
                 {tab === "models" && <ModelsSection s={s} busy={busy} apply={apply} onManageProviders={() => setTab("providers")} />}
                 {tab === "providers" && <ProvidersSection s={s} busy={busy} apply={apply} />}
                 {tab === "permissions" && <PermissionsSection s={s} busy={busy} apply={apply} />}
@@ -169,7 +169,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
     <section className="mb-3">
       <div className="flex items-center justify-between px-1 pb-1.5">
         <div className="text-fg text-sm font-semibold">{t("settings.tab.models")}</div>
-        <button className="btn btn--small" onClick={onManageProviders}>
+        <button className="px-2.5 py-1 text-xs" onClick={onManageProviders}>
           {t("settings.manageProviders")}
         </button>
       </div>
@@ -224,7 +224,7 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
       <div className="flex items-center justify-between px-1 pb-1.5">
         <div className="text-fg text-sm font-semibold">{t("settings.tab.providers")}</div>
         {editing !== "__new__" && (
-          <button className="btn btn--small" disabled={busy} onClick={() => setEditing("__new__")}>
+          <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setEditing("__new__")}>
             {t("settings.addProvider")}
           </button>
         )}
@@ -249,11 +249,11 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
                   {p.keySet ? t("settings.keySet") : t("settings.noKey")}
                 </span>
                 <span className="flex-1" />
-                <button className="btn btn--small" disabled={busy} onClick={() => setEditing(p.name)}>
+                <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setEditing(p.name)}>
                   {t("common.edit")}
                 </button>
                 <button
-                  className="btn btn--small"
+                  className="px-2.5 py-1 text-xs"
                   disabled={busy || defaultProvider === p.name}
                   title={defaultProvider === p.name ? t("settings.cantDeleteDefault") : t("settings.deleteProvider")}
                   onClick={() => void apply(() => app.DeleteProvider(p.name))}
@@ -351,10 +351,10 @@ function ProviderEditor({
       <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
       <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.contextWindowHint")}</div>
       <div className="flex gap-2 mt-2">
-        <button className="btn btn--small" onClick={onCancel} disabled={busy}>
+        <button className="px-2.5 py-1 text-xs" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
-        <button className="btn btn--primary btn--small" onClick={save} disabled={busy || !name.trim() || !baseUrl.trim()}>
+        <button className="btn--primary" onClick={save} disabled={busy || !name.trim() || !baseUrl.trim()}>
           {t("common.save")}
         </button>
       </div>
@@ -376,7 +376,7 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
         onChange={(e) => setVal(e.target.value)}
       />
       <button
-        className="btn btn--small"
+        className="px-2.5 py-1 text-xs"
         disabled={busy || !val.trim()}
         onClick={() => {
           void onSet(val.trim());
@@ -470,7 +470,7 @@ function RuleList({
             if (e.key === "Enter") add();
           }}
         />
-        <button className="btn btn--small" disabled={busy || !draft.trim()} onClick={add}>
+        <button className="px-2.5 py-1 text-xs" disabled={busy || !draft.trim()} onClick={add}>
           {t("common.add")}
         </button>
       </div>
@@ -542,7 +542,7 @@ function AgentSection({ s, busy, apply }: SectionProps) {
       <textarea className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] p-2.5 outline-none resize-y min-h-[120px] focus:border-accent" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={busy} spellCheck={false} />
       <div className="flex gap-2 mt-2">
         <button
-          className="btn btn--primary btn--small"
+          className="btn--primary"
           disabled={busy || !dirty}
           onClick={() => void apply(() => app.SetAgentParams(Number(temp) || 0, Number(steps) || 0, prompt))}
         >
@@ -626,7 +626,7 @@ function UpdatesSection({ configPath }: { configPath: string }) {
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("updater.currentVersion", { v: version || "…" })}</label>
         <span className="flex-1" />
-        <button className="btn btn--small" disabled={busy} onClick={() => void check()}>
+        <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => void check()}>
           {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
         </button>
       </div>
@@ -636,7 +636,7 @@ function UpdatesSection({ configPath }: { configPath: string }) {
           <div className="flex items-center gap-3 mb-2.5">
             <span className="text-fg-dim text-[13px] shrink-0">{t("updater.available", { v: status.info.latest })}</span>
             <span className="flex-1" />
-            <button className="btn btn--primary btn--small" onClick={() => apply(status.info)}>
+            <button className="btn--primary" onClick={() => apply(status.info)}>
               {status.info.canSelfUpdate ? t("updater.installNow") : t("updater.goToDownload")}
             </button>
           </div>
@@ -655,7 +655,7 @@ function UpdatesSection({ configPath }: { configPath: string }) {
       {status.kind === "verifying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.verifying")}</div>}
       {status.kind === "applying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.applying")}</div>}
       {status.kind === "done" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.done")}</div>}
-      {status.kind === "error" && <div className="banner banner--error">{t("updater.failed", { msg: status.message })}</div>}
+      {status.kind === "error" && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("updater.failed", { msg: status.message })}</div>}
       {configPath && (
         <div className="text-fg-faint text-[10px] mt-1 px-1 settings-config-path" title={configPath}>
           {t("settings.config", { path: configPath })}

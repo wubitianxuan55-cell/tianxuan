@@ -106,12 +106,12 @@ export function CapabilitiesPanel({
 
   return (
     <ResizableDrawer onClose={onClose} subtle>
-        <header className="drawer__head">
+        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
           <div>
-            <div className="drawer__title">{t("caps.title")}</div>
-            {view && <div className="drawer__summary">{summary}</div>}
+            <div className="text-[15px] font-semibold text-fg">{t("caps.title")}</div>
+            {view && <div className="mt-[3px] text-fg-faint text-[11px]">{summary}</div>}
           </div>
-          <button className="chip" onClick={onClose} title={t("common.close")}>
+          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={t("common.close")}>
             ✕
           </button>
         </header>
@@ -119,8 +119,8 @@ export function CapabilitiesPanel({
         {!view ? (
           <div className="empty">{t("caps.loading")}</div>
         ) : (
-          <div className="drawer__body">
-            {err && <div className="banner banner--error">{err}</div>}
+          <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]">
+            {err && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{err}</div>}
 
             <div className="flex border-b border-border-soft mb-3" role="tablist" aria-label={t("caps.title")}>
               <button
@@ -141,7 +141,7 @@ export function CapabilitiesPanel({
               <section className="mb-3">
                 <div className="flex justify-end mb-2">
                   {!adding && (
-                    <button className="btn btn--small" disabled={busy} onClick={() => setAdding(true)}>
+                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setAdding(true)}>
                       {t("caps.addServer")}
                     </button>
                   )}
@@ -304,15 +304,15 @@ function FailedServersNotice({
               <div className="flex items-center gap-1 px-3 pb-2">
                 {confirming === s.name ? (
                   <>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onRemove(s.name)}>{t("caps.confirmRemove")}</button>
-                    <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
+                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => onRemove(s.name)}>{t("caps.confirmRemove")}</button>
+                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
                   </>
                 ) : (
                   <>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onRetry(s.name)}>{t("caps.retry")}</button>
-                    <button className="btn btn--small" onClick={() => void navigator.clipboard?.writeText(error)}>{t("common.copy")}</button>
-                    <button className="btn btn--small" onClick={() => onToggle(s.name)} aria-expanded={open}>{open ? t("common.collapse") : t("caps.showLog")}</button>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}>✕</button>
+                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => onRetry(s.name)}>{t("caps.retry")}</button>
+                    <button className="px-2.5 py-1 text-xs" onClick={() => void navigator.clipboard?.writeText(error)}>{t("common.copy")}</button>
+                    <button className="px-2.5 py-1 text-xs" onClick={() => onToggle(s.name)} aria-expanded={open}>{open ? t("common.collapse") : t("caps.showLog")}</button>
+                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}>✕</button>
                   </>
                 )}
               </div>
@@ -381,20 +381,22 @@ function ServerRow({
         <div className="flex items-center gap-1 shrink-0">
           {confirming ? (
             <>
-              <button className="btn btn--small" disabled={busy} onClick={onRemove}>{t("caps.confirmRemove")}</button>
-              <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
+              <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onRemove}>{t("caps.confirmRemove")}</button>
+              <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
             </>
           ) : (
             <>
               {s.status === "failed" ? (
-                <button className="btn btn--small" disabled={busy} onClick={onRetry}>{actionLabel}</button>
+                <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onRetry}>{actionLabel}</button>
               ) : (
-                <label className="cap-switch" title={s.status === "connected" ? t("caps.disable") : t("caps.enable")}>
-                  <input type="checkbox" checked={s.status === "connected"} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
-                  <span className="cap-switch__track" />
+                <label className="inline-flex cursor-pointer no-drag" title={s.status === "connected" ? t("caps.disable") : t("caps.enable")}>
+                  <input type="checkbox" className="peer absolute opacity-0 w-0 h-0" checked={s.status === "connected"} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
+                  <span className="relative w-[30px] h-[17px] rounded-full bg-border transition-colors duration-[0.14s] peer-checked:bg-ok peer-disabled:opacity-50 peer-checked:[&>span]:translate-x-[13px]">
+                    <span className="absolute top-0.5 left-0.5 w-[13px] h-[13px] rounded-full bg-bg-elev transition-transform duration-[0.14s]" />
+                  </span>
                 </label>
               )}
-              <button className="btn btn--small" disabled={busy} onClick={onConfirm} title={t("caps.remove")}>✕</button>
+              <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onConfirm} title={t("caps.remove")}>✕</button>
             </>
           )}
         </div>
@@ -558,10 +560,10 @@ function AddServerForm({
       <label className="set-label">{t("caps.envLabel")}</label>
       <textarea className="mem-textarea" value={env} onChange={(e) => setEnv(e.target.value)} placeholder={t("caps.envPlaceholder")} spellCheck={false} />
       <div className="prov-card__actions">
-        <button className="btn btn--small" onClick={onCancel} disabled={busy}>
+        <button className="px-2.5 py-1 text-xs" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
-        <button className="btn btn--primary btn--small" onClick={submit} disabled={busy || !ready}>
+        <button className="btn--primary" onClick={submit} disabled={busy || !ready}>
           {t("caps.add")}
         </button>
       </div>

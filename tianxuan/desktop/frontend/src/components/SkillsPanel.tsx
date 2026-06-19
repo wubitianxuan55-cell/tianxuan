@@ -11,28 +11,31 @@ export function SkillsPanel({ counts }: { counts: Record<string, number> }) {
   }, []);
 
   return (
-    <div className="rt-panel">
-      <div className="rt-panel__head">
+    <div className="flex flex-col overflow-y-auto text-xs">
+      <div className="flex items-center gap-1.5 px-2.5 py-[9px] border-b border-border-soft text-fg-dim font-semibold text-[11px]">
         <Blocks size={12} />
         <span>技能</span>
       </div>
-      <div className="rt-panel__list">
+      <div className="py-1">
         {skills.length === 0 ? (
-          <div className="rt-panel__empty">加载中...</div>
+          <div className="py-4 px-2.5 text-fg-faint text-[11px] text-center">加载中...</div>
         ) : (
-          <div className="rt-section">
-            <div className="rt-section__grid">
-              {skills.map((sk) => (
+          <div className="px-1.5 py-1">
+            <div className="flex flex-col gap-[3px]">
+              {skills.map((sk) => {
+                const active = (counts[sk.name] ?? 0) > 0;
+                return (
                 <div
                   key={sk.name}
-                  className={`rt-card ${(counts[sk.name] ?? 0) > 0 ? "rt-card--active" : ""}`}
+                  className={`flex items-center gap-[5px] px-[7px] py-[5px] rounded-md border border-border-soft bg-bg ${active ? "border-accent-soft bg-sidebar-active" : ""}`}
                   title={sk.description}
                 >
-                  <span className="rt-card__dot" />
-                  <span className="rt-card__name">{sk.name}</span>
-                  <span className="rt-card__count">{counts[sk.name] ?? 0}</span>
+                  <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${active ? "bg-accent" : "bg-border-soft"}`} />
+                  <span className={`font-mono text-[10.5px] flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${active ? "text-accent font-semibold" : "text-fg-dim"}`}>{sk.name}</span>
+                  <span className={`font-mono text-[11px] font-semibold ${active ? "text-accent" : "text-fg-faint"}`}>{counts[sk.name] ?? 0}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

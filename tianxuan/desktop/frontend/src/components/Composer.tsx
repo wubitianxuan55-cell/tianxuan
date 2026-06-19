@@ -728,7 +728,7 @@ export function Composer({
       <div
         className={`relative border border-border rounded-xl bg-bg-elev overflow-hidden shadow-[0_10px_28px_rgba(0,0,0,0.08)] transition-[border-color] duration-[0.12s] focus-within:border-fg-faint ${
           composerHeight !== null ? "flex flex-col" : ""
-        } ${composerResizing ? "composer-card--resizing" : ""}`}
+        } ${composerResizing ? "cursor-ns-resize" : ""}`}
         style={{ ...(composerHeight !== null ? { height: "var(--composer-height)" } : {}), ...composerCardStyle }}
         ref={composerCardRef}
       >
@@ -764,14 +764,14 @@ export function Composer({
             disabled={disabled}
           />
           {running && (
-            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-[opacity,background] duration-[0.12s] bg-bg-elev-2 text-err" onClick={handleCancel} title={t("composer.stop")}>
+            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[0.12s] bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95" onClick={handleCancel} title={t("composer.stop")}>
               <Square size={14} fill="currentColor" />
             </button>
           )}
           <button
-            className={`inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-[opacity,background] duration-[0.12s] ${
-              running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg" : "bg-accent text-accent-fg"
-            } disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default`}
+            className={`inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[0.12s] active:scale-95 ${
+              running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"
+            } disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100`}
             onClick={submit}
             disabled={disabled || pendingPaste > 0 || (!text.trim() && attachments.length === 0 && (!running || queueLen === 0))}
             title={running ? (queueLen > 0 ? `排队发送 (${queueLen})` : t("composer.queue")) : t("composer.send")}

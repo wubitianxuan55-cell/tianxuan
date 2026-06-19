@@ -72,6 +72,30 @@ function calcCost(tokens: number, pricePerM: number): number {
   return (tokens / 1_000_000) * pricePerM;
 }
 
+const CARD_VARIANTS: Record<string, { border: string; text: string }> = {
+  hit:  { border: "!border-ok/20", text: "text-ok [text-shadow:0_0_8px_rgba(116,184,122,0.3)]" },
+  miss: { border: "!border-warn/15", text: "text-warn" },
+  cost: { border: "", text: "text-accent" },
+};
+
+function CostCard({ icon, label, value, sub, variant, small }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string;
+  variant?: "hit" | "miss" | "cost"; small?: boolean;
+}) {
+  const v = variant ? CARD_VARIANTS[variant] : null;
+  return (
+    <div className={`flex items-start rounded-lg bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,.15),inset_0_1px_0_rgba(255,255,255,.02)] relative overflow-hidden ${small ? "py-[5px] px-2 gap-1" : "py-2.5 pl-3 pr-2.5 gap-2"} ${v?.border ?? ""}`}>
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent pointer-events-none" />
+      <span className="mt-px text-fg-faint shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <div className="text-[9px] text-fg-faint uppercase tracking-[0.6px] font-medium">{label}</div>
+        <div className={`font-bold tabular-nums font-mono tracking-[-0.3px] ${small ? "text-xs" : "text-[17px]"} ${v?.text ?? ""}`}>{value}</div>
+        {sub && <div className="text-[11px] text-fg-faint mt-0.5">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, toolCounts, skillCounts }: {
   usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string
   sessionKey: string; refreshNonce: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
@@ -169,79 +193,57 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
   const lastTurnCost = lastTurn ? lastTurn.cost : 0;
 
   return (
-    <div className="cost-panel">
+    <div className="flex flex-col gap-[14px] p-[12px_14px] h-full overflow-y-auto bg-gradient-to-b from-white/[0.01] to-transparent">
       {/* ① 上下文窗口 */}
       {context.window > 0 && (
-        <div className="cost-section">
-          <div className="cost-section__title"><Gauge size={11} style={{ marginRight: 4, verticalAlign: "middle" }} />上下文 ({fmt(context.used)} / {fmt(context.window)})</div>
-          <div className="cost-ctx-bar"><div className="cost-ctx-bar__fill" style={{ width: `${Math.min(100, (context.used / context.window) * 100)}%` }} /></div>
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5"><Gauge size={11} className="inline mr-1 align-middle" />上下文 ({fmt(context.used)} / {fmt(context.window)})</div>
+          <div className="h-2 rounded bg-border-soft overflow-hidden"><div className="h-full rounded bg-accent transition-[width] duration-300 min-w-0.5" style={{ width: `${Math.min(100, (context.used / context.window) * 100)}%` }} /></div>
         </div>
       )}
 
       {/* ② 会话统计 */}
-      <div className="cost-section">
-        <div className="cost-section__title">
-          <BarChart3 size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+      <div className="flex flex-col gap-1.5">
+        <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5">
+          <BarChart3 size={12} className="inline mr-1 align-middle" />
           会话 · {history.length}轮 · {stepHistory.length}步 · ¥{totalCost.toFixed(3)}
         </div>
-        <div className="cost-cards" style={{ gap: 4 }}>
-          <div className="cost-card" style={{ padding: "5px 8px", gap: 4 }}>
-            <Hash size={11} /><div className="cost-card__body"><div className="cost-card__label">Prompt</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(sessionPrompt)}</div></div>
-          </div>
-          <div className="cost-card cost-card--hit" style={{ padding: "5px 8px", gap: 4 }}>
-            <Zap size={11} /><div className="cost-card__body"><div className="cost-card__label">命中 {pct(sessionHit, sessionPrompt)}</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(sessionHit)}</div></div>
-          </div>
-          <div className="cost-card cost-card--miss" style={{ padding: "5px 8px", gap: 4 }}>
-            <BarChart3 size={11} /><div className="cost-card__body"><div className="cost-card__label">未命中</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(sessionMiss)}</div></div>
-          </div>
+        <div className="grid grid-cols-2 gap-1">
+          <CostCard icon={<Hash size={11} />} label="Prompt" value={fmt(sessionPrompt)} small />
+          <CostCard icon={<Zap size={11} />} label={`命中 ${pct(sessionHit, sessionPrompt)}`} value={fmt(sessionHit)} variant="hit" small />
+          <CostCard icon={<BarChart3 size={11} />} label="未命中" value={fmt(sessionMiss)} variant="miss" small />
         </div>
       </div>
 
       {/* ③ 本轮 */}
       {lastTurn && (
-        <div className="cost-section">
-          <div className="cost-section__title" style={{ marginBottom: 4 }}>
-            <Hash size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5 flex items-center">
+            <Hash size={12} className="inline mr-1" />
             本轮 #{lastTurn.turn}
-            <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-faint)" }}>¥{lastTurnCost.toFixed(4)}</span>
+            <span className="ml-auto text-[10px] text-fg-faint">¥{lastTurnCost.toFixed(4)}</span>
           </div>
-          <div className="cost-cards" style={{ gap: 4 }}>
-            <div className="cost-card" style={{ padding: "5px 8px", gap: 4 }}>
-              <Hash size={11} /><div className="cost-card__body"><div className="cost-card__label">Prompt</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastTurn.prompt)}</div></div>
-            </div>
-            <div className="cost-card" style={{ padding: "5px 8px", gap: 4 }}>
-              <Zap size={11} /><div className="cost-card__body"><div className="cost-card__label">Completion</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastTurn.completion)}</div></div>
-            </div>
-            <div className="cost-card cost-card--hit" style={{ padding: "5px 8px", gap: 4 }}>
-              <Zap size={11} /><div className="cost-card__body"><div className="cost-card__label">命中 {pct(lastTurn.cacheHit, lastTurn.prompt)}</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastTurn.cacheHit)}</div></div>
-            </div>
-            <div className="cost-card cost-card--miss" style={{ padding: "5px 8px", gap: 4 }}>
-              <BarChart3 size={11} /><div className="cost-card__body"><div className="cost-card__label">未命中</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastTurn.cacheMiss)}</div></div>
-            </div>
+          <div className="grid grid-cols-2 gap-1">
+            <CostCard icon={<Hash size={11} />} label="Prompt" value={fmt(lastTurn.prompt)} small />
+            <CostCard icon={<Zap size={11} />} label="Completion" value={fmt(lastTurn.completion)} small />
+            <CostCard icon={<Zap size={11} />} label={`命中 ${pct(lastTurn.cacheHit, lastTurn.prompt)}`} value={fmt(lastTurn.cacheHit)} variant="hit" small />
+            <CostCard icon={<BarChart3 size={11} />} label="未命中" value={fmt(lastTurn.cacheMiss)} variant="miss" small />
           </div>
         </div>
       )}
 
       {/* ④ 当前步 */}
       {lastStep && (
-        <div className="cost-section">
-          <div className="cost-section__title" style={{ marginBottom: 4 }}>
-            <Footprints size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5 flex items-center">
+            <Footprints size={12} className="inline mr-1" />
             当前步 #{lastStep.step}
           </div>
-          <div className="cost-cards" style={{ gap: 4 }}>
-            <div className="cost-card" style={{ padding: "5px 8px", gap: 4 }}>
-              <Hash size={11} /><div className="cost-card__body"><div className="cost-card__label">Prompt</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastStep.prompt)}</div></div>
-            </div>
-            <div className="cost-card" style={{ padding: "5px 8px", gap: 4 }}>
-              <Zap size={11} /><div className="cost-card__body"><div className="cost-card__label">Completion</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastStep.completion)}</div></div>
-            </div>
-            <div className="cost-card cost-card--hit" style={{ padding: "5px 8px", gap: 4 }}>
-              <Zap size={11} /><div className="cost-card__body"><div className="cost-card__label">命中 {pct(lastStep.cacheHit, lastStep.prompt)}</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastStep.cacheHit)}</div></div>
-            </div>
-            <div className="cost-card cost-card--miss" style={{ padding: "5px 8px", gap: 4 }}>
-              <BarChart3 size={11} /><div className="cost-card__body"><div className="cost-card__label">未命中</div><div className="cost-card__value" style={{ fontSize: 12 }}>{fmt(lastStep.cacheMiss)}</div></div>
-            </div>
+          <div className="grid grid-cols-2 gap-1">
+            <CostCard icon={<Hash size={11} />} label="Prompt" value={fmt(lastStep.prompt)} small />
+            <CostCard icon={<Zap size={11} />} label="Completion" value={fmt(lastStep.completion)} small />
+            <CostCard icon={<Zap size={11} />} label={`命中 ${pct(lastStep.cacheHit, lastStep.prompt)}`} value={fmt(lastStep.cacheHit)} variant="hit" small />
+            <CostCard icon={<BarChart3 size={11} />} label="未命中" value={fmt(lastStep.cacheMiss)} variant="miss" small />
           </div>
         </div>
       )}
@@ -266,25 +268,25 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         const yTicks = [minRate, Math.round(minRate + range * 0.33), Math.round(minRate + range * 0.66), maxRate];
 
         return (
-          <div className="cost-section">
-            <div className="cost-section__title">命中率趋势 (最近 {recent.length} 步)</div>
-            <svg viewBox={`0 0 ${W} ${H}`} className="cost-linechart">
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5">命中率趋势 (最近 {recent.length} 步)</div>
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto my-1">
               {yTicks.map(v => {
                 const yPos = padT + plotH - ((v - minRate) / range) * plotH;
-                return <text key={v} x={padL - 4} y={yPos + 3} className="cost-linechart__tick">{v}%</text>;
+                return <text key={v} x={padL - 4} y={yPos + 3} fontSize={9} fill="var(--fg-faint)" textAnchor="end">{v}%</text>;
               })}
               {yTicks.map(v => {
                 const yPos = padT + plotH - ((v - minRate) / range) * plotH;
-                return <line key={"g"+v} x1={padL} y1={yPos} x2={W - padR} y2={yPos} className="cost-linechart__grid" />;
+                return <line key={"g"+v} x1={padL} y1={yPos} x2={W - padR} y2={yPos} stroke="var(--border-soft)" strokeWidth={0.5} />;
               })}
               <path d={path} fill="none" stroke="#f0a040" strokeWidth={2} strokeLinejoin="round" />
               {points.map(p => <circle key={p.step} cx={p.x} cy={p.y} r={2} fill="#f0a040"><title>步#{p.step}: {p.rate.toFixed(1)}%</title></circle>)}
               {points.filter((_, i) => i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)).map(p => (
-                <text key={"x"+p.step} x={p.x} y={H - 3} className="cost-linechart__tick">#{p.step}</text>
+                <text key={"x"+p.step} x={p.x} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">#{p.step}</text>
               ))}
             </svg>
-            <div className="cost-legend">
-              <span><span className="cost-legend__dot" style={{background:"#f0a040"}} /> 每步命中率</span>
+            <div className="flex gap-3 text-[10px] text-fg-faint mt-1">
+              <span><span className="inline-block w-2 h-2 rounded-sm mr-[3px] align-middle" style={{background:"#f0a040"}} /> 每步命中率</span>
             </div>
           </div>
         );
@@ -307,41 +309,41 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         const ticks = [0, Math.round(cumMax * 0.33), Math.round(cumMax * 0.66), cumMax];
 
         return (
-          <div className="cost-section">
-            <div className="cost-section__title">Token 累计趋势 (最近 {recent.length} 轮)</div>
-            <svg viewBox={`0 0 ${W} ${H}`} className="cost-linechart">
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5">Token 累计趋势 (最近 {recent.length} 轮)</div>
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto my-1">
               {[0, 0.33, 0.66, 1].map(pct => (
-                <line key={"g"+pct} x1={padL} y1={padT + plotH - pct * plotH} x2={W - padR} y2={padT + plotH - pct * plotH} className="cost-linechart__grid" />
+                <line key={"g"+pct} x1={padL} y1={padT + plotH - pct * plotH} x2={W - padR} y2={padT + plotH - pct * plotH} stroke="var(--border-soft)" strokeWidth={0.5} />
               ))}
               {ticks.map((v, i) => {
                 const pct = [0, 0.33, 0.66, 1][i];
-                return <text key={"t"+i} x={padL - 4} y={padT + plotH - pct * plotH + 3} className="cost-linechart__tick" textAnchor="end">{fmt(v)}</text>;
+                return <text key={"t"+i} x={padL - 4} y={padT + plotH - pct * plotH + 3} fontSize={9} fill="var(--fg-faint)" textAnchor="end">{fmt(v)}</text>;
               })}
               <path d={path} fill="none" stroke="#4ecb71" strokeWidth={1.5} />
               {points.map(p => <circle key={"p"+p.turn} cx={p.x} cy={p.y} r={1.8} fill="#4ecb71"><title>轮#{p.turn}: {fmt(p.v)} tok</title></circle>)}
             </svg>
-            <div className="cost-legend"><span><span className="cost-legend__dot" style={{background:"#4ecb71"}} />按轮累计 Prompt Tokens</span></div>
+            <div className="flex gap-3 text-[10px] text-fg-faint mt-1"><span><span className="inline-block w-2 h-2 rounded-sm mr-[3px] align-middle" style={{background:"#4ecb71"}} />按轮累计 Prompt Tokens</span></div>
           </div>
         );
       })()}
 
       {/* ⑦ 工具/技能统计 */}
       {(Object.keys(toolCounts).length > 0 || Object.keys(skillCounts).length > 0) && (
-        <div className="cost-section">
-          <div className="cost-section__title"><BarChart3 size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />工具使用统计</div>
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[10px] font-semibold tracking-[0.5px] text-fg-faint uppercase mb-0.5"><BarChart3 size={12} className="inline mr-1 align-middle" />工具使用统计</div>
           {Object.keys(toolCounts).length > 0 && (
-            <div className="cost-tags">
+            <div className="flex flex-wrap gap-1.5">
               {Object.entries(toolCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
-                <span key={name} className="cost-tag"><span className="cost-tag__name">{name}</span><span className="cost-tag__count">{count}</span></span>
+                <span key={name} className="inline-flex items-center gap-1.5 bg-bg-elev border border-border-soft rounded px-2 py-0.5 text-xs"><span className="font-mono text-fg">{name}</span><span className="text-[10px] text-fg-faint tabular-nums">{count}</span></span>
               ))}
             </div>
           )}
           {Object.keys(skillCounts).length > 0 && (
             <>
-              <div style={{ fontSize: 11, color: "var(--fg-faint)", margin: "4px 0 2px" }}>技能调用</div>
-              <div className="cost-tags">
+              <div className="text-[11px] text-fg-faint mt-0.5 mb-0.5">技能调用</div>
+              <div className="flex flex-wrap gap-1.5">
                 {Object.entries(skillCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
-                  <span key={name} className="cost-tag cost-tag--skill"><span className="cost-tag__name">{name}</span><span className="cost-tag__count">{count}</span></span>
+                  <span key={name} className="inline-flex items-center gap-1.5 bg-accent-soft border border-accent/20 rounded px-2 py-0.5 text-xs"><span className="font-mono text-accent">{name}</span><span className="text-[10px] text-accent/70 tabular-nums">{count}</span></span>
                 ))}
               </div>
             </>
@@ -350,8 +352,8 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
       )}
 
       {/* 清空按钮 */}
-      <div className="cost-section" style={{ textAlign: "right", padding: "2px 0" }}>
-        <button className="cost-clear-btn" onClick={() => { setData({ turns: [], steps: [] }); saveData(sessionKey, { turns: [], steps: [] }); turnRef.current = 0; stepRef.current = 0; }} title="清空统计">
+      <div className="flex justify-end py-0.5">
+        <button className="text-[10px] px-1.5 py-0.5 border border-border-soft rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:border-err" onClick={() => { setData({ turns: [], steps: [] }); saveData(sessionKey, { turns: [], steps: [] }); turnRef.current = 0; stepRef.current = 0; }} title="清空统计">
           清空统计
         </button>
       </div>

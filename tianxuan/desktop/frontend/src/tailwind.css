@@ -12,64 +12,87 @@
  */
 
 @theme {
+  /*
+   * All tokens reference styles.css CSS variables (managed by :root[data-theme])
+   * so Tailwind utilities automatically follow the active theme (dark/light/warm/ice).
+   * styles.css is the single source of truth for color values.
+   */
+
   /* ── surfaces ── */
-  --color-bg: #090a0c;
-  --color-bg-soft: #111319;
-  --color-bg-elev: #191b22;
-  --color-bg-elev-2: #222631;
-  --color-sidebar-bg: #0c0e12;
-  --color-sidebar-hover: #181c24;
-  --color-sidebar-active: rgba(217, 119, 87, 0.13);
-  --color-border: #343945;
-  --color-border-soft: #252a34;
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-elev-2: var(--bg-elev-2);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
 
   /* ── text ── */
-  --color-fg: #f4f5f7;
-  --color-fg-dim: #c0c4cc;
-  --color-fg-faint: #858b96;
+  --color-fg: var(--fg);
+  --color-fg-dim: var(--fg-dim);
+  --color-fg-faint: var(--fg-faint);
 
   /* ── brand accent (warm clay) ── */
-  --color-accent: #d97757;
-  --color-accent-soft: rgba(217, 119, 87, 0.18);
-  --color-accent-glow: rgba(217, 119, 87, 0.08);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
 
   /* ── semantic ── */
-  --color-success: #9ece6a;
-  --color-warning: #e0af68;
-  --color-error: #f28b82;
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-err: var(--err);
   --color-info: #7aa2f7;
+  --color-warning: #e0af68;
 
-  /* ── code / terminal ── */
-  --color-code-bg: #0f1119;
-  --color-code-border: #343945;
-  --color-code-syntax: #a9b1d6;
-  --color-code-comment: #565f89;
-  --color-code-keyword: #bb9af7;
-  --color-code-string: #9ece6a;
-  --color-code-number: #ff9e64;
+  /* ── diff ── */
+  --color-add-bg: var(--add-bg);
+  --color-add-fg: var(--add-fg);
+  --color-del-bg: var(--del-bg);
+  --color-del-fg: var(--del-fg);
+
+  /* ── syntax highlight ── */
+  --color-hl-keyword: var(--hl-keyword);
+  --color-hl-string: var(--hl-string);
+  --color-hl-number: var(--hl-number);
+  --color-hl-comment: var(--hl-comment);
+  --color-hl-func: var(--hl-func);
+  --color-hl-type: var(--hl-type);
+  --color-hl-builtin: var(--hl-builtin);
+  --color-hl-meta: var(--hl-meta);
 
   /* ── scrollbar ── */
   --color-scrollbar-track: transparent;
-  --color-scrollbar-thumb: #343945;
+  --color-scrollbar-thumb: var(--border);
   --color-scrollbar-thumb-hover: #444956;
+
+  /* ── fonts ── */
+  --font-mono: var(--mono);
+  --font-sans: var(--sans);
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 14px;
+
+  /* ── border radius ── */
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 12px;
 }
 
 /* ── base layer ── */
 @layer base {
-  html, body, #root {
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
+  /*
+   * Box-sizing, scrollbar, and interaction defaults only.
+   * Body colors & fonts come from styles.css (unlayered, higher priority).
+   */
+  *, *::before, *::after {
+    box-sizing: border-box;
   }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--color-fg);
-    background: var(--color-bg);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  html, #root {
+    height: 100%;
   }
 
   /* Wails titlebar drag region */
@@ -112,8 +135,46 @@
   &::-webkit-scrollbar { display: none; }
 }
 @utility drag-region {
+  --wails-draggable: drag;
   -webkit-app-region: drag;
 }
 @utility no-drag {
+  --wails-draggable: no-drag;
   -webkit-app-region: no-drag;
+}
+
+/* Drawer resizing cursor lock */
+.drawer--resizing,
+.drawer--resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+.drawer--resizing .group > .pointer-events-none {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+/* ── keyframes (referenced by Tailwind arbitrary animation utilities) ── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.8; }
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(12px); opacity: 0.6; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes drawer-out {
+  from { transform: translateX(0);  opacity: 1; }
+  to   { transform: translateX(12px); opacity: 0; }
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

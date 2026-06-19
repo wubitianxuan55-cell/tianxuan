@@ -1,3 +1,40 @@
+## [8.2.1] — 2026-06-19
+
+### 🎨 桌面端 UI — Tailwind CSS 全量迁移
+
+24 个前端组件从手写 BEM CSS 迁移至 Tailwind 工具类，styles.css 缩减 28.3%。
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| 🏗️ 地基 | `tailwind.css` | `@theme` 令牌全部通过 `var()` 引用主题变量，自动跟随 dark/light/warm/ice 四套主题；新增 30+ 令牌 + 5 组 @keyframes |
+| 🧩 小组件 | Toast / ErrorCard / JumpBar / Skeleton | `animate-[toast-in]` / `border-err text-err` / `hover:scale-[1.6]` |
+| 🏠 布局壳 | Topbar / Sidebar / Drawer / ResizableDrawer | 伪元素→真实 DOM，`group-hover:bg-accent`，`animate-[drawer-in]` |
+| ⌨️ 输入系统 | Composer(全) / SlashMenu / FileMenu / ArgMenu | 输入/按钮/模式/附件/斜杠菜单/workspace-switcher |
+| 💬 消息系统 | Message / ToolCard / ToolGroup / StatusBar | 状态变体 border 色微分，思考折叠 `rotate-90` |
+| 📁 文件面板 | WorkspacePanel (全) | tabs/crumbs/tree/search/empty 全部 Tailwind |
+| 🗄️ 抽屉面板 | MemoryPanel / HistoryPanel (全) / SettingsPanel (表单90%) / CapabilitiesPanel (核心+ServerRow+SkillRow) | 搜索/过滤/事实卡片/文档编辑/服务器列表/技能卡片 |
+| 🔧 其他 | ApprovalModal / TodoPanel | icon 修复 |
+
+**数据**：`styles.css` 5263→3773 行 (-1490, -28.3%)，CSS bundle 151.41→126.71 KB (-24.70 KB, -16.3%)，gzip 30.58→26.84 KB (-3.74 KB, -12.2%)。
+
+### 🔧 Go 核心 — 6 修复
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| `wait` 工具 schema 修正 | `compact.go` | `job_id`(string) → `job_ids`(array) + `timeout_seconds`，修复批量等待 |
+| Windows Job Object | `bash.go` | 后台任务进程树可靠清理，fallback `taskkill` |
+| MCP HTTP 超时 | `ssrf.go` | 全请求 60s 超时，防止 MCP 服务器无响应永久阻塞 |
+| stdio readLoop 优雅退出 | `transport_stdio.go` | session context 检查，防止挂起服务器阻塞 goroutine |
+| glob/grep context 取消 | `glob.go` / `grep.go` | 大目录遍历周期性检查 `ctx.Done()` |
+| doctor go version 超时 | `doctor.go` | `exec.CommandContext` 10s 超时 |
+
+### 发布
+
+- CLI: `tianxuan.exe`
+- 桌面端: `tianxuan-desktop.exe` (Wails v2.12.0)
+
+---
+
 ## [8.2.0] — 2026-06-18
 
 ### Go 核心优化

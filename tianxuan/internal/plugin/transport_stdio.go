@@ -26,6 +26,7 @@ type stdioTransport struct {
 	stdin  io.WriteCloser
 	stdout *bufio.Reader
 	stderr *tailBuffer
+	ctx    context.Context // V8.2: session context for readLoop shutdown
 
 	callMu sync.Mutex // one in-flight request/response at a time over the shared pipe
 
@@ -70,6 +71,7 @@ func newStdioTransport(ctx context.Context, s Spec) (*stdioTransport, error) {
 		stdin:   stdin,
 		stdout:  bufio.NewReader(stdout),
 		stderr:  stderr,
+		ctx:     ctx,
 		pending: map[int]chan rpcResponse{},
 	}
 	go t.readLoop()
@@ -80,8 +82,17 @@ func newStdioTransport(ctx context.Context, s Spec) (*stdioTransport, error) {
 // message per line, drops server-initiated notifications/requests (they carry a
 // method), and hands each response to the call waiting on its id. On any read
 // error it fails every pending call and exits.
+// V8.2: checks session context before each blocking read so a hung server
+// doesn't keep the goroutine alive after the session is torn down.
 func (t *stdioTransport) readLoop() {
 	for {
+		// V8.2: don't block on read if the session is already closing
+		select {
+		case <-t.ctx.Done():
+			t.failAll(t.ctx.Err())
+			return
+		default:
+		}
 		line, err := t.stdout.ReadBytes('\n')
 		if err != nil {
 			t.failAll(err)

@@ -50,7 +50,7 @@ func (g globTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	// If the pattern contains **, use recursive matching via filepath.WalkDir.
 	if strings.Contains(p.Pattern, "**") {
-		return globRecursive(p.Pattern)
+		return globRecursive(ctx, p.Pattern)
 	}
 
 	// For patterns without **, try filepath.Glob first. If no matches are
@@ -63,7 +63,7 @@ func (g globTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("glob %q: %w", p.Pattern, err)
 	}
 	if len(matches) == 0 && !strings.ContainsAny(p.Pattern, "/\\") {
-		return globRecursive(filepath.Join("**", p.Pattern))
+		return globRecursive(ctx, filepath.Join("**", p.Pattern))
 	}
 	if len(matches) == 0 {
 		return "(no matches)", nil
@@ -78,7 +78,7 @@ func (g globTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 // globRecursive handles patterns containing ** by walking the filesystem.
 // It splits the pattern at ** to get a root prefix and a suffix to match
 // against each file path found during the walk.
-func globRecursive(pattern string) (string, error) {
+func globRecursive(ctx context.Context, pattern string) (string, error) {
 	// Split on ** to find the root directory and the remaining pattern.
 	parts := strings.SplitN(pattern, "**", 2)
 	root := parts[0]
@@ -106,6 +106,12 @@ func globRecursive(pattern string) (string, error) {
 	truncated := false
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		// V8.2: 周期性检查 context 取消，防止大目录遍历永久阻塞
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		if err != nil {
 			return nil // skip unreadable entries
 		}

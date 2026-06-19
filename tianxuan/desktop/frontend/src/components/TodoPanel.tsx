@@ -44,11 +44,11 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
               className={`todobar__item todobar__item--${t.status}${t.level ? " todobar__item--sub" : ""}`}
             >
               {t.status === "completed" ? (
-                <Check size={14} className="todobar__ico todobar__ico--done" />
+                <Check size={14} className="text-ok shrink-0" />
               ) : t.status === "in_progress" ? (
-                <CircleDot size={14} className="todobar__ico todobar__ico--active" />
+                <CircleDot size={14} className="text-accent shrink-0" />
               ) : (
-                <Circle size={14} className="todobar__ico" />
+                <Circle size={14} className="text-fg-faint shrink-0" />
               )}
               <span className="todobar__text">
                 {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}

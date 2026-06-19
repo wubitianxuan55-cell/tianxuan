@@ -95,6 +95,12 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	if info.IsDir() {
 		_ = filepath.WalkDir(p.Path, func(path string, d os.DirEntry, err error) error {
+			// V8.2: 周期性检查 context 取消，防止大目录遍历永久阻塞
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
 			if err != nil {
 				return nil
 			}

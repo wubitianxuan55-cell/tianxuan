@@ -257,7 +257,7 @@ export default function App() {
       }
       if (!mod) return;
       if (ke.key === "n" && !state.running) { ke.preventDefault(); void startNewSession(); return; }
-      if (ke.key === "k") { ke.preventDefault(); (document.querySelector(".composer__input") as HTMLTextAreaElement)?.focus(); return; }
+      if (ke.key === "k") { ke.preventDefault(); (document.querySelector("textarea[placeholder]") as HTMLTextAreaElement)?.focus(); return; }
       if (ke.key === ",") { ke.preventDefault(); setSettingsOpen(true); return; }
       if (ke.key === "M" && ke.shiftKey) { ke.preventDefault(); void openMemory(); return; }
       if (ke.key === "H" && ke.shiftKey) { ke.preventDefault(); void openHistory(); return; }
@@ -311,12 +311,24 @@ export default function App() {
           .join(" ")}
         style={layoutStyle}
       >
-        <aside className={`sidebar${sidebarCollapsed ? " sidebar--collapsed" : ""}`} aria-label="tianxuan navigation">
-          <div className="sidebar__brand">
-            <img src={logo} alt="" className="sidebar__logo" />
-            <span>tianxuan</span>
+        <aside
+          className={`flex flex-col min-w-0 pt-[50px] pb-3 bg-sidebar-bg border-r border-border-soft select-none overflow-hidden drag-region ${
+            sidebarCollapsed ? "items-center px-2" : "px-2.5"
+          }`}
+          aria-label="tianxuan navigation"
+        >
+          {/* Brand */}
+          <div className={`flex items-center gap-2.5 px-2 pb-3.5 text-fg text-[15px] font-semibold ${
+            sidebarCollapsed ? "flex-col gap-2 px-0 pb-3" : ""
+          }`}>
+            <img src={logo} alt="" className="w-6 h-6 rounded-md" />
+            {!sidebarCollapsed && <span>tianxuan</span>}
             <button
-              className={`sidebar__toggle${sidebarExpandBlocked ? " sidebar__toggle--blocked" : ""}`}
+              className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover no-drag ${
+                sidebarCollapsed ? "ml-0" : "ml-auto"
+              } ${
+                sidebarExpandBlocked ? "!text-fg-faint !bg-transparent !cursor-not-allowed opacity-55" : ""
+              }`}
               onClick={sidebarExpandBlocked ? undefined : toggleSidebar}
               title={sidebarToggleTitle}
               aria-label={sidebarToggleTitle}
@@ -326,89 +338,105 @@ export default function App() {
             </button>
           </div>
 
+          {/* New session button */}
           <button
-            className="sidebar__new"
+            className={`w-full min-w-0 border border-border rounded-lg bg-bg-elev text-fg font-medium cursor-pointer transition-[color,background] duration-[0.12s] hover:bg-sidebar-hover hover:text-fg disabled:opacity-55 disabled:cursor-default flex items-center gap-2.5 h-9 px-2.5 mb-3 no-drag ${
+              sidebarCollapsed ? "justify-center w-10 h-10 !rounded-[10px] !p-0 !gap-0" : ""
+            }`}
             onClick={() => void startNewSession()}
             disabled={state.running}
             title={state.running ? t("common.busyHint") : t("topbar.newSession")}
           >
             <SquarePen size={15} />
-            <span>{t("topbar.newSession")}</span>
+            {!sidebarCollapsed && <span>{t("topbar.newSession")}</span>}
           </button>
 
-          <section className="sidebar__section">
-            <div className="sidebar__section-head">
-              <div className="sidebar__section-title">{t("sidebar.conversations")}</div>
-              <button
-                className="sidebar__view-all"
-                onClick={() => void openHistory()}
-                disabled={state.running}
-                title={state.running ? t("common.busyHint") : t("topbar.history")}
-              >
-                {t("sidebar.viewAll")}
-              </button>
-            </div>
-            {sidebarSessions.length > 3 && <input className="sidebar__search" placeholder="搜索…" value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
-            <div className="sidebar__sessions">
-              {(() => {
-                const q = sidebarQuery.trim().toLowerCase();
-                const visible = q ? sidebarSessions.filter((s: SessionMeta) => (s.title||s.preview||"").toLowerCase().includes(q)||s.path.toLowerCase().includes(q)) : sidebarSessions;
-                if (sidebarSessions.length===0) return <div className="sidebar__empty">{t("sidebar.noRecent")}</div>;
-                if (visible.length===0 && q) return <div className="sidebar__empty">无匹配</div>;
-                return visible.map((session: SessionMeta) => (
-                  <div className={`sidebar-session${session.current?" sidebar-session--current":""}`} key={session.path}>
-                    <button className="sidebar-session__main" onClick={() => void onResumeSession(session.path)} disabled={state.running||session.current} title={session.path}>
-                      <MessageSquare size={14} />
-                      <span className="sidebar-session__body">
-                        <span className="sidebar-session__title">{sessionTitle(session, t("history.emptySession"))}</span>
-                        <span className="sidebar-session__meta">{session.current?t("history.current"):sessionTime(session.modTime)}</span>
-                      </span>
-                    </button>
-                    {!session.current && <button className="sidebar-session__del" title="删除" onClick={e=>{e.stopPropagation();void onDeleteSession(session.path);void refreshSessions();}}>×</button>}
-                  </div>
-                ));
-              })()}
-            </div>
-          </section>
+          {/* Sessions section (hidden when collapsed) */}
+          {!sidebarCollapsed && (
+            <section className="flex-1 min-h-0 flex flex-col">
+              <div className="flex items-center gap-2 px-1 pb-2 pl-2.5">
+                <div className="flex-1 min-w-0 text-fg-faint font-mono text-[11px] uppercase tracking-wider">{t("sidebar.conversations")}</div>
+                <button
+                  className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
+                  onClick={() => void openHistory()}
+                  disabled={state.running}
+                  title={state.running ? t("common.busyHint") : t("topbar.history")}
+                >
+                  {t("sidebar.viewAll")}
+                </button>
+              </div>
+              {sidebarSessions.length > 3 && <input className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag" placeholder="搜索…" value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
+              <div className="min-h-0 overflow-y-auto pr-0.5">
+                {(() => {
+                  const q = sidebarQuery.trim().toLowerCase();
+                  const visible = q ? sidebarSessions.filter((s: SessionMeta) => (s.title||s.preview||"").toLowerCase().includes(q)||s.path.toLowerCase().includes(q)) : sidebarSessions;
+                  if (sidebarSessions.length===0) return <div className="py-2 px-2.5 text-fg-faint text-xs">{t("sidebar.noRecent")}</div>;
+                  if (visible.length===0 && q) return <div className="py-2 px-2.5 text-fg-faint text-xs">无匹配</div>;
+                  return visible.map((session: SessionMeta) => (
+                    <div
+                      className={`flex items-start gap-1 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
+                        session.current ? "bg-sidebar-active" : ""
+                      }`}
+                      key={session.path}
+                    >
+                      <button className="flex items-start gap-2.5 flex-1 min-w-0 bg-transparent border-0 text-inherit cursor-pointer py-1 text-left disabled:cursor-default" onClick={() => void onResumeSession(session.path)} disabled={state.running||session.current} title={session.path}>
+                        <MessageSquare size={14} className={`shrink-0 mt-0.5 ${session.current ? "text-accent" : "text-fg-faint"}`} />
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-[12.5px] leading-[1.35] font-medium ${session.current ? "text-accent" : ""}`}>{sessionTitle(session, t("history.emptySession"))}</span>
+                          <span className="text-fg-faint font-mono text-[10.5px]">{session.current?t("history.current"):sessionTime(session.modTime)}</span>
+                        </span>
+                      </button>
+                      {!session.current && <button className="hidden group-hover:block bg-transparent border-0 text-fg-faint text-[15px] cursor-pointer px-1 py-0.5 rounded-[3px] mt-1 hover:text-err" title="删除" onClick={e=>{e.stopPropagation();void onDeleteSession(session.path);void refreshSessions();}}>×</button>}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </section>
+          )}
 
-          <nav className="sidebar__nav">
+          {/* Bottom nav */}
+          <nav className={`flex flex-col gap-0.5 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
+            sidebarCollapsed ? "items-center w-full !pt-0 !pb-3 !border-t-0" : ""
+          }`}>
             <button
-              className="sidebar__navitem sidebar__navitem--sessions"
+              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${
+                sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
+              } ${sidebarCollapsed ? "flex" : "hidden"}`}
               onClick={() => void openHistory()}
               disabled={state.running}
               title={state.running ? t("common.busyHint") : t("topbar.history")}
             >
               <History size={15} />
-              <span>{t("topbar.history")}</span>
+              {!sidebarCollapsed && <span>{t("topbar.history")}</span>}
             </button>
-            <button className="sidebar__navitem" onClick={() => void openMemory()} title={t("topbar.memory")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
               <Brain size={15} />
-              <span>{t("topbar.memory")}</span>
+              {!sidebarCollapsed && <span>{t("topbar.memory")}</span>}
             </button>
             <button
-              className={`sidebar__navitem ${showPlan ? "sidebar__navitem--active" : ""}`}
+              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${
+                sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
+              } ${showPlan ? "text-accent bg-accent-soft" : ""}`}
               onClick={() => setShowPlan((v) => !v)}
               title={t("plan.title")}
             >
               <FileText size={15} />
-              <span>{t("plan.title")}</span>
+              {!sidebarCollapsed && <span>{t("plan.title")}</span>}
             </button>
-            <button className="sidebar__navitem" onClick={() => setCapsOpen(true)} title={t("caps.title")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
               <Blocks size={15} />
-              <span>{t("caps.title")}</span>
+              {!sidebarCollapsed && <span>{t("caps.title")}</span>}
             </button>
             <button
-              className="sidebar__navitem"
+              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
               onClick={() => setSettingsOpen(true)}
               disabled={state.running}
               title={state.running ? t("common.busyHint") : t("topbar.settings")}
             >
               <SettingsIcon size={15} />
-              <span>{t("topbar.settings")}</span>
+              {!sidebarCollapsed && <span>{t("topbar.settings")}</span>}
             </button>
-
           </nav>
-
         </aside>
         <button
           className="sidebar-resizer"
@@ -426,18 +454,20 @@ export default function App() {
         />
 
         <section className="chat-pane">
-          <header className="topbar">
-            <div className="topbar__identity">
-              <span className="topbar__title">tianxuan</span>
-              <span className="topbar__model">{state.meta?.label ?? "…"}</span>
+          <header className="flex flex-shrink-0 items-center gap-3 h-[50px] px-12 bg-bg border-b border-border-soft select-none drag-region">
+            <div className="flex flex-col justify-center min-w-0 leading-tight pointer-events-none">
+              <span className="text-fg text-[13px] font-semibold">tianxuan</span>
+              <span className="font-mono text-[11px] text-fg-dim truncate">{state.meta?.label ?? "…"}</span>
             </div>
-            <div className="topbar__center">
-              {cwd && (<button className="chip topbar__workspace" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
-              <span className="topbar__think">
+            <div className="flex items-center gap-2 px-3">
+              {cwd && (<button className="chip flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
+              <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
                     key={level}
-                    className={`topbar__think-btn${thinkLevel === level ? " topbar__think-btn--on" : ""}`}
+                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[13px] px-1.5 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default ${
+                      thinkLevel === level ? "text-accent bg-accent-soft" : ""
+                    }`}
                     onClick={() => handleThinkLevelChange(level)}
                     disabled={state.running}
                     title={level === "fast" ? "快速思考" : level === "normal" ? "标准思考" : "深度思考"}
@@ -447,8 +477,8 @@ export default function App() {
                 ))}
               </span>
             </div>
-            <div className="topbar__spacer" />
-            <div className="topbar__actions">
+            <div className="flex-1" />
+            <div className="flex items-center gap-2">
               <button className="chip" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
               <button className="chip" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
               <button className="chip" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>

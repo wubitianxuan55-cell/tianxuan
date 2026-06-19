@@ -56,20 +56,22 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
           <div className="empty">{t("settings.loading")}</div>
         ) : (
           <div className="drawer__body drawer__body--settings">
-            <div className="settings-shell">
-              <nav className="settings-nav" aria-label={t("settings.title")}>
+            <div className="flex h-full">
+              <nav className="flex flex-col gap-1 w-[180px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0" aria-label={t("settings.title")}>
                 {SETTINGS_TABS.map((id) => (
                   <button
                     key={id}
-                    className={`settings-nav__item${tab === id ? " settings-nav__item--active" : ""}`}
+                    className={`flex flex-col gap-0.5 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[0.12s] ${
+                      tab === id ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"
+                    }`}
                     onClick={() => setTab(id)}
                   >
-                    <span>{settingsTabLabel(id, t)}</span>
-                    <small>{settingsTabMeta(id, s, t)}</small>
+                    <span className="text-[13px] font-medium">{settingsTabLabel(id, t)}</span>
+                    <small className="text-[11px] text-fg-faint">{settingsTabMeta(id, s, t)}</small>
                   </button>
                 ))}
               </nav>
-              <main className="settings-content">
+              <main className="flex-1 min-w-0 overflow-y-auto px-5 py-2.5">
                 {err && <div className="banner banner--error">{err}</div>}
                 {tab === "models" && <ModelsSection s={s} busy={busy} apply={apply} onManageProviders={() => setTab("providers")} />}
                 {tab === "providers" && <ProvidersSection s={s} busy={busy} apply={apply} />}
@@ -164,18 +166,18 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
   const [defaultProvider, defaultModel] = defaultRef.split("/");
 
   return (
-    <section className="mem-section">
-      <div className="mem-section__head">
-        <div className="mem-section__title">{t("settings.tab.models")}</div>
+    <section className="mb-3">
+      <div className="flex items-center justify-between px-1 pb-1.5">
+        <div className="text-fg text-sm font-semibold">{t("settings.tab.models")}</div>
         <button className="btn btn--small" onClick={onManageProviders}>
           {t("settings.manageProviders")}
         </button>
       </div>
 
-      <div className="set-row">
-        <label className="set-label">{t("settings.defaultModel")}</label>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.defaultModel")}</label>
         <select
-          className="mem-select set-grow"
+          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow"
           value={toRef(s.defaultModel, s)}
           disabled={busy}
           onChange={(e) => void apply(() => app.SetDefaultModel(e.target.value))}
@@ -188,7 +190,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
         </select>
       </div>
 
-      <div className="settings-model-card">
+      <div className="border border-border-soft rounded-lg p-3 mb-2">
         <div>
           <span>{t("settings.activeProvider")}</span>
           <strong>{defaultProvider || t("common.none")}</strong>
@@ -196,12 +198,12 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
         </div>
       </div>
 
-      <div className="settings-summary-grid">
-        <div className="settings-summary">
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="border border-border-soft rounded-lg p-3">
           <span>{t("settings.providers")}</span>
           <strong>{s.providers.length}</strong>
         </div>
-        <div className="settings-summary">
+        <div className="border border-border-soft rounded-lg p-3">
           <span>{t("settings.availableModels")}</span>
           <strong>{refs.length}</strong>
         </div>
@@ -218,9 +220,9 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
   const [editing, setEditing] = useState<string | null>(null); // provider name, or "__new__"
 
   return (
-    <section className="mem-section">
-      <div className="mem-section__head">
-        <div className="mem-section__title">{t("settings.tab.providers")}</div>
+    <section className="mb-3">
+      <div className="flex items-center justify-between px-1 pb-1.5">
+        <div className="text-fg text-sm font-semibold">{t("settings.tab.providers")}</div>
         {editing !== "__new__" && (
           <button className="btn btn--small" disabled={busy} onClick={() => setEditing("__new__")}>
             {t("settings.addProvider")}
@@ -240,13 +242,13 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
               onSave={(pv) => apply(() => app.SaveProvider(pv)).then(() => setEditing(null))}
             />
           ) : (
-            <div className="prov-card" key={p.name}>
-              <div className="prov-card__head">
-                <span className="prov-card__name">{p.name}</span>
+            <div className="border border-border-soft rounded-lg p-3 mb-2" key={p.name}>
+              <div className="flex items-center gap-2">
+                <span className="text-fg text-[13px] font-semibold">{p.name}</span>
                 <span className={`badge ${p.keySet ? "badge--project" : "badge--feedback"}`}>
                   {p.keySet ? t("settings.keySet") : t("settings.noKey")}
                 </span>
-                <span className="prov-card__spacer" />
+                <span className="flex-1" />
                 <button className="btn btn--small" disabled={busy} onClick={() => setEditing(p.name)}>
                   {t("common.edit")}
                 </button>
@@ -259,7 +261,7 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
                   {t("common.delete")}
                 </button>
               </div>
-              <div className="prov-card__meta">
+              <div className="text-fg-faint text-[11px] mt-1">
                 <span>{p.kind}</span>
                 <span>{p.baseUrl}</span>
                 <span>{p.models.join(", ")}</span>
@@ -330,25 +332,25 @@ function ProviderEditor({
 
   return (
     <div className="prov-card prov-card--edit">
-      <input className="mem-input" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
-      <label className="set-label">{t("settings.providerKind")}</label>
-      <select className="mem-select" value={kind} onChange={(e) => setKind(e.target.value)}>
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
+      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerKind")}</label>
+      <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
         {kindOptions.map((k) => (
           <option key={k} value={k}>
             {k}
           </option>
         ))}
       </select>
-      <input className="mem-input" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-      <input className="mem-input" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
-      <input className="mem-input" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
-      <label className="set-label">{t("settings.providerBalanceUrl")}</label>
-      <input className="mem-input" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
-      <div className="mem-hint">{t("settings.balanceUrlHint")}</div>
-      <label className="set-label">{t("settings.providerContextWindow")}</label>
-      <input className="mem-input" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
-      <div className="mem-hint">{t("settings.contextWindowHint")}</div>
-      <div className="prov-card__actions">
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
+      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerBalanceUrl")}</label>
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
+      <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.balanceUrlHint")}</div>
+      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerContextWindow")}</label>
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
+      <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.contextWindowHint")}</div>
+      <div className="flex gap-2 mt-2">
         <button className="btn btn--small" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
@@ -367,7 +369,7 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
   return (
     <div className="set-key">
       <input
-        className="mem-input"
+        className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
         type="password"
         placeholder={t("settings.setKey", { env: apiKeyEnv })}
         value={val}
@@ -390,12 +392,12 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
 function PermissionsSection({ s, busy, apply }: SectionProps) {
   const t = useT();
   return (
-    <section className="mem-section">
-      <div className="mem-section__title">{t("settings.permissions")}</div>
-      <div className="set-row">
-        <label className="set-label">{t("settings.writerMode")}</label>
+    <section className="mb-3">
+      <div className="text-fg text-sm font-semibold">{t("settings.permissions")}</div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.writerMode")}</label>
         <select
-          className="mem-select set-grow"
+          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow"
           value={s.permissions.mode}
           disabled={busy}
           onChange={(e) => void apply(() => app.SetPermissionMode(e.target.value))}
@@ -405,7 +407,7 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
           <option value="deny">{t("settings.modeDeny")}</option>
         </select>
       </div>
-      <div className="set-rules-grid">
+      <div className="flex flex-col gap-2">
         {(["deny", "ask", "allow"] as const).map((list) => (
           <RuleList
             key={list}
@@ -417,7 +419,7 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
           />
         ))}
       </div>
-      <div className="mem-hint">{t("settings.ruleForm")}</div>
+      <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.ruleForm")}</div>
     </section>
   );
 }
@@ -445,22 +447,22 @@ function RuleList({
     }
   };
   return (
-    <div className="set-rules">
-      <div className="set-rules__label">{list}</div>
-      <div className="set-rules__chips">
+    <div className="mb-2">
+      <div className="text-fg-dim text-[12px] font-medium mb-1">{list}</div>
+      <div className="flex flex-wrap gap-1.5">
         {rules.length === 0 && <span className="mem-empty">{t("common.none")}</span>}
         {rules.map((r) => (
-          <span className="set-rule" key={r}>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-border-soft rounded text-fg-dim text-[11px] bg-bg-soft" key={r}>
             {r}
-            <button className="set-rule__x" disabled={busy} onClick={() => void onRemove(r)} title={t("common.delete")}>
+            <button className="ml-0.5 w-4 h-4 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:bg-bg-elev" disabled={busy} onClick={() => void onRemove(r)} title={t("common.delete")}>
               ✕
             </button>
           </span>
         ))}
       </div>
-      <div className="set-rules__add">
+      <div className="mt-1">
         <input
-          className="mem-input"
+          className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
           placeholder={t("settings.addRule", { list })}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -484,23 +486,23 @@ function SandboxSection({ s, busy, apply }: SectionProps) {
     apply(() => app.SetSandbox(next.bash ?? sb.bash, next.network ?? sb.network, next.workspaceRoot ?? sb.workspaceRoot, next.allowWrite ?? sb.allowWrite));
 
   return (
-    <section className="mem-section">
-      <div className="mem-section__title">{t("settings.sandboxTitle")}</div>
-      <div className="set-row">
-        <label className="set-label">{t("settings.bashSandbox")}</label>
-        <select className="mem-select set-grow" value={sb.bash} disabled={busy} onChange={(e) => void set({ bash: e.target.value })}>
+    <section className="mb-3">
+      <div className="text-fg text-sm font-semibold">{t("settings.sandboxTitle")}</div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.bashSandbox")}</label>
+        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow" value={sb.bash} disabled={busy} onChange={(e) => void set({ bash: e.target.value })}>
           <option value="enforce">{t("settings.bashEnforce")}</option>
           <option value="off">{t("settings.bashOff")}</option>
         </select>
       </div>
-      <label className="set-check">
+      <label className="flex items-center gap-2 text-fg-dim text-[13px] cursor-pointer">
         <input type="checkbox" checked={sb.network} disabled={busy} onChange={(e) => void set({ network: e.target.checked })} />
         {t("settings.allowNetwork")}
       </label>
-      <div className="set-row">
-        <label className="set-label">{t("settings.workspaceRoot")}</label>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.workspaceRoot")}</label>
         <input
-          className="mem-input set-grow"
+          className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-grow"
           placeholder={t("settings.workspaceDefault")}
           value={root}
           disabled={busy}
@@ -527,18 +529,18 @@ function AgentSection({ s, busy, apply }: SectionProps) {
   const dirty = temp !== String(s.agent.temperature) || steps !== String(s.agent.maxSteps) || prompt !== s.agent.systemPrompt;
 
   return (
-    <section className="mem-section">
-      <div className="mem-section__title">{t("settings.agent")}</div>
-      <div className="set-row">
-        <label className="set-label">{t("settings.temperature")}</label>
-        <input className="mem-input set-narrow" value={temp} onChange={(e) => setTemp(e.target.value)} disabled={busy} inputMode="decimal" />
-        <label className="set-label">{t("settings.maxSteps")}</label>
-        <input className="mem-input set-narrow" value={steps} onChange={(e) => setSteps(e.target.value)} disabled={busy} inputMode="numeric" />
-        <span className="mem-hint">{t("settings.unlimited")}</span>
+    <section className="mb-3">
+      <div className="text-fg text-sm font-semibold">{t("settings.agent")}</div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.temperature")}</label>
+        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-narrow" value={temp} onChange={(e) => setTemp(e.target.value)} disabled={busy} inputMode="decimal" />
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.maxSteps")}</label>
+        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-narrow" value={steps} onChange={(e) => setSteps(e.target.value)} disabled={busy} inputMode="numeric" />
+        <span className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.unlimited")}</span>
       </div>
-      <div className="set-rules__label">{t("settings.systemPrompt")}</div>
-      <textarea className="mem-textarea" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={busy} spellCheck={false} />
-      <div className="prov-card__actions">
+      <div className="text-fg-dim text-[12px] font-medium mb-1">{t("settings.systemPrompt")}</div>
+      <textarea className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] p-2.5 outline-none resize-y min-h-[120px] focus:border-accent" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={busy} spellCheck={false} />
+      <div className="flex gap-2 mt-2">
         <button
           className="btn btn--primary btn--small"
           disabled={busy || !dirty}
@@ -555,15 +557,15 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
   const { t, pref, setPref } = useI18n();
   const themeOptions: Theme[] = ["auto", "light", "dark", "warm", "ice"];
   return (
-    <section className="mem-section">
-      <div className="mem-section__title">{t("settings.appearance")}</div>
-      <div className="set-row">
-        <label className="set-label">{t("settings.theme")}</label>
-        <div className="set-seg">
+    <section className="mb-3">
+      <div className="text-fg text-sm font-semibold">{t("settings.appearance")}</div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.theme")}</label>
+        <div className="inline-flex border border-border-soft rounded-md overflow-hidden">
           {themeOptions.map((opt) => (
             <button
               key={opt}
-              className={`set-seg__btn${theme === opt ? " set-seg__btn--on" : ""}`}
+              className={`set-seg__btn${theme === opt ? " bg-accent-soft text-accent" : ""}`}
               onClick={() => onTheme(opt)}
             >
               {themeName(opt, t)}
@@ -571,9 +573,9 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
           ))}
         </div>
       </div>
-      <div className="set-row">
-        <label className="set-label">{t("settings.language")}</label>
-        <select className="mem-select set-grow" value={pref} onChange={(e) => setPref(e.target.value as "" | "en" | "zh" | "zh-TW")}>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.language")}</label>
+        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow" value={pref} onChange={(e) => setPref(e.target.value as "" | "en" | "zh" | "zh-TW")}>
           <option value="">{t("settings.langAuto")}</option>
           <option value="zh">简体中文</option>
           <option value="zh-TW">繁體中文</option>
@@ -619,30 +621,30 @@ function UpdatesSection({ configPath }: { configPath: string }) {
     status.kind === "checking" || status.kind === "downloading" || status.kind === "verifying" || status.kind === "applying";
 
   return (
-    <section className="mem-section">
-      <div className="mem-section__title">{t("updater.title")}</div>
-      <div className="set-row">
-        <label className="set-label">{t("updater.currentVersion", { v: version || "…" })}</label>
-        <span className="prov-card__spacer" />
+    <section className="mb-3">
+      <div className="text-fg text-sm font-semibold">{t("updater.title")}</div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("updater.currentVersion", { v: version || "…" })}</label>
+        <span className="flex-1" />
         <button className="btn btn--small" disabled={busy} onClick={() => void check()}>
           {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
         </button>
       </div>
-      {status.kind === "upToDate" && <div className="mem-hint">{t("updater.upToDate")}</div>}
+      {status.kind === "upToDate" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.upToDate")}</div>}
       {status.kind === "available" && (
         <>
-          <div className="set-row">
-            <span className="set-label">{t("updater.available", { v: status.info.latest })}</span>
-            <span className="prov-card__spacer" />
+          <div className="flex items-center gap-3 mb-2.5">
+            <span className="text-fg-dim text-[13px] shrink-0">{t("updater.available", { v: status.info.latest })}</span>
+            <span className="flex-1" />
             <button className="btn btn--primary btn--small" onClick={() => apply(status.info)}>
               {status.info.canSelfUpdate ? t("updater.installNow") : t("updater.goToDownload")}
             </button>
           </div>
-          {!status.info.canSelfUpdate && <div className="mem-hint">{t("updater.macHint")}</div>}
+          {!status.info.canSelfUpdate && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.macHint")}</div>}
         </>
       )}
       {status.kind === "downloading" && (
-        <div className="mem-hint">
+        <div className="text-fg-faint text-[10px] mt-1 px-1">
           {t("updater.downloading", {
             done: mb(status.received),
             total: mb(status.total),
@@ -650,12 +652,12 @@ function UpdatesSection({ configPath }: { configPath: string }) {
           })}
         </div>
       )}
-      {status.kind === "verifying" && <div className="mem-hint">{t("updater.verifying")}</div>}
-      {status.kind === "applying" && <div className="mem-hint">{t("updater.applying")}</div>}
-      {status.kind === "done" && <div className="mem-hint">{t("updater.done")}</div>}
+      {status.kind === "verifying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.verifying")}</div>}
+      {status.kind === "applying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.applying")}</div>}
+      {status.kind === "done" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.done")}</div>}
       {status.kind === "error" && <div className="banner banner--error">{t("updater.failed", { msg: status.message })}</div>}
       {configPath && (
-        <div className="mem-hint settings-config-path" title={configPath}>
+        <div className="text-fg-faint text-[10px] mt-1 px-1 settings-config-path" title={configPath}>
           {t("settings.config", { path: configPath })}
         </div>
       )}

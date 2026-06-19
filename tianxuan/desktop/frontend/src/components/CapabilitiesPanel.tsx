@@ -122,28 +122,24 @@ export function CapabilitiesPanel({
           <div className="drawer__body">
             {err && <div className="banner banner--error">{err}</div>}
 
-            <div className="cap-tabs" role="tablist" aria-label={t("caps.title")}>
+            <div className="flex border-b border-border-soft mb-3" role="tablist" aria-label={t("caps.title")}>
               <button
-                className={`cap-tab${tab === "servers" ? " cap-tab--active" : ""}`}
-                role="tab"
-                aria-selected={tab === "servers"}
-                onClick={() => setTab("servers")}
-              >
-                {t("caps.connectorsTab")}
-              </button>
+                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[0.12s] ${
+                  tab === "servers" ? "text-accent border-accent" : "text-fg-dim border-transparent hover:text-fg hover:border-fg-faint"
+                }`}
+                role="tab" aria-selected={tab === "servers"} onClick={() => setTab("servers")}
+              >{t("caps.connectorsTab")}</button>
               <button
-                className={`cap-tab${tab === "skills" ? " cap-tab--active" : ""}`}
-                role="tab"
-                aria-selected={tab === "skills"}
-                onClick={() => setTab("skills")}
-              >
-                {t("caps.skillsTab")}
-              </button>
+                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[0.12s] ${
+                  tab === "skills" ? "text-accent border-accent" : "text-fg-dim border-transparent hover:text-fg hover:border-fg-faint"
+                }`}
+                role="tab" aria-selected={tab === "skills"} onClick={() => setTab("skills")}
+              >{t("caps.skillsTab")}</button>
             </div>
 
             {tab === "servers" ? (
-              <section className="mem-section">
-                <div className="mem-section__actions">
+              <section className="mb-3">
+                <div className="flex justify-end mb-2">
                   {!adding && (
                     <button className="btn btn--small" disabled={busy} onClick={() => setAdding(true)}>
                       {t("caps.addServer")}
@@ -183,10 +179,10 @@ export function CapabilitiesPanel({
                 ) : null}
               </section>
             ) : (
-              <section className="mem-section">
-                <div className="cap-search">
+              <section className="mb-3">
+                <div className="mb-2">
                   <input
-                    className="mem-input"
+                    className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
                     type="search"
                     placeholder={t("caps.searchSkills")}
                     value={skillQuery}
@@ -194,11 +190,11 @@ export function CapabilitiesPanel({
                   />
                 </div>
                 {view.skills.length === 0 ? (
-                  <div className="mem-empty">{t("caps.noSkills")}</div>
+                  <div className="py-4 text-fg-faint text-xs text-center">{t("caps.noSkills")}</div>
                 ) : filteredSkills.length === 0 ? (
-                  <div className="mem-empty">{t("caps.noSkillMatches")}</div>
+                  <div className="py-4 text-fg-faint text-xs text-center">{t("caps.noSkillMatches")}</div>
                 ) : (
-                  <div className="cap-skills">
+                  <div className="flex flex-col gap-2">
                     {filteredSkills.map((sk) => (
                       <SkillRow
                         key={sk.name}
@@ -285,54 +281,42 @@ function FailedServersNotice({
 }) {
   const t = useT();
   return (
-    <div className="cap-failures" role="status">
-      <div className="cap-failures__head">
+    <div className="mb-3 p-3 border border-err/20 rounded-lg bg-[rgba(242,139,130,0.06)]" role="status">
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <div className="cap-failures__title">{t("caps.failureTitle", { failed: servers.length })}</div>
-          <div className="cap-failures__hint">{t("caps.failureHint")}</div>
+          <div className="text-err text-sm font-semibold">{t("caps.failureTitle", { failed: servers.length })}</div>
+          <div className="text-fg-faint text-[11px]">{t("caps.failureHint")}</div>
         </div>
       </div>
-      <div className="cap-failures__list">
+      <div className="flex flex-col gap-2">
         {servers.map((s) => {
           const open = expanded.has(s.name);
           const error = s.error || t("caps.failed");
           return (
-            <div className="cap-failure" key={s.name}>
-              <div className="cap-failure__main">
-                <span className="cap-dot cap-dot--failed" />
-                <div className="cap-failure__text">
-                  <div className="cap-failure__name">{s.name}</div>
-                  <div className="cap-failure__summary">{summarizeServerError(error)}</div>
+            <div className="border border-border-soft rounded-lg overflow-hidden" key={s.name}>
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-err shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-fg text-[13px] font-medium">{s.name}</div>
+                  <div className="text-fg-faint text-[11px] truncate">{summarizeServerError(error)}</div>
                 </div>
               </div>
-              <div className="cap-failure__actions">
+              <div className="flex items-center gap-1 px-3 pb-2">
                 {confirming === s.name ? (
                   <>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onRemove(s.name)}>
-                      {t("caps.confirmRemove")}
-                    </button>
-                    <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>
-                      {t("common.cancel")}
-                    </button>
+                    <button className="btn btn--small" disabled={busy} onClick={() => onRemove(s.name)}>{t("caps.confirmRemove")}</button>
+                    <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
                   </>
                 ) : (
                   <>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onRetry(s.name)}>
-                      {t("caps.retry")}
-                    </button>
-                    <button className="btn btn--small" onClick={() => void navigator.clipboard?.writeText(error)}>
-                      {t("common.copy")}
-                    </button>
-                    <button className="btn btn--small" onClick={() => onToggle(s.name)} aria-expanded={open}>
-                      {open ? t("common.collapse") : t("caps.showLog")}
-                    </button>
-                    <button className="btn btn--small" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}>
-                      ✕
-                    </button>
+                    <button className="btn btn--small" disabled={busy} onClick={() => onRetry(s.name)}>{t("caps.retry")}</button>
+                    <button className="btn btn--small" onClick={() => void navigator.clipboard?.writeText(error)}>{t("common.copy")}</button>
+                    <button className="btn btn--small" onClick={() => onToggle(s.name)} aria-expanded={open}>{open ? t("common.collapse") : t("caps.showLog")}</button>
+                    <button className="btn btn--small" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}>✕</button>
                   </>
                 )}
               </div>
-              {open && <pre className="cap-failure__log">{error}</pre>}
+              {open && <pre className="m-0 p-3 bg-bg text-fg-dim text-xs leading-relaxed whitespace-pre-wrap border-t border-border-soft max-h-[200px] overflow-y-auto">{error}</pre>}
             </div>
           );
         })}
@@ -375,10 +359,10 @@ function ServerRow({
         ? t("caps.disabled")
         : t("caps.counts", { tools: s.tools, prompts: s.prompts, resources: s.resources });
   return (
-    <div className={`cap-server-entry${s.status === "disabled" ? " cap-server-entry--disabled" : ""}`}>
-      <div className={`cap-row${s.status === "disabled" ? " cap-row--disabled" : ""}`} title={s.error || undefined}>
+    <div className={`border border-border-soft rounded-lg ${s.status === "disabled" ? "opacity-60" : ""}`}>
+      <div className="flex items-center gap-2 px-3 py-2" title={s.error || undefined}>
         <button
-          className="cap-disclosure"
+          className="w-5 h-5 border-0 bg-transparent text-fg-faint cursor-pointer flex items-center justify-center text-sm disabled:opacity-30 disabled:cursor-default"
           disabled={!hasTools}
           aria-expanded={hasTools ? expanded : undefined}
           onClick={onToggleDetails}
@@ -386,55 +370,42 @@ function ServerRow({
         >
           {hasTools ? (expanded ? "⌄" : "›") : ""}
         </button>
-        <span className={`cap-dot cap-dot--${s.status}`} />
-        <div className="cap-row__text">
-          <div className="cap-row__head">
-            <span className="cap-row__name">{s.name}</span>
-            <span className="cap-row__transport">{s.transport}</span>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${s.status === "connected" ? "bg-ok" : s.status === "failed" ? "bg-err" : "bg-fg-faint"}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-fg text-[13px] font-medium">{s.name}</span>
+            <span className="text-fg-faint text-[11px] font-mono">{s.transport}</span>
           </div>
-          <div className="cap-row__sub">{sub}</div>
+          <div className={`text-[11px] truncate ${s.status === "disabled" ? "text-fg-faint opacity-60" : "text-fg-faint"}`}>{sub}</div>
         </div>
-        <div className="cap-row__actions">
+        <div className="flex items-center gap-1 shrink-0">
           {confirming ? (
             <>
-              <button className="btn btn--small" disabled={busy} onClick={onRemove}>
-                {t("caps.confirmRemove")}
-              </button>
-              <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>
-                {t("common.cancel")}
-              </button>
+              <button className="btn btn--small" disabled={busy} onClick={onRemove}>{t("caps.confirmRemove")}</button>
+              <button className="btn btn--small" disabled={busy} onClick={onCancelConfirm}>{t("common.cancel")}</button>
             </>
           ) : (
             <>
               {s.status === "failed" ? (
-                <button className="btn btn--small" disabled={busy} onClick={onRetry}>
-                  {actionLabel}
-                </button>
+                <button className="btn btn--small" disabled={busy} onClick={onRetry}>{actionLabel}</button>
               ) : (
                 <label className="cap-switch" title={s.status === "connected" ? t("caps.disable") : t("caps.enable")}>
-                  <input
-                    type="checkbox"
-                    checked={s.status === "connected"}
-                    disabled={busy}
-                    onChange={(e) => onToggle(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={s.status === "connected"} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
                   <span className="cap-switch__track" />
                 </label>
               )}
-              <button className="btn btn--small" disabled={busy} onClick={onConfirm} title={t("caps.remove")}>
-                ✕
-              </button>
+              <button className="btn btn--small" disabled={busy} onClick={onConfirm} title={t("caps.remove")}>✕</button>
             </>
           )}
         </div>
       </div>
       {hasTools && expanded && (
-        <div className="cap-tool-list">
-          <div className="cap-tool-list__title">{t("caps.tools")}</div>
+        <div className="border-t border-border-soft px-3 py-2">
+          <div className="text-fg-faint text-[11px] font-medium mb-1">{t("caps.tools")}</div>
           {tools.map((tool) => (
-            <div className="cap-tool" key={tool.name}>
-              <div className="cap-tool__name">{tool.name}</div>
-              {tool.description && <div className="cap-tool__desc">{tool.description}</div>}
+            <div className="flex items-center gap-2 px-2 py-1" key={tool.name}>
+              <span className="font-mono text-fg text-[13px]">{tool.name}</span>
+              {tool.description && <span className="text-fg-faint text-[11px] truncate">{tool.description}</span>}
             </div>
           ))}
         </div>
@@ -483,24 +454,30 @@ function SkillRow({
   const canExpand = summary !== skill.description;
   return (
     <button
-      className={`cap-skill-card${expanded ? " cap-skill-card--expanded" : ""}${canExpand ? " cap-skill-card--expandable" : ""}`}
+      className={`w-full text-left border border-border-soft rounded-lg p-3 bg-transparent cursor-pointer transition-[border-color,background] duration-[0.12s] hover:border-accent/30 hover:bg-bg-soft active:bg-bg-elev ${
+        expanded ? "border-accent/30 bg-bg-elev" : ""
+      }`}
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
       title={skill.description}
     >
-      <div className="cap-skill-card__head">
-        <span className="cap-skill-card__icon">/</span>
-        <span className="cap-skill-card__main">
-          <span className="cap-skill-card__command">{skill.name}</span>
-          <span className="cap-skill-card__badges">
-            <span className={`cap-skill-badge cap-skill-badge--${skill.scope}`}>{skillScopeLabel(skill.scope, t)}</span>
-            {skill.runAs === "subagent" && <span className="cap-skill-badge cap-skill-badge--run">{t("caps.subagent")}</span>}
+      <div className="flex items-center gap-2.5 mb-1">
+        <span className="w-8 h-8 flex items-center justify-center rounded-md bg-accent-soft text-accent font-mono text-base font-bold shrink-0">/</span>
+        <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <span className="text-fg text-[13px] font-semibold font-mono">{skill.name}</span>
+          <span className="flex items-center gap-1">
+            <span className={`text-[10px] px-1.5 py-px rounded font-medium ${
+              skill.scope === "project" ? "bg-ok/15 text-ok" : "bg-fg-faint/15 text-fg-faint"
+            }`}>{skillScopeLabel(skill.scope, t)}</span>
+            {skill.runAs === "subagent" && <span className="text-[10px] px-1.5 py-px rounded font-medium bg-accent/15 text-accent">{t("caps.subagent")}</span>}
           </span>
         </span>
       </div>
-      <div className="cap-skill-card__desc">{expanded ? skill.description : summary}</div>
-      {canExpand && <div className="cap-skill-card__more">{expanded ? t("common.collapse") : t("common.expand")}</div>}
+      <div className={`text-fg-dim text-[12px] leading-snug ${expanded ? "" : "line-clamp-2"}`}>
+        {expanded ? skill.description : summary}
+      </div>
+      {canExpand && <div className="mt-1 text-fg-faint text-[11px]">{expanded ? t("common.collapse") : t("common.expand")}</div>}
     </button>
   );
 }

@@ -61,7 +61,7 @@ var compactSchema = map[string]json.RawMessage{
 	"kill_shell": json.RawMessage(
 		`{"type":"object","properties":{"job_id":{"type":"string"}},"required":["job_id"]}`),
 	"wait": json.RawMessage(
-		`{"type":"object","properties":{"job_id":{"type":"string"},"timeout_ms":{"type":"integer"}},"required":["job_id"]}`),
+		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"}},"timeout_seconds":{"type":"integer"}}}`),
 	"web_fetch": json.RawMessage(
 		`{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}`),
 	"web_search": json.RawMessage(

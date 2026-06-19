@@ -622,19 +622,20 @@ export function Composer({
   const displayElapsed = finalElapsed ?? elapsed;
 
   return (
-    <div className="composer-wrap">
+    <div className="relative max-w-[--maxw] mx-auto">
       {(turnActive || finalElapsed !== null) && (
-        <div className="composer__timer">
+        <div className="flex items-center gap-1 pb-1 pl-1 text-fg-faint text-[11px] tabular-nums">
           <Clock size={12} />
           <span>{displayElapsed.toFixed(1)}s</span>
         </div>
       )}
       {workspaceMenuOpen && cwd && (
-        <div className="workspace-switcher" ref={workspaceMenuRef}>
-          <label className="workspace-switcher__search">
-            <Search size={14} />
+        <div className="absolute left-2.5 bottom-11 z-40 w-[min(320px,82vw)] p-2.5 border border-border rounded-xl bg-bg-elev shadow-[0_16px_42px_rgba(0,0,0,0.18)] no-drag" ref={workspaceMenuRef}>
+          <label className="flex items-center gap-[7px] px-2 py-1.5 mb-1 border border-border-soft rounded-md bg-bg-soft">
+            <Search size={14} className="text-fg-faint" />
             <input
               autoFocus
+              className="flex-1 border-0 bg-transparent text-fg text-[13px] outline-none placeholder:text-fg-faint"
               value={workspaceQuery}
               onChange={(e) => setWorkspaceQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -643,31 +644,31 @@ export function Composer({
               placeholder={t("composer.searchProjects")}
             />
           </label>
-          <div className="workspace-switcher__list">
+          <div className="max-h-[280px] overflow-y-auto mb-1">
             {filteredWorkspaces.map((w) => (
               <button
                 key={w.path}
-                className="workspace-switcher__item"
+                className="flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer text-fg-dim hover:bg-bg-soft hover:text-fg text-[13px]"
                 onClick={() => {
-                  if (w.current) {
-                    setWorkspaceMenuOpen(false);
-                    return;
-                  }
+                  if (w.current) { setWorkspaceMenuOpen(false); return; }
                   void chooseWorkspace(w.path);
                 }}
                 title={w.path}
               >
-                <FolderGit2 size={15} />
-                <span>{w.name}</span>
-                {w.current && <Check size={15} />}
+                <FolderGit2 size={15} className="shrink-0" />
+                <span className="min-w-0 truncate flex-1">{w.name}</span>
+                {w.current && <Check size={15} className="text-accent shrink-0" />}
               </button>
             ))}
-            {filteredWorkspaces.length === 0 && <div className="workspace-switcher__empty">{t("composer.noProjectMatches")}</div>}
+            {filteredWorkspaces.length === 0 && <div className="py-4 text-fg-faint text-xs text-center">{t("composer.noProjectMatches")}</div>}
           </div>
-          <div className="workspace-switcher__actions">
-            <button onClick={() => void chooseWorkspace()}>
-              <FolderPlus size={15} />
-              <span>{t("composer.addProject")}</span>
+          <div className="pt-1 border-t border-border-soft">
+            <button
+              className="flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer text-fg-dim hover:bg-bg-soft hover:text-fg text-[13px]"
+              onClick={() => void chooseWorkspace()}
+            >
+              <FolderPlus size={15} className="shrink-0" />
+              <span className="min-w-0 truncate">{t("composer.addProject")}</span>
             </button>
           </div>
         </div>
@@ -680,13 +681,14 @@ export function Composer({
       )}
       {menuMode === "at" && <FileMenu items={atMatches} activeIndex={active} onPick={pickEntry} onHover={setActive} />}
       {attachments.length > 0 && (
-        <div className="composer__attachments">
+        <div className="flex flex-wrap gap-1.5 px-3 py-1.5">
           {attachments.map((a) => (
-            <div className="composer__attachment" key={a.path}>
-              <img src={a.previewUrl} alt="" />
-              <span>{a.path.split("/").pop()}</span>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-bg-elev-2 border border-border-soft rounded-lg text-xs" key={a.path}>
+              <img src={a.previewUrl} alt="" className="w-8 h-8 rounded object-cover" />
+              <span className="max-w-[120px] truncate text-fg-dim">{a.path.split("/").pop()}</span>
               <button
                 type="button"
+                className="flex items-center justify-center w-5 h-5 bg-transparent border-0 rounded text-fg-faint cursor-pointer hover:text-err hover:bg-bg-soft"
                 title="Remove image"
                 onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}
               >
@@ -697,50 +699,62 @@ export function Composer({
         </div>
       )}
       {activePastedBlocks.length > 0 && (
-        <div className="composer__pasted">
+        <div className="px-3 py-1.5">
           {activePastedBlocks.map((block) => {
             const open = openPastedLabels.includes(block.label);
             return (
-              <div className="composer__pasted-block" key={block.label}>
-                <div className="composer__pasted-head">
-                  <FileText size={15} />
-                  <span>{block.label}</span>
-                  <button type="button" title={t(open ? "composer.pastedHidePreview" : "composer.pastedShowPreview")} onClick={() => togglePastedPreview(block.label)}>
-                    <Eye size={14} />
-                  </button>
-                  <button type="button" title={t("composer.pastedExpand")} onClick={() => expandPastedBlock(block)}>
-                    {t("composer.pastedExpand")}
-                  </button>
-                  <button type="button" title={t("composer.pastedRemove")} onClick={() => removePastedBlock(block)}>
-                    <Trash2 size={14} />
-                  </button>
+              <div className="mb-1 border border-border-soft rounded-lg overflow-hidden" key={block.label}>
+                <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
+                  <FileText size={15} className="text-fg-faint shrink-0" />
+                  <span className="font-mono text-xs text-fg-dim min-w-0 truncate">{block.label}</span>
+                  <div className="flex items-center gap-1 ml-auto">
+                    <button type="button" className="px-1.5 py-0.5 bg-transparent border-0 rounded text-fg-faint cursor-pointer text-[11px] hover:text-fg hover:bg-bg-soft" title={t(open ? "composer.pastedHidePreview" : "composer.pastedShowPreview")} onClick={() => togglePastedPreview(block.label)}>
+                      <Eye size={14} />
+                    </button>
+                    <button type="button" className="px-1.5 py-0.5 bg-transparent border-0 rounded text-fg-faint cursor-pointer text-[11px] hover:text-fg hover:bg-bg-soft" title={t("composer.pastedExpand")} onClick={() => expandPastedBlock(block)}>
+                      {t("composer.pastedExpand")}
+                    </button>
+                    <button type="button" className="px-1.5 py-0.5 bg-transparent border-0 rounded text-fg-faint cursor-pointer text-[11px] hover:text-err hover:bg-bg-soft" title={t("composer.pastedRemove")} onClick={() => removePastedBlock(block)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                {open && <pre className="composer__pasted-preview">{block.text}</pre>}
+                {open && <pre className="m-0 p-2 bg-bg text-fg-dim text-xs leading-relaxed whitespace-pre-wrap break-words max-h-[140px] overflow-y-auto border-t border-border-soft">{block.text}</pre>}
               </div>
             );
           })}
         </div>
       )}
       <div
-        className={`composer-card${composerHeight !== null ? " composer-card--resized" : ""}${composerResizing ? " composer-card--resizing" : ""}`}
+        className={`relative border border-border rounded-xl bg-bg-elev overflow-hidden shadow-[0_10px_28px_rgba(0,0,0,0.08)] transition-[border-color] duration-[0.12s] focus-within:border-fg-faint ${
+          composerHeight !== null ? "flex flex-col" : ""
+        } ${composerResizing ? "composer-card--resizing" : ""}`}
+        style={{ ...(composerHeight !== null ? { height: "var(--composer-height)" } : {}), ...composerCardStyle }}
         ref={composerCardRef}
-        style={composerCardStyle}
       >
         <div
-          className="composer-resize-handle"
+          className="absolute top-0 left-[14px] right-[14px] z-[5] h-2 cursor-ns-resize no-drag"
+          style={{ touchAction: "none" }}
           onPointerDown={onComposerResizeStart}
           onDoubleClick={resetComposerHeight}
         />
         <div
-          className={`composer${dragOver ? " composer--dragover" : ""}${disabled ? " composer--disabled" : ""}`}
+          className={`flex gap-2 items-center shrink-0 min-h-0 bg-transparent border-0 border-b border-border-soft rounded-none px-[13px] py-2.5 ${
+            composerHeight !== null ? "flex-1 items-start" : ""
+          } ${dragOver ? "outline outline-1 outline-dashed outline-accent outline-offset-[-4px]" : ""} ${
+            disabled ? "opacity-50 pointer-events-none" : ""
+          }`}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
         >
-          <span className="composer__caret">›</span>
+          <span className="text-accent font-mono font-semibold leading-[1.55] shrink-0">›</span>
           <textarea
             ref={taRef}
-            className="composer__input"
+            className={`flex-1 resize-none border-0 bg-transparent text-fg leading-[1.55] max-h-[200px] outline-none placeholder:text-fg-faint ${
+              composerHeight !== null ? "h-full max-h-none overflow-y-auto" : ""
+            }`}
+            style={{ fieldSizing: "content" }}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onPaste={onPaste}
@@ -750,28 +764,32 @@ export function Composer({
             disabled={disabled}
           />
           {running && (
-            <button className="composer__btn composer__btn--stop" onClick={handleCancel} title={t("composer.stop")}>
+            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-[opacity,background] duration-[0.12s] bg-bg-elev-2 text-err" onClick={handleCancel} title={t("composer.stop")}>
               <Square size={14} fill="currentColor" />
             </button>
           )}
           <button
-            className={`composer__btn composer__btn--send${running ? " composer__btn--send-queue" : ""}`}
+            className={`inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-[opacity,background] duration-[0.12s] ${
+              running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg" : "bg-accent text-accent-fg"
+            } disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default`}
             onClick={submit}
             disabled={disabled || pendingPaste > 0 || (!text.trim() && attachments.length === 0 && (!running || queueLen === 0))}
             title={running ? (queueLen > 0 ? `排队发送 (${queueLen})` : t("composer.queue")) : t("composer.send")}
           >
             {running && queueLen > 0 ? (
-              <span className="composer__queue-count">{queueLen}</span>
+              <span className="text-xs font-semibold leading-none">{queueLen}</span>
             ) : (
               <ArrowUp size={16} />
             )}
           </button>
         </div>
-        <div className="composer-meta">
+        <div className="flex items-center gap-1.5 min-w-0 px-2.5 py-1.5">
           {cwd && (
-            <div className="composer-workspace-wrap" ref={workspaceAnchorRef}>
+            <div className="relative inline-flex min-w-0" ref={workspaceAnchorRef}>
               <button
-                className={`composer__workspace${workspaceMenuOpen ? " composer__workspace--open" : ""}`}
+                className={`inline-flex items-center gap-1.5 max-w-60 px-2 py-1 border-0 rounded-md bg-transparent text-fg-dim text-xs cursor-pointer hover:text-fg hover:bg-bg-soft disabled:cursor-default disabled:opacity-60 disabled:hover:text-fg-dim disabled:hover:bg-transparent no-drag ${
+                  workspaceMenuOpen ? "text-fg bg-bg-soft" : ""
+                }`}
                 onClick={() => {
                   if (!running) setWorkspaceMenuOpen((open) => !open);
                 }}
@@ -779,24 +797,28 @@ export function Composer({
                 title={running ? t("common.busyHint") : t("status.switchFolder", { cwd })}
               >
                 <FolderGit2 size={13} />
-                <span>{workspaceName}</span>
+                <span className="min-w-0 truncate">{workspaceName}</span>
                 <ChevronDown size={12} />
               </button>
             </div>
           )}
-          <div className="composer__modes">
+          <div className="flex gap-[3px]">
             {(['normal','plan','yolo'] as Mode[]).map(m => (
               <button
                 key={m}
                 type="button"
-                className={`composer__modebtn ${mode === m ? 'composer__modebtn--active' : ''}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 border border-border-soft rounded-md bg-transparent text-fg-dim text-xs cursor-pointer transition-[color,background,border] duration-[0.12s] hover:text-fg hover:bg-bg-soft hover:border-fg-faint ${
+                  mode === m ? "text-accent bg-accent-soft border-accent/30" : ""
+                }`}
                 onClick={() => {
                   let count = 0;
                   while (mode !== m && count < 3) { onCycleMode(); count++; }
                 }}
                 title={m === 'plan' ? t('composer.modePlan') : m === 'yolo' ? t('composer.modeYolo') : t('composer.modeNormal')}
               >
-                <span className={`composer__modebtn-dot composer__modebtn-dot--${m}`} />
+                <span className={`w-2 h-2 rounded-full ${
+                  m === 'normal' ? 'bg-info' : m === 'plan' ? 'bg-warning' : 'bg-err'
+                }`} />
                 {m === 'normal' ? t('composer.modeNormal') : m === 'plan' ? t('composer.modePlan') : t('composer.modeYolo')}
               </button>
             ))}

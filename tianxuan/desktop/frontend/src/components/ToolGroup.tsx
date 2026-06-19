@@ -22,27 +22,27 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
   const moreCount = tools.length - subjects.length;
 
   return (
-    <div className="toolgroup">
+    <div className="my-1 border border-border-soft rounded-lg overflow-hidden">
       <div
-        className="toolgroup__row"
+        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-bg-soft text-fg-dim"
         onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
       >
         <ChevronRight
-          className={`toolgroup__chevron ${open ? "toolgroup__chevron--open" : ""}`}
+          className={`shrink-0 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
           size={13}
         />
-        <FolderOpen className="toolgroup__icon" size={14} />
-        <span className="toolgroup__name">{t.name}</span>
-        <span className="toolgroup__count">× {tools.length}</span>
+        <FolderOpen className="shrink-0 text-fg-faint" size={14} />
+        <span className="font-mono text-xs text-fg font-medium">{t.name}</span>
+        <span className="text-[11px] text-fg-faint font-mono">× {tools.length}</span>
         {subjects.length > 0 && (
-          <span className="toolgroup__subjects">
+          <span className="text-[11px] text-fg-faint truncate ml-1">
             {subjects.join(", ")}
             {moreCount > 0 ? ` +${moreCount}` : ""}
           </span>
         )}
       </div>
       {open && (
-        <div className="toolgroup__items">
+        <div className="border-t border-border-soft pt-0.5">
           {tools.map((t) => (
             <ToolCard key={t.id} item={t} />
           ))}

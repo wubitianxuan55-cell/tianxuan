@@ -347,7 +347,9 @@ export function WorkspacePanel({
       const active = selectedPath === path;
       const row = (
         <button
-          className={`workspace-tree__row${active ? " workspace-tree__row--active" : ""}`}
+          className={`w-full min-w-0 h-[30px] flex items-center gap-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg ${
+            active ? "bg-sidebar-active text-accent" : ""
+          }`}
           key={path}
           onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
           title={path}
@@ -355,19 +357,19 @@ export function WorkspacePanel({
         >
           {entry.isDir ? (
             isOpen ? (
-              <ChevronDown size={13} className="workspace-tree__chev" />
+              <ChevronDown size={13} className="w-[13px] h-[13px] shrink-0 text-fg-faint" />
             ) : (
-              <ChevronRight size={13} className="workspace-tree__chev" />
+              <ChevronRight size={13} className="w-[13px] h-[13px] shrink-0 text-fg-faint" />
             )
           ) : (
-            <span className="workspace-tree__chev" />
+            <span className="w-[13px] h-[13px] shrink-0" />
           )}
           {entry.isDir ? (
-            <Folder size={14} className="workspace-tree__icon workspace-tree__icon--dir" />
+            <Folder size={14} className="shrink-0 text-fg-dim" />
           ) : (
-            <FileText size={14} className="workspace-tree__icon" />
+            <FileText size={14} className="shrink-0 text-fg-faint" />
           )}
-          <span className="workspace-tree__name">{entry.name}</span>
+          <span className="min-w-0 truncate">{entry.name}</span>
         </button>
       );
       if (!entry.isDir || !isOpen) return [row];
@@ -384,50 +386,43 @@ export function WorkspacePanel({
       aria-label={t("workspace.title")}
       style={panelStyle}
     >
-      {previewVisible && <section className="workspace-preview">
-        <header className="workspace-preview__head">
-          <div className="workspace-tabs">
+      {previewVisible && <section className="flex flex-col min-w-0 min-h-0 border-r border-border-soft">
+        <header className="flex items-center gap-2 h-[50px] px-3 border-b border-border-soft shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto overflow-y-hidden flex-1 scrollbar-none">
             {openTabs.map((tab) => (
               <button
-                className={`workspace-tab${selectedPath === tab ? " workspace-tab--active" : ""}`}
+                className={`inline-flex items-center gap-1.5 min-w-[112px] max-w-[180px] h-[30px] px-2.5 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] font-medium cursor-pointer shrink-0 no-drag ${
+                  selectedPath === tab ? "bg-bg-elev text-fg" : "hover:bg-bg-soft hover:text-fg"
+                }`}
                 key={tab}
                 onClick={() => setSelectedPath(tab)}
                 title={tab}
               >
-                <FileText size={14} className="workspace-tab__icon" />
-                <span className="workspace-tab__name">{basename(tab)}</span>
+                <FileText size={14} className="shrink-0" />
+                <span className="flex-1 min-w-0 truncate">{basename(tab)}</span>
                 <span
-                  className="workspace-tab__close"
+                  className="inline-flex items-center justify-center w-4 h-4 rounded text-fg-faint hover:text-fg hover:bg-bg-soft shrink-0"
                   role="button"
                   tabIndex={0}
                   title={t("workspace.closeTab")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      closeTab(tab);
-                    }
-                  }}
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); closeTab(tab); } }}
                 >
                   <X size={12} />
                 </span>
               </button>
             ))}
-            <button className="workspace-tab workspace-tab--new" onClick={openPickerTab} title={t("workspace.newTab")}>
+            <button className="inline-flex items-center justify-center shrink-0 w-[30px] h-[30px] p-0 border border-border-soft rounded-lg bg-transparent text-fg-faint cursor-pointer no-drag hover:bg-bg-soft hover:text-fg" onClick={openPickerTab} title={t("workspace.newTab")}>
               <Plus size={14} />
             </button>
           </div>
 
-          <div className="workspace-preview__window-actions">
-            <button className="workspace-iconbtn" onClick={onToggleMaximized} title={maximized ? t("workspace.restore") : t("workspace.maximize")}>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default no-drag" onClick={onToggleMaximized} title={maximized ? t("workspace.restore") : t("workspace.maximize")}>
               {maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
             <button
-              className="workspace-iconbtn workspace-iconbtn--on"
+              className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft no-drag"
               onClick={() => setTreeVisible((value) => !value)}
               title={treeVisible ? t("workspace.hideTree") : t("workspace.showTree")}
             >
@@ -436,14 +431,10 @@ export function WorkspacePanel({
           </div>
         </header>
 
-        <div className="workspace-preview__meta">
+        <div className="flex items-center gap-1.5 min-w-0 px-[18px] py-2 border-b border-border-soft text-fg-faint text-[11.5px] whitespace-nowrap shrink-0">
           <button
-            className="workspace-crumb"
-            onClick={() => {
-              setFilter("");
-              setTreeVisible(true);
-              setOpenDirs((prev) => new Set([...Array.from(prev), ""]));
-            }}
+            className="inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent text-fg-dim cursor-pointer hover:text-fg truncate no-drag"
+            onClick={() => { setFilter(""); setTreeVisible(true); setOpenDirs((prev) => new Set([...Array.from(prev), ""])); }}
             title={cwd}
           >
             {shortCwd(cwd) || t("workspace.title")}
@@ -452,17 +443,13 @@ export function WorkspacePanel({
             const isLast = index === pathParts.length - 1;
             const dir = pathParts.slice(0, index + 1).join("/") + "/";
             return (
-              <span className="workspace-crumb-group" key={`${part}-${index}`}>
+              <span className="inline-flex items-center min-w-0 gap-1.5" key={`${part}-${index}`}>
                 <span>›</span>
                 <button
-                  className={`workspace-crumb${isLast ? " workspace-crumb--current" : ""}`}
-                  onClick={() => {
-                    if (isLast) return;
-                    setTreeVisible(true);
-                    setFilter("");
-                    setOpenDirs((prev) => new Set([...Array.from(prev), ...breadcrumbDirs, dir]));
-                    void loadDir(dir);
-                  }}
+                  className={`inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent cursor-pointer truncate no-drag ${
+                    isLast ? "text-fg cursor-default" : "text-fg-dim hover:text-fg"
+                  }`}
+                  onClick={() => { if (isLast) return; setTreeVisible(true); setFilter(""); setOpenDirs((prev) => new Set([...Array.from(prev), ...breadcrumbDirs, dir])); void loadDir(dir); }}
                   title={isLast ? (selectedPath ?? undefined) : dir}
                 >
                   {part}
@@ -470,21 +457,21 @@ export function WorkspacePanel({
               </span>
             );
           })}
-          {preview && preview.size > 0 && <span className="workspace-preview__size">{formatBytes(preview.size)}</span>}
+          {preview && preview.size > 0 && <span className="ml-auto shrink-0 font-mono">{formatBytes(preview.size)}</span>}
         </div>
 
-        <div className="workspace-preview__body">
+        <div className="flex-1 min-h-0 overflow-auto px-[18px] py-4">
           {!selectedPath ? (
-            <div className="workspace-empty">{t("workspace.pickFile")}</div>
+            <div className="py-[18px] text-fg-faint text-[13px]">{t("workspace.pickFile")}</div>
           ) : loadingPreview ? (
-            <div className="workspace-empty">{t("workspace.loading")}</div>
+            <div className="py-[18px] text-fg-faint text-[13px]">{t("workspace.loading")}</div>
           ) : preview?.err ? (
-            <div className="workspace-empty workspace-empty--error">{preview.err}</div>
+            <div className="py-[18px] text-err text-[13px]">{preview.err}</div>
           ) : preview?.binary ? (
-            <div className="workspace-empty">{t("workspace.binary")}</div>
+            <div className="py-[18px] text-fg-faint text-[13px]">{t("workspace.binary")}</div>
           ) : preview ? (
             <>
-              {preview.truncated && <div className="workspace-note">{t("workspace.truncated")}</div>}
+              {preview.truncated && <div className="mb-2.5 px-2 py-1.5 border border-border-soft rounded-md bg-bg-soft text-fg-dim text-xs">{t("workspace.truncated")}</div>}
               {isMarkdown ? (
                 <Markdown text={preview.body} />
               ) : (
@@ -512,10 +499,10 @@ export function WorkspacePanel({
         />
       )}
 
-      <section className="workspace-files">
-        <div className="workspace-files__tools">
+      <section className="flex flex-col bg-bg-soft">
+        <div className="flex items-center justify-end gap-1 h-[42px] px-2 py-[7px_8px_3px] shrink-0">
           <button
-            className="workspace-iconbtn workspace-iconbtn--on"
+            className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft no-drag"
             onClick={hideTreeOrClosePanel}
             title={previewVisible ? t("workspace.hideTree") : t("workspace.close")}
           >
@@ -523,30 +510,32 @@ export function WorkspacePanel({
           </button>
         </div>
 
-        <div className="workspace-search">
+        <div className="flex items-center gap-1.5 mx-2.5 my-1 mb-2 px-2 h-8 border border-border rounded-lg bg-bg text-fg-faint shrink-0">
           <Search size={14} />
-          <input ref={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("workspace.filter")} />
+          <input ref={filterRef} className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("workspace.filter")} />
         </div>
-        <div className="workspace-tree">
+        <div className="flex-1 min-h-0 overflow-auto px-1.5 pb-3">
           {flattened
             ? flattened.map(({ path, entry }) => {
                 const cleanPath = path.replace(/\/$/, "");
                 const dir = parentPath(path);
                 return (
                   <button
-                    className={`workspace-tree__row workspace-tree__row--search${selectedPath === path ? " workspace-tree__row--active" : ""}`}
+                    className={`w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg ${
+                      selectedPath === path ? "bg-sidebar-active !text-fg" : ""
+                    }`}
                     key={path}
                     onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
                     title={cleanPath}
                   >
                     {entry.isDir ? (
-                      <Folder size={14} className="workspace-tree__icon workspace-tree__icon--dir" />
+                      <Folder size={14} className="shrink-0 text-fg-dim" />
                     ) : (
-                      <FileText size={14} className="workspace-tree__icon" />
+                      <FileText size={14} className="shrink-0 text-fg-faint" />
                     )}
-                    <span className="workspace-tree__result">
-                      <span className="workspace-tree__result-name">{basename(path)}</span>
-                      {dir && <span className="workspace-tree__result-dir">{dir}</span>}
+                    <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
+                      <span className={`min-w-0 truncate ${selectedPath === path ? "text-accent" : "text-fg"}`}>{basename(path)}</span>
+                      {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
                     </span>
                   </button>
                 );

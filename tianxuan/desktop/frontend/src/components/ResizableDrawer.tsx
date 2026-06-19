@@ -127,14 +127,23 @@ export function ResizableDrawer({
   );
 
   return (
-    <div className={`drawer-backdrop${subtle ? " drawer-backdrop--subtle" : ""}`} onClick={handleClose}>
+    <div
+      className={`fixed inset-0 flex justify-end z-90 ${subtle ? "bg-black/[0.16]" : "bg-black/40"}`}
+      onClick={handleClose}
+    >
       <aside
-        className={`drawer${wide ? " drawer--wide" : ""}${resizing ? " drawer--resizing" : ""}${exiting ? " drawer--exiting" : ""}`}
+        className={`relative flex flex-col h-full bg-bg-elev border-l border-border shadow-[-18px_0_48px_rgba(0,0,0,0.46)] ${
+          exiting ? "animate-[drawer-out_0.12s_ease_forwards]" : "animate-[drawer-in_0.14s_ease]"
+        } ${resizing ? "drawer--resizing" : ""} ${
+          wide
+            ? "w-[min(var(--drawer-width,720px),94vw)]"
+            : "w-[min(var(--drawer-width,440px),92vw)]"
+        }`}
         onClick={(e) => e.stopPropagation()}
         style={style}
       >
         <button
-          className="drawer-resizer"
+          className="absolute top-0 bottom-0 left-[-4px] z-[4] w-2 p-0 border-0 bg-transparent cursor-col-resize no-drag group"
           type="button"
           role="separator"
           aria-orientation="vertical"
@@ -146,7 +155,9 @@ export function ResizableDrawer({
           onKeyDown={onKeyDown}
           onDoubleClick={() => saveWidth(config.defaultWidth)}
           title={t("drawer.resize")}
-        />
+        >
+          <span className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-[background,box-shadow] duration-[0.12s] group-hover:bg-accent group-hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] group-focus-visible:bg-accent group-focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] pointer-events-none" />
+        </button>
         {children}
       </aside>
     </div>

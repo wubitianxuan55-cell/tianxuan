@@ -4,6 +4,7 @@
 
 - 思考输出说中文
 -记得使用skill
+- 2026-06-19: V8.2.1 发布 — Tailwind CSS 全量迁移 (24组件) + 6 Go 修复
 - 2026-06-13: V7.2.0 发布 — DSR + 三闸门 + 归档 + 6 Bug 修复
 
 ## 🔴 核心约束：禁止损害缓存命中率
@@ -24,3 +25,9 @@ DeepSeek 前缀缓存是项目成本命脉。**任何修改如果会导致以下
 - `internal/agent/agent.go` 中的 `filteredSchemas`/`activeSchemas`/`verifyPrefix`
 - `internal/boot/boot.go` 中的系统提示词构建
 - 工具注册表 (`internal/tool/`) 的热加载路径
+
+## 📐 架构文档
+
+- **当前架构**: [V8.0-ARCHITECTURE.md](tianxuan/V8.0-ARCHITECTURE.md) — V8.0.6 完整架构 (2026-06-18)
+- 历史: [_archive/V5.0-ARCHITECTURE.md](tianxuan/_archive/V5.0-ARCHITECTURE.md) (已过时) | [_archive/V6.0-ARCHITECTURE.md](tianxuan/_archive/V6.0-ARCHITECTURE.md) (设计草稿)
+- 设计愿景: [.tianxuan/specs/2026-06-02-tianxuan-design.md](.tianxuan/specs/2026-06-02-tianxuan-design.md)

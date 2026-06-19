@@ -154,7 +154,7 @@ export function ApprovalModal({
         </div>
         <div className="approval-tool">
           <span className="approval-tool__label">{t("approval.toolLabel")}</span>
-          <span className="tool__name">{approval.tool}</span>
+          <span className="font-mono text-xs font-medium text-fg">{approval.tool}</span>
         </div>
         {approval.subject && <pre className="approval-subject">{approval.subject}</pre>}
         <div className="plan-approval-card__choices">

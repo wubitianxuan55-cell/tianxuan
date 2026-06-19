@@ -72,7 +72,7 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
   return (
     <div
       ref={barRef}
-      className="jumpbar"
+      className="absolute right-0 top-0 bottom-0 w-2.5 hover:w-3.5 flex flex-col items-center gap-0.5 py-1 z-10 transition-[width]"
       onMouseMove={onMove}
       onMouseLeave={() => { setHovered(null); setShowPreview(false); }}
     >
@@ -82,7 +82,11 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
           <button
             key={item.turn}
             type="button"
-            className={`jumpbar__dot ${isActive ? "jumpbar__dot--active" : ""}`}
+            className={`w-[5px] h-[5px] rounded-full border-0 cursor-pointer p-0 shrink-0 transition-[background,transform] duration-150 ${
+              isActive
+                ? "bg-accent shadow-[0_0_3px_var(--accent-soft)]"
+                : "bg-border hover:bg-fg-dim hover:scale-[1.6]"
+            }`}
             data-turn={item.turn}
             onClick={(e) => { e.preventDefault(); scrollTo(item.turn); }}
             title={item.text.slice(0, 60)}
@@ -92,7 +96,7 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
 
       {showPreview && hoverText && (
         <div
-          className="jumpbar__preview"
+          className="absolute right-[calc(100%+8px)] max-w-60 px-2 py-1 bg-bg-elev-2 border border-border rounded-md text-[11px] text-fg-dim leading-snug whitespace-pre-wrap break-words shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none z-20"
           style={{
             top: Math.max(0, Math.min(previewY - 16, (barRef.current?.clientHeight ?? 200) - 40)),
           }}

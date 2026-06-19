@@ -47,10 +47,10 @@ function pretty(json: string): string {
 }
 
 function StatusGlyph({ status }: { status: ToolItem["status"] }) {
-  if (status === "running") return <Loader2 className="ico spin" size={13} />;
-  if (status === "error") return <X className="ico ico--err" size={13} />;
-  if (status === "stopped") return <Ban className="ico ico--stopped" size={13} />;
-  return <Check className="ico ico--ok" size={13} />;
+  if (status === "running") return <Loader2 className="animate-spin" size={13} />;
+  if (status === "error") return <X className="text-err" size={13} />;
+  if (status === "stopped") return <Ban className="text-fg-faint" size={13} />;
+  return <Check className="text-ok" size={13} />;
 }
 
 // ToolCard renders one tool call. V5.30: two-level expansion —
@@ -84,35 +84,41 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
   const outputLines = item.output ? item.output.split("\n").length : 0;
 
   return (
-    <div className={`tool tool--${item.status} ${quiet ? "tool--quiet" : ""}`}>
+    <div className={`my-0.5 rounded-lg overflow-hidden border ${
+      item.status === "error" ? "border-err/30 bg-[rgba(242,139,130,0.06)]" :
+      item.status === "running" ? "border-accent/30" :
+      item.status === "stopped" ? "border-border-soft opacity-70" :
+      "border-border-soft"
+    } ${quiet ? "border-transparent bg-transparent" : ""}`}>
       <div
-        className={`tool__row ${expandable ? "tool__row--clickable" : ""}`}
+        className={`flex items-center gap-2 px-2.5 py-1.5 text-fg-dim text-[12.5px] ${
+          expandable ? "cursor-pointer hover:bg-bg-soft" : ""
+        }`}
         onClick={expandable ? () => setOpen((v) => !v) : undefined}
       >
         {expandable ? (
-          <ChevronRight className={`tool__chevron ${open ? "tool__chevron--open" : ""}`} size={13} />
+          <ChevronRight className={`shrink-0 transition-transform duration-150 ${open ? "rotate-90" : ""}`} size={13} />
         ) : (
-          <span className="tool__chevron tool__chevron--placeholder" />
+          <span className="w-[13px] shrink-0" />
         )}
-        <Icon className="tool__icon" size={14} />
-        <span className="tool__name">{item.name}</span>
-        {subject && <span className="tool__subject">{subject}</span>}
-        {summary && <span className="tool__summary">{summary}</span>}
-        <span className="tool__meta">
+        <Icon className={`shrink-0 ${item.status === "error" ? "text-err" : item.status === "running" ? "text-accent" : "text-fg-faint"}`} size={14} />
+        <span className={`font-mono text-xs font-medium ${item.status === "error" ? "text-err" : "text-fg"}`}>{item.name}</span>
+        {subject && <span className="text-[11px] text-fg-faint truncate">{subject}</span>}
+        {summary && <span className="text-[11px] text-fg-faint italic ml-1 hidden group-hover:inline">{summary}</span>}
+        <span className="ml-auto shrink-0 flex items-center gap-1">
           <StatusGlyph status={item.status} />
         </span>
       </div>
 
-      {/* 一级展开：diff + args（要求和结构） */}
       {open && diffs.map((d, i) => (
-        <div className="tool__body" key={i}>
-          {d.label && <div className="tool__difflabel">{d.label}</div>}
+        <div className="px-2 pb-2" key={i}>
+          {d.label && <div className="text-[10px] text-fg-faint uppercase tracking-wider mb-1">{d.label}</div>}
           <DiffView original={d.original} modified={d.modified} language={d.lang} maxHeight={260} />
         </div>
       ))}
 
       {open && hasNested && (
-        <div className="tool__nested">
+        <div className="pl-4 border-l border-border-soft ml-4">
           {nested.map((c) => (
             <ToolCard key={c.id} item={c} />
           ))}
@@ -120,15 +126,14 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
       )}
 
       {open && hasArgs && (
-        <div className="tool__body">
+        <div className="px-2 pb-2">
           {item.args && <CodeViewer value={pretty(item.args)} language="json" maxHeight={120} />}
         </div>
       )}
 
-      {/* 输出切换按钮 — 只有存在输出时显示 */}
       {open && hasOutput && (
         <div
-          className="tool__output-toggle"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft border-t border-border-soft"
           onClick={(e) => { e.stopPropagation(); setShowOutput((v) => !v); }}
         >
           {showOutput ? <EyeOff size={11} /> : <Eye size={11} />}
@@ -139,15 +144,14 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
         </div>
       )}
 
-      {/* 二级展开：输出内容 */}
       {open && showOutput && hasOutput && (
-        <div className="tool__body">
+        <div className="px-2 pb-2">
           <CodeViewer value={item.output!} maxHeight={280} />
-          {item.truncated && <div className="tool__note">{t("tool.truncated")}</div>}
+          {item.truncated && <div className="mt-1 px-2 py-1 border border-border-soft rounded bg-bg-soft text-fg-dim text-[11px]">{t("tool.truncated")}</div>}
         </div>
       )}
 
-      {open && item.error && <div className="tool__err">{item.error}</div>}
+      {open && item.error && <div className="px-2.5 py-1.5 text-err text-[12px] leading-relaxed border-t border-err/20">{item.error}</div>}
     </div>
   );
 }

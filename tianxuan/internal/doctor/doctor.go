@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"tianxuan/internal/billing"
 	"tianxuan/internal/config"
@@ -76,7 +77,7 @@ func Run(ctx context.Context, deps Deps) *Report {
 	r.add(checkEnvironment(deps))
 	r.add(checkMCP(deps))
 	r.add(checkTokens(deps))
-	r.add(checkGoEnv())
+	r.add(checkGoEnv(ctx))
 	r.add(checkProject(deps))
 
 	for _, it := range r.Items {
@@ -215,12 +216,12 @@ func checkTokens(deps Deps) Item {
 	return Item{Name: "Token", Status: Pass, Detail: fmt.Sprintf("累计 %d prompt (命中 %.1f%%)", total, rate)}
 }
 
-func checkGoEnv() Item {
+func checkGoEnv(ctx context.Context) Item {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
 		return Item{Name: "Go", Status: Skip, Detail: "go 未安装"}
 	}
-	ver := goVersion(goBin)
+	ver := goVersion(ctx, goBin)
 	goroot := os.Getenv("GOROOT")
 	if goroot == "" {
 		goroot = filepath.Dir(filepath.Dir(goBin)) // infer from go binary path
@@ -294,8 +295,10 @@ func detectShell() string {
 	return "unknown"
 }
 
-func goVersion(goBin string) string {
-	cmd := exec.Command(goBin, "version")
+func goVersion(ctx context.Context, goBin string) string {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, goBin, "version")
 	out, err := cmd.Output()
 	if err != nil {
 		return ""

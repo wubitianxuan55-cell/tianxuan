@@ -35,24 +35,26 @@ export function SlashMenu({
           ? t("slash.skill")
           : "";
   return (
-    <div className="slashmenu" role="listbox">
+    <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 max-h-[280px] overflow-y-auto bg-bg-elev border border-border rounded-[10px] p-[5px] shadow-[0_12px_32px_rgba(0,0,0,0.4)] z-20 animate-[menu-in_0.12s_ease]" role="listbox">
       {items.map((c, i) => (
         <button
           key={c.kind + ":" + c.name}
           ref={i === activeIndex ? activeRef : undefined}
           role="option"
           aria-selected={i === activeIndex}
-          className={`slashmenu__item ${i === activeIndex ? "slashmenu__item--active" : ""}`}
+          className={`flex items-baseline gap-2 w-full px-2 py-1.5 bg-transparent border-0 rounded-md text-inherit text-left cursor-pointer ${
+            i === activeIndex ? "bg-accent-soft" : ""
+          }`}
           onMouseDown={(e) => {
             e.preventDefault();
             onPick(c);
           }}
           onMouseMove={() => onHover(i)}
         >
-          <span className="slashmenu__name">/{c.name}</span>
-          {c.hint && <span className="slashmenu__hint">{c.hint}</span>}
-          <span className="slashmenu__desc">{c.description}</span>
-          {kindTag(c.kind) && <span className="slashmenu__kind">{kindTag(c.kind)}</span>}
+          <span className="font-mono text-[13px] text-accent shrink-0">/{c.name}</span>
+          {c.hint && <span className="font-mono text-[11.5px] text-fg-faint shrink-0">{c.hint}</span>}
+          <span className="text-[12.5px] text-fg-dim truncate">{c.description}</span>
+          {kindTag(c.kind) && <span className="ml-auto text-[10px] uppercase tracking-[0.4px] text-fg-faint shrink-0">{kindTag(c.kind)}</span>}
         </button>
       ))}
     </div>

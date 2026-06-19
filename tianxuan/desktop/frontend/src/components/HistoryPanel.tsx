@@ -66,10 +66,10 @@ export function HistoryPanel({
           </button>
         </header>
 
-        <div className="hist-search">
-          <Search size={14} className="hist-search__icon" />
+        <div className="flex items-center gap-2 mx-3 mt-2 px-3 h-9 border border-border rounded-lg bg-bg-soft text-fg-faint focus-within:border-accent">
+          <Search size={14} className="text-fg-faint shrink-0" />
           <input
-            className="hist-search__input"
+            className="flex-1 border-0 outline-none bg-transparent text-fg text-[13px] placeholder:text-fg-faint"
             type="search"
             placeholder={tr("history.searchPlaceholder")}
             value={query}
@@ -79,18 +79,18 @@ export function HistoryPanel({
 
         <div className="drawer__body">
           {sessions.length === 0 ? (
-            <div className="mem-empty">{tr("history.empty")}</div>
+            <div className="py-5 text-fg-faint text-xs text-center">{tr("history.empty")}</div>
           ) : filtered.length === 0 ? (
-            <div className="mem-empty">{tr("history.noMatches")}</div>
+            <div className="py-5 text-fg-faint text-xs text-center">{tr("history.noMatches")}</div>
           ) : (
             groups.map((g) => (
-              <section className="mem-section" key={g.label}>
-                <div className="mem-section__title">{g.label}</div>
+              <section className="mb-3" key={g.label}>
+                <div className="text-fg-faint font-mono text-[11px] uppercase tracking-wider px-1 pb-1">{g.label}</div>
                 {g.items.map((s) => (
-                  <div className={`hist-item${s.current ? " hist-item--current" : ""}`} key={s.path}>
+                  <div className={`group flex items-start gap-1 px-2 py-2 rounded-lg hover:bg-bg-soft ${s.current ? "bg-sidebar-active" : ""}`} key={s.path}>
                     {editing === s.path ? (
                       <input
-                        className="hist-item__rename"
+                        className="flex-1 bg-bg border border-accent rounded-md text-fg text-[13px] px-2 py-1 outline-none"
                         autoFocus
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
@@ -102,10 +102,10 @@ export function HistoryPanel({
                         placeholder={tr("history.namePlaceholder")}
                       />
                     ) : (
-                      <button className="hist-item__main" onClick={() => onResume(s.path)} title={s.path}>
-                        <div className="hist-item__preview">{s.title || s.preview || tr("history.emptySession")}</div>
-                        <div className="hist-item__meta">
-                          {s.current && <span className="hist-item__badge">{tr("history.current")}</span>}
+                      <button className="flex-1 min-w-0 flex flex-col gap-0.5 bg-transparent border-0 text-left cursor-pointer" onClick={() => onResume(s.path)} title={s.path}>
+                        <div className="text-fg-dim text-[13px] leading-snug font-medium truncate">{s.title || s.preview || tr("history.emptySession")}</div>
+                        <div className="flex items-center gap-1.5 text-fg-faint text-[11px]">
+                          {s.current && <span className="bg-accent-soft text-accent text-[10px] px-1.5 py-px rounded font-medium">{tr("history.current")}</span>}
                           <span>{tr(s.turns === 1 ? "history.turnOne" : "history.turnOther", { n: s.turns })}</span>
                           <span>·</span>
                           <span>{timeLabel(s.modTime)}</span>
@@ -114,32 +114,17 @@ export function HistoryPanel({
                     )}
 
                     {editing !== s.path && (
-                      <div className="hist-item__actions">
+                      <div className="hidden group-hover:flex items-center gap-1 shrink-0">
                         {confirming === s.path ? (
                           <>
-                            <button
-                              className="hist-act hist-act--danger"
-                              title={tr("history.confirmDelete")}
-                              onClick={() => {
-                                onDelete(s.path);
-                                setConfirming(null);
-                              }}
-                            >
-                              <Check size={14} />
-                            </button>
-                            <button className="hist-act" title={tr("common.cancel")} onClick={() => setConfirming(null)}>
-                              <X size={14} />
-                            </button>
+                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-err cursor-pointer hover:bg-bg-elev" title={tr("history.confirmDelete")} onClick={() => { onDelete(s.path); setConfirming(null); }}><Check size={14} /></button>
+                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg" title={tr("common.cancel")} onClick={() => setConfirming(null)}><X size={14} /></button>
                           </>
                         ) : (
                           <>
-                            <button className="hist-act" title={tr("history.rename")} onClick={() => startRename(s)}>
-                              <Pencil size={13} />
-                            </button>
+                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg" title={tr("history.rename")} onClick={() => startRename(s)}><Pencil size={13} /></button>
                             {!s.current && (
-                              <button className="hist-act" title={tr("common.delete")} onClick={() => setConfirming(s.path)}>
-                                <Trash2 size={13} />
-                              </button>
+                              <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-err" title={tr("common.delete")} onClick={() => setConfirming(s.path)}><Trash2 size={13} /></button>
                             )}
                           </>
                         )}

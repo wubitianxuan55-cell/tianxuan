@@ -110,7 +110,27 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			if id, ok := jobs.JobIDFromContext(jobCtx); ok {
 				jm.SetPid(id, cmd.Process.Pid)
 			}
-			return "", cmd.Wait()
+
+			// V8.2: 后台任务也加上前台同款保护——jobCtx 取消时立刻强杀进程树，
+			// 防止 cmd.Wait() 永久阻塞（软件启动后卡死或不正常退出）。
+			go func() {
+				<-jobCtx.Done()
+				killProcessTree(cmd)
+			}()
+
+			// Try Windows Job Object for reliable process-tree cleanup.
+			// When the job handle closes (defer), Windows kills all child/grandchild
+			// processes recursively — even on kill_shell cancel or session close.
+			job, jobErr := assignToJobObject(cmd)
+			if jobErr == nil {
+				defer syscall.CloseHandle(job)
+			}
+			err := cmd.Wait()
+			if jobErr != nil {
+				// Job Object failed (e.g. sandbox restriction); fall back to taskkill.
+				killProcessTree(cmd)
+			}
+			return "", err
 		})
 		return fmt.Sprintf("Started background job %q. It keeps running across turns; read new output with bash_output(job_id=%q), wait for it with wait, or stop it with kill_shell(job_id=%q).", job.ID, job.ID, job.ID), nil
 	}

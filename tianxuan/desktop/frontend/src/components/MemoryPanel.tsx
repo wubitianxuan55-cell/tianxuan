@@ -196,59 +196,40 @@ export function MemoryPanel({
         </header>
 
         {!view?.available ? (
-          <div className="empty">{t("memory.unavailable")}</div>
+          <div className="py-5 text-fg-faint text-sm text-center">{t("memory.unavailable")}</div>
         ) : (
           <div className="drawer__body">
-            {/* Saved auto-memories — the model owns these via remember/forget;
-                the panel can delete one and follow [[name]] cross-links. */}
-            <section className="mem-section">
-              <div className="mem-section__row">
+            <section className="mb-3">
+              <div className="flex items-center justify-between px-2 pb-1.5">
                 <div>
-                  <div className="mem-section__title">{t("memory.savedMemories")}</div>
-                  <div className="mem-note">{t("memory.fallibleNote")}</div>
+                  <div className="text-fg text-sm font-semibold">{t("memory.savedMemories")}</div>
+                  <div className="text-fg-faint text-[11px]">{t("memory.fallibleNote")}</div>
                 </div>
-                <span className="mem-count">{facts.length}</span>
+                <span className="bg-bg-elev-2 text-fg-dim text-[11px] font-mono px-2 py-0.5 rounded-full">{facts.length}</span>
               </div>
-              <div className="mem-toolbar">
-                <label className="mem-search">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <label className="flex items-center gap-1.5 flex-1 px-2.5 h-8 border border-border rounded-md bg-bg-soft text-fg-faint focus-within:border-accent">
                   <Search size={14} />
                   <input
+                    className="flex-1 border-0 outline-none bg-transparent text-fg text-[13px] placeholder:text-fg-faint"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={t("memory.searchPlaceholder")}
                   />
                 </label>
-                <div className="mem-filter" role="tablist" aria-label={t("memory.typeFilter")}>
-                  <button
-                    className={`mem-filter__item${typeFilter === "all" ? " mem-filter__item--on" : ""}`}
-                    onClick={() => setTypeFilter("all")}
-                    type="button"
-                  >
-                    {t("memory.allTypes")}
-                  </button>
-                  {factTypes.map((type) => (
-                    <button
-                      className={`mem-filter__item${typeFilter === type ? " mem-filter__item--on" : ""}`}
-                      onClick={() => setTypeFilter(type)}
-                      type="button"
-                      key={type}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                <div className="flex gap-1" role="tablist" aria-label={t("memory.typeFilter")}>
+                  <button className={`px-2.5 py-1 border border-border-soft rounded-md text-[11px] bg-transparent cursor-pointer hover:bg-bg-soft hover:text-fg ${typeFilter==="all"?"bg-accent-soft text-accent border-accent/30":"text-fg-dim"}`} onClick={()=>setTypeFilter("all")} type="button">{t("memory.allTypes")}</button>
+                  {factTypes.map((type)=><button className={`px-2.5 py-1 border border-border-soft rounded-md text-[11px] bg-transparent cursor-pointer hover:bg-bg-soft hover:text-fg ${typeFilter===type?"bg-accent-soft text-accent border-accent/30":"text-fg-dim"}`} onClick={()=>setTypeFilter(type)} type="button" key={type}>{type}</button>)}
                 </div>
               </div>
               {facts.length === 0 ? (
-                <div className="mem-empty">{t("memory.noFacts")}</div>
+                <div className="py-4 text-fg-faint text-xs text-center">{t("memory.noFacts")}</div>
               ) : filteredFacts.length === 0 ? (
-                <div className="mem-empty">
+                <div className="py-4 text-fg-faint text-xs text-center">
                   {t("memory.noMatches")}
                   <button
-                    className="mem-empty__action"
-                    onClick={() => {
-                      setQuery("");
-                      setTypeFilter("all");
-                    }}
+                    className="mt-2 px-3 py-1 border border-border rounded text-fg-dim text-[11px] bg-transparent cursor-pointer hover:bg-bg-soft hover:text-fg"
+                    onClick={() => { setQuery(""); setTypeFilter("all"); }}
                     type="button"
                   >
                     {t("memory.clearFilters")}
@@ -262,98 +243,63 @@ export function MemoryPanel({
                     const missing = links.filter((link) => !link.exists);
                     return (
                       <article
-                        className={`mem-fact${highlight === f.name ? " mem-fact--hl" : ""}`}
+                        className={`border border-border-soft rounded-lg overflow-hidden mb-1.5 ${
+                          highlight === f.name ? "ring-2 ring-accent/30" : ""
+                        }`}
                         key={f.name}
-                        ref={(el) => {
-                          factRefs.current[f.name] = el;
-                        }}
+                        ref={(el) => { factRefs.current[f.name] = el; }}
                       >
                         <button
-                          className="mem-fact__summary"
-                          onClick={() => {
-                            setExpanded(isOpen ? null : f.name);
-                            setConfirmForget(null);
-                          }}
+                          className="flex items-start gap-2 w-full px-2.5 py-2 border-0 bg-transparent text-left cursor-pointer hover:bg-bg-soft"
+                          onClick={() => { setExpanded(isOpen ? null : f.name); setConfirmForget(null); }}
                           type="button"
                         >
-                          {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                          <span className="mem-fact__main">
-                            <span className="mem-fact__title">{displayTitle(f)}</span>
-                            <span className="mem-fact__meta">
-                              {f.name} · {f.type}
-                            </span>
-                            <span className="mem-fact__desc">{f.description}</span>
+                          {isOpen ? <ChevronDown size={15} className="shrink-0 mt-0.5 text-fg-faint" /> : <ChevronRight size={15} className="shrink-0 mt-0.5 text-fg-faint" />}
+                          <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                            <span className="text-fg text-[13px] font-semibold leading-tight">{displayTitle(f)}</span>
+                            <span className="text-fg-faint font-mono text-[10px]">{f.name} · {f.type}</span>
+                            <span className="text-fg-dim text-[11.5px] leading-snug">{f.description}</span>
                           </span>
                         </button>
                         {links.length > 0 && (
-                          <div className="mem-fact__links" aria-label={t("memory.links")}>
+                          <div className="flex flex-wrap gap-1 px-2.5 pb-1" aria-label={t("memory.links")}>
                             {links.map((link) =>
                               link.exists ? (
                                 <button
-                                  className="mem-link-chip"
+                                  className="inline-flex items-center px-2 py-0.5 border border-accent/20 rounded text-accent text-[11px] font-mono bg-transparent cursor-pointer hover:bg-accent-soft"
                                   key={link.name}
                                   onClick={() => jumpTo(link.name)}
                                   type="button"
-                                >
-                                  [[{link.name}]]
-                                </button>
+                                >[[{link.name}]]</button>
                               ) : (
                                 <span
-                                  className="mem-link-chip mem-link-chip--dead"
+                                  className="inline-flex items-center px-2 py-0.5 border border-border-soft rounded text-fg-faint text-[11px] font-mono opacity-60"
                                   key={link.name}
                                   title={t("memory.deadLink", { name: link.name })}
-                                >
-                                  [[{link.name}]]
-                                </span>
+                                >[[{link.name}]]</span>
                               ),
                             )}
                           </div>
                         )}
                         {isOpen && (
-                          <div className="mem-fact__detail">
+                          <div className="border-t border-border-soft px-2.5 py-2">
                             {f.body ? (
-                              <div className="mem-fact__body">{renderWithLinks(f.body)}</div>
+                              <div className="text-fg-dim text-xs leading-relaxed pb-2">{renderWithLinks(f.body)}</div>
                             ) : (
-                              <div className="mem-empty">{t("memory.noBody")}</div>
+                              <div className="py-3 text-fg-faint text-xs text-center">{t("memory.noBody")}</div>
                             )}
                             {missing.length > 0 && (
-                              <div className="mem-deadline">
-                                {t("memory.missingLinks", { n: missing.length })}
-                              </div>
+                              <div className="mb-2 text-fg-faint text-[11px]">{t("memory.missingLinks", { n: missing.length })}</div>
                             )}
-                            <div className="mem-fact__actions">
-                              <span className="mem-hint mem-hint--inline">
-                                {t("memory.appliesNow")}
-                              </span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-fg-faint text-[10px]">{t("memory.appliesNow")}</span>
                               {confirmForget === f.name ? (
-                                <div className="mem-confirm">
-                                  <button
-                                    className="btn btn--small"
-                                    onClick={() => setConfirmForget(null)}
-                                    disabled={busy}
-                                    type="button"
-                                  >
-                                    {t("common.cancel")}
-                                  </button>
-                                  <button
-                                    className="btn btn--small mem-danger"
-                                    onClick={() => void forgetFact(f.name)}
-                                    disabled={busy}
-                                    type="button"
-                                  >
-                                    {t("memory.confirmForget")}
-                                  </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button className="btn btn--small" onClick={() => setConfirmForget(null)} disabled={busy} type="button">{t("common.cancel")}</button>
+                                  <button className="btn btn--small mem-danger" onClick={() => void forgetFact(f.name)} disabled={busy} type="button">{t("memory.confirmForget")}</button>
                                 </div>
                               ) : (
-                                <button
-                                  className="btn btn--small mem-fact__forget"
-                                  onClick={() => setConfirmForget(f.name)}
-                                  disabled={busy}
-                                  type="button"
-                                >
-                                  <Trash2 size={13} />
-                                  {t("memory.forget")}
-                                </button>
+                                <button className="btn btn--small mem-fact__forget" onClick={() => setConfirmForget(f.name)} disabled={busy} type="button"><Trash2 size={13} />{t("memory.forget")}</button>
                               )}
                             </div>
                           </div>
@@ -364,36 +310,30 @@ export function MemoryPanel({
                 </div>
               )}
               {view.storeDir && (
-                <div className="mem-hint" title={view.storeDir}>
+                <div className="mt-2 text-fg-faint text-[10px] px-1" title={view.storeDir}>
                   {t("memory.storedUnder", { dir: view.storeDir })}
                 </div>
               )}
             </section>
 
-            {/* Quick-add: scope selector + note, mirroring the "#" shortcut. */}
-            <section className="mem-section">
-              <div className="mem-section__title">{t("memory.quickAdd")}</div>
-              <div className="mem-add">
+            {/* Quick-add */}
+            <section className="mb-3">
+              <div className="text-fg text-sm font-semibold mb-1.5 px-1">{t("memory.quickAdd")}</div>
+              <div className="flex items-center gap-2">
                 <select
-                  className="mem-select"
+                  className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2 py-1.5 outline-none focus:border-accent"
                   value={activeScope}
                   onChange={(e) => setScope(e.target.value)}
                   title={t("memory.whereToSave")}
                 >
-                  {scopes.map((s) => (
-                    <option key={s.scope} value={s.scope}>
-                      {s.scope}
-                    </option>
-                  ))}
+                  {scopes.map((s) => (<option key={s.scope} value={s.scope}>{s.scope}</option>))}
                 </select>
                 <input
-                  className="mem-input"
+                  className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
                   placeholder={t("memory.notePlaceholder")}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void submitNote();
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") void submitNote(); }}
                 />
                 <button
                   className="btn btn--primary btn--small"
@@ -403,62 +343,43 @@ export function MemoryPanel({
                   {t("memory.remember")}
                 </button>
               </div>
-              <div className="mem-hint">
+              <div className="text-fg-faint text-[10px] mt-1 px-1">
                 {scopes.find((s) => s.scope === activeScope)?.path}
               </div>
             </section>
 
-            {/* Doc files — editable in place. */}
-            <section className="mem-section">
-              <div className="mem-section__title">{t("memory.instructionFiles")}</div>
+            {/* Doc files */}
+            <section className="mb-3">
+              <div className="text-fg text-sm font-semibold mb-1.5 px-1">{t("memory.instructionFiles")}</div>
               {view.docs.length === 0 && (
-                <div className="mem-empty">{t("memory.noDocs")}</div>
+                <div className="py-4 text-fg-faint text-xs text-center">{t("memory.noDocs")}</div>
               )}
               {view.docs.map((d) => {
                 const editing = editingPath === d.path;
                 return (
-                  <div className="mem-doc" key={d.path}>
-                    <div className="mem-doc__head">
+                  <div className="mb-2 border border-border-soft rounded-lg overflow-hidden" key={d.path}>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5">
                       <span className={`badge badge--${d.scope}`}>{d.scope}</span>
-                      <span className="mem-doc__path" title={d.path}>
-                        {d.path}
-                      </span>
+                      <span className="flex-1 text-fg-dim font-mono text-[11px] truncate" title={d.path}>{d.path}</span>
                       {!editing && (
-                        <button
-                          className="btn btn--small"
-                          onClick={() => startEdit(d.path, d.body)}
-                        >
-                          {t("common.edit")}
-                        </button>
+                        <button className="btn btn--small" onClick={() => startEdit(d.path, d.body)}>{t("common.edit")}</button>
                       )}
                     </div>
                     {editing ? (
-                      <div className="mem-doc__edit">
+                      <div className="px-2.5 pb-2">
                         <textarea
-                          className="mem-textarea"
+                          className="w-full bg-bg border border-border-soft rounded-md text-fg text-[13px] p-2 outline-none resize-y min-h-[120px] focus:border-accent"
                           value={draft}
                           onChange={(e) => setDraft(e.target.value)}
                           spellCheck={false}
                         />
-                        <div className="mem-doc__actions">
-                          <button
-                            className="btn btn--small"
-                            onClick={() => setEditingPath(null)}
-                            disabled={busy}
-                          >
-                            {t("common.cancel")}
-                          </button>
-                          <button
-                            className="btn btn--primary btn--small"
-                            onClick={() => void saveEdit()}
-                            disabled={busy}
-                          >
-                            {t("common.save")}
-                          </button>
+                        <div className="flex justify-end gap-2 mt-1.5">
+                          <button className="btn btn--small" onClick={() => setEditingPath(null)} disabled={busy}>{t("common.cancel")}</button>
+                          <button className="btn btn--primary btn--small" onClick={() => void saveEdit()} disabled={busy}>{t("common.save")}</button>
                         </div>
                       </div>
                     ) : (
-                      <pre className="mem-doc__body">{d.body}</pre>
+                      <pre className="m-0 px-2.5 py-2 bg-bg text-fg-dim text-xs leading-relaxed whitespace-pre-wrap border-t border-border-soft">{d.body}</pre>
                     )}
                   </div>
                 );

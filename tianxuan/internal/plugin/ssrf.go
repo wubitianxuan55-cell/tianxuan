@@ -16,6 +16,7 @@ import (
 func ssrfGuardedHTTPClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 30 * time.Second}
 	return &http.Client{
+		Timeout: 60 * time.Second, // V8.2: 全请求超时防止 MCP 服务器无响应导致永久阻塞
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				host, port, err := net.SplitHostPort(addr)

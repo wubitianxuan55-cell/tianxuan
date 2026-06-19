@@ -1,24 +1,24 @@
 export function Skeleton() {
   return (
-    <div className="skeleton">
+    <div className="flex-1 px-8 py-10 flex flex-col gap-6 overflow-hidden">
       {/* User message */}
-      <div className="skeleton__msg skeleton__msg--user">
-        <div className="skeleton__line" style={{ width: "60%" }} />
+      <div className="flex flex-col gap-2.5 items-end pr-6">
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "60%" }} />
       </div>
       {/* Assistant reply */}
-      <div className="skeleton__msg skeleton__msg--assistant">
-        <div className="skeleton__line" style={{ width: "90%" }} />
-        <div className="skeleton__line" style={{ width: "75%" }} />
-        <div className="skeleton__line" style={{ width: "45%" }} />
+      <div className="flex flex-col gap-2.5 items-start">
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "90%" }} />
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "75%" }} />
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "45%" }} />
       </div>
       {/* Tool call */}
-      <div className="skeleton__tool">
-        <div className="skeleton__line" style={{ width: "30%" }} />
+      <div className="flex py-2 px-3 ml-5 border border-border-soft rounded-md">
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "30%" }} />
       </div>
       {/* Another assistant reply */}
-      <div className="skeleton__msg skeleton__msg--assistant">
-        <div className="skeleton__line" style={{ width: "80%" }} />
-        <div className="skeleton__line" style={{ width: "50%" }} />
+      <div className="flex flex-col gap-2.5 items-start">
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "80%" }} />
+        <div className="h-3 bg-border-soft rounded animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" style={{ width: "50%" }} />
       </div>
     </div>
   );

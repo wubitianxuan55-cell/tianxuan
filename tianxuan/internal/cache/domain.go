@@ -44,7 +44,7 @@ var shellTools = []string{
 
 var metaTools = []string{
 	"todo_write", "complete_step",
-	"remember", "forget", "memory_search",
+	"remember", "forget", "memory",
 }
 
 var subagentTools = []string{

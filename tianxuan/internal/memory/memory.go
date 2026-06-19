@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 )
 
 // Set is everything memory loaded for one session: the hierarchical docs and a
@@ -13,12 +15,11 @@ import (
 // UserDir are retained so the controller can resolve quick-add targets without
 // re-deriving discovery context.
 type Set struct {
-	Docs    []Source      // TIANXUAN.md / AGENTS.md, ascending precedence
-	Store   Store         // auto-memory store (may be a zero/disabled Store)
-	Index   string        // MEMORY.md contents at load time
-	Search  *SearchIndex  // V5.31: in-memory inverted index for memory_search
-	CWD     string        // project working dir used for discovery
-	UserDir string        // user config root (may be "")
+	Docs    []Source // TIANXUAN.md / AGENTS.md / REASONIX.md, ascending precedence
+	Store   Store    // auto-memory store (may be a zero/disabled Store)
+	Index   string   // MEMORY.md contents at load time
+	CWD     string   // project working dir used for discovery
+	UserDir string   // user config root (may be "")
 }
 
 // Options configures discovery. CWD defaults to "." and UserDir is the user
@@ -42,18 +43,31 @@ func Load(opts Options) *Set {
 		Docs:    discoverDocs(cwd, opts.UserDir),
 		Store:   store,
 		Index:   store.Index(),
-		Search:  store.BuildSearchIndex(),
 		CWD:     cwd,
 		UserDir: opts.UserDir,
 	}
 }
 
+// RefreshDocs re-discovers only the hierarchical doc memory (TIANXUAN.md chain)
+// without touching the auto-memory index. Used after QuickAdd / SaveDoc so the
+// full Load() cost (which also reads all .md fact files) is avoided.
+func (s *Set) RefreshDocs() {
+	s.Docs = discoverDocs(s.CWD, s.UserDir)
+}
+
+// RefreshIndex re-reads only the MEMORY.md index without touching doc discovery
+// or individual memory files. Used after remember/forget so the Index stays in
+// sync with the active memory set.
+func (s *Set) RefreshIndex() {
+	s.Index = s.Store.Index()
+}
+
 // DocPath returns the doc-memory file a given scope writes to. To avoid splitting
 // a project's memory across conventions, it prefers a file that already exists
-// (TIANXUAN.md / AGENTS.md / CLAUDE.md, in that order); when none exists it
-// creates the universal default (AGENTS.md / AGENTS.local.md). ScopeUser →
-// <userDir>, ScopeLocal → <cwd> with the *.local.md names, anything else → <cwd>.
-// Returns "" for ScopeUser when no user dir is configured.
+// (TIANXUAN.md / AGENTS.md / REASONIX.md / CLAUDE.md, in that order); when none
+// exists it creates the universal default (AGENTS.md / AGENTS.local.md).
+// ScopeUser → <userDir>, ScopeLocal → <cwd> with the *.local.md names, anything
+// else → <cwd>. Returns "" for ScopeUser when no user dir is configured.
 func (s *Set) DocPath(scope Scope) string {
 	dir := s.CWD
 	names, def := docNames, defaultDocName
@@ -123,40 +137,17 @@ func (s *Set) WriteDoc(path, body string) (string, error) {
 	return path, writeDocFile(path, body)
 }
 
-// Block renders memory for the cache-stable prefix. Returns a compact block when
-// the full memory would exceed a reasonable size, keeping the prefix lean.
+// Block renders the memory as a single Markdown section, or "" when empty. It is
+// deterministic given the same files, which is what keeps it a stable cache
+// prefix across sessions that don't change their memory.
 //
-// V5.30: doc bodies larger than 4 KiB total are replaced with their paths and
-// first line only — the controller injects the full bodies at turn-tail via
-// DocBlock, so the model still sees them without expanding the cache prefix.
+// Doc bodies load in full; the MEMORY.md index is included as a one-line-per-fact
+// summary. The model reads individual saved facts on demand via the `memory` tool
+// rather than keeping all bodies in the prefix.
 func (s *Set) Block() string {
 	if s.Empty() {
 		return ""
 	}
-	full := s.buildFullBlock()
-	if len(full) <= 4096 {
-		return full // small memory → everything in prefix
-	}
-	return s.buildCompactBlock()
-}
-
-// DocBlock returns just the doc bodies for turn-tail injection (V5.30).
-// The controller calls this in the first turn to give the model full doc content
-// without expanding the cache-stable prefix.
-func (s *Set) DocBlock() string {
-	if len(s.Docs) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("# Memory docs (loaded from turn-tail)\n\n")
-	for _, d := range s.Docs {
-		fmt.Fprintf(&b, "\n## %s (%s)\n\n%s\n", d.Path, d.Scope, strings.TrimSpace(d.Body))
-	}
-	return b.String()
-}
-
-// buildFullBlock returns the complete memory block (docs + index).
-func (s *Set) buildFullBlock() string {
 	var b strings.Builder
 	b.WriteString("# Memory\n\n")
 
@@ -168,35 +159,32 @@ func (s *Set) buildFullBlock() string {
 		b.WriteString("\n## Saved memories\n\n")
 		b.WriteString("Facts you saved in earlier sessions — use read_file to see details.\n\n")
 		b.WriteString(idx)
-		fmt.Fprintf(&b, "\n\n(stored under %s)\n", s.Store.Dir)
+		var dirs []string
+		for _, d := range s.Store.dirs() {
+			if d != "" {
+				dirs = append(dirs, d)
+			}
+		}
+		fmt.Fprintf(&b, "\n\n(stored under %s)\n", strings.Join(dirs, " and "))
+		// Aging: count stale memories (>90 days since last update).
+		if stale := countStale(s.Store.List(), 90); stale > 0 {
+			fmt.Fprintf(&b, "(%d memories not updated in >90 days — use `memory list` to review)\n", stale)
+		}
 	}
 	return b.String()
 }
 
-// buildCompactBlock returns an abbreviated memory block for the cache prefix.
-// Includes doc paths and first line, plus the complete MEMORY.md index.
-func (s *Set) buildCompactBlock() string {
-	var b strings.Builder
-	b.WriteString("# Memory\n\nDocs available:\n\n")
-	for _, d := range s.Docs {
-		first := strings.TrimSpace(d.Body)
-		if idx := strings.Index(first, "\n"); idx >= 0 {
-			first = first[:idx]
+func countStale(memories []Memory, days int) int {
+	cutoff := time.Now().AddDate(0, 0, -days)
+	n := 0
+	for _, m := range memories {
+		if !m.Mtime.IsZero() && m.Mtime.Before(cutoff) {
+			n++
 		}
-		first = strings.TrimSpace(first)
-		if len(first) > 160 {
-			first = first[:160] + "\u2026"
-		}
-		fmt.Fprintf(&b, "- %s (%s): %s\n", filepath.Base(d.Path), d.Scope, first)
 	}
-
-	if idx := strings.TrimSpace(s.Index); idx != "" {
-		b.WriteString("\n## Saved memories\n\n")
-		b.WriteString(idx)
-		fmt.Fprintf(&b, "\n\n(stored under %s)\n", s.Store.Dir)
-	}
-	return b.String()
+	return n
 }
+
 // Compose folds the memory block onto the base system prompt and returns the
 // durable cached-prefix string. Base stays first (it is the most stable text, so
 // it remains a valid cache prefix even when memory changes between sessions);
@@ -210,4 +198,64 @@ func Compose(base string, s *Set) string {
 		return block
 	}
 	return strings.TrimRight(base, "\n") + "\n\n" + block
+}
+
+// SearchMatch is a single search result with a relevance score.
+type SearchMatch struct {
+	Name  string // memory slug
+	Score int    // number of matching tokens (higher = more relevant)
+}
+
+// Search finds memories matching the query using simple token matching.
+// Returns nil when the store is empty or no matches found.
+// Used by controller for /memories command and dream distillation.
+func (s *Set) Search(query string) []SearchMatch {
+	if s == nil {
+		return nil
+	}
+	memories := s.Store.List()
+	if len(memories) == 0 {
+		return nil
+	}
+
+	query = strings.ToLower(strings.TrimSpace(query))
+	queryTokens := strings.FieldsFunc(query, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_')
+	})
+	if len(queryTokens) == 0 {
+		return nil
+	}
+
+	type scored struct {
+		name  string
+		score int
+	}
+	var results []scored
+	for _, m := range memories {
+		text := strings.ToLower(m.Title + " " + m.Description + " " + m.Body)
+		score := 0
+		for _, token := range queryTokens {
+			if len(token) >= 2 && strings.Contains(text, token) {
+				score++
+			}
+		}
+		if score > 0 {
+			results = append(results, scored{m.Name, score})
+		}
+	}
+	if len(results) == 0 {
+		return nil
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].score != results[j].score {
+			return results[i].score > results[j].score
+		}
+		return results[i].name < results[j].name
+	})
+
+	matches := make([]SearchMatch, len(results))
+	for i, r := range results {
+		matches[i] = SearchMatch{Name: r.name, Score: r.score}
+	}
+	return matches
 }

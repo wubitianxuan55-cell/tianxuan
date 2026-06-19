@@ -1,4 +1,63 @@
-## [8.2.3] — 2026-06-20
+## [8.3.0] — 2026-06-21
+
+### 🧠 记忆模块全量升级 — GlobalDir + Archive + BM25 + 增量刷新 + 老化
+
+**参照 DeepSeek-Reasonix v1.9.1 记忆架构重写，13文件变更，+537/-565行（净精简+功能增强）**
+
+#### P0: 核心架构 — 双目录 + 按类型路由 + 归档
+
+| 特性 | 文件 | 说明 |
+|------|------|------|
+| **GlobalDir** | `store.go` | `Store{Dir, GlobalDir}` — `user`/`feedback` 全局共享，`project`/`reference` 项目隔离 |
+| **按类型路由** | `store.go` | `saveDir(t)` 自动选择目标目录；跨目录去重 `removeActiveMemoryInDir` |
+| **Archive 归档** | `store.go` | `Archive()` 替代 `Delete()` — 移到 `.archive/<timestamp>-<name>.md`，永不可逆丢失 |
+| **ListArchived** | `store.go` | 查看所有已归档记忆，按时间倒序 |
+| **安全路径** | `store.go` | `safeJoin()` 防止路径穿越；`os.OpenRoot` 沙箱操作 |
+
+#### P1: BM25 检索引擎 + 三合一 memory 工具
+
+| 特性 | 文件 | 说明 |
+|------|------|------|
+| **retrieval 包** | `retrieval/bm25.go` (214行) | 通用 BM25 (`k1=1.2,b=0.75`) + CJK 单字切分 + Snippet 智能截取 + 相对分截断 |
+| **memory 工具** | `memory/recall.go` (284行) | `search`(BM25) / `read` / `list` 三合一，支持 type 过滤 + snippet + 无结果纠错建议 |
+| **删除旧工具** | 删除 | `memory_search.go` (106行) + `search.go` (129行) + `search_test.go` (170行) |
+
+#### P1: 增量刷新 + 编辑距离纠错 + 老化追踪
+
+| 特性 | 文件 | 说明 |
+|------|------|------|
+| **增量刷新** | `memory.go` + `controller_memory.go` | `RefreshDocs()` 只重读文档，`RefreshIndex()` 只重读 MEMORY.md — 从 O(N) 到 O(1) |
+| **forget 纠错** | `store.go` | `Archive()` 找不到时用 Levenshtein 编辑距离建议候选：`did you mean "x"?` |
+| **mtime 追踪** | `store.go` | `Memory.Mtime` 自动填充文件修改时间 |
+| **老化标记** | `memory.go` | `Block()` 末尾追加 `(3 memories not updated in >90 days)` 提醒 |
+
+#### 辅助改进
+
+| 特性 | 说明 |
+|------|------|
+| **REASONIX.md** | `doc.go` 新增 REASONIX.md/REASONIX.local.md 识别，兼容 Reasonix 生态 |
+| **memory.go 简化** | 移除 SearchIndex/compact/DocBlock，新增 `Search()` 桥接方法供 controller 使用 |
+| **配置更新** | `config.go` + `domain.go` 将 `memory_search` 改为 `memory` |
+
+#### 搜索能力对比
+
+| 维度 | 旧 `memory_search` | 新 `memory` 工具 |
+|------|-------------------|-------------------|
+| 算法 | 简单 token 计数 | **BM25** (k1=1.2, b=0.75) |
+| 中文 | 整词吞掉 | **单字切分** (CJK 逐字索引) |
+| 操作 | 仅 search | **search / read / list** |
+| 片段 | 无 | **Snippet** 智能截取 (260 字符) |
+| 类型过滤 | 无 | **按 type 过滤** |
+| 删除 | 永久删除 | **归档** (.archive/) |
+
+#### 三级记忆体系
+
+| 层级 | 媒介 | 加载策略 |
+|------|------|---------|
+| **Tier 1 — 核心** | 文档记忆 (TIANXUAN.md/AGENTS.md) | 完整注入系统前缀，始终在模型上下文 |
+| **Tier 2 — 重要** | `GlobalDir` (user/feedback) | 仅索引进前缀，正文通过 `memory read` 按需加载 |
+| **Tier 3 — 存档** | `.archive/` + `ListArchived()` | 不进入前缀，可追溯但不可搜索 |
+
 
 ### 🎨 桌面端 UI — 对话窗口 6 项核心修复
 

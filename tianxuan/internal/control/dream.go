@@ -325,8 +325,8 @@ func (c *Controller) Dream(ctx context.Context) error {
 	date := time.Now().Format("2006-01-02")
 	// Search past memories related to this session and merge insights
 	related := ""
-	if mem := c.Memory(); mem != nil && mem.Search != nil {
-		matches := mem.Search.Search("project architecture code design")
+	if mem := c.Memory(); mem != nil {
+		matches := mem.Search("project architecture code design")
 		if len(matches) > 0 {
 			var sb strings.Builder
 			sb.WriteString("\nRelated past memories:\n")

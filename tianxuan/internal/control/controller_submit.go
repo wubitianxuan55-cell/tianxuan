@@ -67,11 +67,11 @@ func (c *Controller) Submit(input string) {
 		}()
 	case trimmed == "/memories" || strings.HasPrefix(trimmed, "/memories "):
 		query := strings.TrimSpace(strings.TrimPrefix(trimmed, "/memories"))
-		if mem := c.Memory(); mem != nil && mem.Search != nil {
+		if mem := c.Memory(); mem != nil {
 			if query == "" {
 				query = "project code feature fix"
 			}
-			matches := mem.Search.Search(query)
+			matches := mem.Search(query)
 			if len(matches) == 0 {
 				c.notice("no memories found")
 				return

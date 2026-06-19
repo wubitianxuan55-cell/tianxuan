@@ -38,10 +38,10 @@ const (
 // path), so a repo already carrying an AGENTS.md / CLAUDE.md is picked up without
 // renaming. New docs are created as AGENTS.md (the universal convention) — see
 // defaultDocName / Set.DocPath.
-var docNames = []string{"TIANXUAN.md", "AGENTS.md", "CLAUDE.md"}
+var docNames = []string{"TIANXUAN.md", "AGENTS.md", "REASONIX.md", "CLAUDE.md"}
 
 // localNames are the personal, git-ignored overrides, highest precedence.
-var localNames = []string{"TIANXUAN.local.md", "AGENTS.local.md", "CLAUDE.local.md"}
+var localNames = []string{"TIANXUAN.local.md", "AGENTS.local.md", "REASONIX.local.md", "CLAUDE.local.md"}
 
 // defaultDocName / defaultLocalName are the filenames a fresh doc is created as
 // when a directory has none yet: AGENTS.md is the widely-shared convention, so a

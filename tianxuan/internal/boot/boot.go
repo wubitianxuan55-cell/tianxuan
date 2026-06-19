@@ -130,7 +130,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// controller's transient turn-injection and fold in on the next session.
 	mem := memory.Load(memory.Options{CWD: ".", UserDir: config.MemoryUserDir()})
 	sysPrompt = memory.Compose(sysPrompt, mem)
-	builtin.SetMemorySearchIndex(mem.Search) // V5.31: wire search index to memory_search tool
 
 	// Skills: discover playbooks (built-in + project/custom/global) and fold their
 	// one-liner index into the same cache-stable prefix — names + descriptions
@@ -299,6 +298,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// The `remember` tool lets the model persist durable facts to the project's
 	// auto-memory store; `forget` prunes ones that turn out wrong. The saved index
 	// loads into the prefix on the next session.
+	reg.Add(memory.NewRecallTool(mem.Store))
 	reg.Add(memory.NewRememberTool(mem.Store))
 	reg.Add(memory.NewForgetTool(mem.Store))
 

@@ -1,3 +1,31 @@
+## [8.2.3] — 2026-06-20
+
+### 🎨 桌面端 UI — 对话窗口 6 项核心修复
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| 对话窗口无法滚动 | `styles.css` | `.transcript` 类缺失 `overflow-y:auto` + `flex:1`，浏览器无滚动上下文 |
+| JumpBar 定位漂移 | `styles.css` + `JumpBar.tsx` | `.main` 缺 `position:relative` 导致绝对定位基准错误；改为垂直居中 |
+| 用户消息左对齐 | `Message.tsx` | `flex-row-reverse` + `rounded-br-md` 实现右对齐 |
+| 留白过窄 | `Transcript.tsx` | 新增 `px-[100px]` 包裹层，两侧各 100px |
+| AskCard 遮罩消失 | `tailwind.css` | Tailwind v4 自定义 `@theme` 覆盖默认色板，`--color-black`/`--color-white` 未定义 |
+| 批准窗口错位 | `styles.css` | `.plan-approval-dock` 缺失 `position:fixed`，从文档流挤出 |
+
+### 🧩 组件重设计
+
+| 组件 | 改进 |
+|------|------|
+| **TodoPanel** | 完全重写：顶部进度条 + Loader 旋转动画 + 完成项删除线 + 子任务竖线 + 悬停高亮 |
+| **AskCard** | 自定义 radio 圆圈（18px 双环） + fadeIn/scaleIn 入场动画 + 选项 hover/active 状态 + 标题装饰线 |
+
+### 🔧 颜色系统修复
+
+- `tailwind.css` `@theme` 新增 `--color-black: #000` / `--color-white: #fff`
+- 恢复 `bg-black/*`、`text-white`、`bg-white/*` 等系列工具类
+- 新增 `@keyframes fadeIn` / `scaleIn` 动画关键帧
+
+---
+
 ## [8.2.1] — 2026-06-19
 
 ### 🎨 桌面端 UI — Tailwind CSS 全量迁移

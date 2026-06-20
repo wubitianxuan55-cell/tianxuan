@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
+import { useCompact } from "../hooks/useCompact";
 import type { Item } from "../lib/store";
 
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
@@ -15,18 +16,19 @@ export const UserMessage = memo(function UserMessage({
 }: {
   text: string;
   turn?: number;
-  open?: boolean; // whether this message's rewind menu is the open one (lifted to Transcript)
+  open?: boolean;
   onToggle?: () => void;
   onRewind?: (turn: number, scope: string) => void;
 }) {
   const t = useT();
+  const compact = useCompact();
   const canRewind = onRewind != null && turn != null;
   const rewind = (scope: string) => onRewind?.(turn as number, scope);
   const displayText = text.replace(/@\.tianxuan\/attachments\/[^\s]+/g, "[image]");
   return (
-    <div className="relative flex flex-row-reverse items-center gap-2 px-4 py-2.5 group">
-      <span className="text-accent font-mono font-semibold text-lg leading-none shrink-0">›</span>
-      <div className="bg-accent-soft text-fg rounded-xl rounded-br-md shadow-sm px-4 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words max-w-[85%]">{displayText}</div>
+    <div className={`relative flex flex-row-reverse items-center gap-2 group ${compact ? "px-3 py-1.5" : "px-4 py-2.5"}`}>
+      <span className={`text-accent font-mono font-semibold leading-none shrink-0 ${compact ? "text-base" : "text-lg"}`}>›</span>
+      <div className={`bg-accent-soft text-fg rounded-xl rounded-br-md shadow-sm leading-relaxed whitespace-pre-wrap break-words max-w-[85%] ${compact ? "px-3 py-1.5 text-[13px]" : "px-4 py-2 text-[14px]"}`}>{displayText}</div>
       {canRewind && (
         <div className="relative shrink-0 ml-auto">
           <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-all duration-[0.12s] active:scale-90" title={t("rewind.label")} onClick={onToggle}>
@@ -50,12 +52,13 @@ export const UserMessage = memo(function UserMessage({
 
 export const AssistantMessage = memo(function AssistantMessage({ item }: { item: AssistantItem; onCollapse?: () => void }) {
   const t = useT();
+  const compact = useCompact();
   const thinkOnly = !!item.reasoning && !item.text;
   const [open, setOpen] = useState(false);
   const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
 
   return (
-    <div className={`relative py-1 ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
+    <div className={`relative ${compact ? "py-0.5" : "py-1"} ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
       {item.reasoning && (
         <div className="mb-1">
           <button
@@ -75,8 +78,8 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
               open ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
             }`}
           >
-            <div className="overflow-hidden">
-              <div className="pl-3 border-l-2 border-accent/40 text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+            <div className="overflow-hidden min-h-0">
+              <div className={`pl-3 ml-1 border-l-2 border-accent/30 bg-accent/[0.03] rounded-sm text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[300px] py-1" : "max-h-[500px] py-1.5"}`}>
                 {item.reasoning}
               </div>
             </div>

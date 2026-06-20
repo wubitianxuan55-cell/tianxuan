@@ -46,7 +46,7 @@ export function AskCard({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-6 animate-[fadeIn_.15s_ease-out]">
+    <div className="fixed inset-0 flex items-center justify-center bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out]">
       <div className="flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 animate-[scaleIn_.2s_ease-out]">
         {ask.questions.map((q) => (
           <div className="flex flex-col gap-3" key={q.id}>
@@ -65,7 +65,7 @@ export function AskCard({
                     key={o.label}
                     className={`flex items-start gap-2.5 w-full px-3 py-2.5 rounded-lg border text-left transition-all duration-150 ${
                       on
-                        ? "border-accent bg-accent-soft shadow-[0_0_0_1px_var(--accent-soft)]"
+                        ? "border-accent bg-accent-soft shadow-[0_0_0_1px_var(--accent)]"
                         : "border-border-soft bg-transparent hover:border-border hover:bg-bg-soft active:scale-[0.99]"
                     }`}
                     onClick={() => toggle(q, o.label)}
@@ -94,7 +94,7 @@ export function AskCard({
               })}
             </div>
             <input
-              className="w-full border border-border-soft rounded-lg bg-bg text-fg text-[12.5px] px-3 py-2 outline-none placeholder:text-fg-faint/60 transition-colors duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
+              className="w-full border border-border-soft rounded-lg bg-bg text-fg text-[12.5px] px-3 py-2 outline-none placeholder:text-fg-faint/40 transition-colors duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
               placeholder={t("ask.customPlaceholder")}
               value={custom[q.id] ?? ""}
               onChange={(e) => setTyped(q, e.target.value)}
@@ -103,13 +103,13 @@ export function AskCard({
         ))}
         <div className="flex justify-end gap-2 pt-1 border-t border-border-soft">
           <button
-            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-150 hover:text-fg hover:border-border hover:bg-bg-soft active:scale-[0.98]"
+            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-[0.12s] hover:text-fg hover:border-border hover:bg-bg-soft hover:-translate-y-px active:scale-[0.98]"
             onClick={onDismiss}
           >
             {t("ask.justChat")}
           </button>
           <button
-            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-150 enabled:hover:brightness-110 enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-default"
+            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-[0.12s] enabled:hover:brightness-110 enabled:hover:-translate-y-px enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-default"
             onClick={submit}
             disabled={!allAnswered}
           >

@@ -1,14 +1,9 @@
 import { useMemo, useState } from "react";
-import { Pencil, Search, Trash2, Check, X } from "lucide-react";
+import { Pencil, Search, Trash2, Check, X, MessageSquare, Clock } from "lucide-react";
 import { t, useT } from "../lib/i18n";
 import type { SessionMeta } from "../lib/types";
 import { ResizableDrawer } from "./ResizableDrawer";
 
-// HistoryPanel is the desktop session switcher: a right-side drawer listing saved
-// sessions newest-first, grouped by day. Each row resumes on click, and carries
-// rename (a custom display name) and delete actions on hover — the desktop
-// analogue of managing conversations in Claude Code. The active session can't be
-// deleted (auto-save would just recreate it).
 export function HistoryPanel({
   sessions,
   onResume,
@@ -43,12 +38,12 @@ export function HistoryPanel({
     setDraft(s.title || s.preview || "");
   };
   const commitRename = (path: string) => {
-    onRename(path, draft.trim());
+    const title = draft.trim();
+    if (title) onRename(path, title);
     setEditing(null);
   };
 
-  // Sessions arrive newest-first; bucket consecutive ones under a day heading
-  // (Today / Yesterday / a date) while preserving that order.
+  // 按日期分组
   const groups: { label: string; items: SessionMeta[] }[] = [];
   for (const s of filtered) {
     const label = dayLabel(s.modTime);
@@ -57,17 +52,33 @@ export function HistoryPanel({
     else groups.push({ label, items: [s] });
   }
 
+  const hasSessions = sessions.length > 0;
+
   return (
     <ResizableDrawer onClose={onClose}>
-        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
-          <div className="text-[15px] font-semibold text-fg">{tr("history.title")}</div>
-          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={tr("common.close")}>
-            ✕
-          </button>
-        </header>
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between shrink-0 px-4 py-3.5 bg-bg-elev border-b border-border">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-[15px] font-semibold text-fg">{tr("history.title")}</span>
+          {hasSessions && (
+            <span className="text-fg-faint text-[11px] bg-bg-soft px-2 py-0.5 rounded-full font-mono">
+              {sessions.length}
+            </span>
+          )}
+        </div>
+        <button
+          className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag"
+          onClick={onClose}
+          title={tr("common.close")}
+        >
+          <X size={14} />
+        </button>
+      </header>
 
-        <div className="flex items-center gap-2 mx-3 mt-2 px-3 h-9 border border-border rounded-lg bg-bg-soft text-fg-faint focus-within:border-accent">
-          <Search size={14} className="text-fg-faint shrink-0" />
+      {/* ── 搜索栏 ── */}
+      <div className="shrink-0 px-4 py-3 border-b border-border-soft bg-bg-soft/30">
+        <label className="flex items-center gap-1.5 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_2px_var(--accent-soft)] transition-[border-color,box-shadow] duration-[0.12s]">
+          <Search size={14} />
           <input
             className="flex-1 border-0 outline-none bg-transparent text-fg text-[13px] placeholder:text-fg-faint"
             type="search"
@@ -75,22 +86,57 @@ export function HistoryPanel({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-        </div>
+          {query && (
+            <button
+              className="shrink-0 w-5 h-5 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
+              onClick={() => setQuery("")}
+              title={tr("common.clear")}
+            >
+              <X size={13} />
+            </button>
+          )}
+        </label>
+      </div>
 
-        <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]">
-          {sessions.length === 0 ? (
-            <div className="py-5 text-fg-faint text-xs text-center">{tr("history.empty")}</div>
-          ) : filtered.length === 0 ? (
-            <div className="py-5 text-fg-faint text-xs text-center">{tr("history.noMatches")}</div>
-          ) : (
-            groups.map((g) => (
-              <section className="mb-3" key={g.label}>
-                <div className="text-fg-faint font-mono text-[11px] uppercase tracking-wider px-1 pb-1">{g.label}</div>
+      {/* ── 列表 ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {!hasSessions ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-fg-faint">
+            <MessageSquare size={32} className="opacity-20" />
+            <div className="text-[13px]">{tr("history.empty")}</div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-fg-faint">
+            <Search size={32} className="opacity-20" />
+            <div className="text-[13px]">{tr("history.noMatches")}</div>
+            <button
+              className="px-3 py-1 border border-border rounded text-fg-dim text-[11px] bg-transparent cursor-pointer hover:bg-bg-soft hover:text-fg transition-colors"
+              onClick={() => setQuery("")}
+            >
+              {tr("history.clearSearch")}
+            </button>
+          </div>
+        ) : (
+          <div className="px-4 py-3.5 flex flex-col">
+            {groups.map((g) => (
+              <section className="mb-4" key={g.label}>
+                <div className="flex items-center gap-2 text-fg-faint text-[10px] font-semibold uppercase tracking-wider px-2 pb-1.5">
+                  <span className="w-1 h-1 rounded-full bg-fg-faint/30" />
+                  {g.label}
+                  <span className="text-fg-faint/40 font-mono font-normal normal-case tracking-normal">{g.items.length}</span>
+                </div>
                 {g.items.map((s) => (
-                  <div className={`group flex items-start gap-1 px-2 py-2 rounded-lg hover:bg-bg-soft ${s.current ? "bg-sidebar-active" : ""}`} key={s.path}>
+                  <div
+                    className={`group flex items-start gap-1 px-2 py-2.5 rounded-lg transition-colors duration-[0.12s] ${
+                      s.current
+                        ? "bg-sidebar-active border-l-[3px] border-l-accent"
+                        : "border-l-[3px] border-l-transparent hover:bg-bg-soft"
+                    }`}
+                    key={s.path}
+                  >
                     {editing === s.path ? (
                       <input
-                        className="flex-1 bg-bg border border-accent rounded-md text-fg text-[13px] px-2 py-1 outline-none"
+                        className="flex-1 bg-bg border border-accent rounded-md text-fg text-[13px] px-2 py-1 outline-none focus:shadow-[0_0_0_2px_var(--accent-soft)]"
                         autoFocus
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
@@ -98,33 +144,63 @@ export function HistoryPanel({
                           if (e.key === "Enter") commitRename(s.path);
                           if (e.key === "Escape") setEditing(null);
                         }}
-                        onBlur={() => commitRename(s.path)}
+                        onBlur={() => { if (editing === s.path) commitRename(s.path); }}
                         placeholder={tr("history.namePlaceholder")}
                       />
                     ) : (
-                      <button className="flex-1 min-w-0 flex flex-col gap-0.5 bg-transparent border-0 text-left cursor-pointer" onClick={() => onResume(s.path)} title={s.path}>
-                        <div className="text-fg-dim text-[13px] leading-snug font-medium truncate">{s.title || s.preview || tr("history.emptySession")}</div>
+                      <button
+                        className="flex-1 min-w-0 flex flex-col gap-1 bg-transparent border-0 text-left cursor-pointer"
+                        onClick={() => onResume(s.path)}
+                        title={s.path}
+                      >
+                        <div className={`text-[13px] leading-snug font-medium truncate ${s.current ? "text-accent" : "text-fg-dim"}`}>
+                          {s.title || s.preview || tr("history.emptySession")}
+                        </div>
                         <div className="flex items-center gap-1.5 text-fg-faint text-[11px]">
-                          {s.current && <span className="bg-accent-soft text-accent text-[10px] px-1.5 py-px rounded font-medium">{tr("history.current")}</span>}
-                          <span>{tr(s.turns === 1 ? "history.turnOne" : "history.turnOther", { n: s.turns })}</span>
-                          <span>·</span>
-                          <span>{timeLabel(s.modTime)}</span>
+                          {s.current && (
+                            <span className="bg-accent-soft text-accent text-[10px] px-1.5 py-px rounded font-medium">{tr("history.current")}</span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <MessageSquare size={11} className="opacity-50" />
+                            {tr(s.turns === 1 ? "history.turnOne" : "history.turnOther", { n: s.turns })}
+                          </span>
+                          <span className="text-fg-faint/40">·</span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} className="opacity-50" />
+                            {timeLabel(s.modTime)}
+                          </span>
                         </div>
                       </button>
                     )}
 
                     {editing !== s.path && (
-                      <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+                      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
                         {confirming === s.path ? (
                           <>
-                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-err cursor-pointer hover:bg-bg-elev" title={tr("history.confirmDelete")} onClick={() => { onDelete(s.path); setConfirming(null); }}><Check size={14} /></button>
-                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg" title={tr("common.cancel")} onClick={() => setConfirming(null)}><X size={14} /></button>
+                            <button
+                              className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-err cursor-pointer hover:bg-err/10 transition-colors"
+                              title={tr("history.confirmDelete")}
+                              onClick={() => { onDelete(s.path); setConfirming(null); }}
+                            ><Check size={14} /></button>
+                            <button
+                              className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg transition-colors"
+                              title={tr("common.cancel")}
+                              onClick={() => setConfirming(null)}
+                            ><X size={14} /></button>
                           </>
                         ) : (
                           <>
-                            <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg" title={tr("history.rename")} onClick={() => startRename(s)}><Pencil size={13} /></button>
+                            <button
+                              className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-fg transition-colors"
+                              title={tr("history.rename")}
+                              onClick={() => startRename(s)}
+                            ><Pencil size={13} /></button>
                             {!s.current && (
-                              <button className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-err" title={tr("common.delete")} onClick={() => setConfirming(s.path)}><Trash2 size={13} /></button>
+                              <button
+                                className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:bg-bg-elev hover:text-err transition-colors"
+                                title={tr("common.delete")}
+                                onClick={() => setConfirming(s.path)}
+                              ><Trash2 size={13} /></button>
                             )}
                           </>
                         )}
@@ -133,22 +209,21 @@ export function HistoryPanel({
                   </div>
                 ))}
               </section>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+      </div>
     </ResizableDrawer>
   );
 }
 
-// dayLabel buckets a timestamp into "Today", "Yesterday", or a locale date. It's
-// module-level (not a component), so it uses the non-reactive translator; the
-// panel re-renders on a locale switch via its parent, picking up the new strings.
+/** 日期分组标签 */
 function dayLabel(ms: number): string {
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(ms))) / 86_400_000);
   if (days <= 0) return t("history.today");
   if (days === 1) return t("history.yesterday");
-  return new Date(ms).toLocaleDateString();
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function timeLabel(ms: number): string {

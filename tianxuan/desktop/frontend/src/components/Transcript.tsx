@@ -67,12 +67,22 @@ export function Transcript({
   onRewind,
   running,
   onThreadEl,
+  cwd,
+  cwdName,
+  sessions,
+  onResumeSession,
+  meta,
 }: {
   items: Item[];
   onPrompt: (text: string) => void;
   onRewind?: (turn: number, scope: string) => void;
   running: boolean;
   onThreadEl?: (el: HTMLElement | null) => void;
+  cwd?: string;
+  cwdName?: string;
+  sessions?: import('../lib/types').SessionMeta[];
+  onResumeSession?: (path: string) => Promise<void>;
+  meta?: import('../lib/types').Meta;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -240,7 +250,7 @@ export function Transcript({
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
       <div className="max-w-[--maxw] mx-auto px-8">
-        {items.length === 0 && <Welcome onPrompt={onPrompt} />}
+        {items.length === 0 && <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />}
         <StreamingIndicator running={running} items={items} />
 
         <div

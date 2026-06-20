@@ -75,16 +75,17 @@
   --font-size-base: 13px;
   --font-size-lg: 14px;
 
+  /* ── animation durations ── */
+  --transition-fast: 120ms;
+  --transition-normal: 150ms;
+  --transition-slow: 200ms;
+
   --color-black: #000;
   --color-white: #fff;
 }
 
 /* ── base layer ── */
 @layer base {
-  /*
-   * Box-sizing, scrollbar, and interaction defaults only.
-   * Body colors & fonts come from styles.css (unlayered, higher priority).
-   */
   *, *::before, *::after {
     box-sizing: border-box;
   }
@@ -150,14 +151,10 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.12s, transform 0.12s;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
 }
-.btn--primary:hover {
-  filter: brightness(1.1);
-}
-.btn--primary:active {
-  transform: scale(0.97);
-}
+.btn--primary:hover { filter: brightness(1.1); }
+.btn--primary:active { transform: scale(0.97); }
 .btn--primary:disabled {
   opacity: 0.4;
   cursor: default;
@@ -182,11 +179,6 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%      { opacity: 0.8; }
-}
-
 @keyframes drawer-in {
   from { transform: translateX(12px); opacity: 0.6; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -209,4 +201,18 @@
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* ── accessibility: reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

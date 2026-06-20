@@ -128,7 +128,7 @@ export function ResizableDrawer({
 
   return (
     <div
-      className={`fixed inset-0 flex justify-end z-90 ${subtle ? "bg-black/[0.16]" : "bg-black/40"}`}
+      className={`fixed inset-0 flex justify-end z-90 ${subtle ? "bg-bg/16" : "bg-bg/60"}`}
       onClick={handleClose}
     >
       <aside

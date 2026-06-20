@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import type { Item } from "../lib/store";
 
 /**
@@ -12,18 +13,15 @@ export function ErrorCard({
   onDismiss: (id: string) => void;
 }) {
   return (
-    <div
-      className="mx-4 my-2 p-2 rounded-lg border border-err border-l-[3px] flex gap-2 items-start"
-      style={{ background: "rgba(242,139,130,0.08)" }}
-    >
+    <div className="mx-4 my-2 p-2 rounded-lg border border-err/30 border-l-[3px] border-l-err flex gap-2 items-start bg-[color-mix(in_srgb,var(--err)_8%,transparent)]">
       <span className="flex-1 text-xs text-err leading-snug break-words">{item.text}</span>
       <button
         type="button"
-        className="shrink-0 bg-transparent border-0 text-fg-faint cursor-pointer text-sm leading-none px-0.5 hover:text-fg"
+        className="shrink-0 bg-transparent border-0 text-fg-faint cursor-pointer p-0.5 rounded hover:text-err hover:bg-bg-soft transition-colors"
         onClick={() => onDismiss(item.id)}
         aria-label="Dismiss error"
       >
-        ✕
+        <X size={14} />
       </button>
     </div>
   );

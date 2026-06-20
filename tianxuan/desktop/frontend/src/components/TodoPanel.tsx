@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, ChevronDown, ChevronRight, Circle, Loader, X } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { useCompact } from "../hooks/useCompact";
 import type { Todo } from "../lib/tools";
 
 const statusIcon = (status: string) => {
@@ -16,6 +17,7 @@ const statusIcon = (status: string) => {
 
 export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () => void }) {
   const t = useT();
+  const compact = useCompact();
   const [open, setOpen] = useState(true);
   if (todos.length === 0) return null;
 
@@ -23,20 +25,24 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
   const current = todos.find((t) => t.status === "in_progress");
   const pct = todos.length > 0 ? Math.round((done / todos.length) * 100) : 0;
 
+  const itemPy = compact ? "py-[5px]" : "py-[7px]";
+  const itemPx = compact ? "px-[7px] pl-[9px]" : "px-[7px] pl-[11px]";
+  const itemTextSize = compact ? "text-[11.5px]" : "text-[12.5px]";
+
   return (
     <div className="max-w-[--maxw] mx-auto mb-2 border border-border rounded-[9px] bg-bg-soft overflow-hidden shadow-sm">
       {/* Thin progress bar */}
       <div className="h-[3px] bg-border-soft">
         <div
-          className="h-full bg-accent transition-[width] duration-500 ease-out"
+          className={`h-full transition-[width] duration-500 ease-out ${pct >= 100 ? "bg-ok" : "bg-accent"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
 
       {/* Header */}
-      <div className="flex items-center px-[7px] pl-[11px]">
+      <div className={`flex items-center ${itemPx}`}>
         <button
-          className="flex items-center gap-[7px] flex-1 min-w-0 py-[7px] bg-transparent border-0 text-fg-dim text-[12.5px] cursor-pointer no-drag"
+          className={`flex items-center gap-[7px] flex-1 min-w-0 ${itemPy} bg-transparent border-0 text-fg-dim ${itemTextSize} cursor-pointer no-drag`}
           onClick={() => setOpen((v) => !v)}
         >
           {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -45,13 +51,13 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
             {done}/{todos.length}
           </span>
           {!open && current && (
-            <span className="text-fg-faint text-[11px] truncate">
+            <span className={`text-fg-faint truncate ${compact ? "text-[10px]" : "text-[11px]"}`}>
               {current.activeForm || current.content}
             </span>
           )}
         </button>
         <button
-          className="ml-auto border-0 bg-transparent text-fg-faint cursor-pointer p-[5px] rounded hover:text-err hover:bg-bg-soft no-drag"
+          className="ml-auto border-0 bg-transparent text-fg-faint cursor-pointer p-1.5 rounded hover:text-err hover:bg-bg-soft no-drag"
           onClick={onDismiss}
           title={t("todo.dismiss")}
         >
@@ -68,13 +74,17 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
             return (
               <li
                 key={i}
-                className={`relative flex items-center gap-2.5 px-[11px] py-[7px] border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
+                className={`relative flex items-center gap-2.5 ${itemPx} ${itemPy} border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
                   t.status === "in_progress"
                     ? "bg-accent-soft"
                     : "bg-transparent hover:bg-bg-elev"
-                } ${isSub ? "pl-9" : ""}`}
+                } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
               >
-                {/* Left border indicator for sub-items */}
+                {/* Left accent strip for in-progress items */}
+                {t.status === "in_progress" && !isSub && (
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm" />
+                )}
+                {/* Sub-item border trail */}
                 {isSub && (
                   <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
                 )}
@@ -82,7 +92,7 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
                 {statusIcon(t.status)}
 
                 <span
-                  className={`min-w-0 text-[12.5px] leading-relaxed ${
+                  className={`min-w-0 leading-relaxed ${
                     isPhase ? "font-medium text-fg" : "text-fg-dim"
                   } ${
                     t.status === "completed"
@@ -90,7 +100,7 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
                       : t.status === "in_progress"
                         ? "text-fg font-medium"
                         : ""
-                  }`}
+                  } ${itemTextSize}`}
                 >
                   {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
                 </span>

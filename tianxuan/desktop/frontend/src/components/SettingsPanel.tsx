@@ -5,6 +5,7 @@ import { useUpdater } from "../lib/useUpdater";
 import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
 import { ResizableDrawer } from "./ResizableDrawer";
+import { X } from "lucide-react";
 
 type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
 
@@ -47,8 +48,8 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     <ResizableDrawer onClose={onClose} wide>
         <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
           <div className="text-[15px] font-semibold text-fg">{t("settings.title")}</div>
-          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={t("common.close")}>
-            ✕
+          <button className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag" onClick={onClose} title={t("common.close")}>
+            <X size={14} />
           </button>
         </header>
 
@@ -169,7 +170,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
     <section className="mb-3">
       <div className="flex items-center justify-between px-1 pb-1.5">
         <div className="text-fg text-sm font-semibold">{t("settings.tab.models")}</div>
-        <button className="px-2.5 py-1 text-xs" onClick={onManageProviders}>
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors">
           {t("settings.manageProviders")}
         </button>
       </div>
@@ -177,7 +178,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.defaultModel")}</label>
         <select
-          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow"
+          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0"
           value={toRef(s.defaultModel, s)}
           disabled={busy}
           onChange={(e) => void apply(() => app.SetDefaultModel(e.target.value))}
@@ -224,13 +225,13 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
       <div className="flex items-center justify-between px-1 pb-1.5">
         <div className="text-fg text-sm font-semibold">{t("settings.tab.providers")}</div>
         {editing !== "__new__" && (
-          <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setEditing("__new__")}>
+          <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => setEditing("__new__")}>
             {t("settings.addProvider")}
           </button>
         )}
       </div>
 
-      <div className="provider-list">
+      <div className="flex flex-col gap-2">
         {s.providers.map((p) =>
           editing === p.name ? (
             <ProviderEditor
@@ -249,11 +250,11 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
                   {p.keySet ? t("settings.keySet") : t("settings.noKey")}
                 </span>
                 <span className="flex-1" />
-                <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setEditing(p.name)}>
+                <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors">
                   {t("common.edit")}
                 </button>
                 <button
-                  className="px-2.5 py-1 text-xs"
+                  className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
                   disabled={busy || defaultProvider === p.name}
                   title={defaultProvider === p.name ? t("settings.cantDeleteDefault") : t("settings.deleteProvider")}
                   onClick={() => void apply(() => app.DeleteProvider(p.name))}
@@ -331,7 +332,7 @@ function ProviderEditor({
   };
 
   return (
-    <div className="prov-card prov-card--edit">
+    <div className="flex flex-col gap-2 p-3 border border-border-soft rounded-lg mb-2">
       <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
       <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerKind")}</label>
       <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
@@ -351,7 +352,7 @@ function ProviderEditor({
       <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
       <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.contextWindowHint")}</div>
       <div className="flex gap-2 mt-2">
-        <button className="px-2.5 py-1 text-xs" onClick={onCancel} disabled={busy}>
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
         <button className="btn--primary" onClick={save} disabled={busy || !name.trim() || !baseUrl.trim()}>
@@ -367,7 +368,7 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
   const [val, setVal] = useState("");
   if (!apiKeyEnv) return null;
   return (
-    <div className="set-key">
+    <div className="flex items-center gap-2 mt-2">
       <input
         className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
         type="password"
@@ -376,7 +377,7 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
         onChange={(e) => setVal(e.target.value)}
       />
       <button
-        className="px-2.5 py-1 text-xs"
+        className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
         disabled={busy || !val.trim()}
         onClick={() => {
           void onSet(val.trim());
@@ -397,7 +398,7 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.writerMode")}</label>
         <select
-          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow"
+          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0"
           value={s.permissions.mode}
           disabled={busy}
           onChange={(e) => void apply(() => app.SetPermissionMode(e.target.value))}
@@ -450,12 +451,12 @@ function RuleList({
     <div className="mb-2">
       <div className="text-fg-dim text-[12px] font-medium mb-1">{list}</div>
       <div className="flex flex-wrap gap-1.5">
-        {rules.length === 0 && <span className="mem-empty">{t("common.none")}</span>}
+        {rules.length === 0 && <span className="text-fg-faint text-xs">{t("common.none")}</span>}
         {rules.map((r) => (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-border-soft rounded text-fg-dim text-[11px] bg-bg-soft" key={r}>
             {r}
-            <button className="ml-0.5 w-4 h-4 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:bg-bg-elev" disabled={busy} onClick={() => void onRemove(r)} title={t("common.delete")}>
-              ✕
+            <button className="ml-0.5 w-4 h-4 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:bg-bg-elev transition-colors" disabled={busy} onClick={() => void onRemove(r)} title={t("common.delete")}>
+              <X size={11} />
             </button>
           </span>
         ))}
@@ -470,7 +471,7 @@ function RuleList({
             if (e.key === "Enter") add();
           }}
         />
-        <button className="px-2.5 py-1 text-xs" disabled={busy || !draft.trim()} onClick={add}>
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy || !draft.trim()} onClick={add}>
           {t("common.add")}
         </button>
       </div>
@@ -490,7 +491,7 @@ function SandboxSection({ s, busy, apply }: SectionProps) {
       <div className="text-fg text-sm font-semibold">{t("settings.sandboxTitle")}</div>
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.bashSandbox")}</label>
-        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow" value={sb.bash} disabled={busy} onChange={(e) => void set({ bash: e.target.value })}>
+        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0" value={sb.bash} disabled={busy} onChange={(e) => void set({ bash: e.target.value })}>
           <option value="enforce">{t("settings.bashEnforce")}</option>
           <option value="off">{t("settings.bashOff")}</option>
         </select>
@@ -502,7 +503,7 @@ function SandboxSection({ s, busy, apply }: SectionProps) {
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.workspaceRoot")}</label>
         <input
-          className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-grow"
+          className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
           placeholder={t("settings.workspaceDefault")}
           value={root}
           disabled={busy}
@@ -565,7 +566,7 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
           {themeOptions.map((opt) => (
             <button
               key={opt}
-              className={`set-seg__btn${theme === opt ? " bg-accent-soft text-accent" : ""}`}
+              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft last:border-r-0 ${theme === opt ? "bg-accent-soft text-accent" : ""}`}
               onClick={() => onTheme(opt)}
             >
               {themeName(opt, t)}
@@ -575,7 +576,7 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
       </div>
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.language")}</label>
-        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent set-grow" value={pref} onChange={(e) => setPref(e.target.value as "" | "en" | "zh" | "zh-TW")}>
+        <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0" value={pref} onChange={(e) => setPref(e.target.value as "" | "en" | "zh" | "zh-TW")}>
           <option value="">{t("settings.langAuto")}</option>
           <option value="zh">简体中文</option>
           <option value="zh-TW">繁體中文</option>
@@ -626,7 +627,7 @@ function UpdatesSection({ configPath }: { configPath: string }) {
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("updater.currentVersion", { v: version || "…" })}</label>
         <span className="flex-1" />
-        <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => void check()}>
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => void check()}>
           {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
         </button>
       </div>
@@ -657,7 +658,7 @@ function UpdatesSection({ configPath }: { configPath: string }) {
       {status.kind === "done" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.done")}</div>}
       {status.kind === "error" && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("updater.failed", { msg: status.message })}</div>}
       {configPath && (
-        <div className="text-fg-faint text-[10px] mt-1 px-1 settings-config-path" title={configPath}>
+        <div className="text-fg-faint text-[10px] mt-1 px-1 font-mono truncate" title={configPath}>
           {t("settings.config", { path: configPath })}
         </div>
       )}

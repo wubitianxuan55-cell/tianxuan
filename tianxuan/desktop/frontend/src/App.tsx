@@ -3,13 +3,12 @@ import type { CSSProperties } from "react";
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FileText, FolderGit2, FolderTree,
   Settings as SettingsIcon, MessageSquare,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, X,
 } from "lucide-react";
 import logo from "./assets/logo.png";
 import { useT } from "./lib/i18n";
-import { useController } from "./lib/store";
 import { applyTheme } from "./lib/theme";
-import type { Theme } from "./lib/theme";
+import { useController } from "./lib/store";
 import { Transcript } from "./components/Transcript";
 import { JumpBar } from "./components/JumpBar";
 import { ToastProvider, useToast } from "./components/Toast";
@@ -17,6 +16,7 @@ import { Composer } from "./components/Composer";
 import { TodoPanel } from "./components/TodoPanel";
 import { ApprovalModal } from "./components/ApprovalModal";
 import { AskCard } from "./components/AskCard";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { StatusBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
@@ -46,6 +46,7 @@ import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_DEFAULT_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH,
 } from "./hooks/useLayoutSizes";
+import CompactContext from "./hooks/useCompact";
 
 function sessionTitle(session: SessionMeta, fallback: string): string {
   return session.title || session.preview || fallback;
@@ -94,6 +95,7 @@ export default function App() {
   const [capsOpen, setCapsOpen] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("files");
+  const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
@@ -402,26 +404,26 @@ export default function App() {
           <nav className={`flex flex-col gap-0.5 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
             sidebarCollapsed ? "items-center w-full !pt-0 !pb-3" : ""
           }`}>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
               <Brain size={15} />
               {!sidebarCollapsed && <span>{t("topbar.memory")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${
+              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${
                 sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
-              } ${showPlan ? "text-accent bg-accent-soft" : ""}`}
+              } ${showPlan ? "text-accent bg-accent-soft hover:bg-accent-soft" : ""}`}
               onClick={() => setShowPlan((v) => !v)}
               title={t("plan.title")}
             >
               <FileText size={15} />
               {!sidebarCollapsed && <span>{t("plan.title")}</span>}
             </button>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
               <Blocks size={15} />
               {!sidebarCollapsed && <span>{t("caps.title")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-40 disabled:cursor-default ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
               onClick={() => setSettingsOpen(true)}
               disabled={state.running}
               title={state.running ? t("common.busyHint") : t("topbar.settings")}
@@ -447,7 +449,7 @@ export default function App() {
         />
 
         <section className="chat-pane">
-          <header className="flex flex-shrink-0 items-center gap-3 h-[50px] px-12 bg-bg border-b border-border-soft shadow-[0_1px_3px_rgba(0,0,0,0.06)] select-none drag-region">
+          <header className="flex flex-shrink-0 items-center gap-3 px-12 bg-bg border-b border-border-soft shadow-[0_1px_3px_rgba(0,0,0,0.06)] select-none drag-region transition-all duration-200">
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
@@ -471,11 +473,10 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] no-drag" onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</button>
               <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
               <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>
-                {themeNow==="dark"?"深色":themeNow==="light"?"浅色":themeNow==="warm"?"暖护眼":"冰蓝"}
-              </button>
+              <ThemeSwitcher theme={themeNow} onSet={applyTheme} onStore={setTheme} />
             </div>
           </header>
 
@@ -486,17 +487,20 @@ export default function App() {
           <UpdateBanner />
           <NewSessionToast done={newSessionDone} />
           <main className="main">
+            <CompactContext.Provider value={compactMode}>
             {(state.meta?.ready === false && !state.meta?.startupErr) || switchingModel ? (
               <Skeleton />
             ) : (
               <>
-                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} />
+                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
                 {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} />}
               </>
             )}
+            </CompactContext.Provider>
           </main>
 
-          <footer className="shrink-0 border-t border-border-soft bg-bg pt-3 pb-1 px-8">
+          <footer className={`shrink-0 border-t border-border-soft bg-bg px-8 ${compactMode ? "pt-2 pb-0.5" : "pt-3 pb-1"}`}>
+            <CompactContext.Provider value={compactMode}>
             {showTodos && <TodoPanel todos={todos} onDismiss={() => setDismissedTodo(todoItem!.id)} />}
             <Composer
               running={state.running}
@@ -519,8 +523,10 @@ export default function App() {
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
+              model={state.meta?.label}
               onOpenStats={() => { setRightTab("stats"); setWorkspacePanel(true); }}
             />
+            </CompactContext.Provider>
           </footer>
         </section>
 
@@ -546,7 +552,7 @@ export default function App() {
         )}
 
         {workspacePanelOpen && (
-        <div className="flex flex-col min-w-0 overflow-hidden border-l border-border-soft bg-bg">
+        <div className="flex flex-col min-w-0 overflow-hidden border-l border-border-soft bg-bg transition-all duration-200">
           <div className="flex items-center border-b border-border-soft overflow-hidden shrink">
             <button
               className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "files" ? "text-accent border-accent" : ""}`}

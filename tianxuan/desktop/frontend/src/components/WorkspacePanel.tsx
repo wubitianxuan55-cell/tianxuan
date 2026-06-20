@@ -80,9 +80,14 @@ function languageFor(path: string): string | undefined {
     json: "json",
     jsx: "jsx",
     md: "markdown",
+    mjs: "javascript",
+    php: "php",
     py: "python",
+    rb: "ruby",
     rs: "rust",
     sh: "bash",
+    sql: "sql",
+    svg: "xml",
     toml: "toml",
     ts: "typescript",
     tsx: "tsx",
@@ -347,8 +352,8 @@ export function WorkspacePanel({
       const active = selectedPath === path;
       const row = (
         <button
-          className={`w-full min-w-0 h-[30px] flex items-center gap-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg ${
-            active ? "bg-sidebar-active text-accent" : ""
+          className={`w-full min-w-0 h-[30px] flex items-center gap-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] ${
+            active ? "!border-l-accent bg-sidebar-active !text-fg" : "border-l-transparent"
           }`}
           key={path}
           onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
@@ -365,11 +370,11 @@ export function WorkspacePanel({
             <span className="w-[13px] h-[13px] shrink-0" />
           )}
           {entry.isDir ? (
-            <Folder size={14} className="shrink-0 text-fg-dim" />
+            <Folder size={14} className={`shrink-0 ${active ? "text-accent" : "text-fg-dim"}`} />
           ) : (
-            <FileText size={14} className="shrink-0 text-fg-faint" />
+            <FileText size={14} className={`shrink-0 ${active ? "text-accent" : "text-fg-faint"}`} />
           )}
-          <span className="min-w-0 truncate">{entry.name}</span>
+          <span className={`min-w-0 truncate ${active ? "text-accent font-medium" : ""}`}>{entry.name}</span>
         </button>
       );
       if (!entry.isDir || !isOpen) return [row];
@@ -391,8 +396,10 @@ export function WorkspacePanel({
           <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto overflow-y-hidden flex-1 scrollbar-none">
             {openTabs.map((tab) => (
               <button
-                className={`inline-flex items-center gap-1.5 min-w-[112px] max-w-[180px] h-[30px] px-2.5 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] font-medium cursor-pointer shrink-0 no-drag ${
-                  selectedPath === tab ? "bg-bg-elev text-fg" : "hover:bg-bg-soft hover:text-fg"
+                className={`inline-flex items-center gap-1.5 min-w-[112px] max-w-[180px] h-[30px] px-2.5 border rounded-lg bg-transparent text-fg-dim text-[12.5px] font-medium cursor-pointer shrink-0 no-drag transition-[color,background,border] duration-[0.12s] ${
+                  selectedPath === tab
+                    ? "bg-bg-elev text-fg border-fg-faint/30"
+                    : "border-border-soft hover:bg-bg-soft hover:text-fg hover:border-fg-faint"
                 }`}
                 key={tab}
                 onClick={() => setSelectedPath(tab)}
@@ -401,7 +408,7 @@ export function WorkspacePanel({
                 <FileText size={14} className="shrink-0" />
                 <span className="flex-1 min-w-0 truncate">{basename(tab)}</span>
                 <span
-                  className="inline-flex items-center justify-center w-4 h-4 rounded text-fg-faint hover:text-fg hover:bg-bg-soft shrink-0"
+                  className="inline-flex items-center justify-center w-4 h-4 rounded text-fg-faint hover:text-err hover:bg-bg-soft shrink-0"
                   role="button"
                   tabIndex={0}
                   title={t("workspace.closeTab")}
@@ -431,9 +438,9 @@ export function WorkspacePanel({
           </div>
         </header>
 
-        <div className="flex items-center gap-1.5 min-w-0 px-[18px] py-2 border-b border-border-soft text-fg-faint text-[11.5px] whitespace-nowrap shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0 px-[18px] py-2 border-b border-border-soft text-[11.5px] whitespace-nowrap shrink-0">
           <button
-            className="inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent text-fg-dim cursor-pointer hover:text-fg truncate no-drag"
+            className="inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent text-fg-dim cursor-pointer hover:text-fg truncate no-drag text-[11.5px]"
             onClick={() => { setFilter(""); setTreeVisible(true); setOpenDirs((prev) => new Set([...Array.from(prev), ""])); }}
             title={cwd}
           >
@@ -444,10 +451,10 @@ export function WorkspacePanel({
             const dir = pathParts.slice(0, index + 1).join("/") + "/";
             return (
               <span className="inline-flex items-center min-w-0 gap-1.5" key={`${part}-${index}`}>
-                <span>›</span>
+                <span className="text-fg-faint/40 select-none text-[10px] mx-px">›</span>
                 <button
-                  className={`inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent cursor-pointer truncate no-drag ${
-                    isLast ? "text-fg cursor-default" : "text-fg-dim hover:text-fg"
+                  className={`inline-flex items-center max-w-[160px] p-0 border-0 bg-transparent cursor-pointer truncate no-drag text-[11.5px] ${
+                    isLast ? "text-fg font-medium cursor-default" : "text-fg-dim hover:text-fg"
                   }`}
                   onClick={() => { if (isLast) return; setTreeVisible(true); setFilter(""); setOpenDirs((prev) => new Set([...Array.from(prev), ...breadcrumbDirs, dir])); void loadDir(dir); }}
                   title={isLast ? (selectedPath ?? undefined) : dir}
@@ -457,7 +464,7 @@ export function WorkspacePanel({
               </span>
             );
           })}
-          {preview && preview.size > 0 && <span className="ml-auto shrink-0 font-mono">{formatBytes(preview.size)}</span>}
+          {preview && preview.size > 0 && <span className="ml-auto shrink-0 font-mono text-[11px] text-fg-faint">{formatBytes(preview.size)}</span>}
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto px-[18px] py-4">
@@ -521,20 +528,20 @@ export function WorkspacePanel({
                 const dir = parentPath(path);
                 return (
                   <button
-                    className={`w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg ${
-                      selectedPath === path ? "bg-sidebar-active !text-fg" : ""
+                    className={`w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] ${
+                      selectedPath === path ? "!border-l-accent bg-sidebar-active !text-fg" : "border-l-transparent"
                     }`}
                     key={path}
                     onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
                     title={cleanPath}
                   >
                     {entry.isDir ? (
-                      <Folder size={14} className="shrink-0 text-fg-dim" />
+                      <Folder size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-dim"}`} />
                     ) : (
-                      <FileText size={14} className="shrink-0 text-fg-faint" />
+                      <FileText size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-faint"}`} />
                     )}
                     <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
-                      <span className={`min-w-0 truncate ${selectedPath === path ? "text-accent" : "text-fg"}`}>{basename(path)}</span>
+                      <span className={`min-w-0 truncate ${selectedPath === path ? "text-accent font-medium" : "text-fg"}`}>{basename(path)}</span>
                       {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
                     </span>
                   </button>

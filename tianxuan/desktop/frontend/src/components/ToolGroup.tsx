@@ -1,47 +1,52 @@
 import { useState } from "react";
 import { ChevronRight, FolderOpen } from "lucide-react";
 import { ToolCard } from "./ToolCard";
+import { useCompact } from "../hooks/useCompact";
 import { subjectOf } from "../lib/tools";
 import type { Item } from "../lib/store";
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
 // ToolGroup collapses consecutive same-name tool calls into a single row.
-// V5.30: all tools are grouped (not just read-only). The collapsed row shows
-// the tool name × count + subjects summary; clicking expands individual cards.
 export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse?: () => void }) {
   const [open, setOpen] = useState(false);
+  const compact = useCompact();
   if (tools.length === 0) return null;
   const t = tools[0];
 
-  // 提取所有工具的操作目标（最多5个）
-  const subjects = tools
+  // 提取所有工具的操作目标 — 最多 3 个，溢出显示 +N
+  const allSubjects = tools
     .map(t => subjectOf(t.name, t.args))
-    .filter(Boolean)
-    .slice(0, 5);
-  const moreCount = tools.length - subjects.length;
+    .filter((s): s is string => !!s);
+  const uniqueSubjects = [...new Set(allSubjects)];
+  const subjects = uniqueSubjects.slice(0, 3);
+  const moreSubjects = uniqueSubjects.length - 3;
+
+  const rowPy = compact ? "py-1" : "py-1.5";
+  const rowPx = compact ? "px-2" : "px-2.5";
+  const iconSize = compact ? 12 : 14;
 
   return (
     <div className="my-1 border border-border-soft rounded-lg overflow-hidden bg-bg-elev/30">
       <div
-        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-bg-elev/60 text-fg-dim transition-colors duration-[0.12s]"
+        className={`flex items-center gap-2 ${rowPx} ${rowPy} cursor-pointer hover:bg-bg-elev/60 text-fg-dim transition-colors duration-[0.12s]`}
         onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
       >
         <ChevronRight
           className={`shrink-0 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
-          size={13}
+          size={iconSize}
         />
-        <FolderOpen className="shrink-0 text-fg-faint" size={14} />
-        <span className="font-mono text-xs text-fg font-medium">{t.name}</span>
-        <span className="text-[11px] text-fg-faint font-mono">× {tools.length}</span>
+        <FolderOpen className="shrink-0 text-fg-faint" size={iconSize} />
+        <span className={`font-mono text-fg font-medium ${compact ? "text-[11px]" : "text-xs"}`}>{t.name}</span>
+        <span className={`text-fg-faint font-mono ${compact ? "text-[10px]" : "text-[11px]"}`}>× {tools.length}</span>
         {subjects.length > 0 && (
-          <span className="text-[11px] text-fg-faint truncate ml-1">
+          <span className={`text-fg-faint truncate ml-1 ${compact ? "text-[10px]" : "text-[11px]"}`}>
             {subjects.join(", ")}
-            {moreCount > 0 ? ` +${moreCount}` : ""}
+            {moreSubjects > 0 ? ` +${moreSubjects}` : ""}
           </span>
         )}
       </div>
-      <div className={`grid transition-all duration-300 ${
+      <div className={`grid transition-all duration-200 ${
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       }`}>
         <div className="overflow-hidden min-h-0">
@@ -57,8 +62,7 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
 }
 
 // scanGroups walks items and replaces runs of ≥2 consecutive same-name tools
-// with a single synthetic "group" marker. V5.30: all tools (not just read-only)
-// are grouped. The marker has kind "group" and carries the grouped items in `tools`.
+// with a single synthetic "group" marker.
 export type GroupItem =
   | { kind: "item"; item: Item }
   | { kind: "group"; id: string; name: string; tools: ToolItem[] };
@@ -74,8 +78,6 @@ export function scanGroups(items: Item[]): GroupItem[] {
       continue;
     }
     const t = it as ToolItem;
-    // V5.30: 所有工具都分组（包括读写工具），减少刷屏
-    // Collect consecutive same-name tools.
     let j = i + 1;
     while (
       j < items.length &&

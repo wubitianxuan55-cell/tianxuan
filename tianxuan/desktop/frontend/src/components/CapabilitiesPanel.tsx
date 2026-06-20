@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { CapabilitiesView, MCPServerInput, ServerView, SkillView } from "../lib/types";
@@ -111,8 +112,8 @@ export function CapabilitiesPanel({
             <div className="text-[15px] font-semibold text-fg">{t("caps.title")}</div>
             {view && <div className="mt-[3px] text-fg-faint text-[11px]">{summary}</div>}
           </div>
-          <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={onClose} title={t("common.close")}>
-            ✕
+          <button className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag" onClick={onClose} title={t("common.close")}>
+            <X size={14} />
           </button>
         </header>
 
@@ -160,7 +161,7 @@ export function CapabilitiesPanel({
                   />
                 )}
                 {view.servers.length === 0 && !adding && (
-                  <div className="mem-empty">{t("caps.noServers")}</div>
+                  <div className="text-fg-faint text-xs text-center py-4">{t("caps.noServers")}</div>
                 )}
                 <ServerGroup
                   busy={busy}
@@ -281,7 +282,7 @@ function FailedServersNotice({
 }) {
   const t = useT();
   return (
-    <div className="mb-3 p-3 border border-err/20 rounded-lg bg-[rgba(242,139,130,0.06)]" role="status">
+    <div className="mb-3 p-3 border border-err/20 rounded-lg bg-[color-mix(in_srgb,var(--err)_6%,transparent)]" role="status">
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-err text-sm font-semibold">{t("caps.failureTitle", { failed: servers.length })}</div>
@@ -310,9 +311,9 @@ function FailedServersNotice({
                 ) : (
                   <>
                     <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => onRetry(s.name)}>{t("caps.retry")}</button>
-                    <button className="px-2.5 py-1 text-xs" onClick={() => void navigator.clipboard?.writeText(error)}>{t("common.copy")}</button>
+                    <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={() => void navigator.clipboard?.writeText(error)}>{t("common.copy")}</button>
                     <button className="px-2.5 py-1 text-xs" onClick={() => onToggle(s.name)} aria-expanded={open}>{open ? t("common.collapse") : t("caps.showLog")}</button>
-                    <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}>✕</button>
+                    <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-err hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => onConfirm(s.name)} title={t("caps.remove")}><X size={13} /></button>
                   </>
                 )}
               </div>
@@ -396,7 +397,7 @@ function ServerRow({
                   </span>
                 </label>
               )}
-              <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={onConfirm} title={t("caps.remove")}>✕</button>
+              <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-err hover:bg-bg-soft transition-colors" disabled={busy} onClick={onConfirm} title={t("caps.remove")}><X size={13} /></button>
             </>
           )}
         </div>
@@ -544,23 +545,23 @@ function AddServerForm({
   };
 
   return (
-    <div className="prov-card prov-card--edit">
-      <input className="mem-input" placeholder={t("caps.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
-      <label className="set-label">{t("caps.transport")}</label>
-      <select className="mem-select" value={transport} onChange={(e) => setTransport(e.target.value)}>
+    <div className="flex flex-col gap-2 p-3 border border-border-soft rounded-lg mb-2">
+      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("caps.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
+      <label className="text-fg-dim text-[13px] shrink-0">{t("caps.transport")}</label>
+      <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={transport} onChange={(e) => setTransport(e.target.value)}>
         <option value="stdio">stdio</option>
         <option value="http">http</option>
         <option value="sse">sse</option>
       </select>
       {isStdio ? (
-        <input className="mem-input" placeholder={t("caps.commandPlaceholder")} value={command} onChange={(e) => setCommand(e.target.value)} />
+        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("caps.commandPlaceholder")} value={command} onChange={(e) => setCommand(e.target.value)} />
       ) : (
-        <input className="mem-input" placeholder={t("caps.urlPlaceholder")} value={url} onChange={(e) => setUrl(e.target.value)} />
+        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("caps.urlPlaceholder")} value={url} onChange={(e) => setUrl(e.target.value)} />
       )}
-      <label className="set-label">{t("caps.envLabel")}</label>
-      <textarea className="mem-textarea" value={env} onChange={(e) => setEnv(e.target.value)} placeholder={t("caps.envPlaceholder")} spellCheck={false} />
-      <div className="prov-card__actions">
-        <button className="px-2.5 py-1 text-xs" onClick={onCancel} disabled={busy}>
+      <label className="text-fg-dim text-[13px] shrink-0">{t("caps.envLabel")}</label>
+      <textarea className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] p-2 outline-none resize-y min-h-[60px] focus:border-accent" value={env} onChange={(e) => setEnv(e.target.value)} placeholder={t("caps.envPlaceholder")} spellCheck={false} />
+      <div className="flex justify-end gap-2 mt-2">
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
         <button className="btn--primary" onClick={submit} disabled={busy || !ready}>

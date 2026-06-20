@@ -3,8 +3,26 @@ import { Check, Copy } from "lucide-react";
 import { useT } from "../lib/i18n";
 
 // CopyButton copies `text` to the clipboard on click and briefly flips to a check.
-// navigator.clipboard works in the webview under the click's user gesture; a
-// failure is swallowed (nothing to copy to).
+// Falls back to document.execCommand("copy") when navigator.clipboard is unavailable
+// (e.g. in some Wails webview configurations).
+function copyFallback(text: string): boolean {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "-9999px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function CopyButton({
   text,
   className,
@@ -17,12 +35,16 @@ export function CopyButton({
   const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
+    let ok = false;
     try {
       await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      ok = copyFallback(text);
+    }
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* clipboard unavailable */
     }
   };
   return (

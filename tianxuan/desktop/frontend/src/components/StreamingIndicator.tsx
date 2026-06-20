@@ -3,9 +3,16 @@ import type { Item } from "../lib/store";
 
 type Stage = "idle" | "preparing" | "streaming" | "stalled";
 
+const stageConfig: Record<Stage, { label: string; barClass: string; dotClass: string; textClass: string }> = {
+  idle:      { label: "",          barClass: "",                    dotClass: "",                          textClass: "" },
+  preparing: { label: "准备中",     barClass: "bg-warning/60",       dotClass: "bg-warning animate-pulse",  textClass: "text-warning" },
+  streaming: { label: "生成中",     barClass: "bg-info",             dotClass: "bg-info",                   textClass: "text-info" },
+  stalled:   { label: "仍在处理…",  barClass: "bg-err/50",           dotClass: "bg-err animate-pulse",      textClass: "text-err" },
+};
+
 /**
  * StreamingIndicator renders a compact "preparing → streaming → stalled"
- * status badge inside the transcript while the model is generating a response.
+ * status bar inside the transcript while the model is generating a response.
  */
 export function StreamingIndicator({
   running,
@@ -41,23 +48,20 @@ export function StreamingIndicator({
 
   if (!running || stage === "idle") return null;
 
-  const stageColors: Record<Stage, string> = {
-    idle: "",
-    preparing: "text-warning",
-    streaming: "text-info",
-    stalled: "text-err",
-  };
+  const cfg = stageConfig[stage];
 
   return (
-    <div className={`flex items-center gap-2 py-2 px-3 text-[12px] ${stageColors[stage]}`}>
-      <span className={`w-2 h-2 rounded-full animate-pulse ${stage === "streaming" ? "bg-info" : "bg-warning"}`} />
-      <span>
-        {stage === "preparing" && "Preparing…"}
-        {stage === "streaming" && "Streaming"}
-        {stage === "stalled" && "Still working…"}
-      </span>
+    <div className="relative flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50">
+      {/* 滚动色条 — 高 3px，顶对齐 */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-border-soft overflow-hidden">
+        <div className="h-full rounded-r-sm animate-pulse" style={{ width: stage === "preparing" ? "25%" : stage === "stalled" ? "40%" : "60%", background: stage === "streaming" ? "var(--info)" : stage === "preparing" ? "var(--warn)" : "var(--err)" }} />
+      </div>
+
+      <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dotClass}`} />
+      <span className={`text-[12px] font-medium ${cfg.textClass}`}>{cfg.label}</span>
+
       {stage === "preparing" && (
-        <span className="text-fg-faint text-[11px] ml-auto">15"</span>
+        <span className="text-fg-faint text-[11px] ml-auto tabular-nums">15"</span>
       )}
     </div>
   );

@@ -72,35 +72,44 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
   return (
     <div
       ref={barRef}
-      className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 z-10"
+      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 z-10 py-2"
       onMouseMove={onMove}
       onMouseLeave={() => { setHovered(null); setShowPreview(false); }}
     >
       {turns.map((item) => {
         const isActive = active === item.turn;
+        const isHovered = hovered === item.turn;
         return (
           <button
             key={item.turn}
             type="button"
-            className={`w-[5px] h-[5px] rounded-full border-0 cursor-pointer p-0 shrink-0 transition-[background,transform] duration-150 ${
+            className={`relative w-[6px] h-[6px] rounded-full border-0 cursor-pointer p-0 shrink-0 transition-all duration-150 ${
               isActive
-                ? "bg-accent shadow-[0_0_3px_var(--accent-soft)]"
-                : "bg-border hover:bg-fg-dim hover:scale-[1.6]"
+                ? "bg-accent scale-125 shadow-[0_0_4px_var(--accent)]"
+                : isHovered
+                  ? "bg-fg-dim scale-150"
+                  : "bg-border hover:bg-fg-dim hover:scale-[1.6]"
             }`}
             data-turn={item.turn}
             onClick={(e) => { e.preventDefault(); scrollTo(item.turn); }}
             title={item.text.slice(0, 60)}
-          />
+          >
+            {/* Active ring pulse */}
+            {isActive && (
+              <span className="absolute inset-[-3px] rounded-full border border-accent/30 animate-pulse pointer-events-none" />
+            )}
+          </button>
         );
       })}
 
       {showPreview && hoverText && (
         <div
-          className="absolute right-[calc(100%+8px)] max-w-60 px-2 py-1 bg-bg-elev-2 border border-border rounded-md text-[11px] text-fg-dim leading-snug whitespace-pre-wrap break-words shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none z-20"
+          className="absolute right-[calc(100%+10px)] max-w-64 px-2.5 py-1.5 bg-bg-elev-2 border border-border rounded-lg text-[11px] text-fg-dim leading-snug whitespace-pre-wrap break-words shadow-[0_4px_16px_rgba(0,0,0,0.25)] pointer-events-none z-20 animate-[menu-in_0.1s_ease]"
           style={{
-            top: Math.max(0, Math.min(previewY - 16, (barRef.current?.clientHeight ?? 200) - 40)),
+            top: Math.max(0, Math.min(previewY - 18, (barRef.current?.clientHeight ?? 200) - 48)),
           }}
         >
+          <span className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mr-1">#{hovered}</span>
           {hoverText}
         </div>
       )}

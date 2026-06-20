@@ -1,3 +1,57 @@
+## [8.3.1] — 2026-06-20
+
+### 🔧 Go 核心 — 缓存诊断 L4 追踪 + 截断激活
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| cacheBreakDetector 激活 | `agent.go:1102` | `record()` 在 `stream()` 中调用，修复此前定义但从未使用的遗漏 |
+| maybeCompact 激活 | `agent.go:801` | `runDirect` 循环中加入自动截断，高水位线触发历史压缩 |
+| L4 追踪新增 | `cache_guard.go:68-73` | `prevMsgCount`/`lastMsgCount`/`prevPrefixHash`/`lastPrefixHash` 四个字段 |
+| L4 消息哈希 | `cache_guard.go:97-107` | 全量非系统消息累积异或哈希，正常增长跳过，等量消息内 tool_result 变化可检出 |
+| diagnose 增强 | `cache_guard.go:148-155` | 新增 2 个分支：消息截断检测 (`N→M`) + L4 内容变化检测 (`N msgs`)；末尾文本 `server-side (L1/L2/tools/L4 stable)` |
+| 死代码清理 | `cache_guard.go:159` | 移除未使用的 `minInt` 函数 |
+
+**诊断能力**：`cacheBreakDetector` 现可区分 **5 种**缓存断裂原因：
+- `L1 changed` — 系统提示词被修改（最高风险）
+- `L2 changed` — 运行时上下文变化
+- `tools changed` — 工具列表变化
+- `messages truncated N→M` — compaction 截断历史
+- `L4 content changed (N msgs)` — 同数量消息内容被替换
+
+### 🧪 测试 — 新增 3 个 L4 追踪用例
+
+| 测试 | 文件 | 说明 |
+|------|------|------|
+| `TestCacheBreakDetectorMessagesTruncated` | `guards_l4_test.go` | 消息截断后诊断包含 "messages truncated" |
+| `TestCacheBreakDetectorL4ContentChanged` | `guards_l4_test.go` | 等量消息内容变化诊断包含 "L4 content changed" |
+| `TestCacheBreakDetectorNormalGrowth` | `guards_l4_test.go` | 正常消息增长不误报，服务端断裂正确识别为 server-side |
+
+全部 10 个 `cacheBreakDetector` 测试 + 60+ agent 测试通过，无回归。
+
+### 🖥️ 桌面端 UI — 统计面板按会话持久化
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| 统计面板按会话持久化 | `App.tsx:283-291` | `currentSessionKey` 不再拼接 `_${sessionNonce}`，直接用 `.jsonl` 文件路径。新会话自然空数据开始；恢复/重启同一会话统计持续累加；不同会话互不干扰 |
+| sessionKey 防抖 | `StatsPanel.tsx:115-132` | 新增 `lastKeyRef` 守卫：`sessionKey` 未实质变化时 `useEffect` 跳过重载，防止 props 抖动覆写空数据；移除 `refreshNonce` 死参数 |
+| 轮次结束不再刷新侧边栏 | `App.tsx:184-190` | 移除 `turn_done` 后自动 `refreshSessions()`，防止 `sidebarSessions` 引用变化 → `useMemo` 重算 → `sessionKey` 漂移 |
+
+### 🖥️ 桌面端 UI — 工具卡折叠修复
+
+| 修复 | 文件 | 行 | 说明 |
+|------|------|-----|------|
+| ToolCard min-h-0 | `ToolCard.tsx` | 119 | 修复 CSS Grid `0fr` 折叠失效 |
+| ToolGroup min-h-0 | `ToolGroup.tsx` | 47 | 同上 |
+
+**根因**：Tailwind 迁移（V8.2.1）将折叠从 React 条件渲染改为 CSS grid 动画，但 grid 子项默认 `min-height: auto` 会导致内容撑开 `0fr` 行，折叠完全失效。`min-h-0` 覆写此行为。
+
+### 📦 发布
+
+- CLI: `tianxuan.exe`
+- 桌面端: `tianxuan-desktop.exe` (Wails v2.12.0, ~16MB)
+
+---
+
 ## [8.2.1] — 2026-06-19
 
 ### 🎨 桌面端 UI — Tailwind CSS 全量迁移

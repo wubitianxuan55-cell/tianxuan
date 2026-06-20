@@ -116,7 +116,7 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
       <div className={`grid transition-all duration-300 ease-in-out ${
         effectiveOpen && expandable ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       }`}>
-        <div className="overflow-hidden">
+        <div className="overflow-hidden min-h-0">
           {diffs.map((d, i) => (
             <div className="px-2 pb-2" key={i}>
               {d.label && <div className="text-[10px] text-fg-faint uppercase tracking-wider mb-1">{d.label}</div>}

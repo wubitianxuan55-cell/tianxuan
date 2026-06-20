@@ -1,6 +1,14 @@
 # tianxuan project memory
 
-> V8.2.2 — 10轮 UI 优化：CSS -58.5%, gzip -14.3%, 桌面端构建 · 2026-06-20
+> V8.3.1 — 缓存诊断 L4 追踪 + 统计面板会话持久化 + 工具卡折叠修复 · 2026-06-20
+
+## V8.3.1 发布摘要 (2026-06-20)
+
+**基于**: V8.2.3 (commit d5aeed1)
+
+**Go 核心**: cacheBreakDetector L4 追踪激活（5 种断裂原因诊断）；maybeCompact 重新启用。
+**测试**: 新增 3 个 L4 追踪测试，10 个 cacheBreakDetector 全绿。
+**前端**: 统计面板按会话持久化（sessionKey 绑定 .jsonl 路径）；工具卡折叠修复（min-h-0）。
 
 ## V8.2.2 发布摘要 (2026-06-20)
 

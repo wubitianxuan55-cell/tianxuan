@@ -98,7 +98,7 @@ function CostCard({ icon, label, value, sub, variant, small }: {
 
 export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, toolCounts, skillCounts }: {
   usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string
-  sessionKey: string; refreshNonce: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
+  sessionKey: string; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
 }) {
   const turnRef = useRef(0);
   const stepRef = useRef(0);
@@ -112,14 +112,23 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
   });
   const { turns: history, steps: stepHistory } = data;
 
+  // 防御：若 sessionKey 未真正变化，跳过重载。避免因 props 抖动（如
+  // sidebarSessions 数组引用刷新导致 useMemo 重算但未改变字符串值）而
+  // 加载空数据覆写当前统计。
+  const lastKeyRef = useRef(sessionKey);
+  const keyChanged = lastKeyRef.current !== sessionKey;
+  if (keyChanged) lastKeyRef.current = sessionKey;
+
   // sessionKey 变化时切换统计
   useEffect(() => {
+    if (!keyChanged) return;
     const loaded = loadData(sessionKey);
     turnRef.current = loaded.turns.length > 0 ? loaded.turns[loaded.turns.length - 1].turn : 0;
     stepRef.current = loaded.steps.length > 0 ? loaded.steps[loaded.steps.length - 1].step : 0;
     turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
     perTurnRef.current = null;
     setData(loaded);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
 
   // V5.31: 每个 usage 事件创建 StepRecord（实时）

@@ -68,6 +68,10 @@ type cacheBreakDetector struct {
 	lastTools uint64 // �ϴι��� schemas �� FNV-1a ��ϣ
 	lastRead  int    // �ϴ� cache_read ֵ
 	callCount int    // ���ü���
+	prevMsgCount int    // L4 message count (prev)
+	lastMsgCount int    // L4 message count (last)
+	prevPrefixHash uint64 // 全部非系统消息哈希 (prev)
+	lastPrefixHash uint64 // 全部非系统消息哈希 (last)
 }
 
 // record �� API ����ǰ��¼��ǰǰ׺��ϣ��
@@ -83,10 +87,23 @@ func (d *cacheBreakDetector) record(msgs []provider.Message, tools []provider.To
 	d.prevL1 = d.lastL1
 	d.prevL2 = d.lastL2
 	d.prevTools = d.lastTools
+	d.prevMsgCount = d.lastMsgCount
+	d.prevPrefixHash = d.lastPrefixHash
 
 	d.lastL1 = fnv1a(l1)
 	d.lastL2 = fnv1a(l2)
 	d.lastTools = hashTools(tools)
+	// L4: 全量非系统消息累积异或哈希。diagnose 仅在消息数未增长时比对
+	// ——正常增长跳过不报警，但等量消息内的 tool_result 变化会检出。
+	d.lastMsgCount = len(msgs)
+	var h uint64
+	for _, m := range msgs {
+		if m.Role != provider.RoleSystem {
+			h ^= fnv1a(string(m.Role) + ":" + truncateStr(m.Content, 80))
+		}
+	}
+	h ^= uint64(d.lastMsgCount) * 0x9E3779B97F4A7C15
+	d.lastPrefixHash = h
 	d.callCount++
 }
 
@@ -118,9 +135,6 @@ func (d *cacheBreakDetector) check(u *provider.Usage) string {
 
 // diagnose ����������ѵĿ���ԭ��
 func (d *cacheBreakDetector) diagnose() string {
-	// 比对前后两次调用的哈希来区分 client-side 还是 server-side
-	// 如果前后哈希变了，说明有代码路径修改了前缀（可能是 bug）
-	// 如果没变，说明是服务端原因（TTL 过期、路由切换等）
 	var parts []string
 	if d.prevL1 != d.lastL1 {
 		parts = append(parts, "L1 changed")
@@ -131,13 +145,18 @@ func (d *cacheBreakDetector) diagnose() string {
 	if d.prevTools != d.lastTools {
 		parts = append(parts, "tools changed")
 	}
+	if d.lastMsgCount < d.prevMsgCount {
+		parts = append(parts, fmt.Sprintf("messages truncated %d→%d", d.prevMsgCount, d.lastMsgCount))
+	} else if d.lastMsgCount == d.prevMsgCount && d.prevMsgCount > 0 && d.prevPrefixHash != d.lastPrefixHash {
+		parts = append(parts, fmt.Sprintf("L4 content changed (%d msgs)", d.lastMsgCount))
+	}
 	if len(parts) > 0 {
 		return "client-side prefix drift: " + strings.Join(parts, ", ")
 	}
-	return "server-side (L1/L2/tools unchanged)"
+	return "server-side (L1/L2/tools/L4 stable)"
 }
 
-// fnv1a �����ַ����� 64-bit FNV-1a ��ϣ��
+
 func fnv1a(s string) uint64 {
 	const (
 		offset64 = 14695981039346656037

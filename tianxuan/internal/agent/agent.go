@@ -796,6 +796,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: msg})
 		}
 
+
+		// V8.2.5: automatic compaction — truncates history when prompt
+		// exceeds the high-water mark. legacyTruncate preserves
+		// L1+L2+prefix+summary+tail for maximum cache continuity.
+		a.maybeCompact(ctx, usage)
+
 		// Keep reasoning_content on the assistant turn for display and session
 		// archive. It is NOT re-uploaded to the API: the openai provider drops it
 		// when building the request, since re-sent reasoning is billable prompt
@@ -1093,6 +1099,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 
 	// V5.10: ImmutablePrefix 校验——验证前缀指纹，确保缓存稳定。
 	a.verifyPrefix(msgs, tools)
+	a.cacheBreakDetector.record(msgs, tools)
 
 	ch, err := a.activeProv.Stream(ctx, provider.Request{
 		Messages:    msgs,

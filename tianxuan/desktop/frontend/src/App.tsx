@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FileText, FolderGit2, FolderTree,
   Settings as SettingsIcon, MessageSquare,
-  PanelLeftClose, PanelLeftOpen, X,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import logo from "./assets/logo.png";
 import { useT } from "./lib/i18n";

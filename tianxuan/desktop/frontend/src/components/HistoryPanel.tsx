@@ -90,7 +90,7 @@ export function HistoryPanel({
             <button
               className="shrink-0 w-5 h-5 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
               onClick={() => setQuery("")}
-              title={tr("common.clear")}
+              title="清除搜索"
             >
               <X size={13} />
             </button>
@@ -113,7 +113,7 @@ export function HistoryPanel({
               className="px-3 py-1 border border-border rounded text-fg-dim text-[11px] bg-transparent cursor-pointer hover:bg-bg-soft hover:text-fg transition-colors"
               onClick={() => setQuery("")}
             >
-              {tr("history.clearSearch")}
+              清除搜索
             </button>
           </div>
         ) : (

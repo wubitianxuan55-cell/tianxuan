@@ -178,8 +178,11 @@ export function StatusBar({
   const p = priceFor(model);
   const sessionHit = usage?.sessionCacheHitTokens ?? 0;
   const sessionMiss = usage?.sessionCacheMissTokens ?? 0;
-  const sessionCompl = usage?.sessionCompletionTokens ?? 0;
-  const sessionCost = calcCost(sessionHit, p.cacheHit) + calcCost(sessionMiss, p.input) + calcCost(sessionCompl, p.output);
+  const sessionCompl = usage?.completionTokens ?? 0;
+  const totalPromptTokens = sessionHit + sessionMiss;
+  const sessionCost = totalPromptTokens > 0
+    ? calcCost(sessionHit, p.cacheHit) + calcCost(sessionMiss, p.input) + calcCost(sessionCompl, p.output)
+    : 0;
 
   // ── 缓存率 ──
   const totalCacheable = sessionHit + sessionMiss;

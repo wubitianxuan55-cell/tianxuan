@@ -1,3 +1,114 @@
+## [8.4.0] — 2026-06-20
+
+### 🎨 桌面端 UI — 全线优化 22 轮
+
+> 基于 V8.3.1 (commit facab32)，36 文件变更，+1858/-1994 行
+
+#### P0 主题修复 — CSS 变量补全
+| 修复 | 说明 |
+|------|------|
+| `:root` 补全 `--info`/`--warning`/`--error`/`--danger` | 4 个缺失的语义色变量，Toast/ErrorCard 边框色修复 |
+| light 主题补全 `--accent-soft`+diff 色+`--hl-*` | 浅色主题下 accent 背景色、diff 高亮、语法高亮全部正确 |
+| `:root[data-theme="light"]` 同补全 | 强制浅色模式下颜色正确 |
+| warm/ice 补全 `--add-bg/fg`/`--del-bg/fg` | diff 高亮在暖色/冰蓝主题下可见 |
+| ResizableDrawer 遮罩 `bg-black/40→bg-bg/60` | 遮罩跟随主题正确感知 |
+
+#### 死代码清理 — styles.css 瘦身 ~400 行
+| 删除 | 说明 |
+|------|------|
+| `.ico--ok/err/stopped`、`@keyframes spin` | 已被 Tailwind `text-ok/err` + `animate-spin` 替代 |
+| `.menu`/`.menu__item`/`.menu-backdrop`/`.customize` | 旧菜单体系，已被 Tailwind 内联替代 |
+| `.toast`/`.toast--info/warn`、`@keyframes toast-in` | 重复定义，tailwind.css 已有 |
+| `.error-card`/`.error-card__msg/dismiss` | 已被 ErrorCard.tsx Tailwind 替代 |
+| `.cap-row*`/`.cap-server-entry*`/`.cap-failure*` 等 ~30 类名 | CapabilitiesPanel 已迁移到 Tailwind |
+| `.topbar`/`.topbar__*`/`.welcome__hints`/`.sidebar` | 无引用死类名 |
+| tailwind.css `@keyframes skeleton-pulse` | 未使用 |
+
+#### ✨ Compact 紧凑模式
+- 新增 `hooks/useCompact.tsx` — React Context 驱动
+- 6 组件自适应：`Message`/`ToolCard`/`ToolGroup`/`TodoPanel`/`StatusBar`/`Welcome`
+- 字号 ↓1-2px、图标 ↓2px、padding ↓2-4px、ToolCard 折叠延迟 500→300ms
+
+#### 🎯 动画系统统一
+| 变更 | 说明 |
+|------|------|
+| tailwind.css `--transition-fast/normal/slow` | 120ms/150ms/200ms 三档 token |
+| `@media (prefers-reduced-motion: reduce)` | 全局动画降级 |
+| `@keyframes cursor-blink` | MemoMarkdown 流式光标闪烁 |
+
+#### 🛠️ ToolCard 彻底重做
+| 变更 | 说明 |
+|------|------|
+| 修复模板字面量 bug | `w-[${v}px]`→固定 `invisible` ChevronRight 占位 |
+| ICONS 10→30+ 个工具名 | 含 MCP `mcp__*`→`Plug` 前缀匹配 |
+| 摘要始终可见 | 不再 hover 才显示 |
+| `border-err/30→40` | error 状态边框对比度增强 |
+| 阴影 `#d97757→var(--accent)` | 主题随动 |
+| HljsCode 语言标签+行数 | 左上角语言 label，右上角 `N 行` |
+| HljsDiff 增删统计条 | sticky `-N +M` bar |
+| CodeViewer/DiffView Suspense fallback 增强 | 语言+行数+截断预览 |
+
+#### 🪟 7 个弹窗/面板 → 居中模态
+| 组件 | 变更 |
+|------|------|
+| **MemoryPanel** | 右侧抽屉→居中弹窗 `max-w-2xl/max-h-[88vh]`，搜索+类型筛选+折叠文档 |
+| **PlanPanel** | Header/Body/Footer 三区，空态居中，Footer 状态栏 |
+| **ApprovalModal** | 抽取 `<PlanBtn>` 组件，6→3 行调用，shadow 美化 |
+| **AskCard** | 主题遮罩，shadow CSS 变量，placeholder 亮度，过渡统一 |
+| **Toast** | 整行 `style={{}}`→Tailwind 类 |
+| **HistoryPanel** | `✕`→`<X/>`，分组圆点+计数，搜索清除按钮，空态图标，`border-l-[3px]` 色条 |
+| **SettingsPanel+CapabilitiesPanel** | `set-grow/set-seg__btn/prov-card` 等全表单 CSS 类→Tailwind inline |
+
+#### 💰 StatusBar — 实时费用面板
+- 空闲态左侧：`Token总量` + `💰 ¥0.52`（自动匹配模型价格表计价）+ 上下文条
+- `MODEL_PRICES` 表与 StatsPanel 共享
+
+#### ⌨️ Composer 输入体验重构
+| 特性 | 说明 |
+|------|------|
+| 项目感知 placeholder | `在 tianxuan/ 中提问…` |
+| focus 发光环 | `shadow-[0_0_0_3px_var(--accent-soft)]` |
+| 底部快捷提示条 | `/ 命令  @ 文件  Shift+Tab 切换` |
+| 模式按钮 glow+press | 活跃态光环 + `active:scale-[0.97]` |
+| workspace 菜单动画 | `animate-[menu-in]` + 搜索框 focus 高亮 |
+| 粘贴块 `<ActionBtn>` | 组件化预览/展开/删除按钮 |
+
+#### 🔧 其他小部件
+- `✕` 字符→lucide `<X/>` 图标：全局 12 处统一
+- StreamingIndicator：英文→中文"准备中/生成中/仍在处理…"+ 顶部 3px 滚动色条
+- JumpBar：6×6px 点+hover 独立态+活跃光环+预览编号
+- Skeleton：旋转外圈动画+Card hover 过渡+delay Tailwind v4 任意属性
+- ErrorCard：内联色→CSS 变量，`border-err→border-err/30`
+- CopyButton：新增 `document.execCommand("copy")` fallback
+- Welcome：`sessionStorage→localStorage`（Wails 可靠性）
+
+#### 📂 侧边栏+文件树
+- 底部 4 按钮：`rounded-md`+三态过渡 `transition-[color,background,transform]`
+- 文件树选中：左侧 accent 色条 + 图标/文字 `text-accent`
+- 标签栏关闭按钮→红色，选中态 border 增强
+- 面包屑 `›` 分隔符半透明 + 尾段 `font-medium`
+- TodoPanel：进度条 100% 变绿 + in_progress 左侧 accent 色条
+
+#### 📱 响应式布局
+- 删除 820px 断点 macOS 硬编码 `topbar padding-left: 82px`
+- 用 `aside` 选择器替代 `.sidebar` 死类名
+
+### 🔧 Go 核心 — 16 个新工具图标 + Context hook
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| ICONS 30+ 映射 | `ToolCard.tsx` | `delete_range→Trash2`, `doctor→Activity`, `git_commit→GitBranch`, `lsp_diagnostics→Bug`, `run_skill→Zap` 等 |
+| MCP 前缀匹配 | `ToolCard.tsx` | `mcp__*→Plug` 统一图标 |
+| `useCompact` Context | `useCompact.tsx` | 新建 React Context hook，驱动紧凑模式 |
+
+### 📦 发布
+
+- CLI: `tianxuan.exe` (13MB, Go 1.x)
+- 桌面端: `tianxuan-desktop.exe` (16MB, Wails v2.12.0)
+- 位置: `release/v8.4.0/`
+
+---
+
 ## [8.3.1] — 2026-06-20
 
 ### 🔧 Go 核心 — 缓存诊断 L4 追踪 + 截断激活

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Gauge, TrendingUp, Zap } from "lucide-react";
 import type { WireUsage, ContextInfo } from "../lib/types";
 
+interface Point { x: number; y: number; label: string; }
+
 function storageKey(sessionKey: string) { return `tianxuan.stats.${sessionKey}`; }
 
 interface StoredData { turns: TurnRecord[]; steps: StepRecord[]; }
@@ -70,49 +72,6 @@ function hitRateRing(rate: number): string {
 }
 
 // ─── 微型折线图（无面积填充）─────────────────────────────────────
-interface Point { x: number; y: number; label: string; }
-
-/** SVG 微型折线图：单线 + 数据点 + Y 轴刻度 + X 轴标签（首/中/尾） */
-function MiniLineChart({
-  title, W, H, padL, padR, padT, padB, points, yTicks, color, xLabels,
-}: {
-  title: string; W: number; H: number; padL: number; padR: number; padT: number; padB: number;
-  points: Point[]; yTicks: [number, string][]; color: string;
-  xLabels: { at: number; text: string }[];
-}) {
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  return (
-    <div className="py-3 border-b border-border-soft">
-      <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">{title}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-        {/* Y 轴网格线 + 刻度 */}
-        {yTicks.map(([val, label], i) => {
-          const y = padT + plotH - (i / (yTicks.length - 1)) * plotH;
-          return (
-            <g key={`y${i}`}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} />
-              <text x={padL - 4} y={y + 3} fontSize={9} fill="var(--fg-faint)" textAnchor="end">{label}</text>
-            </g>
-          );
-        })}
-        {/* 数据线 */}
-        <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-        {/* 数据点 */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2} fill={color}>
-            <title>{p.label}</title>
-          </circle>
-        ))}
-        {/* X 轴标签 */}
-        {xLabels.map((xl, i) => (
-          <text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
 /** SVG 微型折线图：带半透明面积填充 + 数据点 */
 function MiniAreaChart({
   title, W, H, padL, padR, padT, padB, points, yTicks, color, xLabels,
@@ -121,7 +80,7 @@ function MiniAreaChart({
   points: Point[]; yTicks: [number, string][]; color: string;
   xLabels: { at: number; text: string }[];
 }) {
-  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const plotH = H - padT - padB;
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const last = points[points.length - 1];
   const first = points[0];
@@ -130,7 +89,7 @@ function MiniAreaChart({
     <div className="py-3 border-b border-border-soft">
       <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">{title}</div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-        {yTicks.map(([val, label], i) => {
+        {yTicks.map(([_val, label], i) => {
           const y = padT + plotH - (i / (yTicks.length - 1)) * plotH;
           return (
             <g key={`y${i}`}>
@@ -263,20 +222,9 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
     ? ((lastTurn.cacheHit / Math.max(1, lastTurn.prompt)) * 100 - (prevTurn.cacheHit / prevTurn.prompt) * 100)
     : null;
 
-  // 会话总 Token
-  const sessionPromptTk = usage?.sessionPromptTokens ?? sessionPrompt;
-  const sessionComplTk = usage?.sessionCompletionTokens ?? 0;
-  const sessionTotalTk = sessionPromptTk + sessionComplTk;
-
-  // 吞吐量（tokens/sec）— 基于 lastTurn totalTokens
-  const throughput = useMemo(() => {
-    if (!lastTurn || !history.length) return null;
-    const total = lastTurn.prompt + lastTurn.completion;
-    if (total <= 0) return null;
-    // 粗略估计：totalTokens 是这一步的总 token 数，用粗略的 2-3s 来估
-    // 更精确的应该在 WireUsage 中加 elapsed 字段
-    return null; // 保持占位，等后端加 elapsed 后启用
-  }, [lastTurn, history]);
+  // 会话总 Token — 从 history 累计
+  const sessionPromptTk = useMemo(() => history.reduce((s, r) => s + r.prompt, 0), [history]);
+  const sessionComplTk = useMemo(() => history.reduce((s, r) => s + r.completion, 0), [history]);
 
   // 有数据？
   const hasAnyData = history.length > 0 || stepHistory.length > 0;
@@ -454,7 +402,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
                 </div>
               </div>
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-                {yLabels.map(([val, label], i) => {
+                {yLabels.map(([_val, label], i) => {
                   const y = padT + plotH - (i / (yLabels.length - 1)) * plotH;
                   return (
                     <g key={`y${i}`}>

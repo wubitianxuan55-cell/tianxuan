@@ -170,7 +170,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
     <section className="mb-3">
       <div className="flex items-center justify-between px-1 pb-1.5">
         <div className="text-fg text-sm font-semibold">{t("settings.tab.models")}</div>
-        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors">
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onManageProviders}>
           {t("settings.manageProviders")}
         </button>
       </div>

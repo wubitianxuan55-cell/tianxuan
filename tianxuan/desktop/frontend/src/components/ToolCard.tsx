@@ -23,7 +23,6 @@ import {
   List,
   ListTree,
   Loader2,
-  MessageSquareQuestion,
   Pencil,
   Plug,
   PlusCircle,
@@ -93,7 +92,7 @@ const ICONS: Record<string, LucideIcon> = {
   // 计划
   complete_step: CheckCircle,
   // 交互
-  ask: MessageSquareQuestion,
+  ask: List,
 };
 
 /** MCP 工具（`mcp__<server>__<tool>`）统一用插头图标 */

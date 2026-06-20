@@ -1,6 +1,23 @@
 # tianxuan project memory
 
-> V8.3.1 — 缓存诊断 L4 追踪 + 统计面板会话持久化 + 工具卡折叠修复 · 2026-06-20
+> V8.4.0 — 全线 UI 优化：主题补全/紧凑模式/费用面板/居中弹窗 · 2026-06-20
+
+## V8.4.0 发布摘要 (2026-06-20)
+
+**基于**: V8.3.1 (commit facab32) · **二进制**: CLI 13MB / Desktop 16MB (Wails v2.12.0) · **位置**: `release/v8.4.0/`
+
+🎨 前端全量 UI 优化 — 22 轮，36 文件，+1858/-1994 行：
+- P0 主题修复：补全 15+ 缺失 CSS 变量，浅色主题下 color-mix/diff/语法高亮恢复正常
+- 紧凑模式：新增 `hooks/useCompact.tsx` React Context，一键切换 6 组件自适应字号/间距/图标
+- CSS 清理：styles.css 删除 ~400 行死代码（`.ico/menu/toast/error-card/cap-*` 旧样式）
+- 动画统一：`--transition-fast/normal/slow` 三档 token + `prefers-reduced-motion`
+- ToolCard：ICONS 10→30+（含 MCP `mcp__*→Plug`），模板字面量 bug 修复，HljsCode/Diff 增强
+- 居中弹窗：MemoryPanel/PlanPanel/ApprovalModal 从右侧抽屉重做为居中模态（`animate-[scaleIn]`）
+- 费用面板：StatusBar 空闲态 → `Total + 💰¥0.52`（自动 DeepSeek 模型价格表计价）
+- Composer：项目感知 placeholder、focus 发光环、底部快捷提示条、菜单动画、粘贴块 `<ActionBtn>` 组件化
+- 全局统一：`✕` 字符→lucide `<X/>` 图标 12 处；硬编码色值→CSS 变量；`bg-black→bg-bg` 主题感知
+- 侧边栏+文件树：4 按钮三态过渡、文件树选中色条、面包屑打磨
+- 响应式：删除 820px 断点 macOS 硬编码 `topbar padding-left: 82px`
 
 ## V8.3.1 发布摘要 (2026-06-20)
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Item } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -82,6 +83,7 @@ export function Transcript({
   // stick tracks whether the view is pinned to the bottom; once the user scrolls
   // up to read, we stop yanking them back down.
   const stick = useRef(true);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   // 预处理：合并连续推理 + 扫描工具组
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
@@ -96,8 +98,12 @@ export function Transcript({
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }, []);
+    if (el) {
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        stick.current = atBottom;
+        setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight + 200);
+    }
+}, []);
 
   // Follow new content by setting scrollTop directly inside rAF so layout has
   // settled first — together with plain-text streaming this keeps the view from
@@ -211,6 +217,16 @@ export function Transcript({
           if (dismissedErrors.has(it.id)) return null;
           return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
         }
+        // Diagnostics notices get special styling
+        if (it.text.startsWith("diagnostics:")) {
+          const clean = it.text.includes("— clean");
+          return (
+            <div key={it.id} className={`flex items-center gap-1.5 px-4 py-1 text-[11px] ${clean ? "text-ok" : "text-warning"}`}>
+              <span className="shrink-0">{clean ? "✔" : "⚠"}</span>
+              <span>{it.text}</span>
+            </div>
+          );
+        }
         return (
           <div key={it.id} className="notice">
             {it.text}
@@ -223,7 +239,7 @@ export function Transcript({
 
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
-      <div className="px-[100px]">
+      <div className="max-w-[--maxw] mx-auto px-8">
         {items.length === 0 && <Welcome onPrompt={onPrompt} />}
         <StreamingIndicator running={running} items={items} />
 
@@ -254,6 +270,23 @@ export function Transcript({
           ))}
         </div>
       </div>
+      {showScrollDown && (
+        <button
+          className="absolute bottom-5 right-8 z-10 w-9 h-9 rounded-full bg-accent text-accent-fg shadow-lg flex items-center justify-center border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn"
+          onClick={() => {
+            stick.current = true;
+            setShowScrollDown(false);
+            const el = scrollRef.current;
+            if (el) {
+              if (grouped.length > 0) virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
+              el.scrollTop = el.scrollHeight;
+            }
+          }}
+          aria-label="回到底部"
+        >
+          <ArrowDown size={16} />
+        </button>
+      )}
     </div>
   );
 }

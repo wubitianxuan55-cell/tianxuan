@@ -811,8 +811,10 @@ export function Composer({
                   mode === m ? "text-accent bg-accent-soft border-accent/30" : ""
                 }`}
                 onClick={() => {
-                  let count = 0;
-                  while (mode !== m && count < 3) { onCycleMode(); count++; }
+                  if (mode === m) return;
+                  const order: Mode[] = ['normal', 'plan', 'yolo'];
+                  const steps = (order.indexOf(m) - order.indexOf(mode) + 3) % 3;
+                  for (let i = 0; i < steps; i++) onCycleMode();
                 }}
                 title={m === 'plan' ? t('composer.modePlan') : m === 'yolo' ? t('composer.modeYolo') : t('composer.modeNormal')}
               >

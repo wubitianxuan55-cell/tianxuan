@@ -1,3 +1,60 @@
+## [8.3.4] — 2026-06-21
+
+### 🎨 桌面端 UI — 统计面板重构 + Logo 重设计 + 多项打磨
+
+| 分类 | 文件 | 改动 |
+|------|------|------|
+| 🎨 Logo | `logo.svg` | 菱形简化版 — 去发光滤镜、碎三角、圆点连线；保留暖铜渐变底座 + 内嵌菱形分割 |
+| 🎨 Header | `App.tsx` | 模型名改为可点击 `ModelSwitcher`，删除右侧重复历史/新会话按钮 |
+| 🎨 Header | `StatusBar.tsx` | `ModelSwitcher` 移入 Header，精简 props |
+| 🎨 Welcome | `Welcome.tsx` | 新增中央大输入框；品牌名/tagline 简化为 logo + 输入框 + 快捷卡片 |
+| 🎨 思维模式 | `App.tsx` | emoji 按钮(⚡🧠💎) → 文字标签(快速/标准/深度) |
+| 🎨 侧栏搜索 | `App.tsx` + i18n | 搜索框从 `length>3` 常驻为 `length>0`，placeholder 改为 i18n "搜索会话…" |
+| 🎨 折叠导航 | `App.tsx` | 删除折叠模式重复历史按钮，消除二重入口 |
+| 🎨 StatusBar | `StatusBar.tsx` | 缓存徽章可点击→弹出 mini popover，展示本轮/会话 token 明细 |
+| 🎨 Transcript | `Transcript.tsx` | 宽度约束从固定 `px-[100px]` → `max-w-[--maxw] mx-auto` |
+| 🎨 诊断通知 | `Transcript.tsx` | 诊断 notice 渲染为 ✔(clean) / ⚠(issues) + 颜色区分 |
+| 📊 StatsPanel | `StatsPanel.tsx` | 重构：缓存健康环形图 + 会话/本轮/步三列对比表 + 工具/技能 mini bar chart |
+| 🧹 清理 | `CostPanel.tsx` | 删除 305 行死代码（与 StatsPanel 完全重叠，零引用） |
+| 🧹 清理 | `App.tsx` | 删除未使用 `History` import |
+| 🎨 ToolGroup | `ToolGroup.tsx` | 折叠组加底色区分 + hover 过渡 |
+| 🎨 Skeleton | `Skeleton.tsx` | 脉冲占位块 → 能力摘要卡片(工具/技能/模型/缓存) + 动画图标 |
+| 🧹 清理 | `StatusBar.tsx` | 移除未使用 `Meta` import、`meta`/`onSwitchModel` props |
+
+### 🔧 后端
+
+| 分类 | 文件 | 改动 |
+|------|------|------|
+| 🔧 诊断可见 | `agent/agent.go` | 挂接 `runPostToolDiagnostics`+`runPostToolDiffPreview`，编辑后自动 LSP 诊断 + diff 预览 |
+| 🔧 诊断通知 | `agent/agent.go` | notice 包含完整诊断详情（截断 500 字符），用户可直接看到编译错误 |
+| 🔧 桌面通知 | `desktop/app.go` | 接入 `TurnDoneSink`，Agent 完成长任务后弹桌面通知 |
+
+### 已知问题
+
+- 新建会话首轮可能缺失 L2 运行时上下文（V8.3.3 延续）
+
+## [8.3.3] — 2026-06-20
+
+### 🔴 修复
+
+| 分类 | 文件 | 改动 |
+|------|------|------|
+| 🐛 模式切换无高亮 | `useModeManager.ts` | `cycleMode` 改用函数式 `setMode`，消除闭包陈旧 bug |
+| 🐛 模式切换无高亮 | `Composer.tsx` | onClick 根据当前模式计算精确步数，按钮立即高亮 |
+| 🐛 新会话偶发崩溃 | `agent/agent.go` | `SetSession` 重置 `prefixFingerprintSet` + `lastToolFingerprintSet`，防止 `verifyPrefix` panic |
+
+### ↩️ 回退
+
+| 文件 | 说明 |
+|------|------|
+| `agent/agent.go` — `SetSession` | 回退 V8.3.1 `RebuildTodoState`（导致启动卡住） |
+| `cache/runtime.go` | 回退 V8.3.2 `Unlock()` 方法 |
+| `control/controller.go` | 回退 V8.3.2 `NewSession` 中 `Unlock` 调用 |
+
+### 已知问题
+
+- 新建会话首轮可能缺失 L2 运行时上下文（项目信息），由 `Unlock` 回退导致
+
 ## [8.3.0] — 2026-06-21
 
 ### 🧠 记忆模块全量升级 — GlobalDir + Archive + BM25 + 增量刷新 + 老化

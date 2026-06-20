@@ -43,21 +43,21 @@ export function StreamingIndicator({
 
   const stageColors: Record<Stage, string> = {
     idle: "",
-    preparing: "text-(--color-warning)",
-    streaming: "text-(--color-info)",
-    stalled: "text-(--color-error)",
+    preparing: "text-warning",
+    streaming: "text-info",
+    stalled: "text-err",
   };
 
   return (
     <div className={`flex items-center gap-2 py-2 px-3 text-[12px] ${stageColors[stage]}`}>
-      <span className={`w-2 h-2 rounded-full animate-pulse ${stage === "streaming" ? "bg-(--color-info)" : "bg-(--color-warning)"}`} />
+      <span className={`w-2 h-2 rounded-full animate-pulse ${stage === "streaming" ? "bg-info" : "bg-warning"}`} />
       <span>
         {stage === "preparing" && "Preparing…"}
         {stage === "streaming" && "Streaming"}
         {stage === "stalled" && "Still working…"}
       </span>
       {stage === "preparing" && (
-        <span className="text-(--color-fg-faint) text-[11px] ml-auto">15"</span>
+        <span className="text-fg-faint text-[11px] ml-auto">15"</span>
       )}
     </div>
   );

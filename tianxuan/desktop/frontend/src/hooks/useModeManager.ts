@@ -27,8 +27,13 @@ export function useModeManager(
   );
 
   const cycleMode = useCallback(() => {
-    applyMode(mode === "normal" ? "plan" : mode === "plan" ? "yolo" : "normal");
-  }, [mode, applyMode]);
+    setMode(prev => {
+      const next = prev === "normal" ? "plan" as Mode : prev === "plan" ? "yolo" as Mode : "normal" as Mode;
+      setPlan(next === "plan");
+      setBypass(next === "yolo");
+      return next;
+    });
+  }, [setPlan, setBypass]);
 
   const handleThinkLevelChange = useCallback(async (level: string) => {
     setThinkLevel(level as "fast" | "normal" | "deep");

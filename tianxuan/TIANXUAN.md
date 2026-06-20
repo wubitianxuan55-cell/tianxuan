@@ -1,8 +1,25 @@
 # tianxuan project memory
 
-> V8.3.0 — 记忆模块全量升级：GlobalDir + Archive + BM25 + 增量刷新 · 2026-06-21
+> V8.3.4 — 桌面端 UI 全面优化 + 后端诊断自动反馈循环 · 2026-06-21
 
-## V8.3.0 发布摘要 (2026-06-21)
+## V8.3.4 发布摘要 (2026-06-21)
+
+**核心升级**:
+- 🎨 **Logo 重设计** — 菱形简化版，去发光滤镜/碎三角，暖铜渐变 + 内嵌菱形分割
+- 🎨 **Header 精简** — 模型名可点击切换（ModelSwitcher），删除右侧重复按钮，emoji→文字标签
+- 🎨 **Welcome 升级** — 中央大输入框，类 ChatGPT 首屏体验
+- 🎨 **Transcript 宽度统一** — `max-w-[--maxw] mx-auto`，窄窗口不挤压
+- 📊 **StatsPanel 重构** — 缓存健康环形图 + 三列对比表 + mini bar chart
+- 🔧 **后端诊断自动反馈** — 编辑后自动 LSP 诊断 + diff 预览，通知包含详情
+- 🔧 **桌面通知** — 接入 TurnDoneSink，长任务完成后弹桌面通知
+
+**文件变更**: `logo.svg`, `App.tsx`, `StatusBar.tsx`, `Welcome.tsx`, `Transcript.tsx`, `StatsPanel.tsx`, `ToolGroup.tsx`, `Skeleton.tsx`, `CostPanel.tsx`(删除), `agent/agent.go`, `desktop/app.go`, i18n locales
+
+**构建产物**:
+- CLI: `tianxuan.exe` (13.45MB)
+- Desktop: `desktop/build/bin/tianxuan-v8.3.4.exe` (16.66MB)
+
+**已知问题**: 新建会话首轮可能缺失 L2 运行时上下文（V8.3.3 延续）
 
 **参照**: DeepSeek-Reasonix v1.9.1 `internal/memory` + `internal/retrieval` 架构
 

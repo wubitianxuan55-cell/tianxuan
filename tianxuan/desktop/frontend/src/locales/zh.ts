@@ -33,6 +33,7 @@ export const zh: Record<DictKey, string> = {
   "sidebar.conversations": "会话",
   "sidebar.viewAll": "全部",
   "sidebar.noRecent": "还没有最近会话",
+  "sidebar.search": "搜索会话…",
   "sidebar.workspace": "工作区",
   "sidebar.changeWorkspace": "更改",
   "sidebar.collapse": "收起侧边栏",
@@ -128,6 +129,18 @@ export const zh: Record<DictKey, string> = {
   "welcome.ex2": "总结最近的 git 改动",
   "welcome.ex3": "智能体的运行主循环在哪，它做了什么？",
 
+  // 加载
+  "skeleton.title": "正在连接智能体…",
+  "skeleton.desc": "tianxuan 正在初始化引擎，请稍后。准备好后，你就可以开始编码了。",
+  "skeleton.tools": "工具",
+  "skeleton.toolsDesc": "20+ 内置工具",
+  "skeleton.skills": "技能",
+  "skeleton.skillsDesc": "自适应学习",
+  "skeleton.models": "模型",
+  "skeleton.modelsDesc": "多模型切换",
+  "skeleton.cache": "缓存",
+  "skeleton.cacheDesc": "智能前缀缓存",
+
   // 输入框
   "composer.placeholder": "给 tianxuan 发消息…  ( / 命令 · @ 文件 )",
   "composer.placeholderRunning": "回复中… 继续输入可排队发送",
@@ -171,6 +184,13 @@ export const zh: Record<DictKey, string> = {
   "status.jobsTitle": "后台作业",
   "status.yolo": "YOLO",
   "status.yoloTitle": "YOLO —— 本会话正在跳过所有批准",
+  "status.cacheDetail": "缓存详情",
+  "status.promptTokens": "本轮提示",
+  "status.completionTokens": "本轮生成",
+  "status.cacheHitTokens": "缓存命中",
+  "status.cacheMissTokens": "缓存未命中",
+  "status.sessionTotal": "会话累计",
+  "status.viewFullStats": "查看完整统计 →",
 
   // 审批弹窗
   "approval.planTitle": "可以开始写代码了吗？",

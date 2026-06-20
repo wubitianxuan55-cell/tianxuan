@@ -26,10 +26,10 @@ export const UserMessage = memo(function UserMessage({
   return (
     <div className="relative flex flex-row-reverse items-center gap-2 px-4 py-2.5 group">
       <span className="text-accent font-mono font-semibold text-lg leading-none shrink-0">›</span>
-      <div className="bg-accent-soft text-fg rounded-xl rounded-br-md px-4 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words max-w-[85%]">{displayText}</div>
+      <div className="bg-accent-soft text-fg rounded-xl rounded-br-md shadow-sm px-4 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words max-w-[85%]">{displayText}</div>
       {canRewind && (
         <div className="relative shrink-0 ml-auto">
-          <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-opacity" title={t("rewind.label")} onClick={onToggle}>
+          <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-all duration-[0.12s] active:scale-90" title={t("rewind.label")} onClick={onToggle}>
             ⟲
           </button>
           {open && (
@@ -76,7 +76,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
             }`}
           >
             <div className="overflow-hidden">
-              <div className="pl-3 border-l-2 border-border-soft text-fg-dim text-xs leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+              <div className="pl-3 border-l-2 border-accent/40 text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
                 {item.reasoning}
               </div>
             </div>

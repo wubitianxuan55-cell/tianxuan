@@ -411,83 +411,6 @@ func (a *AgentRunner) SetPatternExtractor(e interface {
 }) {
 	a.patternExtractor = e
 }
-
-// runPostToolDiffPreview formats collected writer diffs as unified diff text
-// and injects them as a system message so the model sees its own changes.
-func (a *AgentRunner) runPostToolDiffPreview(ctx context.Context) {
-	if len(a.pendingDiffs) == 0 {
-		return
-	}
-	var sb strings.Builder
-	sb.WriteString("Changes made in this step:\n")
-	for _, ch := range a.pendingDiffs {
-		if ch.Diff == "" {
-			continue
-		}
-		fmt.Fprintf(&sb, "\n--- %s (%s, +%d -%d)\n%s\n",
-			ch.Path, string(ch.Kind), ch.Added, ch.Removed, ch.Diff)
-	}
-	text := strings.TrimRight(sb.String(), "\n")
-	if text == "" {
-		return
-	}
-	a.session.Add(provider.Message{
-		Role:    provider.RoleSystem,
-		Content: text,
-	})
-	a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-		Text: "diff: " + fmt.Sprintf("%d file(s) changed", len(a.pendingDiffs))})
-	a.pendingDiffs = nil
-}
-
-// runPostToolDiagnostics runs LSP diagnostics on files modified by writer tools
-
-// in the current batch and injects results into the session. The model sees
-// compilation errors before the next turn, reducing fix cycles.
-func (a *AgentRunner) runPostToolDiagnostics(ctx context.Context, calls []provider.ToolCall) {
-	if a.lspManager == nil || len(calls) == 0 {
-		return
-	}
-
-	// Collect unique file paths from writer tool calls
-	seen := map[string]bool{}
-	var files []string
-	for _, call := range calls {
-		switch call.Name {
-		case "edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol", "notebook_edit":
-			path := extractFilePath(call.Name, string(call.Arguments))
-			if path != "" && !seen[path] {
-				seen[path] = true
-				files = append(files, path)
-			}
-		}
-	}
-	if len(files) == 0 {
-		return
-	}
-
-	var results []string
-	for _, f := range files {
-		diag, err := a.lspManager.Diagnostics(ctx, f)
-		if err != nil || diag == "" {
-			continue
-		}
-		results = append(results, diag)
-	}
-	if len(results) == 0 {
-		return
-	}
-
-	// Inject diagnostics as a single synthetic system message
-	text := "LSP diagnostics after edit:\n" + strings.Join(results, "\n")
-	a.session.Add(provider.Message{
-		Role:    provider.RoleSystem,
-		Content: text,
-	})
-	a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-		Text: "diagnostics: " + fmt.Sprintf("%d file(s) with issues", len(results))})
-}
-
 func (a *AgentRunner) SetArchive(ar *archive.Store, sessionID string) {
 	a.archive = ar
 	a.sessionID = sessionID
@@ -516,6 +439,12 @@ func (a *AgentRunner) SetSession(s *Session) {
 	a.sessMu.Lock()
 	defer a.sessMu.Unlock()
 	a.session = s
+	// V8.3.2: reset prefix fingerprint baseline for the new session.
+	// verifyPrefix compares L1/L2/tools hashes against the saved baseline;
+	// a fresh session has different L1 content, so we must let it re-establish
+	// the baseline rather than panic on mismatch.
+	a.prefixFingerprintSet = false
+	a.lastToolFingerprintSet = false
 }
 
 // LastUsage returns the most recent per-turn token telemetry the provider

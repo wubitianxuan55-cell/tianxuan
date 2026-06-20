@@ -121,7 +121,7 @@ export function MemoryPanel({
         ) : (
           <span
             key={k++}
-            className="mem-link mem-link--dead"
+            className="bg-transparent border-0 p-0 font-[inherit] cursor-help text-err line-through underline decoration-dotted"
             title={t("memory.deadLink", { name: target })}
           >
             {target}

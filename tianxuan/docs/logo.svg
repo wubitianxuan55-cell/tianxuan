@@ -14,13 +14,10 @@
     </linearGradient>
   </defs>
 
-  <!-- Icon: diamond mark -->
+  <!-- Icon: simplified diamond mark (V8.x redesign) -->
   <g transform="translate(105, 85)">
-    <polygon points="0,-40 26,0 0,40 -26,0" fill="none" stroke="url(#tx-grad-mark)" stroke-width="2" opacity="0.6"/>
-    <polygon points="0,-25 16,0 0,25 -16,0" fill="url(#tx-grad-mark)" opacity="0.9"/>
-    <rect x="-16" y="-4" width="32" height="3" rx="1.5" fill="#1a1a2e" opacity="0.5"/>
-    <line x1="0" y1="-16" x2="0" y2="16" stroke="#1a1a2e" stroke-width="3" opacity="0.25"/>
-    <circle cx="0" cy="-30" r="3" fill="url(#tx-grad-mark)"/>
+    <polygon points="0,-44 30,0 0,44 -30,0" fill="url(#tx-grad-mark)" opacity="0.95"/>
+    <polygon points="0,-32 22,0 0,32 -22,0" fill="#1a1a2e" opacity="0.18"/>
   </g>
 
   <!-- Wordmark: "tianxuan" -->

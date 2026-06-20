@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { CSSProperties } from "react";
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FileText, FolderGit2, FolderTree,
-  History, Settings as SettingsIcon, MessageSquare,
+  Settings as SettingsIcon, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import logo from "./assets/logo.png";
@@ -18,6 +18,7 @@ import { TodoPanel } from "./components/TodoPanel";
 import { ApprovalModal } from "./components/ApprovalModal";
 import { AskCard } from "./components/AskCard";
 import { StatusBar } from "./components/StatusBar";
+import { ModelSwitcher } from "./components/ModelSwitcher";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
@@ -340,7 +341,7 @@ export default function App() {
 
           {/* New session button */}
           <button
-            className={`w-full min-w-0 border border-border rounded-lg bg-bg-elev text-fg font-medium cursor-pointer transition-[color,background] duration-[0.12s] hover:bg-sidebar-hover hover:text-fg disabled:opacity-55 disabled:cursor-default flex items-center gap-2.5 h-9 px-2.5 mb-3 no-drag ${
+            className={`w-full min-w-0 border border-border rounded-lg bg-bg-elev text-fg font-medium cursor-pointer transition-[color,background,transform] duration-[0.12s] hover:bg-sidebar-hover hover:text-fg active:scale-[0.98] disabled:opacity-55 disabled:cursor-default flex items-center gap-2.5 h-9 px-2.5 mb-3 no-drag ${
               sidebarCollapsed ? "justify-center w-10 h-10 !rounded-[10px] !p-0 !gap-0" : ""
             }`}
             onClick={() => void startNewSession()}
@@ -357,7 +358,7 @@ export default function App() {
               <div className="flex items-center gap-2 px-1 pb-2 pl-2.5">
                 <div className="flex-1 min-w-0 text-fg-faint font-mono text-[11px] uppercase tracking-wider">{t("sidebar.conversations")}</div>
                 <button
-                  className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
+                  className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
                   onClick={() => void openHistory()}
                   disabled={state.running}
                   title={state.running ? t("common.busyHint") : t("topbar.history")}
@@ -365,7 +366,7 @@ export default function App() {
                   {t("sidebar.viewAll")}
                 </button>
               </div>
-              {sidebarSessions.length > 3 && <input className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag" placeholder="搜索…" value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
+              {sidebarSessions.length > 0 && <input className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag" placeholder={t("sidebar.search")} value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
               <div className="min-h-0 overflow-y-auto pr-0.5">
                 {(() => {
                   const q = sidebarQuery.trim().toLowerCase();
@@ -375,7 +376,7 @@ export default function App() {
                   return visible.map((session: SessionMeta) => (
                     <div
                       className={`flex items-start gap-1 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
-                        session.current ? "bg-sidebar-active" : ""
+                        session.current ? "bg-sidebar-active border-l-[3px] border-accent pl-[8px]" : ""
                       }`}
                       key={session.path}
                     >
@@ -396,25 +397,14 @@ export default function App() {
 
           {/* Bottom nav */}
           <nav className={`flex flex-col gap-0.5 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
-            sidebarCollapsed ? "items-center w-full !pt-0 !pb-3 !border-t-0" : ""
+            sidebarCollapsed ? "items-center w-full !pt-0 !pb-3" : ""
           }`}>
-            <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${
-                sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
-              } ${sidebarCollapsed ? "flex" : "hidden"}`}
-              onClick={() => void openHistory()}
-              disabled={state.running}
-              title={state.running ? t("common.busyHint") : t("topbar.history")}
-            >
-              <History size={15} />
-              {!sidebarCollapsed && <span>{t("topbar.history")}</span>}
-            </button>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
               <Brain size={15} />
               {!sidebarCollapsed && <span>{t("topbar.memory")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${
+              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${
                 sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
               } ${showPlan ? "text-accent bg-accent-soft" : ""}`}
               onClick={() => setShowPlan((v) => !v)}
@@ -423,12 +413,12 @@ export default function App() {
               <FileText size={15} />
               {!sidebarCollapsed && <span>{t("plan.title")}</span>}
             </button>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
               <Blocks size={15} />
               {!sidebarCollapsed && <span>{t("caps.title")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+              className={`flex items-center gap-2.5 h-8 px-2.5 text-[13px] no-drag transition-transform duration-[0.12s] active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
               onClick={() => setSettingsOpen(true)}
               disabled={state.running}
               title={state.running ? t("common.busyHint") : t("topbar.settings")}
@@ -454,52 +444,34 @@ export default function App() {
         />
 
         <section className="chat-pane">
-          <header className="flex flex-shrink-0 items-center gap-3 h-[50px] px-12 bg-bg border-b border-border-soft select-none drag-region">
-            <div className="flex flex-col justify-center min-w-0 leading-tight pointer-events-none">
-              <span className="text-fg text-[13px] font-semibold">tianxuan</span>
-              <span className="font-mono text-[11px] text-fg-dim truncate">{state.meta?.label ?? "…"}</span>
+          <header className="flex flex-shrink-0 items-center gap-3 h-[50px] px-12 bg-bg border-b border-border-soft shadow-[0_1px_3px_rgba(0,0,0,0.06)] select-none drag-region">
+            <div className="flex items-center gap-2 min-w-0">
+              <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
             <div className="flex items-center gap-2 px-3">
-              {cwd && (<button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
+              {cwd && (<button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
               <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
                     key={level}
-                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[13px] px-1.5 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default ${
+                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default ${
                       thinkLevel === level ? "text-accent bg-accent-soft" : ""
                     }`}
                     onClick={() => handleThinkLevelChange(level)}
                     disabled={state.running}
                     title={level === "fast" ? "快速思考" : level === "normal" ? "标准思考" : "深度思考"}
                   >
-                    {level === "fast" ? "⚡" : level === "normal" ? "🧠" : "💎"}
+                    {level === "fast" ? "快速" : level === "normal" ? "标准" : "深度"}
                   </button>
                 ))}
               </span>
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
+              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => { const themes:Theme[]=["dark","light","warm","ice"]; const cur=themeNow==="auto"?"dark":themeNow; const idx=themes.indexOf(cur); const n=themes[(idx+1)%4]; applyTheme(n); setTheme(n); }}>
                 {themeNow==="dark"?"深色":themeNow==="light"?"浅色":themeNow==="warm"?"暖护眼":"冰蓝"}
-              </button>
-              <button
-                className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag px-2"
-                onClick={() => void openHistory()}
-                disabled={state.running}
-                title={state.running ? t("common.busyHint") : t("topbar.history")}
-              >
-                <History size={13} />
-              </button>
-
-              <button
-                className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag px-2"
-                onClick={() => void startNewSession()}
-                disabled={state.running}
-                title={state.running ? t("common.busyHint") : t("topbar.newSession")}
-              >
-                <SquarePen size={13} />
               </button>
             </div>
           </header>
@@ -534,7 +506,6 @@ export default function App() {
               disabled={state.meta?.ready === false || state.approval != null}
             />
             <StatusBar
-              meta={state.meta}
               context={state.context}
               usage={state.usage}
               balance={state.balance}
@@ -545,7 +516,7 @@ export default function App() {
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
-              onSwitchModel={switchModel}
+              onOpenStats={() => { setRightTab("stats"); setWorkspacePanel(true); }}
             />
           </footer>
         </section>

@@ -32,6 +32,7 @@ export const zhTW: Record<DictKey, string> = {
   "sidebar.conversations": "對話",
   "sidebar.viewAll": "全部",
   "sidebar.noRecent": "暫無最近對話",
+  "sidebar.search": "搜尋對話…",
   "sidebar.workspace": "工作區",
   "sidebar.changeWorkspace": "切換",
   "sidebar.collapse": "收起側邊欄",
@@ -126,6 +127,18 @@ export const zhTW: Record<DictKey, string> = {
   "welcome.ex2": "摘要最近的 git 變更",
   "welcome.ex3": "代理執行迴圈在哪裡？它的功能是什麼？",
 
+  // 載入
+  "skeleton.title": "正在連線智慧體…",
+  "skeleton.desc": "tianxuan 正在初始化引擎。準備好後，你就可以開始編寫程式碼了。",
+  "skeleton.tools": "工具",
+  "skeleton.toolsDesc": "20+ 內建工具",
+  "skeleton.skills": "技能",
+  "skeleton.skillsDesc": "自適應學習",
+  "skeleton.models": "模型",
+  "skeleton.modelsDesc": "多模型切換",
+  "skeleton.cache": "快取",
+  "skeleton.cacheDesc": "智慧前綴快取",
+
   // composer
   "composer.placeholder": "向 tianxuan 發送訊息…（ / 指令 · @ 檔案）",
   "composer.placeholderRunning": "回覆中…持續輸入以加入佇列",
@@ -169,6 +182,13 @@ export const zhTW: Record<DictKey, string> = {
   "status.jobsTitle": "背景工作",
   "status.yolo": "YOLO",
   "status.yoloTitle": "YOLO — 此工作階段跳過核准",
+  "status.cacheDetail": "快取詳情",
+  "status.promptTokens": "本輪提示",
+  "status.completionTokens": "本輪生成",
+  "status.cacheHitTokens": "快取命中",
+  "status.cacheMissTokens": "快取未命中",
+  "status.sessionTotal": "對話累計",
+  "status.viewFullStats": "查看完整統計 →",
 
   // approval modal
   "approval.planTitle": "準備好開始編碼了嗎？",

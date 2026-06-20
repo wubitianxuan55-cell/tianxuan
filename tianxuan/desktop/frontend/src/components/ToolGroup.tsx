@@ -22,9 +22,9 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
   const moreCount = tools.length - subjects.length;
 
   return (
-    <div className="my-1 border border-border-soft rounded-lg overflow-hidden">
+    <div className="my-1 border border-border-soft rounded-lg overflow-hidden bg-bg-elev/30">
       <div
-        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-bg-soft text-fg-dim"
+        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-bg-elev/60 text-fg-dim transition-colors duration-[0.12s]"
         onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
       >
         <ChevronRight

@@ -32,6 +32,7 @@ export const en = {
   "sidebar.conversations": "Chats",
   "sidebar.viewAll": "All",
   "sidebar.noRecent": "No recent chats",
+  "sidebar.search": "Search chats…",
   "sidebar.workspace": "Workspace",
   "sidebar.changeWorkspace": "Change",
   "sidebar.collapse": "Collapse sidebar",
@@ -127,6 +128,18 @@ export const en = {
   "welcome.ex2": "Summarize the recent git changes",
   "welcome.ex3": "Where is the agent run loop, and what does it do?",
 
+  // loading
+  "skeleton.title": "Connecting…",
+  "skeleton.desc": "tianxuan is initializing. Sit tight — you'll be coding in a moment.",
+  "skeleton.tools": "Tools",
+  "skeleton.toolsDesc": "20+ built-in tools",
+  "skeleton.skills": "Skills",
+  "skeleton.skillsDesc": "Adaptive learning",
+  "skeleton.models": "Models",
+  "skeleton.modelsDesc": "Multi-model switching",
+  "skeleton.cache": "Cache",
+  "skeleton.cacheDesc": "Smart prefix cache",
+
   // composer
   "composer.placeholder": "Message tianxuan…  ( / commands · @ files )",
   "composer.placeholderRunning": "Replying… keep typing to queue",
@@ -170,6 +183,13 @@ export const en = {
   "status.jobsTitle": "Background jobs",
   "status.yolo": "YOLO",
   "status.yoloTitle": "YOLO — approvals are being skipped this session",
+  "status.cacheDetail": "Cache details",
+  "status.promptTokens": "Prompt tokens",
+  "status.completionTokens": "Completion tokens",
+  "status.cacheHitTokens": "Cache hit",
+  "status.cacheMissTokens": "Cache miss",
+  "status.sessionTotal": "Session total",
+  "status.viewFullStats": "View full stats →",
 
   // approval modal
   "approval.planTitle": "Ready to start coding?",

@@ -1,144 +1,54 @@
-## [8.3.4] — 2026-06-21
+## [8.3.1] — 2026-06-20
 
-### 🎨 桌面端 UI — 统计面板重构 + Logo 重设计 + 多项打磨
+### 🔧 Go 核心 — 缓存诊断 L4 追踪 + 截断激活
 
-| 分类 | 文件 | 改动 |
+| 变更 | 文件 | 说明 |
 |------|------|------|
-| 🎨 Logo | `logo.svg` | 菱形简化版 — 去发光滤镜、碎三角、圆点连线；保留暖铜渐变底座 + 内嵌菱形分割 |
-| 🎨 Header | `App.tsx` | 模型名改为可点击 `ModelSwitcher`，删除右侧重复历史/新会话按钮 |
-| 🎨 Header | `StatusBar.tsx` | `ModelSwitcher` 移入 Header，精简 props |
-| 🎨 Welcome | `Welcome.tsx` | 新增中央大输入框；品牌名/tagline 简化为 logo + 输入框 + 快捷卡片 |
-| 🎨 思维模式 | `App.tsx` | emoji 按钮(⚡🧠💎) → 文字标签(快速/标准/深度) |
-| 🎨 侧栏搜索 | `App.tsx` + i18n | 搜索框从 `length>3` 常驻为 `length>0`，placeholder 改为 i18n "搜索会话…" |
-| 🎨 折叠导航 | `App.tsx` | 删除折叠模式重复历史按钮，消除二重入口 |
-| 🎨 StatusBar | `StatusBar.tsx` | 缓存徽章可点击→弹出 mini popover，展示本轮/会话 token 明细 |
-| 🎨 Transcript | `Transcript.tsx` | 宽度约束从固定 `px-[100px]` → `max-w-[--maxw] mx-auto` |
-| 🎨 诊断通知 | `Transcript.tsx` | 诊断 notice 渲染为 ✔(clean) / ⚠(issues) + 颜色区分 |
-| 📊 StatsPanel | `StatsPanel.tsx` | 重构：缓存健康环形图 + 会话/本轮/步三列对比表 + 工具/技能 mini bar chart |
-| 🧹 清理 | `CostPanel.tsx` | 删除 305 行死代码（与 StatsPanel 完全重叠，零引用） |
-| 🧹 清理 | `App.tsx` | 删除未使用 `History` import |
-| 🎨 ToolGroup | `ToolGroup.tsx` | 折叠组加底色区分 + hover 过渡 |
-| 🎨 Skeleton | `Skeleton.tsx` | 脉冲占位块 → 能力摘要卡片(工具/技能/模型/缓存) + 动画图标 |
-| 🧹 清理 | `StatusBar.tsx` | 移除未使用 `Meta` import、`meta`/`onSwitchModel` props |
+| cacheBreakDetector 激活 | `agent.go:1102` | `record()` 在 `stream()` 中调用，修复此前定义但从未使用的遗漏 |
+| maybeCompact 激活 | `agent.go:801` | `runDirect` 循环中加入自动截断，高水位线触发历史压缩 |
+| L4 追踪新增 | `cache_guard.go:68-73` | `prevMsgCount`/`lastMsgCount`/`prevPrefixHash`/`lastPrefixHash` 四个字段 |
+| L4 消息哈希 | `cache_guard.go:97-107` | 全量非系统消息累积异或哈希，正常增长跳过，等量消息内 tool_result 变化可检出 |
+| diagnose 增强 | `cache_guard.go:148-155` | 新增 2 个分支：消息截断检测 (`N→M`) + L4 内容变化检测 (`N msgs`)；末尾文本 `server-side (L1/L2/tools/L4 stable)` |
+| 死代码清理 | `cache_guard.go:159` | 移除未使用的 `minInt` 函数 |
 
-### 🔧 后端
+**诊断能力**：`cacheBreakDetector` 现可区分 **5 种**缓存断裂原因：
+- `L1 changed` — 系统提示词被修改（最高风险）
+- `L2 changed` — 运行时上下文变化
+- `tools changed` — 工具列表变化
+- `messages truncated N→M` — compaction 截断历史
+- `L4 content changed (N msgs)` — 同数量消息内容被替换
 
-| 分类 | 文件 | 改动 |
+### 🧪 测试 — 新增 3 个 L4 追踪用例
+
+| 测试 | 文件 | 说明 |
 |------|------|------|
-| 🔧 诊断可见 | `agent/agent.go` | 挂接 `runPostToolDiagnostics`+`runPostToolDiffPreview`，编辑后自动 LSP 诊断 + diff 预览 |
-| 🔧 诊断通知 | `agent/agent.go` | notice 包含完整诊断详情（截断 500 字符），用户可直接看到编译错误 |
-| 🔧 桌面通知 | `desktop/app.go` | 接入 `TurnDoneSink`，Agent 完成长任务后弹桌面通知 |
+| `TestCacheBreakDetectorMessagesTruncated` | `guards_l4_test.go` | 消息截断后诊断包含 "messages truncated" |
+| `TestCacheBreakDetectorL4ContentChanged` | `guards_l4_test.go` | 等量消息内容变化诊断包含 "L4 content changed" |
+| `TestCacheBreakDetectorNormalGrowth` | `guards_l4_test.go` | 正常消息增长不误报，服务端断裂正确识别为 server-side |
 
-### 已知问题
+全部 10 个 `cacheBreakDetector` 测试 + 60+ agent 测试通过，无回归。
 
-- 新建会话首轮可能缺失 L2 运行时上下文（V8.3.3 延续）
-
-## [8.3.3] — 2026-06-20
-
-### 🔴 修复
-
-| 分类 | 文件 | 改动 |
-|------|------|------|
-| 🐛 模式切换无高亮 | `useModeManager.ts` | `cycleMode` 改用函数式 `setMode`，消除闭包陈旧 bug |
-| 🐛 模式切换无高亮 | `Composer.tsx` | onClick 根据当前模式计算精确步数，按钮立即高亮 |
-| 🐛 新会话偶发崩溃 | `agent/agent.go` | `SetSession` 重置 `prefixFingerprintSet` + `lastToolFingerprintSet`，防止 `verifyPrefix` panic |
-
-### ↩️ 回退
-
-| 文件 | 说明 |
-|------|------|
-| `agent/agent.go` — `SetSession` | 回退 V8.3.1 `RebuildTodoState`（导致启动卡住） |
-| `cache/runtime.go` | 回退 V8.3.2 `Unlock()` 方法 |
-| `control/controller.go` | 回退 V8.3.2 `NewSession` 中 `Unlock` 调用 |
-
-### 已知问题
-
-- 新建会话首轮可能缺失 L2 运行时上下文（项目信息），由 `Unlock` 回退导致
-
-## [8.3.0] — 2026-06-21
-
-### 🧠 记忆模块全量升级 — GlobalDir + Archive + BM25 + 增量刷新 + 老化
-
-**参照 DeepSeek-Reasonix v1.9.1 记忆架构重写，13文件变更，+537/-565行（净精简+功能增强）**
-
-#### P0: 核心架构 — 双目录 + 按类型路由 + 归档
-
-| 特性 | 文件 | 说明 |
-|------|------|------|
-| **GlobalDir** | `store.go` | `Store{Dir, GlobalDir}` — `user`/`feedback` 全局共享，`project`/`reference` 项目隔离 |
-| **按类型路由** | `store.go` | `saveDir(t)` 自动选择目标目录；跨目录去重 `removeActiveMemoryInDir` |
-| **Archive 归档** | `store.go` | `Archive()` 替代 `Delete()` — 移到 `.archive/<timestamp>-<name>.md`，永不可逆丢失 |
-| **ListArchived** | `store.go` | 查看所有已归档记忆，按时间倒序 |
-| **安全路径** | `store.go` | `safeJoin()` 防止路径穿越；`os.OpenRoot` 沙箱操作 |
-
-#### P1: BM25 检索引擎 + 三合一 memory 工具
-
-| 特性 | 文件 | 说明 |
-|------|------|------|
-| **retrieval 包** | `retrieval/bm25.go` (214行) | 通用 BM25 (`k1=1.2,b=0.75`) + CJK 单字切分 + Snippet 智能截取 + 相对分截断 |
-| **memory 工具** | `memory/recall.go` (284行) | `search`(BM25) / `read` / `list` 三合一，支持 type 过滤 + snippet + 无结果纠错建议 |
-| **删除旧工具** | 删除 | `memory_search.go` (106行) + `search.go` (129行) + `search_test.go` (170行) |
-
-#### P1: 增量刷新 + 编辑距离纠错 + 老化追踪
-
-| 特性 | 文件 | 说明 |
-|------|------|------|
-| **增量刷新** | `memory.go` + `controller_memory.go` | `RefreshDocs()` 只重读文档，`RefreshIndex()` 只重读 MEMORY.md — 从 O(N) 到 O(1) |
-| **forget 纠错** | `store.go` | `Archive()` 找不到时用 Levenshtein 编辑距离建议候选：`did you mean "x"?` |
-| **mtime 追踪** | `store.go` | `Memory.Mtime` 自动填充文件修改时间 |
-| **老化标记** | `memory.go` | `Block()` 末尾追加 `(3 memories not updated in >90 days)` 提醒 |
-
-#### 辅助改进
-
-| 特性 | 说明 |
-|------|------|
-| **REASONIX.md** | `doc.go` 新增 REASONIX.md/REASONIX.local.md 识别，兼容 Reasonix 生态 |
-| **memory.go 简化** | 移除 SearchIndex/compact/DocBlock，新增 `Search()` 桥接方法供 controller 使用 |
-| **配置更新** | `config.go` + `domain.go` 将 `memory_search` 改为 `memory` |
-
-#### 搜索能力对比
-
-| 维度 | 旧 `memory_search` | 新 `memory` 工具 |
-|------|-------------------|-------------------|
-| 算法 | 简单 token 计数 | **BM25** (k1=1.2, b=0.75) |
-| 中文 | 整词吞掉 | **单字切分** (CJK 逐字索引) |
-| 操作 | 仅 search | **search / read / list** |
-| 片段 | 无 | **Snippet** 智能截取 (260 字符) |
-| 类型过滤 | 无 | **按 type 过滤** |
-| 删除 | 永久删除 | **归档** (.archive/) |
-
-#### 三级记忆体系
-
-| 层级 | 媒介 | 加载策略 |
-|------|------|---------|
-| **Tier 1 — 核心** | 文档记忆 (TIANXUAN.md/AGENTS.md) | 完整注入系统前缀，始终在模型上下文 |
-| **Tier 2 — 重要** | `GlobalDir` (user/feedback) | 仅索引进前缀，正文通过 `memory read` 按需加载 |
-| **Tier 3 — 存档** | `.archive/` + `ListArchived()` | 不进入前缀，可追溯但不可搜索 |
-
-
-### 🎨 桌面端 UI — 对话窗口 6 项核心修复
+### 🖥️ 桌面端 UI — 统计面板按会话持久化
 
 | 修复 | 文件 | 说明 |
 |------|------|------|
-| 对话窗口无法滚动 | `styles.css` | `.transcript` 类缺失 `overflow-y:auto` + `flex:1`，浏览器无滚动上下文 |
-| JumpBar 定位漂移 | `styles.css` + `JumpBar.tsx` | `.main` 缺 `position:relative` 导致绝对定位基准错误；改为垂直居中 |
-| 用户消息左对齐 | `Message.tsx` | `flex-row-reverse` + `rounded-br-md` 实现右对齐 |
-| 留白过窄 | `Transcript.tsx` | 新增 `px-[100px]` 包裹层，两侧各 100px |
-| AskCard 遮罩消失 | `tailwind.css` | Tailwind v4 自定义 `@theme` 覆盖默认色板，`--color-black`/`--color-white` 未定义 |
-| 批准窗口错位 | `styles.css` | `.plan-approval-dock` 缺失 `position:fixed`，从文档流挤出 |
+| 统计面板按会话持久化 | `App.tsx:283-291` | `currentSessionKey` 不再拼接 `_${sessionNonce}`，直接用 `.jsonl` 文件路径。新会话自然空数据开始；恢复/重启同一会话统计持续累加；不同会话互不干扰 |
+| sessionKey 防抖 | `StatsPanel.tsx:115-132` | 新增 `lastKeyRef` 守卫：`sessionKey` 未实质变化时 `useEffect` 跳过重载，防止 props 抖动覆写空数据；移除 `refreshNonce` 死参数 |
+| 轮次结束不再刷新侧边栏 | `App.tsx:184-190` | 移除 `turn_done` 后自动 `refreshSessions()`，防止 `sidebarSessions` 引用变化 → `useMemo` 重算 → `sessionKey` 漂移 |
 
-### 🧩 组件重设计
+### 🖥️ 桌面端 UI — 工具卡折叠修复
 
-| 组件 | 改进 |
-|------|------|
-| **TodoPanel** | 完全重写：顶部进度条 + Loader 旋转动画 + 完成项删除线 + 子任务竖线 + 悬停高亮 |
-| **AskCard** | 自定义 radio 圆圈（18px 双环） + fadeIn/scaleIn 入场动画 + 选项 hover/active 状态 + 标题装饰线 |
+| 修复 | 文件 | 行 | 说明 |
+|------|------|-----|------|
+| ToolCard min-h-0 | `ToolCard.tsx` | 119 | 修复 CSS Grid `0fr` 折叠失效 |
+| ToolGroup min-h-0 | `ToolGroup.tsx` | 47 | 同上 |
 
-### 🔧 颜色系统修复
+**根因**：Tailwind 迁移（V8.2.1）将折叠从 React 条件渲染改为 CSS grid 动画，但 grid 子项默认 `min-height: auto` 会导致内容撑开 `0fr` 行，折叠完全失效。`min-h-0` 覆写此行为。
 
-- `tailwind.css` `@theme` 新增 `--color-black: #000` / `--color-white: #fff`
-- 恢复 `bg-black/*`、`text-white`、`bg-white/*` 等系列工具类
-- 新增 `@keyframes fadeIn` / `scaleIn` 动画关键帧
+### 📦 发布
+
+- CLI: `tianxuan.exe`
+- 桌面端: `tianxuan-desktop.exe` (Wails v2.12.0, ~16MB)
 
 ---
 

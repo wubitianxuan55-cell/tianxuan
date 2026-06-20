@@ -182,8 +182,12 @@ export default function App() {
     if (window.innerWidth < minForPanel) setWorkspacePanel(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 轮次结束时不再自动刷新侧边栏：refreshSessions 会改变 sidebarSessions
+  // 引用，导致 useMemo 重算 currentSessionKey。若 session 路径恰好变化
+  //（如首轮自动持久化），StatsPanel 会从空 localStorage key 加载数据，
+  // 表现为统计面板全部清零。侧边栏列表由用户显式操作驱动刷新。
   useEffect(() => {
-    if (!state.running && state.items.length > 0) void refreshSessions();
+    // sidebar session list refresh is driven by explicit user actions
   }, [state.running, state.items.length, refreshSessions]);
 
 
@@ -277,16 +281,15 @@ export default function App() {
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
-  // 当前会话标识：用于统计面板按会话分组
-  // V5.25: 加入 sessionNonce 确保每次新建/恢复会话生成唯一 key，
-  // 修复新建会话和切换会话时统计面板不刷新的问题。
+  // 当前会话标识：直接使用 Go 后端生成的 .jsonl 文件路径作为 key。
+  // 每个会话文件对应唯一的 localStorage key：新会话自然空数据开始，
+  // 恢复/重启同一会话则统计数据持续累加，会话之间互不干扰。
   const currentSessionKey = useMemo(() => {
     const cur = sidebarSessions.find(s => s.current);
-    const base = cur?.path
+    return cur?.path
       ? cur.path.replace(/[\\/:*?"<>|]/g, "_")
       : cwd ? `unsaved_${cwd.replace(/[\\/:*?"<>|]/g, "_")}` : "unsaved";
-    return `${base}_${state.sessionNonce}`;
-  }, [sidebarSessions, cwd, state.sessionNonce]);
+  }, [sidebarSessions, cwd]);
 
   const layoutStyle = useMemo(
     () =>
@@ -594,7 +597,7 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} refreshNonce={state.sessionNonce} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
           </div>
         </div>

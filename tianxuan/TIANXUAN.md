@@ -1,5 +1,11 @@
 # tianxuan project memory
 
+> V8.16.0 — system tray + brand cleanup · 2026-06-21
+## V8.16.0 (2026-06-21)
+🖥️ System tray (getlantern/systray): close→hide, tray menu (Show/Quit), graceful shutdown chain
+🧹 Brand cleanup: Makefile 12处 + desktop/README 14处 reasonix→tianxuan
+🐛 Fix: os.Exit(0)→runtime.Quit(ctx) graceful shutdown, QuitApp no longer double-cleans ctrl.Snapshot+Close
+
 > V8.15.1 — VS Code cleanup · back to CLI/Desktop only · 2026-06-21
 ## V8.15.1 (2026-06-21)
 Reverted V8.13/14/15 · deleted vscode/ · uninstalled VS Code · pure CLI+Desktop now

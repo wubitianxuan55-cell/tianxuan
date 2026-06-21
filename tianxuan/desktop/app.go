@@ -83,6 +83,9 @@ func (a *App) startup(ctx context.Context) {
 	// During this window Meta().Ready is false and the frontend shows a loading
 	// state; bound calls are no-ops (ctrl is nil).
 	go a.buildController()
+
+	// Start system tray — close minimizes to tray, not exit.
+	go runTray(ctx)
 }
 
 // buildController runs the full initialization sequence in a background goroutine:

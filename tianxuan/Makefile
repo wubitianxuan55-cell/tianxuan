@@ -8,8 +8,8 @@ CODEGRAPH_VERSION := v0.9.7
 .PHONY: build vet fmt test hooks cross clean e2e-codegraph
 
 build:
-	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/reasonix ./cmd/reasonix
-	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/reasonix-plugin-example ./cmd/reasonix-plugin-example
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan ./cmd/tianxuan
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan-plugin-example ./cmd/tianxuan-plugin-example
 
 vet:
 	go vet ./...
@@ -29,16 +29,16 @@ cross:
 	@for p in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do \
 		os=$${p%/*}; arch=$${p#*/}; ext=; [ $$os = windows ] && ext=.exe; \
 		echo "build $$os/$$arch"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" -o dist/reasonix-$$os-$$arch$$ext ./cmd/reasonix; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" -o dist/tianxuan-$$os-$$arch$$ext ./cmd/tianxuan; \
 	done
 
 clean:
 	rm -rf bin dist
 
 # Fetch the matching CodeGraph bundle into bin/codegraph/ (the distribution
-# layout: launcher at bin/codegraph/bin/codegraph beside bin/reasonix) and run the
+# layout: launcher at bin/codegraph/bin/codegraph beside bin/tianxuan) and run the
 # gated MCP end-to-end test against it. Requires `gh`. Windows: install via the
-# upstream install.ps1 and run the test with REASONIX_CODEGRAPH_BIN set.
+# upstream install.ps1 and run the test with TIANXUAN_CODEGRAPH_BIN set.
 e2e-codegraph:
 	@os=$$(uname -s | tr 'A-Z' 'a-z'); arch=$$(uname -m); \
 	case $$arch in arm64|aarch64) arch=arm64;; x86_64|amd64) arch=x64;; *) echo "unsupported arch $$arch"; exit 1;; esac; \
@@ -47,5 +47,5 @@ e2e-codegraph:
 	rm -rf $$dest && mkdir -p $$dest; \
 	gh release download $(CODEGRAPH_VERSION) -R colbymchenry/codegraph -p $$asset -O /tmp/$$asset; \
 	tar -xzf /tmp/$$asset -C $$dest --strip-components=1; \
-	REASONIX_CODEGRAPH_E2E=1 REASONIX_CODEGRAPH_BIN=$$PWD/$$dest/bin/codegraph \
+	TIANXUAN_CODEGRAPH_E2E=1 TIANXUAN_CODEGRAPH_BIN=$$PWD/$$dest/bin/codegraph \
 		go test ./internal/codegraph/ -run E2E -v -count=1

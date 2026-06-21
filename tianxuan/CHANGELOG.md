@@ -1,3 +1,22 @@
+## [8.16.0] — 2026-06-21
+
+### 🖥️ 桌面端系统托盘 + 品牌清理 — 关闭即隐藏，托盘常驻
+
+> 基于 V8.15.1 · 9文件 +97/-13行 · CLI 16MB / Desktop 16MB
+
+| 变更 | 说明 |
+|------|------|
+| 系统托盘 | getlantern/systray，任务栏图标 + "显示/退出" 右键菜单 |
+| 关闭到托盘 | 点 X 隐藏窗口而非退出，托盘菜单可恢复或彻底退出 |
+| 优雅关闭链 | systray.Quit() → runtime.Quit() → OnShutdown → snapshot + ctrl.Close |
+| QuitApp 精简 | 去除重复的 ctrl.Snapshot+Close（已在 OnShutdown 中处理） |
+| 命名统一 | Makefile 12处 + desktop/README 14处: reasonix→tianxuan |
+| 临时文件清理 | 删除 desktop/patch.py |
+
+### 📦 发布
+
+- `release/v8.16.0/` · CLI exe · Desktop exe
+
 ## [8.15.1] — 2026-06-21
 
 ### 🧹 VS Code 清理 — 回退 V8.13.0/14.0/15.0

@@ -54,6 +54,7 @@ func main() {
 		AssetServer:      &assetserver.Options{Assets: assets},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		OnBeforeClose:    app.beforeClose,
 		Bind:             []any{app},
 
 		// --- per-platform adaptation (see desktop/README.md for the rationale) ---

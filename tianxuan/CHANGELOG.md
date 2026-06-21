@@ -1,3 +1,41 @@
+## [8.17.0] — 2026-06-21
+
+### 🔬 从 Reasonix v1.10.0 跨项目吸收 — DeepSeek thinking + 4模块
+
+> 基于 V8.16.2 · 25文件 +~2400/-27行 · 缓存安全: L1/L2/L3 零影响
+
+#### P0: DeepSeek thinking 注入（关键修复）
+
+| 变更 | 说明 |
+|------|------|
+| thinking.type=enabled | provider/openai 自动检测 DeepSeek → 注入 thinking 字段，推理链(CoT)回归 |
+| reasoning_content 回传 | DeepSeek tool_calls 轮次必须回传，否则 400 错误 |
+| effort 自动校验 | DeepSeek 限定 high/max，MiniMax 限定 adaptive/disabled |
+| 厂商自动检测 | host.go: IsDeepSeek/IsMiniMax 按 baseURL 自动识别 |
+| reasoning_protocol | 新增配置项，可手动指定 deepseek/openai/none |
+
+#### P1: 吸收 4 个独立模块
+
+| 模块 | 用途 | 测试 |
+|------|------|:---:|
+| retrieval | BM25 全文检索 — CJK/Latin 混合分词、评分、摘录生成 | 4 |
+| sysproxy | Windows 系统代理解析 — WinHTTP/PAC/WPAD | ✓ |
+| netclient | 统一 HTTP 代理客户端 — auto/env/custom/off 四种模式 + SOCKS5 | 10 |
+| proc | 跨平台进程管理 — 隐藏窗口/进程树强杀/低优先级/shell PATH 探测 | ✓ |
+
+#### P2: Compact 保持纯截断
+
+评估后跳过 LLM 摘要压缩：额外 API 成本 + 缓存前缀影响。天璇纯截断方案零成本且 DeepSeek 缓存友好。
+
+### 📦 发布
+
+- `internal/provider/openai/host.go` + `host_test.go` (新)
+- `internal/retrieval/` (新 · 275行)
+- `internal/sysproxy/` (新 · 268行)
+- `internal/netclient/` (新 · 587行)
+- `internal/proc/` (新 · 425行)
+- `go.mod`: 新增 golang.org/x/net v0.56.0
+
 ## [8.16.2] — 2026-06-21
 
 ### 📝 仓库公开 — 首次 git push + README

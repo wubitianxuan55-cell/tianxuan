@@ -4,6 +4,7 @@
 
 - 思考输出说中文
 -记得使用skill
+- 2026-06-21: V8.17.0 发布 — 从 Reasonix v1.10.0 跨项目吸收: P0 DeepSeek thinking注入 + P1 4模块(retrieval/sysproxy/netclient/proc) · P2 Compact保持纯截断
 - 2026-06-21: 首次 git push — 46提交推至 github.com/wubitianxuan55-cell/tianxuan · SSH 密钥配置 · 根目录 README.md
 - 2026-06-21: V8.16.1 发布 — 缓存命中率趋势图 Y轴修复
 - 2026-06-21: V8.4.1 发布 — Token成本优化+统计修复+7组件UI优化 · 24文件 +451/-275行 · release/v8.4.1/

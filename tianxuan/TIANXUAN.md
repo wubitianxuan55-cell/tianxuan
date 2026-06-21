@@ -1,5 +1,25 @@
 # tianxuan project memory
 
+> V8.17.0 — 从 Reasonix v1.10.0 跨项目吸收: DeepSeek thinking + 4模块 · 2026-06-21
+## V8.17.0 (2026-06-21)
+### P0: DeepSeek thinking 注入 (关键修复)
+🔧 provider/openai: 自动检测 DeepSeek/MiniMax → thinking.type=enabled → 推理链回归
+🔧 tool_calls 轮次 reasoning_content 回传 → 避免 DeepSeek 400 错误
+🔧 effort 参数自动校验 (DeepSeek=high/max, MiniMax=adaptive/disabled)
+📁 host.go + host_test.go · openai.go +98/-27行 · 22测试全绿(含真实API探针)
+
+### P1: 吸收 4 个独立模块
+📦 retrieval: BM25 全文检索(CJK+Latin 分词/评分/摘录) · 零外部依赖
+📦 sysproxy: Windows 系统代理解析(WinHTTP/PAC) · x/sys
+📦 netclient: 统一 HTTP 代理客户端(auto/env/custom/off/SOCKS5) · x/net + sysproxy
+📦 proc: 跨平台进程管理(隐藏窗口/强杀/优先级/shell探测) · x/sys(Windows)
+📁 21 文件 +1955 行 · 全部测试通过
+
+### P2: Compact 保持纯截断 (评估跳过)
+💡 LLM 摘要压缩会增加 API 成本 + 影响缓存前缀，纯截断在天璇架构下最优
+
+🔒 缓存安全: 全部改动纯新增/API请求层参数，L1/L2/L3 缓存前缀零影响
+
 > V8.16.2 — 仓库公开: 首次 git push + README · 2026-06-21
 ## V8.16.2 (2026-06-21)
 📝 仓库根目录 README.md — 项目概览、四域缓存设计、快速开始

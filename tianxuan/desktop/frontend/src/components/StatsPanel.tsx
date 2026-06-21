@@ -319,11 +319,15 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
           const recent = stepHistory.slice(-20);
           const rates = recent.map(r => r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0);
           const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
-          // 自适应步长：窄范围用细粒度，避免 98-100% 数据被压平成 95-100%
+          // 自适应步长：窄范围用细粒度。关键：99-100% 区间 spread≈0.15%，
+          // 用 step=1 会把 0.15% 波动压成 8.4px 平坦线——肉眼不可见。
+          // 方案：新增 0.1/0.2 两档，确保窄区间也有 4+ 刻度线。
           let step: number, padding: number;
-          if (spread <= 2)     { step = 1; padding = 0.5; }
-          else if (spread <= 5) { step = 2; padding = 1.0; }
-          else                  { step = 5; padding = Math.max(5, spread * 0.15); }
+          if (spread <= 0.5)    { step = 0.1; padding = 0.05; }
+          else if (spread <= 1) { step = 0.2; padding = 0.1; }
+          else if (spread <= 2) { step = 1;   padding = 0.5; }
+          else if (spread <= 5) { step = 2;   padding = 1.0; }
+          else                  { step = 5;   padding = Math.max(5, spread * 0.15); }
           const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
           const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
           const rawRange = maxRate - minRate || 1;
@@ -337,10 +341,12 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
           });
           const yLabels: [number, string][] = (() => {
-            const mid = Math.round(minRate + range * 0.5);
-            const labels: [number, string][] = [[minRate, `${minRate}%`]];
-            if (mid !== minRate && mid !== maxRate) labels.push([mid, `${mid}%`]);
-            if (maxRate !== minRate) labels.push([maxRate, `${maxRate}%`]);
+            // 小数步长时（< 1）用 1 位小数显示，避免 "99.6%" 被截成 "99%"
+            const fmt = (v: number) => step < 1 ? v.toFixed(1) + "%" : `${Math.round(v)}%`;
+            const mid = minRate + range * 0.5;
+            const labels: [number, string][] = [[minRate, fmt(minRate)]];
+            if (mid !== minRate && mid !== maxRate) labels.push([mid, fmt(mid)]);
+            if (maxRate !== minRate) labels.push([maxRate, fmt(maxRate)]);
             return labels;
           })();
           const xLabels = [

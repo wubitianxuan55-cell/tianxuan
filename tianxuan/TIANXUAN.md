@@ -1,5 +1,10 @@
 # tianxuan project memory
 
+> V8.16.1 — cache trend Y-axis fix for 99-100% narrow range · 2026-06-21
+## V8.16.1 (2026-06-21)
+🔧 StatsPanel Y-axis: added step=0.1/0.2 tiers so 99-100% cache hit fluctuations are visible (was ~8px flat line)
+🔧 Y-axis labels now show 1 decimal place when step < 1 (e.g., "99.8%" instead of truncated "99%")
+
 > V8.16.0 — system tray + brand cleanup · 2026-06-21
 ## V8.16.0 (2026-06-21)
 🖥️ System tray (getlantern/systray): close→hide, tray menu (Show/Quit), graceful shutdown chain

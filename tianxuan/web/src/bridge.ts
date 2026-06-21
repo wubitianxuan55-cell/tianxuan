@@ -2,6 +2,10 @@
 // Implements the same AppBindings interface as desktop/frontend/src/lib/bridge.ts,
 // but talks to tianxuan serve (HTTP/SSE) instead of Wails IPC.
 //
+// Two transports, transparent to callers:
+//   Browser → direct fetch + EventSource
+//   VS Code → postMessage proxy via extension.ts (CSP-safe)
+//
 // 缓存安全: 纯传输层，不触及系统提示词/工具Schema/消息链。
 
 import type {
@@ -28,31 +32,99 @@ import type {
   UpdateInfo,
 } from "@shared/lib/types";
 
-// ── SSE event subscription ──
+// ── VS Code 环境检测 ─────────────────────────────────────────────────
 
-let eventSource: EventSource | null = null;
+interface VSCodeAPI {
+  postMessage(msg: unknown): void;
+  getState(): unknown;
+  setState(state: unknown): void;
+}
+declare function acquireVsCodeApi(): VSCodeAPI;
+
+const isVSCode = typeof acquireVsCodeApi !== "undefined";
+
+// ── VS Code postMessage 请求器 ───────────────────────────────────────
+
+type PendingReq = { resolve: (v: unknown) => void; reject: (e: Error) => void };
+
+function makeVSCodeProxy() {
+  const api = acquireVsCodeApi();
+  let reqId = 0;
+  const pending = new Map<number, PendingReq>();
+
+  window.addEventListener("message", (ev: MessageEvent) => {
+    const msg = ev.data;
+    if (!msg || typeof msg !== "object") return;
+
+    // 普通请求/响应（HTTP 代理 + 原生 API）
+    if (msg.type === "tianxuan:response") {
+      const p = pending.get(msg.id as number);
+      if (p) { pending.delete(msg.id as number); handleResponse(p, msg); }
+    }
+
+    // SSE 事件转发
+    if (msg.type === "tianxuan:sse:event") {
+      try {
+        const e = JSON.parse(msg.data as string) as WireEvent;
+        listeners.forEach((l) => l(e));
+      } catch { /* ignore */ }
+    }
+  });
+
+  function handleResponse(p: PendingReq, msg: Record<string, unknown>) {
+    if (msg.error) p.reject(new Error(msg.error as string));
+    else p.resolve(msg.result);
+  }
+
+  function request(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const id = ++reqId;
+      pending.set(id, { resolve, reject });
+      api.postMessage({ type: "tianxuan:request", id, method, params });
+      setTimeout(() => { if (pending.delete(id)) reject(new Error("timeout")); }, 30000);
+    });
+  }
+
+  // HTTP 代理 — 把 fetch 调用包装成 postMessage 请求
+  async function proxyFetch(m: string, path: string, body?: unknown): Promise<{ status: number; body: string }> {
+    return await request("fetch", { method: m, path, body }) as { status: number; body: string };
+  }
+
+  return { request, proxyFetch };
+}
+
+const vscodeProxy = isVSCode ? makeVSCodeProxy() : null;
+
+// ── SSE (两套传输) ───────────────────────────────────────────────────
+
 const listeners = new Set<(e: WireEvent) => void>();
+let sseConnected = false;
 
 export function onEvent(cb: (e: WireEvent) => void): () => void {
   listeners.add(cb);
-  if (!eventSource) {
-    eventSource = new EventSource("/events");
-    eventSource.onmessage = (msg) => {
-      try {
-        const e = JSON.parse(msg.data) as WireEvent;
-        listeners.forEach((l) => l(e));
-      } catch { /* ignore parse errors */ }
-    };
-    eventSource.onerror = () => {
-      // Auto-reconnect handled by EventSource
-    };
+  if (!sseConnected) {
+    sseConnected = true;
+    if (isVSCode) {
+      vscodeProxy!.request("sse:connect");
+    } else {
+      const es = new EventSource("/events");
+      es.onmessage = (msg) => {
+        try { listeners.forEach((l) => l(JSON.parse(msg.data) as WireEvent)); } catch { /* */ }
+      };
+      es.onerror = () => { /* auto-reconnect */ };
+    }
   }
   return () => listeners.delete(cb);
 }
 
-// ── HTTP helpers ──
+// ── HTTP helpers (两套传输) ──────────────────────────────────────────
 
 async function post(path: string, body?: unknown): Promise<void> {
+  if (isVSCode) {
+    const r = await vscodeProxy!.proxyFetch("POST", path, body);
+    if (r.status >= 400) throw new Error(`${r.status}`);
+    return;
+  }
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -62,12 +134,32 @@ async function post(path: string, body?: unknown): Promise<void> {
 }
 
 async function get<T>(path: string): Promise<T> {
+  if (isVSCode) {
+    const r = await vscodeProxy!.proxyFetch("GET", path);
+    if (r.status >= 400) throw new Error(`${r.status}`);
+    return JSON.parse(r.body) as T;
+  }
   const res = await fetch(path);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
 
-// ── AppBindings 实现 ──
+async function fetchJson<T>(path: string, method: string, body?: unknown): Promise<T> {
+  if (isVSCode) {
+    const r = await vscodeProxy!.proxyFetch(method, path, body);
+    if (r.status >= 400) throw new Error(`${r.status}`);
+    return JSON.parse(r.body) as T;
+  }
+  const res = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+// ── AppBindings 实现 ─────────────────────────────────────────────────
 
 export const app = {
   Submit: (input: string) => post("/submit", { input }),
@@ -85,43 +177,39 @@ export const app = {
   },
   Balance: () => get<BalanceInfo>("/balance"),
 
-  // ── sessions ──
+  // sessions
   ListSessions: () => get<SessionMeta[]>("/sessions"),
   ResumeSession: (path: string) => post("/resume-session", { path }).then(() => get<HistoryMessage[]>("/history")),
   DeleteSession: (path: string) => post("/delete-session", { path }),
   RenameSession: (path: string, title: string) => post("/rename-session", { path, title }),
 
-  // ── checkpoints ──
+  // checkpoints
   Checkpoints: () => get<CheckpointMeta[]>("/checkpoints"),
   Rewind: (turn: number, scope: string) => post("/checkpoints/rewind", { turn, scope }),
   Fork: (turn: number) => post("/checkpoints/fork", { turn }).then(() => {}),
   SummarizeFrom: (turn: number) => post("/checkpoints/summarize-from", { turn }).then(() => {}),
   SummarizeUpTo: (turn: number) => post("/checkpoints/summarize-up-to", { turn }).then(() => {}),
 
-  // ── jobs ──
+  // jobs / meta / models
   Jobs: () => get<JobView[]>("/jobs"),
-
-  // ── meta ──
   Meta: () => get<Meta>("/meta"),
-
-  // ── models ──
   Models: () => get<ModelInfo[]>("/models"),
 
-  // ── memory ──
+  // memory
   Memory: () => get<MemoryView>("/memory"),
   Remember: (scope: string, note: string) => post("/remember", { scope, note }).then(() => ""),
   Forget: (name: string) => post("/forget", { name }),
   SaveDoc: (path: string, body: string) => post("/save-doc", { path, body }).then(() => ""),
 
-  // ── commands / capabilities ──
+  // commands / capabilities
   Commands: () => get<CommandInfo[]>("/commands"),
   Capabilities: () => get<CapabilitiesView>("/capabilities"),
 
-  // ── files ──
+  // files
   ListDir: (rel: string) => get<DirEntry[]>(`/files?path=${encodeURIComponent(rel || "")}`),
   ReadFile: (rel: string) => get<FilePreview>(`/file?path=${encodeURIComponent(rel || "")}`),
 
-  // ── settings ──
+  // settings
   Settings: () => get<SettingsView>("/settings"),
   SetBypass: (on: boolean) => post("/settings/bypass", { on }),
   SetModel: (name: string) => post("/settings/model", { ref: name }),
@@ -136,114 +224,36 @@ export const app = {
   SetPermissionMode: (mode: string) => post("/settings/permission-mode", { mode }),
   AddPermissionRule: (list: string, rule: string) => post("/settings/permission-rule", { list, rule }),
   RemovePermissionRule: (list: string, rule: string) =>
-    fetch(`/settings/permission-rule?list=${encodeURIComponent(list)}&rule=${encodeURIComponent(rule)}`, { method: "DELETE" }).then(() => {}),
+    isVSCode
+      ? fetchJson("/settings/permission-rule", "DELETE", { list, rule }).then(() => {})
+      : fetch(`/settings/permission-rule?list=${encodeURIComponent(list)}&rule=${encodeURIComponent(rule)}`, { method: "DELETE" }).then(() => {}),
 
-  // ── MCP ──
+  // MCP
   AddMCPServer: async (input: MCPServerInput) => {
-    const res = await fetch("/mcp/add", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const j = await res.json() as { tools: number };
+    const j = await fetchJson<{ tools: number }>("/mcp/add", "POST", input);
     return j.tools;
   },
   RemoveMCPServer: (name: string) => post("/mcp/remove", { name }).then(() => {}),
   RetryMCPServer: (name: string) => post("/mcp/retry", { name }).then(() => {}),
   SetMCPServerEnabled: (name: string, enabled: boolean) => post("/mcp/enabled", { name, enabled }).then(() => {}),
 
-  // ── slash ──
+  // slash
   SlashArgs: (input: string) => get<SlashArgsResult>(`/slash-args?input=${encodeURIComponent(input)}`),
 
-// ── workspace / desktop file ops (no-op on web, postMessage in VS Code) ──
-  ListWorkspaces: async () => {
-    if (vscode) {
-      return await vscode.request("listWorkspaces") as WorkspaceView[];
-    }
-    return [] as WorkspaceView[];
-  },
-  PickWorkspace: async () => {
-    if (vscode) {
-      return await vscode.request("pickWorkspace") as string;
-    }
-    return "";
-  },
-  SwitchWorkspace: async (path: string) => {
-    if (vscode) {
-      return await vscode.request("switchWorkspace", { path }) as string;
-    }
-    return "";
-  },
-  OpenWorkspacePath: async (rel: string) => {
-    if (vscode) {
-      await vscode.request("openWorkspacePath", { rel });
-    }
-  },
-  RevealWorkspacePath: async (rel: string) => {
-    if (vscode) {
-      await vscode.request("revealWorkspacePath", { rel });
-    }
-  },
+  // workspace / desktop file ops — postMessage in VS Code, no-op in browser
+  ListWorkspaces: async () => isVSCode ? await vscodeProxy!.request("listWorkspaces") as WorkspaceView[] : [],
+  PickWorkspace: async () => isVSCode ? await vscodeProxy!.request("pickWorkspace") as string : "",
+  SwitchWorkspace: async (path: string) => isVSCode ? await vscodeProxy!.request("switchWorkspace", { path }) as string : "",
+  OpenWorkspacePath: async (rel: string) => { if (isVSCode) await vscodeProxy!.request("openWorkspacePath", { rel }); },
+  RevealWorkspacePath: async (rel: string) => { if (isVSCode) await vscodeProxy!.request("revealWorkspacePath", { rel }); },
   SavePastedImage: async () => "",
   AttachmentDataURL: async () => "",
 
-  // ── updates (no-op on web) ──
-  Version: async () => {
-    if (vscode) {
-      try { return await vscode.request("version") as string; } catch { return "8.10.0-vscode"; }
-    }
-    return "8.10.0-web";
-  },
+  // updates
+  Version: async () => isVSCode
+    ? (() => { try { return vscodeProxy!.request("version") as Promise<string>; } catch { return "8.12.0-vscode"; } })()
+    : "8.12.0-web",
   CheckUpdate: async () => null,
   ApplyUpdate: async () => {},
   OpenDownloadPage: async () => {},
 };
-
-// ── VS Code 桥接层 ──
-// 当 web 前端运行在 VS Code Webview 内时，通过 postMessage 调用
-// VS Code 原生 API（工作区选择器、文件打开等）。在普通浏览器中
-// vscode 为 null，所有操作 fallback 到 no-op。
-
-interface VSCodeAPI {
-  postMessage(msg: unknown): void;
-  getState(): unknown;
-  setState(state: unknown): void;
-}
-
-declare function acquireVsCodeApi(): VSCodeAPI;
-
-const vscode: {
-  request(method: string, params?: Record<string, unknown>): Promise<unknown>;
-} | null = (() => {
-  if (typeof acquireVsCodeApi === "undefined") return null;
-
-  const api = acquireVsCodeApi();
-  let reqId = 0;
-  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-
-  window.addEventListener("message", (ev: MessageEvent) => {
-    const msg = ev.data;
-    if (msg && typeof msg === "object" && msg.type === "tianxuan:response") {
-      const p = pending.get(msg.id as number);
-      if (p) {
-        pending.delete(msg.id as number);
-        if (msg.error) p.reject(new Error(msg.error as string));
-        else p.resolve(msg.result);
-      }
-    }
-  });
-
-  return {
-    request(method: string, params?: Record<string, unknown>): Promise<unknown> {
-      return new Promise((resolve, reject) => {
-        const id = ++reqId;
-        pending.set(id, { resolve, reject });
-        api.postMessage({ type: "tianxuan:request", id, method, params });
-        setTimeout(() => {
-          if (pending.delete(id)) reject(new Error("timeout"));
-        }, 30000);
-      });
-    },
-  };
-})();

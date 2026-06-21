@@ -37,9 +37,11 @@
   "scripts": {
     "compile": "tsc -p ./",
     "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
-    "package": "npm run build && vsce package"
+    "build:webview": "cd ../web && npm run build && cp -r dist ../vscode/webview/",
+    "package": "npm run build:webview && npm run build && vsce package"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0"

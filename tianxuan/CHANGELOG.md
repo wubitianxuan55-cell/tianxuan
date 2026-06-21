@@ -1,3 +1,41 @@
+## [8.9.0] — 2026-06-21
+
+### 🔄 跨项目吸收 — Whale + MiMo-Code + superpowers-zh
+
+> 基于 V8.8.0 · 23文件 +~700/-34行 · 缓存前缀零影响
+
+| 来源 | 特性 | 文件 | 说明 |
+|------|------|------|------|
+| **Whale** | ToolEnvelope | tool/envelope.go | 统一 JSON 工具结果 |
+| **Whale** | CacheShape | agent/cache_shape.go | 每轮 emit 消息形状哈希 |
+| **MiMo** | RecoverableError | event/event.go + agent/* + 前端 | 可恢复错误→灰色；系统故障→红色 |
+| **MiMo** | 截断 tail scan | agent/text_utils.go | 优先保留尾部 error |
+| **MiMo** | Never-Ask | agent/ask.go | headless 自主决策指导 |
+| **MiMo** | output_schema | agent/task.go | 子Agent结构化输出 |
+| **MiMo** | Checkpoint | agent/compact.go | 压缩时写 markdown 归档 |
+| **superpowers-zh** | 技能替换 | skills/ | 14→20 中文技能 |
+
+### 🖥️ 前端打通 — Web UI + VS Code + serve
+
+| 变更 | 说明 |
+|------|------|
+| serve 11→28 端点 | meta/memory/answer/models/sessions/files 等 |
+| web bridge 11 空桩→HTTP | 80%方法已接通 |
+| vite proxy 5→25 | 全端点代理 |
+| serve go:embed web/dist | 弃用 app.js，内嵌 React SPA |
+| VS Code webview 产物 | build:webview 脚本 |
+
+### 🎨 UI增强
+
+| 变更 | 说明 |
+|------|------|
+| ASK 弹窗拖拽 | 顶部手柄，自由拖动 |
+| ToolCard 可恢复错误 | 灰色X+删除线 |
+
+### 📦 发布
+
+- release/v8.9.0/ · 23文件 · Desktop exe · CLI exe
+
 ## [8.8.0] — 2026-06-21
 
 ### 🧩 Context7 内置集成 — 第三方库实时文档

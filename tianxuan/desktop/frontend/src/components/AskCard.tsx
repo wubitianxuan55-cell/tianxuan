@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "../lib/i18n";
 import type { QuestionAnswer, WireAsk, WireAskQuestion } from "../lib/types";
+
+/** 卡片至少保留在屏幕内的边距 (px) */
+const DRAG_MARGIN = 40;
 
 export function AskCard({
   ask,
@@ -15,6 +18,87 @@ export function AskCard({
   const [sel, setSel] = useState<Record<string, string[]>>({});
   const [custom, setCustom] = useState<Record<string, string>>({});
 
+  // ── 拖拽：位置状态 ──────────────────────────────────────────────
+  const cardRef = useRef<HTMLDivElement>(null);
+  const cardSize = useRef({ w: 0, h: 0 });
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const posStart = useRef({ x: 0, y: 0 });
+
+  /** 将坐标约束在可视区域内 */
+  const clamp = useCallback((x: number, y: number) => {
+    const { w, h } = cardSize.current;
+    const M = DRAG_MARGIN;
+    return {
+      x: Math.min(window.innerWidth - M, Math.max(-w + M, x)),
+      y: Math.min(window.innerHeight - M, Math.max(-h + M, y)),
+    };
+  }, []);
+
+  // 初始居中
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    cardSize.current = { w: r.width, h: r.height };
+    setPos(clamp((window.innerWidth - r.width) / 2, (window.innerHeight - r.height) / 2));
+  }, [clamp]);
+
+  // 窗口 resize 时重新约束
+  useEffect(() => {
+    const onResize = () => {
+      setPos((p) => {
+        if (!p) return p;
+        // 重新测量卡片尺寸（max-w-lg 可能触发宽度变化）
+        const r = cardRef.current?.getBoundingClientRect();
+        if (r) cardSize.current = { w: r.width, h: r.height };
+        return clamp(p.x, p.y);
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clamp]);
+
+  // ── 拖拽事件 ──────────────────────────────────────────────────
+  const startDrag = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return; // 仅左键
+      e.preventDefault();
+      dragging.current = true;
+      dragStart.current = { x: e.clientX, y: e.clientY };
+      setPos((p) => {
+        posStart.current = p ?? { x: 0, y: 0 };
+        return p; // 保持当前值，不触发额外渲染
+      });
+
+      const onMove = (me: PointerEvent) => {
+        if (!dragging.current) return;
+        setPos(
+          clamp(
+            posStart.current.x + (me.clientX - dragStart.current.x),
+            posStart.current.y + (me.clientY - dragStart.current.y),
+          ),
+        );
+      };
+      const onUp = () => {
+        dragging.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+      };
+      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    },
+    [clamp],
+  );
+
+  // ── 问题交互（不变）────────────────────────────────────────────
   const toggle = (q: WireAskQuestion, label: string) => {
     setCustom((c) => ({ ...c, [q.id]: "" }));
     setSel((s) => {
@@ -46,8 +130,25 @@ export function AskCard({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
-      <div className="flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 animate-[scaleIn_.2s_ease-out] pointer-events-auto">
+    <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
+      <div
+        ref={cardRef}
+        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 pt-7 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
+        style={
+          pos
+            ? { position: "absolute", left: pos.x, top: pos.y }
+            : { visibility: "hidden" } // 等待 useLayoutEffect 计算位置后再显示
+        }
+      >
+        {/* 拖拽手柄 */}
+        <div
+          className="absolute top-0 left-0 right-0 h-7 cursor-grab flex items-start justify-center pt-2 select-none"
+          onPointerDown={startDrag}
+          title="拖拽移动"
+        >
+          <span className="w-8 h-1 rounded-full bg-fg-faint/25" />
+        </div>
+
         {ask.questions.map((q) => (
           <div className="flex flex-col gap-3" key={q.id}>
             {q.header && (

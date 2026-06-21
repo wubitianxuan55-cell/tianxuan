@@ -82,6 +82,11 @@ type Tool struct {
 	Args      string
 	Output    string // ToolResult: the result text fed to the model
 	Err       string // ToolResult: non-empty when the call failed or was blocked
+	// Recoverable is true when the error is one the agent can fix on the next
+	// turn (bad arguments, wrong file path, command exit code) — not a genuine
+	// system fault (unknown tool, permission block, panic). Frontends render
+	// recoverable errors muted (strikethrough, no red) so the user isn't alarmed.
+	Recoverable bool
 	ReadOnly  bool
 	Truncated bool // ToolResult: Output was head+tailed before display/model
 	// Partial marks an early ToolDispatch emitted when a call begins (ID/Name set,

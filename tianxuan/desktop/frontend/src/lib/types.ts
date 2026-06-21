@@ -31,6 +31,7 @@ export interface WireTool {
   args?: string;
   output?: string;
   err?: string;
+  recoverable?: boolean; // true when agent can fix this on next turn (bad args, wrong file, etc.)
   readOnly: boolean;
   truncated?: boolean;
   partial?: boolean; // an early dispatch (name only) — a full one with args follows

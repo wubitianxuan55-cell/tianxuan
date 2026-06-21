@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"tianxuan/internal/evidence"
@@ -17,7 +18,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	t, ok := a.tools.Get(call.Name)
 	if !ok {
 		return toolOutcome{
-			output: fmt.Sprintf("error: unknown tool %q", call.Name),
+			output: tool.WrapError(tool.CodeUnknownTool, fmt.Sprintf("unknown tool %q", call.Name), nil),
 			errMsg: fmt.Sprintf("unknown tool %q", call.Name),
 		}
 	}
@@ -178,15 +179,21 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		a.hooks.PostToolUse(ctx, call.Name, json.RawMessage(call.Arguments), result)
 	}
 	if err != nil {
-		body, truncMsg := truncateToolOutput(fmt.Sprintf("error: %v\n%s", err, result))
-		return toolOutcome{output: body, errMsg: firstLine(err.Error()), truncated: truncMsg != "", truncMsg: truncMsg}
+		// Errors from tool execution are agent-recoverable (bad args, wrong file,
+		// command failed) — the model can fix them on the next turn. Errors from
+		// unknown-tool / blocked / panic are NOT recoverable.
+		recoverable := true
+		env := tool.WrapError(tool.CodeExecError, firstLine(err.Error()), map[string]any{"tool": call.Name, "detail": strings.TrimSpace(result)})
+		body, truncMsg := truncateToolOutput(env)
+		return toolOutcome{output: body, errMsg: firstLine(err.Error()), recoverable: recoverable, truncated: truncMsg != "", truncMsg: truncMsg}
 	}
 	// A foreground `task` sub-agent just finished — its result is the final answer.
 	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
 		a.hooks.SubagentStop(ctx, result)
 	}
 	result = SmartCompress(call.Name, result)
-	body, truncMsg := truncateToolOutput(result)
+	env := tool.WrapResult(tool.CodeOK, map[string]any{"tool": call.Name, "result": result})
+	body, truncMsg := truncateToolOutput(env)
 	return toolOutcome{output: body, truncated: truncMsg != "", truncMsg: truncMsg}
 }
 

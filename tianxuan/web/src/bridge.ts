@@ -74,49 +74,58 @@ export const app = {
   SubmitDisplay: (_display: string, input: string) => post("/submit", { input }),
   Cancel: () => post("/cancel"),
   Approve: (id: string, allow: boolean, session: boolean) => post("/approve", { id, allow, session }),
-  AnswerQuestion: async () => {}, // Web MVP: 暂不支持
+  AnswerQuestion: (id: string, answers: QuestionAnswer[]) => post("/answer", { id, answers }),
   SetPlanMode: (on: boolean) => post("/plan", { on }),
   Compact: () => post("/compact"),
   NewSession: () => post("/new"),
   History: () => get<HistoryMessage[]>("/history"),
   ContextUsage: () => get<ContextInfo>("/context"),
   TCCAReport: async () => "",
-  Balance: async () => ({ available: false, balance: "", currency: "", message: "Web 版不支持" } as BalanceInfo),
+  Balance: () => get<BalanceInfo>("/balance"),
 
-  // 以下为 Web MVP 暂不实现的方法（返回默认值）
+  // ── sessions ──
+  ListSessions: () => get<SessionMeta[]>("/sessions"),
+  ResumeSession: (path: string) => post("/resume-session", { path }).then(() => get<HistoryMessage[]>("/history")),
+  DeleteSession: (path: string) => post("/delete-session", { path }),
+
+  // ── jobs ──
+  Jobs: () => get<JobView[]>("/jobs"),
+
+  // ── meta ──
+  Meta: () => get<Meta>("/meta"),
+
+  // ── models ──
+  Models: () => get<ModelInfo[]>("/models"),
+
+  // ── memory ──
+  Memory: () => get<MemoryView>("/memory"),
+  Remember: (scope: string, note: string) => post("/remember", { scope, note }).then(() => ""),
+  Forget: (name: string) => post("/forget", { name }),
+  SaveDoc: (path: string, body: string) => post("/save-doc", { path, body }).then(() => ""),
+
+  // ── commands / capabilities ──
+  Commands: () => get<CommandInfo[]>("/commands"),
+  Capabilities: () => get<CapabilitiesView>("/capabilities"),
+
+  // ── files ──
+  ListDir: (rel: string) => get<DirEntry[]>(`/files?path=${encodeURIComponent(rel || "")}`),
+  ReadFile: (rel: string) => get<FilePreview>(`/file?path=${encodeURIComponent(rel || "")}`),
+
+  // 以下暂不实现
   Checkpoints: async () => [] as CheckpointMeta[],
-  Rewind: async () => {},
-  Fork: async () => {},
-  SummarizeFrom: async () => {},
-  SummarizeUpTo: async () => {},
-  ListSessions: async () => [] as SessionMeta[],
-  ResumeSession: async () => [] as HistoryMessage[],
-  DeleteSession: async () => {},
-  RenameSession: async () => {},
   ListWorkspaces: async () => [] as WorkspaceView[],
   PickWorkspace: async () => "",
   SwitchWorkspace: async () => "",
-  Jobs: async () => [] as JobView[],
-  Meta: async () => ({ ready: true, startupErr: "", cwd: "", cwdName: "", label: "" } as Meta),
-  Commands: async () => [] as CommandInfo[],
-  Capabilities: async () => ({ servers: [], skills: [] } as CapabilitiesView),
-  AddMCPServer: async () => 0,
-  RemoveMCPServer: async () => {},
-  RetryMCPServer: async () => {},
-  SetMCPServerEnabled: async () => {},
-  SlashArgs: async () => ({ args: [] } as SlashArgsResult),
-  ListDir: async () => [] as DirEntry[],
-  ReadFile: async () => ({ path: "", content: "", truncated: false } as FilePreview),
   OpenWorkspacePath: async () => {},
   RevealWorkspacePath: async () => {},
   SavePastedImage: async () => "",
   AttachmentDataURL: async () => "",
-  Models: async () => [] as ModelInfo[],
+  SlashArgs: async () => ({ items: [], from: 0, total: 0 } as SlashArgsResult),
+  AddMCPServer: async () => 0,
+  RemoveMCPServer: async () => {},
+  RetryMCPServer: async () => {},
+  SetMCPServerEnabled: async () => {},
   SetModel: async () => {},
-  Memory: async () => ({ docs: [], facts: [], scopes: [], storeDir: "", available: false } as MemoryView),
-  Remember: async () => "",
-  Forget: async () => {},
-  SaveDoc: async () => "",
   Settings: async () => ({} as SettingsView),
   SetDefaultModel: async () => {},
   SaveProvider: async () => {},

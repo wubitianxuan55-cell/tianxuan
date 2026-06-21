@@ -17,7 +17,7 @@ export type Item =
   | { kind: "phase"; id: string; text: string }
   | { kind: "notice"; id: string; level: "info" | "warn"; text: string }
   | { kind: "compaction"; id: string; pending: boolean; trigger: string; messages: number; summary: string; archive: string }
-  | { kind: "tool"; id: string; name: string; args: string; readOnly: boolean; status: ToolStatus; output?: string; error?: string; truncated?: boolean; parentId?: string };
+  | { kind: "tool"; id: string; name: string; args: string; readOnly: boolean; status: ToolStatus; output?: string; error?: string; truncated?: boolean; recoverable?: boolean; parentId?: string };
 
 interface ControllerState {
   items: Item[]; running: boolean; turnActive: boolean; approval?: WireApproval; ask?: WireAsk;
@@ -99,7 +99,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
       const t = e.tool; if (!t) return s; const next = [...s.items];
       let idx = t.id ? next.findIndex(it => it.kind === "tool" && it.id === t.id) : -1;
       if (idx < 0) { for (let i = next.length - 1; i >= 0; i--) { const cand = next[i]; if (cand.kind === "tool" && (cand as any).status === "running") { idx = i; break; } } }
-      if (idx >= 0) { const it = next[idx]; if (it.kind === "tool") next[idx] = { ...it, status: t.err ? "error" : "done", output: t.output, error: t.err, truncated: t.truncated }; }
+      if (idx >= 0) { const it = next[idx]; if (it.kind === "tool") next[idx] = { ...it, status: t.err ? "error" : "done", output: t.output, error: t.err, recoverable: t.recoverable, truncated: t.truncated }; }
       return { ...s, items: next };
     }
     case "usage": {

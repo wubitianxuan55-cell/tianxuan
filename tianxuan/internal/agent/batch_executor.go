@@ -102,13 +102,14 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 		o := outcomes[i]
 		t, ok := a.tools.Get(c.Name)
 		a.sink.Emit(event.Event{Kind: event.ToolResult, Tool: event.Tool{
-			ID:        c.ID,
-			Name:      c.Name,
-			Args:      c.Arguments,
-			Output:    o.output,
-			Err:       o.errMsg,
-			ReadOnly:  ok && t.ReadOnly(),
-			Truncated: o.truncated,
+			ID:          c.ID,
+			Name:        c.Name,
+			Args:        c.Arguments,
+			Output:      o.output,
+			Err:         o.errMsg,
+			Recoverable: o.recoverable,
+			ReadOnly:    ok && t.ReadOnly(),
+			Truncated:   o.truncated,
 		}})
 		if o.truncated && o.truncMsg != "" {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: o.truncMsg})
@@ -319,6 +320,7 @@ type toolOutcome struct {
 	output    string
 	blocked   bool
 	errMsg    string
+	recoverable bool // agent can fix this on next turn (bad args, wrong file, etc.)
 	truncated bool
 	truncMsg  string
 }

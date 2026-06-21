@@ -6,6 +6,7 @@
 package serve
 
 import (
+	"embed"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -18,14 +19,11 @@ import (
 	"tianxuan/internal/control"
 )
 
-//go:embed index.html
+//go:embed webui/index.html
 var indexHTML []byte
 
-//go:embed app.css
-var appCSS []byte
-
-//go:embed app.js
-var appJS []byte
+//go:embed webui
+var webDist embed.FS
 
 // Server wires a controller to its HTTP surface. The Broadcaster must be the
 // same sink the controller was constructed with, so events reach SSE clients.
@@ -68,6 +66,23 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /plan", s.plan)
 	mux.HandleFunc("POST /compact", s.compact)
 	mux.HandleFunc("POST /new", s.newSession)
+	mux.HandleFunc("GET /meta", s.meta)
+	mux.HandleFunc("GET /memory", s.memory)
+	mux.HandleFunc("POST /remember", s.remember)
+	mux.HandleFunc("POST /forget", s.forget)
+	mux.HandleFunc("POST /save-doc", s.saveDoc)
+	mux.HandleFunc("POST /answer", s.answer)
+	mux.HandleFunc("GET /models", s.models)
+	mux.HandleFunc("GET /sessions", s.sessions)
+	mux.HandleFunc("POST /delete-session", s.deleteSession)
+	mux.HandleFunc("POST /resume-session", s.resumeSession)
+	mux.HandleFunc("GET /files", s.listDir)
+	mux.HandleFunc("GET /file", s.readFile)
+	mux.HandleFunc("GET /balance", s.balance)
+	mux.HandleFunc("GET /jobs", s.jobs)
+	mux.HandleFunc("GET /commands", s.commands)
+	mux.HandleFunc("GET /capabilities", s.capabilities)
+	mux.Handle("GET /assets/", http.FileServer(http.FS(webDist)))
 	return logMiddleware(csrfGuard(mux))
 }
 
@@ -137,14 +152,12 @@ func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 
 // staticCSS serves the client stylesheet.
 func (s *Server) staticCSS(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	_, _ = w.Write(appCSS)
+	http.NotFound(w, nil)
 }
 
 // staticJS serves the client script.
 func (s *Server) staticJS(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	_, _ = w.Write(appJS)
+	http.NotFound(w, nil)
 }
 
 // health returns 200 with a JSON heartbeat so the frontend can detect liveness

@@ -26,9 +26,9 @@ function pretty(json: string): string {
   }
 }
 
-function StatusGlyph({ status }: { status: ToolItem["status"] }) {
+function StatusGlyph({ status, recoverable }: { status: ToolItem["status"]; recoverable?: boolean }) {
   if (status === "running") return <Loader2 className="animate-spin" size={13} />;
-  if (status === "error") return <X className="text-err" size={13} />;
+  if (status === "error") return <X className={recoverable ? "text-fg-faint/60" : "text-err"} size={13} />;
   if (status === "stopped") return <Ban className="text-fg-faint" size={13} />;
   return <Check className="text-ok" size={13} />;
 }
@@ -91,7 +91,8 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
 
   return (
     <div className={`my-0.5 rounded-lg overflow-hidden border transition-colors duration-300 ${
-      item.status === "error" ? "border-err/40 bg-[color-mix(in_srgb,var(--err)_6%,transparent)]" :
+      item.status === "error" && !item.recoverable ? "border-err/40 bg-[color-mix(in_srgb,var(--err)_6%,transparent)]" :
+      item.status === "error" && item.recoverable ? "border-fg-faint/30" :
       item.status === "running" ? "border-accent/30 bg-accent/[0.02] shadow-[0_0_8px_var(--accent-soft)]" :
       item.status === "stopped" ? "border-border-soft opacity-70" :
       "border-border-soft"
@@ -111,10 +112,10 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
           <ChevronRight className="shrink-0 invisible" size={chevronSize} />
         )}
         <Icon
-          className={`shrink-0 ${item.status === "error" ? "text-err" : item.status === "running" ? "text-accent" : "text-fg-faint"}`}
+          className={`shrink-0 ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-faint/60" : item.status === "running" ? "text-accent" : "text-fg-faint"}`}
           size={iconSize}
         />
-        <span className={`font-mono font-medium ${item.status === "error" ? "text-err" : "text-fg"} ${compact ? "text-[11px]" : "text-xs"}`}>
+        <span className={`font-mono font-medium ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[11px]" : "text-xs"}`}>
           {item.name}
         </span>
         {subject && (
@@ -124,7 +125,7 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
           <span className={`text-fg-faint italic ml-1 ${summarySize}`}>{summary}</span>
         )}
         <span className="ml-auto shrink-0 flex items-center gap-1">
-          <StatusGlyph status={item.status} />
+          <StatusGlyph status={item.status} recoverable={item.recoverable} />
         </span>
       </div>
 
@@ -177,8 +178,13 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
             </div>
           )}
 
-          {item.error && (
+          {item.error && !item.recoverable && (
             <div className="px-2.5 py-1.5 text-err text-[12px] leading-relaxed border-t border-err/20">
+              {item.error}
+            </div>
+          )}
+          {item.error && item.recoverable && (
+            <div className="px-2.5 py-1.5 text-fg-faint/60 text-[12px] leading-relaxed border-t border-fg-faint/15">
               {item.error}
             </div>
           )}

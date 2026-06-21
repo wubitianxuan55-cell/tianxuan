@@ -3,8 +3,11 @@
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
@@ -162,6 +165,7 @@ func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 		a.compactStuck = false
 		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
 			Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(legacyRep)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
+		a.writeCheckpointFile(mode, summary, nil, len(legacyRep))
 		return
 	}
 
@@ -284,6 +288,7 @@ func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 	if a.memQueue != nil && cpSummary != "" {
 		a.memQueue.QueueMemory("checkpoint [" + mode + "]: " + truncateText(cpSummary, 300))
 	}
+	a.writeCheckpointFile(mode, cpSummary, cpTodos, len(replacement))
 }
 
 // buildMemoryContext returns a compact memory summary string for budgeted injection.
@@ -367,3 +372,57 @@ func (a *AgentRunner) legacyTruncate(msgs []provider.Message, keepFrom, keep, pr
 		Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(replacement)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
 }
 
+// writeCheckpointFile persists a structured markdown checkpoint to the
+// archive directory after compaction. Pure side-effect — does not alter
+// the message stream or affect the DeepSeek prefix cache.
+func (a *AgentRunner) writeCheckpointFile(mode, cpSummary string, cpTodos []checkpointTodo, msgCount int) {
+	if a.compaction.ArchiveDir == "" {
+		return
+	}
+	dir := filepath.Join(a.compaction.ArchiveDir, "checkpoints")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return
+	}
+	ts := time.Now().UTC().Format("2006-01-02T150405")
+	sid := a.sessionID
+	if sid == "" {
+		sid = "session"
+	}
+
+	var b strings.Builder
+	b.WriteString("# Session Checkpoint\n\n")
+	b.WriteString(fmt.Sprintf("**Mode**: %s  \n", mode))
+	b.WriteString(fmt.Sprintf("**Time**: %s  \n", ts))
+	b.WriteString(fmt.Sprintf("**Messages**: %d (after compaction)  \n", msgCount))
+	b.WriteString(fmt.Sprintf("**Compaction count**: %d  \n\n", a.compaction.TruncateCount))
+
+	if cpSummary != "" {
+		b.WriteString("## Summary\n\n")
+		b.WriteString(cpSummary)
+		b.WriteString("\n\n")
+	}
+
+	if len(cpTodos) > 0 {
+		b.WriteString("## Task Progress\n\n")
+		for _, t := range cpTodos {
+			icon := "○"
+			switch t.Status {
+			case "completed":
+				icon = "✓"
+			case "in_progress":
+				icon = "▶"
+			}
+			b.WriteString(fmt.Sprintf("- %s %s\n", icon, t.Content))
+		}
+		b.WriteString("\n")
+	}
+
+	memCtx := a.buildMemoryContext()
+	if memCtx != "" {
+		b.WriteString("## Memory\n\n")
+		b.WriteString(memCtx)
+		b.WriteString("\n\n")
+	}
+
+	_ = os.WriteFile(filepath.Join(dir, sid+"-"+ts+".md"), []byte(b.String()), 0644)
+}

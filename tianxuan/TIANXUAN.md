@@ -1,5 +1,14 @@
 # tianxuan project memory
 
+> V8.9.0 — 跨项目吸收+前端打通+技能升级 · 2026-06-21
+## V8.9.0 发布摘要 (2026-06-21)
+**基于**: V8.8.0 · **位置**: `release/v8.9.0/` · **变更**: 23文件 +~700/-34行
+🔄 跨项目吸收：Whale(ToolEnvelope/CacheShape) + MiMo-Code(RecoverableError/截断/output_schema/Checkpoint)
+🖥️ 前端打通：Web UI 28端点 + VS Code 扩展接入 + serve 内嵌 React
+🎨 UI增强：ASK弹窗拖拽 + ToolCard可恢复错误灰度 + 截断tail scan
+📝 技能升级：20个 superpowers-zh 中文技能替换
+🔒 缓存安全：全部改动仅影响传输层/L4域 — L1/L2/Tools 零变动
+
 > V8.8.0 — Context7内置集成 · 第三方库实时文档 · 2026-06-21
 ## V8.8.0 发布摘要 (2026-06-21)
 **基于**: V8.7.0 · **位置**: `release/v8.8.0/` · **变更**: 5文件 +80/-0行

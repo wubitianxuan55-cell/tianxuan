@@ -115,6 +115,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				}
 			}
 		}
+		// V8.9: emit a cache-shape notice after every completion so the user can
+		// correlate structural changes (new tools, prefix drift) to cache breaks.
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+			Text: a.computeCacheShape("agent").format()})
+
 		if msg, ok := finishReasonMessage(usage); ok {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: msg})
 		}

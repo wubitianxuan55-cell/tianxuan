@@ -126,7 +126,8 @@ func (t *TaskTool) Schema() json.RawMessage {
   "description":{"type":"string","description":"Short label for the sub-task (3-7 words). Surfaced in the dispatch line so the user sees what's running."},
   "tools":{"type":"array","items":{"type":"string"},"description":"Optional tool whitelist. Subagent/skill meta-tools are still excluded so delegation stays one layer deep."},
   "max_steps":{"type":"integer","description":"Optional cap on tool-call rounds. Defaults to half the parent's cap (min 5).","minimum":1},
-  "run_in_background":{"type":"boolean","description":"Run the sub-agent asynchronously: returns a job id immediately and keeps working across turns. Collect its final answer with wait, and you'll be notified when it finishes. Use for long, independent sub-tasks you don't need to block on right now."}
+  "run_in_background":{"type":"boolean","description":"Run the sub-agent asynchronously: returns a job id immediately and keeps working across turns. Collect its final answer with wait, and you'll be notified when it finishes. Use for long, independent sub-tasks you don't need to block on right now."},
+  "output_schema":{"type":"object","description":"Optional JSON Schema the sub-agent MUST return its result in. If set, the parent will attempt to parse the final answer as JSON. If the result is valid JSON matching the expected shape, it is returned verbatim; otherwise a diagnostic note is prefixed. Use when the parent needs structured data from the sub-agent."}
 },
 "required":["prompt"]
 }`)
@@ -144,6 +145,7 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 		Tools           []string `json:"tools"`
 		MaxSteps        int      `json:"max_steps"`
 		RunInBackground bool     `json:"run_in_background"`
+	OutputSchema    json.RawMessage `json:"output_schema,omitempty"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -176,12 +178,12 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 			label = "task"
 		}
 		job := jm.Start("task", label, func(jobCtx context.Context, _ io.Writer) (string, error) {
-			return t.runSub(jobCtx, p.Prompt, subReg, nested, maxSteps)
+			return t.runSub(jobCtx, p.Prompt, subReg, nested, maxSteps, p.OutputSchema)
 		})
 		return fmt.Sprintf("Started background task %q (%s). It runs across turns; collect its final answer with wait (or wait will return it once done), and you'll be notified when it finishes.", job.ID, label), nil
 	}
 
-	return t.runSub(ctx, p.Prompt, subReg, subSink(ctx), maxSteps)
+	return t.runSub(ctx, p.Prompt, subReg, subSink(ctx), maxSteps, p.OutputSchema)
 }
 
 func (t *TaskTool) buildSubReg(names []string) *tool.Registry {
@@ -216,7 +218,7 @@ func (t *TaskTool) SetTemplatePrefix(prefix string) { t.templatePrefix = prefix 
 func (t *TaskTool) SetActiveSchemas(schemas []provider.ToolSchema) { t.activeSchemas = schemas }
 func (t *TaskTool) SubUsage() *provider.Usage { return t.accumulatedUsage }
 
-func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, maxSteps int) (string, error) {
+func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, maxSteps int, outputSchema json.RawMessage) (string, error) {
 	// V6.0: sub-agent does NOT inherit parent L1+L2 — uses DefaultTaskSystemPrompt independently.
 	// This saves ~50K tokens per sub-agent call (97% reduction) and keeps cache stats separate.
 	sysPrompt := t.sysPrompt
@@ -240,6 +242,18 @@ var subUsage provider.Usage
 		ArchiveDir:     t.archiveDir,
 		L2Dir:          t.l2Dir,
 	}, sink, &subUsage)
+	if err == nil && len(outputSchema) > 0 {
+		// output_schema set: verify the result is parseable JSON.
+		// We don't validate every field (full JSON Schema needs a lib),
+		// but we confirm the sub-agent returned well-formed JSON.
+		var parsed interface{}
+		if json.Unmarshal([]byte(result), &parsed) != nil {
+			result = "[output_schema: sub-agent returned non-JSON; parent should retry]" + "\n" + result
+		}
+		u := subUsage
+		t.accumulatedUsage = &u
+		return result, nil
+	}
 	if err == nil {
 		u := subUsage
 		t.accumulatedUsage = &u

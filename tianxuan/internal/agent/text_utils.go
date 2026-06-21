@@ -10,6 +10,7 @@ import (
 // context window. 48 KiB keeps the overhead per call bounded while leaving room
 // for meaningful output.
 const maxToolOutputBytes = 48 * 1024
+const tailScanChars = 2048 // scan last N chars for error patterns when truncation needed
 
 const (
 	maxToolResultLines = 320
@@ -54,7 +55,13 @@ func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
 		return s, ""
 	}
 
-	selected := selectHygieneLines(lines, maxLines)
+	// If the tail contains error patterns, bias toward tail (diagnostics
+	// are more valuable than startup noise); otherwise keep head+tail.
+	direction := "head+tail"
+	if hasErrorInTail(s, tailScanChars) {
+		direction = "tail"
+	}
+	selected := selectHygieneLines(lines, maxLines, direction)
 
 	var out strings.Builder
 	used := 0
@@ -163,8 +170,24 @@ func hasSignalKeyword(line string) bool {
 	return false
 }
 
+
+
+// hasErrorInTail scans the last n characters for error patterns.
+func hasErrorInTail(s string, n int) bool {
+	start := len(s) - n
+	if start < 0 {
+		start = 0
+	}
+	tail := strings.ToLower(s[start:])
+	for _, kw := range signalKeywords {
+		if strings.Contains(tail, kw) {
+			return true
+		}
+	}
+	return false
+}
 // selectHygieneLines picks head + tail + signal-bearing lines for truncation.
-func selectHygieneLines(lines []string, maxLines int) []string {
+func selectHygieneLines(lines []string, maxLines int, direction string) []string {
 	if len(lines) <= maxLines {
 		return lines
 	}
@@ -189,6 +212,14 @@ func selectHygieneLines(lines []string, maxLines int) []string {
 	}
 
 	signalCount := 0
+	if direction == "tail" {
+		// Error detected in tail: drop head lines, keep only tail + signal.
+		// headCount stays 0 (already set above).
+	} else {
+		for i := 0; i < headCount && i < len(lines); i++ {
+			indexes[i] = true
+		}
+	}
 	for i := 0; i < len(lines) && len(indexes) < maxLines; i++ {
 		if hasSignalKeyword(lines[i]) && !indexes[i] {
 			indexes[i] = true

@@ -58,8 +58,9 @@ type wireTool struct {
 	Name      string `json:"name"`
 	Args      string `json:"args,omitempty"`
 	Output    string `json:"output,omitempty"`
-	Err       string `json:"err,omitempty"`
-	ReadOnly  bool   `json:"readOnly"`
+	Err        string `json:"err,omitempty"`
+	Recoverable bool   `json:"recoverable,omitempty"`
+	ReadOnly   bool   `json:"readOnly"`
 	Truncated bool   `json:"truncated,omitempty"`
 	Partial   bool   `json:"partial,omitempty"`
 	ParentID  string `json:"parentId,omitempty"`
@@ -131,6 +132,7 @@ func toWire(e event.Event) wireEvent {
 		w.Tool = &wireTool{
 			ID: e.Tool.ID, Name: e.Tool.Name, Args: e.Tool.Args,
 			Output: e.Tool.Output, Err: e.Tool.Err,
+			Recoverable: e.Tool.Recoverable,
 			ReadOnly: e.Tool.ReadOnly, Truncated: e.Tool.Truncated,
 			Partial: e.Tool.Partial, ParentID: e.Tool.ParentID,
 		}

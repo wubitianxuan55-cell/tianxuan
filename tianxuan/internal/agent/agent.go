@@ -143,13 +143,11 @@ type AgentRunner struct {
 	// aggregate never craters when the prefix is summarized away. Atomic: the run
 	// loop accumulates them while the status line reads them.
 	sessCacheHit  atomic.Int64
-	cacheBreakCount atomic.Int64 // V5.30: ������Ѵ���
 	sessCacheMiss atomic.Int64
-	// V8.12: lastShape holds the most recent cache-shape fingerprint, written
-	// by the run loop every turn and read by TCCAReport. Not emitted as a Notice
-	// -- users fetch it on demand via /tcca-report.
-	lastShape   *CacheShape
-	lastShapeMu sync.Mutex
+	// lastPrefixShape records the previous request's cacheable prefix
+	// so usage events can explain prefix churn on the next request.
+	lastPrefixShape     PrefixShape
+	prefixFingerprintSet bool
 
 
 	// V5.31: ����������Ƚضϼ�����output_continue.go��
@@ -259,17 +257,6 @@ type AgentRunner struct {
 
 	// storm tracks repeated failures to detect death spirals (V3.0).
 	storm StormBreaker
-
-	// V5.9: ������Ѽ�⡪��ÿ�� stream() ����ǰ��Ա�ǰ׺��ϣ��
-	// �� cache_read �½� >5% �� >2000 tokens ʱ�������ԭ��
-	cacheBreakDetector cacheBreakDetector
-
-
-	// V5.10: ImmutablePrefix ָ�ơ������� stream() ʱ���� L1+L2+tools ��
-	// SHA256 ָ�ƣ�����ÿ��У�顣Ư�� �� panic�����⾲Ĭ�ƻ����档
-	prefixFingerprint    string
-	prefixFingerprintSet bool
-
 
 	// V5.11: ����Ŀ¼ָ�ơ������� stream() ʱ��¼������ÿ�ֱȽϡ�
 	// ��⹤�߼��仯��additive/breaking����breaking ʱ emit Warning��
@@ -436,7 +423,7 @@ func (a *AgentRunner) SetSession(s *Session) {
 	// increment on every API call and must reset when starting a new session.
 	a.sessCacheHit.Store(0)
 	a.sessCacheMiss.Store(0)
-	a.cacheBreakCount.Store(0)
+	// cacheBreakCount removed (Phase 3)
 }
 
 // LastUsage returns the most recent per-turn token telemetry the provider
@@ -454,8 +441,23 @@ func (a *AgentRunner) SessionCache() (hit, miss int) {
 // ContextWindow returns the configured context-window size in tokens. 0
 // means compaction is disabled for this agent.
 func (a *AgentRunner) CacheBreakCount() int {
-	return int(a.cacheBreakCount.Load())
+	return a.compaction.CompactCount
 }
+
+// systemPrompt returns the concatenated system messages (L1 + L2).
+func (a *AgentRunner) systemPrompt() string {
+	var b strings.Builder
+	for _, m := range a.session.Messages {
+		if m.Role == provider.RoleSystem {
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(m.Content)
+		}
+	}
+	return b.String()
+}
+
 
 
 func (a *AgentRunner) ContextWindow() int { return a.compaction.Window }

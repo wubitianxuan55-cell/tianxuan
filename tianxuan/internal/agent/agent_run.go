@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -116,17 +115,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				}
 			}
 		}
-		// V8.12: compute + store the cache-shape fingerprint every turn so
-		// TCCAReport can surface it on demand. Not emitted as a Notice —
-		// users fetch it via /tcca-report. Debug log for cache diagnostics.
-		shape := a.computeCacheShape("agent")
-		a.lastShapeMu.Lock()
-		a.lastShape = shape
-		a.lastShapeMu.Unlock()
-		slog.Debug("cache-shape", "kind", shape.Kind, "msgs", shape.MsgCount,
-			"roles", shape.Roles, "sys", shape.SysHash,
-			"tools", shape.ToolsHash, "prefix", shape.PrefixHash,
-			"tail", shape.TailHash)
+		// Phase 3: compute cache-shape fingerprint for TCCA diagnostics
+		if a.prefixFingerprintSet {
+			shape := a.CaptureShape()
+			a.lastPrefixShape = shape
+		}
 
 		if msg, ok := finishReasonMessage(usage); ok {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: msg})

@@ -22,9 +22,9 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	a.activeSchemasMu.RUnlock()
 	msgs := a.session.Messages
 
-	// V5.10: ImmutablePrefix 校验——验证前缀指纹，确保缓存稳定。
-	a.verifyPrefix(msgs, tools)
-	a.cacheBreakDetector.record(msgs, tools)
+	// V5.10: ImmutablePrefix guard — capture prefix shape before API call,
+	// compare against session baseline; emit Notice on drift (not panic).
+	prevShape := a.verifyPrefixAndShape()
 
 	ch, err := a.activeProv.Stream(ctx, provider.Request{
 		Messages:    msgs,
@@ -90,9 +90,15 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 			a.lastUsage.Store(chunk.Usage)
 			a.sessCacheHit.Add(int64(chunk.Usage.CacheHitTokens)); chunk.Usage.SessionCacheHitTokens = int(a.sessCacheHit.Load())
 			a.sessCacheMiss.Add(int64(chunk.Usage.CacheMissTokens)); chunk.Usage.SessionCacheMissTokens = int(a.sessCacheMiss.Load())
-			// V5.9: ��⻺�����
-			if reason := a.cacheBreakDetector.check(chunk.Usage); reason != "" {
-				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: reason})
+			// Phase 3: CompareShape diagnostics — explain cache behaviour
+			if chunk.Usage != nil {
+				postShape := a.CaptureShape()
+				diag := CompareShape(prevShape, postShape, chunk.Usage)
+				if diag.PrefixChanged {
+					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+						Text: diag.Format()})
+				}
+				a.lastPrefixShape = postShape
 			}
 		case provider.ChunkError:
 			return "", "", "", nil, nil, chunk.Err

@@ -1,3 +1,17 @@
+## [8.16.2] — 2026-06-21
+
+### 📝 仓库公开 — 首次 git push + README
+
+> 基于 V8.16.1 · 1文件 +77行 · 缓存安全: Go内核零变更
+
+| 变更 | 说明 |
+|------|------|
+| 根目录 README.md | 项目概览：天璇简介、四域缓存设计、快速开始、特性清单、项目结构 |
+| 首次 git push | 46 提交推至 `github.com/wubitianxuan55-cell/tianxuan` |
+| SSH 密钥 | ed25519 生成 (`~/.ssh/id_ed25519`)，添加至 GitHub |
+| 分支策略 | 本地 `master` 推送至远程 `main`（force push 覆盖 GitHub 默认空分支） |
+| 文档更新 | AGENTS.md + TIANXUAN.md + CHANGELOG.md 同步 |
+
 ## [8.16.1] — 2026-06-21
 
 ### 🔧 缓存命中率趋势图 Y 轴修复 — 99-100% 窄区间不再被压平

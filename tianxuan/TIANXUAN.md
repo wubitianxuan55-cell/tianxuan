@@ -1,5 +1,12 @@
 # tianxuan project memory
 
+> V8.16.2 — 仓库公开: 首次 git push + README · 2026-06-21
+## V8.16.2 (2026-06-21)
+📝 仓库根目录 README.md — 项目概览、四域缓存设计、快速开始
+🔗 首次 git push: 46 提交 → github.com/wubitianxuan55-cell/tianxuan (main)
+🔑 SSH 密钥: ed25519 生成并添加到 GitHub · 本地 master 推送覆盖远程 main
+🔒 缓存安全: 纯文档/仓库操作，Go 内核零变更
+
 > V8.16.1 — cache trend Y-axis fix for 99-100% narrow range · 2026-06-21
 ## V8.16.1 (2026-06-21)
 🔧 StatsPanel Y-axis: added step=0.1/0.2 tiers so 99-100% cache hit fluctuations are visible (was ~8px flat line)

@@ -15,22 +15,14 @@
       { "command": "tianxuan.submitSelection", "title": "tianxuan: 发送选中内容" },
       { "command": "tianxuan.explainSelection", "title": "tianxuan: 解释代码" },
       { "command": "tianxuan.reviewSelection", "title": "tianxuan: 审查代码" },
-      { "command": "tianxuan.fixSelection", "title": "tianxuan: 修复问题" },
-      { "command": "tianxuan.generateDocstring", "title": "tianxuan: 生成文档注释" },
-      { "command": "tianxuan.generateTest", "title": "tianxuan: 生成单元测试" },
-      { "command": "tianxuan.explainTerminal", "title": "tianxuan: 解释终端错误" }
+      { "command": "tianxuan.fixSelection", "title": "tianxuan: 修复问题" }
     ],
     "menus": {
       "editor/context": [
         { "command": "tianxuan.submitSelection", "group": "tianxuan@1" },
         { "command": "tianxuan.explainSelection", "group": "tianxuan@2" },
         { "command": "tianxuan.reviewSelection", "group": "tianxuan@3" },
-        { "command": "tianxuan.fixSelection", "group": "tianxuan@4" },
-        { "command": "tianxuan.generateDocstring", "group": "tianxuan@5" },
-        { "command": "tianxuan.generateTest", "group": "tianxuan@6" }
-      ],
-      "commandPalette": [
-        { "command": "tianxuan.explainTerminal", "when": "terminalFocus" }
+        { "command": "tianxuan.fixSelection", "group": "tianxuan@4" }
       ]
     },
     "keybindings": [

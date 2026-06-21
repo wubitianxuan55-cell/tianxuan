@@ -1,4 +1,4 @@
-import { ArrowUp, FolderOpen, Bug, Lightbulb, Code, Search, FileText } from "lucide-react";
+import { ArrowUp, FolderOpen, Bug, Lightbulb, Code, Search, FileText, MessageSquare, Clock, Zap, PenTool, TestTube } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
@@ -19,6 +19,26 @@ function sessionTime(ms: number): string {
 function sessionTitle(session: SessionMeta, fallback: string): string {
   return session.title || session.preview || fallback;
 }
+
+function formatTimeAgo(ms: number): string {
+  const diff = Date.now() - ms;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min}分钟前`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `${hrs}小时前`;
+  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// 快捷命令 — 对标 Cline HomeView 的命令卡片
+const QUICK_COMMANDS = [
+  { icon: <Search size={14} />, label: "探索代码库", prompt: "explore this codebase — identify the key modules, their responsibilities, and how they connect" },
+  { icon: <Bug size={14} />, label: "修复 Bug", prompt: "fix this bug: " },
+  { icon: <PenTool size={14} />, label: "添加功能", prompt: "add a feature: " },
+  { icon: <Zap size={14} />, label: "代码审查", prompt: "review my recent changes for issues" },
+  { icon: <TestTube size={14} />, label: "写测试", prompt: "write tests for " },
+  { icon: <FileText size={14} />, label: "写文档", prompt: "write documentation for " },
+];
 
 export function Welcome({
   onPrompt,
@@ -41,7 +61,7 @@ export function Welcome({
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // 快捷键横幅：首次显示，localStorage 记录（Wails webview 更可靠）
+  // 快捷键横幅：首次显示，localStorage 记录
   useEffect(() => {
     try {
       if (!localStorage.getItem("tianxuan.shortcutsSeen")) {
@@ -52,32 +72,6 @@ export function Welcome({
       }
     } catch {}
   }, []);
-
-  // 动态起始卡片
-  const cards: StarterCard[] = (() => {
-    const base: StarterCard[] = [];
-    base.push({
-      icon: <Search size={compact ? 16 : 18} />,
-      title: t("welcome.card1.title") || "探索代码库",
-      desc: cwdName ? `了解 ${cwdName} 项目结构和关键模块` : (t("welcome.card1.desc") || "了解项目结构和关键模块"),
-      prompt: cwd
-        ? "explore this codebase — identify the key modules, their responsibilities, and how they connect"
-        : (t("welcome.card1.prompt") || "explore this codebase"),
-    });
-    base.push({
-      icon: <Bug size={compact ? 16 : 18} />,
-      title: t("welcome.card2.title") || "修复 Bug",
-      desc: t("welcome.card2.desc") || "描述你遇到的问题，我来定位和修复",
-      prompt: t("welcome.card2.prompt") || "there is a bug — when I ... it does ... instead of ...",
-    });
-    base.push({
-      icon: <Lightbulb size={compact ? 16 : 18} />,
-      title: t("welcome.card3.title") || "添加功能",
-      desc: t("welcome.card3.desc") || "描述你想添加的新功能",
-      prompt: t("welcome.card3.prompt") || "add a feature: ",
-    });
-    return base;
-  })();
 
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim();
@@ -100,7 +94,7 @@ export function Welcome({
 
   return (
     <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto px-6 overflow-y-auto">
-      {/* 项目语境提示 */}
+      {/* 项目语境提示 — 增强版：显示项目+分支+模型 */}
       {cwdName && (
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 mb-5 rounded-full bg-accent-soft border border-accent/20 text-fg-dim ${compact ? "text-[11px]" : "text-[12px]"}`}>
           <FolderOpen size={compact ? 12 : 13} className="text-accent" />
@@ -109,16 +103,15 @@ export function Welcome({
         </div>
       )}
 
-      {/* Logo */}
+      {/* Logo + Tagline */}
       <img src={logo} className={`rounded-[10px] mb-3 ${compact ? "w-8 h-8" : "w-10 h-10"}`} alt="tianxuan" />
       <div className={`text-fg-dim mb-7 ${compact ? "text-[12.5px]" : "text-[13.5px]"}`}>{t("welcome.tagline")}</div>
 
-      {/* Central input box */}
-      <div className="w-full border border-border rounded-xl bg-bg-soft shadow-sm hover:border-fg-faint focus-within:border-accent transition-colors duration-[0.15s]">
+      {/* 智能输入框 */}
+      <div className="w-full border border-border rounded-xl bg-bg-soft shadow-sm hover:border-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[0.15s]">
         <textarea
           ref={taRef}
-          className={`w-full resize-none border-0 bg-transparent text-fg leading-relaxed outline-none placeholder:text-fg-faint px-4 pt-4 pb-2 ${compact ? "text-[13px]" : "text-[14px]"}`}
-          style={{ minHeight: compact ? "64px" : "80px", maxHeight: "160px" }}
+          className={`w-full resize-none border-0 bg-transparent text-fg leading-relaxed outline-none placeholder:text-fg-faint px-4 pt-4 pb-2 ${compact ? "text-[13px] min-h-[64px]" : "text-[14px] min-h-[80px]"} max-h-[160px]`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -147,7 +140,7 @@ export function Welcome({
         </div>
       </div>
 
-      {/* 快捷键横幅 */}
+      {/* 快捷键横幅 — 首次引导 */}
       {showShortcuts && (
         <div className="w-full mt-3 animate-[toast-in_0.3s_ease-out]">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-soft border border-accent/15 text-[11px] text-fg-dim">
@@ -165,39 +158,38 @@ export function Welcome({
         </div>
       )}
 
-      {/* Starter cards grid */}
-      <div className={`grid grid-cols-3 gap-2.5 mt-6 w-full ${compact ? "[&_button]:p-2 [&_button]:text-[12px]" : ""}`}>
-        {cards.map((card) => (
+      {/* 快捷命令网格 — 对标 Cline HomeView 的命令面板 */}
+      <div className={`grid grid-cols-3 gap-2 mt-4 w-full ${compact ? "[&_button]:p-2 [&_button]:text-[11px]" : ""}`}>
+        {QUICK_COMMANDS.map((cmd) => (
           <button
-            key={card.title}
-            className={`flex flex-col items-start gap-2 text-left font-[inherit] bg-bg-soft border border-border-soft text-fg-dim rounded-lg hover:text-fg hover:border-accent-soft hover:bg-bg-elev hover:-translate-y-px transition-all ${compact ? "p-2 text-[12px]" : "p-3 text-[13px]"}`}
-            onClick={() => onPrompt(card.prompt)}
+            key={cmd.label}
+            className={`flex items-center gap-2 text-left font-[inherit] bg-bg-soft border border-border-soft text-fg-dim rounded-lg hover:text-fg hover:border-accent-soft hover:bg-bg-elev hover:-translate-y-px transition-all ${compact ? "p-2 text-[11px]" : "p-2.5 text-[12px]"}`}
+            onClick={() => onPrompt(cmd.prompt)}
+            title={cmd.prompt}
           >
-            <span className="text-fg-dim">{card.icon}</span>
-            <span className="flex flex-col gap-0.5">
-              <span className={`font-medium text-fg ${compact ? "text-[12px]" : "text-[13px]"}`}>{card.title}</span>
-              <span className={`text-fg-faint leading-snug ${compact ? "text-[11px]" : "text-[12px]"}`}>{card.desc}</span>
-            </span>
+            <span className="text-fg-faint shrink-0">{cmd.icon}</span>
+            <span className="font-medium truncate">{cmd.label}</span>
           </button>
         ))}
       </div>
 
-      {/* 最近会话迷你列表 */}
+      {/* 最近会话 — 增强为卡片式 */}
       {recentSessions.length > 0 && onResumeSession && (
-        <div className="w-full mt-7 pt-5 border-t border-border-soft">
-          <div className={`font-semibold text-fg-faint uppercase tracking-wider mb-3 flex items-center gap-1.5 ${compact ? "text-[10px]" : "text-[11px]"}`}>
-            <FileText size={12} />
+        <div className="w-full mt-5 pt-4 border-t border-border-soft">
+          <div className={`font-semibold text-fg-faint uppercase tracking-wider mb-2.5 flex items-center gap-1.5 ${compact ? "text-[10px]" : "text-[11px]"}`}>
+            <Clock size={12} />
             最近会话
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {recentSessions.map((s) => (
               <button
                 key={s.path}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg bg-bg-soft border border-border-soft text-left font-[inherit] text-fg-dim hover:text-fg hover:bg-bg-elev hover:border-fg-faint transition-colors ${compact ? "text-[11.5px]" : "text-[12.5px]"}`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg bg-bg-soft border border-border-soft text-left font-[inherit] text-fg-dim hover:text-fg hover:bg-bg-elev hover:border-fg-faint transition-all ${compact ? "text-[11px]" : "text-[12px]"}`}
                 onClick={() => void onResumeSession(s.path)}
               >
+                <MessageSquare size={compact ? 12 : 13} className="text-fg-faint shrink-0" />
                 <span className="flex-1 truncate font-medium">{sessionTitle(s, "未命名会话")}</span>
-                <span className={`text-fg-faint shrink-0 ${compact ? "text-[10px]" : "text-[11px]"}`}>{sessionTime(s.modTime)}</span>
+                <span className={`text-fg-faint shrink-0 ${compact ? "text-[10px]" : "text-[11px]"}`}>{formatTimeAgo(s.modTime)}</span>
               </button>
             ))}
           </div>

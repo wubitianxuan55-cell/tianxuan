@@ -78,12 +78,8 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
       {/* 横条列表——超过 15 轮可滚动 */}
       <div
         ref={barRef}
-        className="flex flex-col gap-[3px] items-stretch"
-        style={{
-          maxHeight: turns.length > 15 ? "calc(100vh - 280px)" : "none",
-          overflowY: turns.length > 15 ? "auto" : "visible",
-          scrollbarWidth: "none",
-        }}
+        className={`flex flex-col gap-[3px] items-stretch ${turns.length > 15 ? "overflow-y-auto" : ""}`}
+        style={turns.length > 15 ? { maxHeight: "calc(100vh - 280px)", scrollbarWidth: "none" as any } : undefined}
       >
         {turns.map((item) => {
           const isActive = active === item.turn;

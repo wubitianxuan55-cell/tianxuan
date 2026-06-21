@@ -399,11 +399,11 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
                 </div>
                 <div className="flex items-center gap-3 text-[9px] text-fg-faint">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded" style={{ background: "var(--accent)" }} />
+                    <span className="w-2 h-0.5 rounded bg-accent" />
                     Prompt
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded" style={{ background: "var(--ok)" }} />
+                    <span className="w-2 h-0.5 rounded bg-ok" />
                     Compl
                   </span>
                 </div>

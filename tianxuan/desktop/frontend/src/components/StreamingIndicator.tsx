@@ -54,7 +54,11 @@ export function StreamingIndicator({
     <div className="sticky top-0 z-10 flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50 backdrop-blur-sm">
       {/* 滚动色条 — 高 3px，顶对齐 */}
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-border-soft overflow-hidden">
-        <div className="h-full rounded-r-sm animate-pulse" style={{ width: stage === "preparing" ? "25%" : stage === "stalled" ? "40%" : "60%", background: stage === "streaming" ? "var(--info)" : stage === "preparing" ? "var(--warn)" : "var(--err)" }} />
+        <div className={`h-full rounded-r-sm animate-pulse ${
+          stage === "preparing" ? "bg-warning w-1/4" :
+          stage === "stalled" ? "bg-err w-[40%]" :
+          "bg-info w-[60%]"
+        }`} />
       </div>
 
       <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dotClass}`} />

@@ -282,7 +282,7 @@ export function Transcript({
       </div>
       {showScrollDown && (
         <button
-          className="absolute bottom-5 right-8 z-10 w-9 h-9 rounded-full bg-accent text-accent-fg shadow-lg flex items-center justify-center border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn"
+          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg shadow-lg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn px-3 py-1.5"
           onClick={() => {
             stick.current = true;
             setShowScrollDown(false);
@@ -294,7 +294,8 @@ export function Transcript({
           }}
           aria-label="回到底部"
         >
-          <ArrowDown size={16} />
+          <ArrowDown size={14} className="animate-bounce" />
+          <span className="text-[11px] font-medium">↓</span>
         </button>
       )}
     </div>

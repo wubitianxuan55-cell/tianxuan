@@ -358,8 +358,7 @@ export function WorkspacePanel({
           key={path}
           onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
           title={path}
-          style={{ paddingLeft: 8 + depth * 14 }}
-        >
+          style={{ paddingLeft: 8 + depth * 14 }}>
           {entry.isDir ? (
             isOpen ? (
               <ChevronDown size={13} className="w-[13px] h-[13px] shrink-0 text-fg-faint" />

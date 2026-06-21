@@ -43,15 +43,11 @@ export function PlanPanel({
         <div className="shrink-0 px-4 pt-3 pb-1">
           <div className="h-1.5 bg-bg-soft rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{
-                width: `${progress}%`,
-                background: progress === 100
-                  ? "var(--ok)"
-                  : progress > 0
-                    ? "linear-gradient(90deg, var(--ok), var(--accent))"
-                    : "transparent",
-              }}
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                progress === 100 ? "bg-ok w-full" :
+                progress > 0 ? "bg-ok/50" : "bg-transparent w-0"
+              }`}
+              style={progress > 0 && progress < 100 ? { width: `${progress}%`, background: "linear-gradient(90deg, var(--ok), var(--accent))" } : undefined}
             />
           </div>
         </div>

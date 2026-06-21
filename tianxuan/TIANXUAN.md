@@ -1,5 +1,12 @@
 # tianxuan project memory
 
+> V8.7.0 — UI优化: 智能主页+内联style消除+微交互 · 2026-06-21
+## V8.7.0 发布摘要 (2026-06-21)
+**基于**: V8.6.0 · **位置**: `release/v8.7.0/` · **变更**: 7文件 +63/-75行
+🎨 UI: Welcome智能主页(6快捷命令+会话卡片+首次引导) + JumpBar/PlanPanel/StatsPanel/StreamingIndicator内联style消除(16→10) + Transcript滚动按钮动画增强
+🔒 缓存安全: Go内核零变动
+
+
 > V8.6.0 — God对象拆分+Web/VS Code骨架+死代码大扫除 · 2026-06-21
 ## V8.6.0 发布摘要 (2026-06-21)
 **基于**: V8.4.1 · **二进制**: CLI / Desktop · **位置**: `release/v8.6.0/` · **变更**: 17文件 +96/-6629行

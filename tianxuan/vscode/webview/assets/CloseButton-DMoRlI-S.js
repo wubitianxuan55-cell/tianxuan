@@ -1,1 +1,0 @@
-import{j as o}from"./vendor-markdown-D1It5uYK.js";import{u as e,X as n}from"./index-CI9lVw5E.js";function c({onClick:t}){const s=e();return o.jsx("button",{className:"close-btn no-drag",onClick:t,title:s("common.close"),children:o.jsx(n,{size:15})})}export{c as C};

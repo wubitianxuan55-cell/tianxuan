@@ -95,32 +95,6 @@ function makeVSCodeProxy() {
 
 const vscodeProxy = isVSCode ? makeVSCodeProxy() : null;
 
-// ── VS Code 生命周期消息（init / submit-text / theme-changed）────────
-// 这些消息不由 makeVSCodeProxy 的请求/响应通道处理，而是直接驱动 UI。
-
-if (isVSCode) {
-  const api = acquireVsCodeApi();
-  window.addEventListener("message", (ev: MessageEvent) => {
-    const msg = ev.data;
-    if (!msg || typeof msg !== "object") return;
-
-    // 扩展发来的提交文本（右键菜单 / 快捷键发送选中内容）
-    if (msg.type === "tianxuan:submit-text" && typeof msg.text === "string") {
-      // 使用 setTimeout 确保 Composer 已完成挂载
-      setTimeout(() => {
-        app.Submit(msg.text as string);
-      }, 300);
-    }
-
-    // 扩展发来的主题变更
-    if (msg.type === "tianxuan:theme-changed" && typeof msg.theme === "string") {
-      import("@shared/lib/theme").then(({ applyTheme }) => {
-        applyTheme(msg.theme as "dark" | "light" | "auto");
-      });
-    }
-  });
-}
-
 // ── SSE (两套传输) ───────────────────────────────────────────────────
 
 const listeners = new Set<(e: WireEvent) => void>();
@@ -274,16 +248,6 @@ export const app = {
   RevealWorkspacePath: async (rel: string) => { if (isVSCode) await vscodeProxy!.request("revealWorkspacePath", { rel }); },
   SavePastedImage: async () => "",
   AttachmentDataURL: async () => "",
-
-  // editor integration — VS Code only
-  GetDiagnostics: async () => isVSCode ? await vscodeProxy!.request("getDiagnostics") as unknown[] : [],
-  GetEditorContext: async () => isVSCode
-    ? await vscodeProxy!.request("getEditorContext") as { file: string; language: string; selection: string; cursorLine: number }
-    : { file: "", language: "", selection: "", cursorLine: 0 },
-  ApplyEdit: async (filePath: string, edits: { range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }[]) =>
-    isVSCode ? await vscodeProxy!.request("applyEdit", { filePath, edits }) : null,
-  DiffPreview: async (original: string, modified: string, title?: string) =>
-    isVSCode ? await vscodeProxy!.request("diffPreview", { original, modified, title }) : null,
 
   // updates
   Version: async () => isVSCode

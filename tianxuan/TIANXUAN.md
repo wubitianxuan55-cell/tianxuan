@@ -1,5 +1,22 @@
 # tianxuan project memory
 
+> V8.12.0 — 全线桥接打通 · VS Code 全连通 · 2026-06-21
+## V8.12.0 发布摘要 (2026-06-21)
+**基于**: V8.11.0 · **变更**: 2文件 +285/-230行
+🔌 Web bridge 双传输层: 浏览器→fetch, VS Code→postMessage 透明切换
+🔌 extension.ts HTTP/SSE 代理: proxyFetch + connectSSE 逐帧转发
+🔒 CSP 收紧: 取消 connect-src 白名单，全走 postMessage 更安全
+
+## V8.11.0 发布摘要 (2026-06-21)
+**基于**: V8.10.0 · **变更**: 2文件 +244/-37行
+🔌 VS Code postMessage 请求/响应通道 + 6个原生 API + CSP注入
+
+## V8.10.0 发布摘要 (2026-06-21)
+**基于**: V8.9.0 · **变更**: 233文件 +3869/-24行
+🔌 50 serve 端点: Settings/MCP/Checkpoint/Session/Slash/TCCA/Rebuild
+🌐 Web bridge 46/46 全接通 + 30桩替换 + 5缺失补全
+🏗️ Server Rebuild 热重载: Snapshot→Carry→Rebuild→Resume
+
 > V8.9.0 — 跨项目吸收+前端打通+技能升级 · 2026-06-21
 ## V8.9.0 发布摘要 (2026-06-21)
 **基于**: V8.8.0 · **位置**: `release/v8.9.0/` · **变更**: 23文件 +~700/-34行

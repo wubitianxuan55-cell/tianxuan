@@ -1,3 +1,51 @@
+## [8.12.0] — 2026-06-21
+
+### 🔌 VS Code 全连通 — HTTP/SSE postMessage 代理
+
+> 基于 V8.11.0 · 2文件 +285/-230行 · VS Code webview 可完整运行
+
+| 变更 | 说明 |
+|------|------|
+| bridge.ts 双传输层 | VS Code 环境自动检测；get/post/fetchJson→浏览器fetch,VS Code→postMessage代理 |
+| onEvent 双传输 | 浏览器→EventSource, VS Code→postMessage SSE转发 |
+| extension.ts HTTP代理 | proxyFetch 转发 HTTP 请求到 tianxuan serve |
+| extension.ts SSE代理 | connectSSE 连接 /events 流，逐帧转发 webview |
+| CSP 收紧 | 取消 connect-src 白名单，全部走 postMessage 更安全 |
+
+### 📦 发布
+
+- release/v8.12.0/ · CLI exe · Web dist · VS Code extension
+
+## [8.11.0] — 2026-06-21
+
+### 🔌 VS Code 专有桥接 — postMessage 通道
+
+> 基于 V8.10.0 · 2文件 +244/-37行
+
+| 变更 | 说明 |
+|------|------|
+| extension.ts postMessage 请求/响应通道 | tianxuan:request/response 双向通信 |
+| 6个 VS Code 原生 API | listWorkspaces/pickWorkspace/switchWorkspace/openWorkspacePath/revealWorkspacePath/version |
+| CSP 注入 | 允许 webview 通过 HTTP/SSE 连接 serve |
+| 工作区变化监听 | 切换工作区时通知 webview |
+
+## [8.10.0] — 2026-06-21
+
+### 🔌 全线桥接打通 — 50 serve 端点 + web bridge 补全
+
+> 基于 V8.9.0 · 233文件 +3869/-24行
+
+| 域 | 变更 |
+|------|------|
+| Settings | GET /settings + 12个 POST/DELETE 端点 (模型/Provider/密钥/沙箱/权限/Agent参数) |
+| MCP 管理 | POST /mcp/{add,remove,retry,enabled} |
+| Checkpoint | GET /checkpoints + 4个 POST 端点 (rewind/fork/summarize) |
+| Session | POST /rename-session |
+| Slash/TCCA/重建 | GET /slash-args, GET /tcca-report, POST /rebuild |
+| Server 重构 | WithRebuild 方法 + Rebuild (Snapshot→Carry→Resume) |
+| Web bridge | 30桩全部替换 + 5缺失补全 → 46/46 全接通 |
+| V9.0 遗漏补交 | serve_handlers.go/cache_shape.go/envelope.go/webui/ |
+
 ## [8.9.0] — 2026-06-21
 
 ### 🔄 跨项目吸收 — Whale + MiMo-Code + superpowers-zh

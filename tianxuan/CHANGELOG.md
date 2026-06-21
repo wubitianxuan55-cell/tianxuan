@@ -1,3 +1,52 @@
+## [8.8.0] — 2026-06-21
+
+### 🧩 Context7 内置集成 — 第三方库实时文档
+
+> 基于 V8.7.0 · 5文件 +80/-0行 · 零 Go 核心风险
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| 内置 skill | `builtins.go` | 新增 `/context7` 内置技能: 何时使用+分步工具调用指南 |
+| 一键添加 | `CapabilitiesPanel.tsx` | UI 按钮 "⚡ 一键添加 Context7", 自动注册 MCP 服务器 |
+| 国际化 | `en/zh/zh-TW locales` | 3 语言完整适配 |
+
+**Context7**: 57,800⭐ MIT, 50,000+ 第三方库实时文档。用户一键添加或 `tianxuan mcp add`。
+添加后获得 `mcp__context7__resolve-library-id` + `mcp__context7__query-docs`。
+
+### 🔒 缓存安全
+- Skill 文本注入 L4 域 ✅ · MCP 运行时 → 不影响 L3 hash ✅ · Go 内核零变动 ✅
+
+### 📦 发布
+- 位置: `release/v8.8.0/` · 变更: 5 文件, +80/-0 行
+
+---
+
+## [8.8.0] — 2026-06-21
+
+### 🧩 Context7 内置集成 — 第三方库实时文档
+
+> 基于 V8.7.0 · 5文件 +80/-0行 · 零 Go 核心风险
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| 内置 skill | `builtins.go` | 新增 `/context7` 内置技能: 何时使用+分步工具调用指南 |
+| 一键添加 | `CapabilitiesPanel.tsx` | UI 按钮 "⚡ 一键添加 Context7", 自动注册 MCP 服务器 |
+| 国际化 | `en/zh/zh-TW locales` | 3 语言完整适配 |
+
+**Context7**: 57,800⭐ MIT, 50,000+ 第三方库实时文档。用户一键添加或 `tianxuan mcp add`。
+添加后获得 `mcp__context7__resolve-library-id` + `mcp__context7__query-docs`。
+
+### 🔒 缓存安全
+- Skill 文本注入 L4 域 ✅ · MCP 运行时 → 不影响 L3 hash ✅ · Go 内核零变动 ✅
+
+### 📦 发布
+- CLI: `tianxuan.exe` (13.0 MB)
+- 桌面端: `tianxuan-desktop.exe` (11.9 MB)
+- 位置: `release/v8.8.0/`
+- 变更: 5 文件，+80/-0 行
+
+---
+
 ## [8.7.0] — 2026-06-21
 
 ### 🎨 前端 UI 优化 — Welcome 智能主页 + 内联 style 消除 + 微交互 + ToolCard 图标提取

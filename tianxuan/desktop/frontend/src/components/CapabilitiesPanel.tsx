@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, Globe } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { CapabilitiesView, MCPServerInput, ServerView, SkillView } from "../lib/types";
@@ -22,6 +22,7 @@ export function CapabilitiesPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addingContext7, setAddingContext7] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [tab, setTab] = useState<CapTab>("servers");
   const [skillQuery, setSkillQuery] = useState("");
@@ -49,6 +50,24 @@ export function CapabilitiesPanel({
       return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  const addContext7 = async () => {
+    setAddingContext7(true);
+    setErr(null);
+    try {
+      await app.AddMCPServer({
+        name: "context7",
+        transport: "streamable-http",
+        url: "https://mcp.context7.com/mcp",
+        env: {},
+      });
+      await reload();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setAddingContext7(false);
     }
   };
 
@@ -140,6 +159,20 @@ export function CapabilitiesPanel({
             {tab === "servers" ? (
               <section className="mb-3">
                 <div className="flex justify-end mb-2">
+                  {/* Context7 一键添加 */}
+                  <button
+                    className="flex items-center gap-1.5 mr-2 px-2.5 py-1 text-xs border border-accent/30 rounded bg-accent/5 text-accent cursor-pointer hover:bg-accent/10 transition-colors disabled:opacity-40"
+                    disabled={busy || addingContext7}
+                    onClick={() => addContext7()}
+                    title={t("caps.addContext7Hint")}
+                  >
+                    {addingContext7 ? (
+                      <span className="animate-spin inline-block w-3 h-3 border border-current border-t-transparent rounded-full" />
+                    ) : (
+                      <Globe size={12} />
+                    )}
+                    <span>{addingContext7 ? t("caps.addContext7Busy") : t("caps.addContext7")}</span>
+                  </button>
                   {!adding && (
                     <button className="px-2.5 py-1 text-xs" disabled={busy} onClick={() => setAdding(true)}>
                       {t("caps.addServer")}

@@ -235,7 +235,38 @@ Pro tips:
 - lsp_diagnostics returns results per-file — run it on each file you touched, not just the one you think has errors.
 - All LSP read operations (definition/references/hover/diagnostics/completion) are read-only — parallelise them freely.`
 
+const builtinContext7Body = `This skill is INLINED — you run in the parent loop. The user invoked /context7 or you need up-to-date third-party library documentation.
 
+## What Context7 Does
+
+Context7 is a documentation MCP server that fetches real-time, version-specific docs and code examples for 50,000+ libraries. Without it, you rely on potentially outdated training data and may hallucinate APIs.
+
+## When to Use
+
+Use Context7 when:
+- The user asks about a third-party library's API, setup, or configuration
+- You need code examples for a library you haven't used before
+- You're generating code that imports an unfamiliar package
+- The user asks "how do I use X with Y" where X or Y is a library
+
+## Tool Usage
+
+**Step 1 — Resolve the library name:**
+Run ` + "`mcp__context7__resolve-library-id`" + ` with libraryName="<user's library>" and the user's full question as query.
+
+**Step 2 — Fetch docs:**
+Run ` + "`mcp__context7__query-docs`" + ` with libraryId (from step 1) and the user's exact question as query.
+
+**Step 3 — Use the results:**
+The response contains code examples and API docs directly from the library's source. Use them to write correct, up-to-date code. Cite the library version if mentioned.
+
+## Rules
+
+- Always resolve the library ID first — don't guess the /owner/repo format.
+- If the user mentions a specific version, include it in the query (e.g., "Next.js 14 middleware").
+- If Context7 is not configured (the MCP tools are not available), fall back to web_search + web_fetch for documentation.
+- For library setup/configuration questions, combine Context7 docs with the user's actual project context.
+- Don't use Context7 for the language's own stdlib — only for third-party packages/libraries.`
 
 const builtinDebugBody = `This skill is INLINED — you run in the parent loop. The user invoked /debug or wants systematic debugging. Follow the 4-phase method below — don't jump to fixes before finding the root cause.
 
@@ -350,6 +381,14 @@ func builtinSkills() []Skill {
 			Name:        "lsp",
 			Description: "Use Tianxuan's LSP tools to diagnose, understand, and fix code — run lsp_diagnostics after every edit, use lsp_definition/lsp_references/lsp_hover for code understanding, use lsp_rename for safe refactors. Inlined.",
 			Body:        builtinLSPBody,
+			Scope:       ScopeBuiltin,
+			Path:        "(builtin)",
+			RunAs:       RunInline,
+		},
+		{
+			Name:        "context7",
+			Description: "Fetch up-to-date third-party library documentation via Context7 — use mcp__context7__resolve-library-id + mcp__context7__query-docs for API docs, code examples, and setup guides. Inlined.",
+			Body:        builtinContext7Body,
 			Scope:       ScopeBuiltin,
 			Path:        "(builtin)",
 			RunAs:       RunInline,

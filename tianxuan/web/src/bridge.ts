@@ -80,13 +80,23 @@ export const app = {
   NewSession: () => post("/new"),
   History: () => get<HistoryMessage[]>("/history"),
   ContextUsage: () => get<ContextInfo>("/context"),
-  TCCAReport: async () => "",
+  TCCAReport: async () => {
+    try { return JSON.stringify(await get<unknown>("/tcca-report")); } catch { return ""; }
+  },
   Balance: () => get<BalanceInfo>("/balance"),
 
   // ── sessions ──
   ListSessions: () => get<SessionMeta[]>("/sessions"),
   ResumeSession: (path: string) => post("/resume-session", { path }).then(() => get<HistoryMessage[]>("/history")),
   DeleteSession: (path: string) => post("/delete-session", { path }),
+  RenameSession: (path: string, title: string) => post("/rename-session", { path, title }),
+
+  // ── checkpoints ──
+  Checkpoints: () => get<CheckpointMeta[]>("/checkpoints"),
+  Rewind: (turn: number, scope: string) => post("/checkpoints/rewind", { turn, scope }),
+  Fork: (turn: number) => post("/checkpoints/fork", { turn }).then(() => {}),
+  SummarizeFrom: (turn: number) => post("/checkpoints/summarize-from", { turn }).then(() => {}),
+  SummarizeUpTo: (turn: number) => post("/checkpoints/summarize-up-to", { turn }).then(() => {}),
 
   // ── jobs ──
   Jobs: () => get<JobView[]>("/jobs"),
@@ -111,8 +121,42 @@ export const app = {
   ListDir: (rel: string) => get<DirEntry[]>(`/files?path=${encodeURIComponent(rel || "")}`),
   ReadFile: (rel: string) => get<FilePreview>(`/file?path=${encodeURIComponent(rel || "")}`),
 
-  // 以下暂不实现
-  Checkpoints: async () => [] as CheckpointMeta[],
+  // ── settings ──
+  Settings: () => get<SettingsView>("/settings"),
+  SetBypass: (on: boolean) => post("/settings/bypass", { on }),
+  SetModel: (name: string) => post("/settings/model", { ref: name }),
+  SetDefaultModel: (ref: string) => post("/settings/default-model", { ref }),
+  SaveProvider: (p: ProviderView) => post("/settings/provider", p),
+  DeleteProvider: (name: string) => post("/settings/delete-provider", { name }),
+  SetProviderKey: (apiKeyEnv: string, value: string) => post("/settings/provider-key", { apiKeyEnv, value }),
+  SetAgentParams: (temperature: number, maxSteps: number, systemPrompt: string) =>
+    post("/settings/agent-params", { temperature, maxSteps, systemPrompt }),
+  SetSandbox: (bash: string, network: boolean, workspaceRoot: string, allowWrite: string[]) =>
+    post("/settings/sandbox", { bash, network, workspaceRoot, allowWrite }),
+  SetPermissionMode: (mode: string) => post("/settings/permission-mode", { mode }),
+  AddPermissionRule: (list: string, rule: string) => post("/settings/permission-rule", { list, rule }),
+  RemovePermissionRule: (list: string, rule: string) =>
+    fetch(`/settings/permission-rule?list=${encodeURIComponent(list)}&rule=${encodeURIComponent(rule)}`, { method: "DELETE" }).then(() => {}),
+
+  // ── MCP ──
+  AddMCPServer: async (input: MCPServerInput) => {
+    const res = await fetch("/mcp/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const j = await res.json() as { tools: number };
+    return j.tools;
+  },
+  RemoveMCPServer: (name: string) => post("/mcp/remove", { name }).then(() => {}),
+  RetryMCPServer: (name: string) => post("/mcp/retry", { name }).then(() => {}),
+  SetMCPServerEnabled: (name: string, enabled: boolean) => post("/mcp/enabled", { name, enabled }).then(() => {}),
+
+  // ── slash ──
+  SlashArgs: (input: string) => get<SlashArgsResult>(`/slash-args?input=${encodeURIComponent(input)}`),
+
+  // ── workspace / desktop file ops (no-op on web) ──
   ListWorkspaces: async () => [] as WorkspaceView[],
   PickWorkspace: async () => "",
   SwitchWorkspace: async () => "",
@@ -120,24 +164,9 @@ export const app = {
   RevealWorkspacePath: async () => {},
   SavePastedImage: async () => "",
   AttachmentDataURL: async () => "",
-  SlashArgs: async () => ({ items: [], from: 0, total: 0 } as SlashArgsResult),
-  AddMCPServer: async () => 0,
-  RemoveMCPServer: async () => {},
-  RetryMCPServer: async () => {},
-  SetMCPServerEnabled: async () => {},
-  SetModel: async () => {},
-  Settings: async () => ({} as SettingsView),
-  SetDefaultModel: async () => {},
-  SaveProvider: async () => {},
-  DeleteProvider: async () => {},
-  SetProviderKey: async () => {},
-  SetPermissionMode: async () => {},
-  AddPermissionRule: async () => {},
-  RemovePermissionRule: async () => {},
-  SetSandbox: async () => {},
-  SetAgentParams: async () => {},
-  SetBypass: async () => {},
-  Version: async () => "8.6.0-web",
+
+  // ── updates (no-op on web) ──
+  Version: async () => "8.9.0-web",
   CheckUpdate: async () => null,
   ApplyUpdate: async () => {},
   OpenDownloadPage: async () => {},

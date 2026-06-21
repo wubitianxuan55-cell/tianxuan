@@ -210,7 +210,11 @@ func runServe(args []string) int {
 	// Use graceful shutdown so SIGINT/SIGTERM drain active connections.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	if err := serve.New(ctrl, bc).RunGraceful(ctx, *addr); err != nil {
+	rebuildFn := func() (*control.Controller, error) {
+		return setup(context.Background(), *model, *maxSteps, true, bc)
+	}
+	srv := serve.New(ctrl, bc).WithRebuild(rebuildFn, *model, *maxSteps)
+	if err := srv.RunGraceful(ctx, *addr); err != nil {
 		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 		return 1
 	}

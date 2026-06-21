@@ -54,6 +54,13 @@ export default defineConfig({
       "/jobs": "http://127.0.0.1:8080",
       "/commands": "http://127.0.0.1:8080",
       "/capabilities": "http://127.0.0.1:8080",
+      "/settings": "http://127.0.0.1:8080",
+      "/mcp": "http://127.0.0.1:8080",
+      "/checkpoints": "http://127.0.0.1:8080",
+      "/rename-session": "http://127.0.0.1:8080",
+      "/slash-args": "http://127.0.0.1:8080",
+      "/tcca-report": "http://127.0.0.1:8080",
+      "/rebuild": "http://127.0.0.1:8080",
     },
   },
 });

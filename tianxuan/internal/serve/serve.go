@@ -16,7 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/agent"
 	"tianxuan/internal/control"
+	"tianxuan/internal/provider"
 )
 
 //go:embed webui/index.html
@@ -28,13 +30,26 @@ var webDist embed.FS
 // Server wires a controller to its HTTP surface. The Broadcaster must be the
 // same sink the controller was constructed with, so events reach SSE clients.
 type Server struct {
-	ctrl *control.Controller
-	bc   *Broadcaster
+	ctrl      *control.Controller
+	bc        *Broadcaster
+	rebuildFn func() (*control.Controller, error)
+	model     string
+	maxSteps  int
 }
 
 // New builds a Server. bc must be the controller's event sink.
 func New(ctrl *control.Controller, bc *Broadcaster) *Server {
 	return &Server{ctrl: ctrl, bc: bc}
+}
+
+// WithRebuild attaches a controller-rebuild function (e.g. boot.Build) so
+// POST /rebuild can hot-reload settings. model/maxSteps are recorded for
+// the settings view.
+func (s *Server) WithRebuild(fn func() (*control.Controller, error), model string, maxSteps int) *Server {
+	s.rebuildFn = fn
+	s.model = model
+	s.maxSteps = maxSteps
+	return s
 }
 
 // Handler returns the HTTP routes: GET / (browser client), GET /app.css, GET
@@ -82,6 +97,31 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /jobs", s.jobs)
 	mux.HandleFunc("GET /commands", s.commands)
 	mux.HandleFunc("GET /capabilities", s.capabilities)
+	mux.HandleFunc("GET /tcca-report", s.tccaReport)
+	mux.HandleFunc("POST /rebuild", s.rebuildHandler)
+	mux.HandleFunc("GET /checkpoints", s.checkpoints)
+	mux.HandleFunc("POST /checkpoints/rewind", s.rewindCheckpoint)
+	mux.HandleFunc("POST /checkpoints/fork", s.forkCheckpoint)
+	mux.HandleFunc("POST /checkpoints/summarize-from", s.summarizeFrom)
+	mux.HandleFunc("POST /checkpoints/summarize-up-to", s.summarizeUpTo)
+	mux.HandleFunc("POST /rename-session", s.renameSession)
+	mux.HandleFunc("GET /slash-args", s.slashArgs)
+	mux.HandleFunc("GET /settings", s.settings)
+	mux.HandleFunc("POST /settings/bypass", s.setBypass)
+	mux.HandleFunc("POST /settings/model", s.setModel)
+	mux.HandleFunc("POST /settings/default-model", s.setDefaultModel)
+	mux.HandleFunc("POST /settings/provider", s.saveProvider)
+	mux.HandleFunc("POST /settings/delete-provider", s.deleteProvider)
+	mux.HandleFunc("POST /settings/provider-key", s.setProviderKey)
+	mux.HandleFunc("POST /settings/agent-params", s.setAgentParams)
+	mux.HandleFunc("POST /settings/sandbox", s.setSandbox)
+	mux.HandleFunc("POST /settings/permission-mode", s.setPermissionMode)
+	mux.HandleFunc("POST /settings/permission-rule", s.addPermissionRule)
+	mux.HandleFunc("DELETE /settings/permission-rule", s.removePermissionRule)
+	mux.HandleFunc("POST /mcp/add", s.addMCPServer)
+	mux.HandleFunc("POST /mcp/remove", s.removeMCPServer)
+	mux.HandleFunc("POST /mcp/retry", s.retryMCPServer)
+	mux.HandleFunc("POST /mcp/enabled", s.setMCPServerEnabled)
 	mux.Handle("GET /assets/", http.FileServer(http.FS(webDist)))
 	return logMiddleware(csrfGuard(mux))
 }
@@ -164,6 +204,44 @@ func (s *Server) staticJS(w http.ResponseWriter, _ *http.Request) {
 // independently of the SSE stream (which may reconnect).
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "time": time.Now().UnixMilli()})
+}
+
+// Rebuild re-creates the controller from current config, carrying the
+// conversation forward (same pattern as desktop/settings_app.go rebuild).
+func (s *Server) Rebuild() error {
+	if s.rebuildFn == nil {
+		return fmt.Errorf("rebuild not available")
+	}
+	var carried []provider.Message
+	var sessionDir string
+	if s.ctrl != nil {
+		_ = s.ctrl.Snapshot()
+		carried = s.ctrl.History()
+		sessionDir = s.ctrl.SessionDir()
+		s.ctrl.Close()
+	}
+	ctrl, err := s.rebuildFn()
+	if err != nil {
+		return err
+	}
+	s.ctrl = ctrl
+	s.ctrl.EnableInteractiveApproval()
+	if len(carried) > 0 {
+		s.ctrl.Resume(&agent.Session{Messages: carried}, "")
+	}
+	if sessionDir != "" {
+		s.ctrl.SetSessionPath(agent.NewSessionPath(sessionDir, s.ctrl.Label()))
+	}
+	return nil
+}
+
+// rebuildHandler runs Rebuild on demand and returns the new meta.
+func (s *Server) rebuildHandler(w http.ResponseWriter, _ *http.Request) {
+	if err := s.Rebuild(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.meta(w, nil)
 }
 
 // events streams the controller's event flow as SSE until the client

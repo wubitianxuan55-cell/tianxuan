@@ -973,16 +973,13 @@ func (s *Server) tccaReport(w http.ResponseWriter, _ *http.Request) {
 	}
 	if shape := s.ctrl.LastCacheShape(); shape != nil {
 		resp["lastShape"] = map[string]any{
-			"kind":       shape.Kind,
-			"msgCount":   shape.MsgCount,
-			"roles":      shape.Roles,
-			"sysHash":    shape.SysHash,
-			"toolsHash":  shape.ToolsHash,
-			"prefixHash": shape.PrefixHash,
-			"tailHash":   shape.TailHash,
+			"prefixHash":        shape.PrefixHash,
+			"systemHash":        shape.SystemHash,
+			"toolsHash":         shape.ToolsHash,
+			"toolSchemaTokens":  shape.ToolSchemaTokens,
+			"logRewriteVersion": shape.LogRewriteVersion,
 		}
 	}
-	writeJSON(w, resp)
 }
 
 // ── helpers ────────────────────────────────────────────────────────────

@@ -366,7 +366,7 @@ func Default() *Config {
 		// Mode "ask" with no rules keeps `tianxuan run` autonomous (no TTY → ask
 		// resolves to allow) while `tianxuan chat` prompts before writers. Users add
 		// deny/allow rules to harden or quiet specific tools.
-		Permissions: PermissionsConfig{Mode: "ask"},
+		Permissions: PermissionsConfig{Mode: "ask", Allow: []string{"run_skill"}},
 		// Sandbox on by default: bash is jailed (macOS), network allowed so
 		// builds/downloads work. Set bash = "off" to disable. Network=true here
 		// so an absent [sandbox] in a user's file keeps egress (zero value would

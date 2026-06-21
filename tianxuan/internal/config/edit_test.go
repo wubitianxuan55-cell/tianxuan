@@ -234,7 +234,7 @@ func TestSaveToRoundTrips(t *testing.T) {
 	if got.Permissions.Mode != "deny" {
 		t.Errorf("mode = %q", got.Permissions.Mode)
 	}
-	if len(got.Permissions.Allow) != 1 || got.Permissions.Allow[0] != "bash(go test*)" {
+	if len(got.Permissions.Allow) != 2 || got.Permissions.Allow[0] != "run_skill" || got.Permissions.Allow[1] != "bash(go test*)" {
 		t.Errorf("allow list = %v", got.Permissions.Allow)
 	}
 	if len(got.Plugins) != 1 || got.Plugins[0].Name != "stripe" {

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useT } from "../lib/i18n";
 import type { MemoryArchive, MemoryFact, MemoryView } from "../lib/types";
@@ -6,7 +6,7 @@ import type { MemoryArchive, MemoryFact, MemoryView } from "../lib/types";
 type LinkInfo = { name: string; exists: boolean };
 
 function displayTitle(fact: MemoryFact | MemoryArchive): string {
-  return fact.title || fact.name.replaceAll("-", " ");
+  return fact.title || fact.name;
 }
 
 function uniqueLinks(body: string, names: Set<string>): LinkInfo[] {
@@ -21,6 +21,14 @@ function uniqueLinks(body: string, names: Set<string>): LinkInfo[] {
     links.push({ name, exists: names.has(name) });
   }
   return links;
+}
+
+function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button className={`ds-chip ${active ? "ds-chip--accent" : "ds-chip--muted"}`} onClick={onClick} type="button">
+      {label}
+    </button>
+  );
 }
 
 export function MemoryPanel({
@@ -76,13 +84,10 @@ export function MemoryPanel({
   const scopes = view?.scopes ?? [];
   const activeScope = scope || scopes[0]?.scope || "";
 
-  // Set initial scope
   if (!scope && scopes.length > 0) setScope(scopes[0].scope);
 
   const scrollToFact = (name: string) => {
-    const el = factRefs.current[name];
-    if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    factRefs.current[name]?.scrollIntoView({ behavior: "smooth", block: "center" });
     setHighlight(name);
     window.setTimeout(() => setHighlight((h) => (h === name ? null : h)), 1200);
   };
@@ -135,10 +140,7 @@ export function MemoryPanel({
 
   const submitNote = () => { if (note.trim()) void remember(activeScope, note.trim()); };
 
-  const startEdit = (path: string, body: string) => {
-    setEditingPath(path);
-    setDraft(body);
-  };
+  const startEdit = (path: string, body: string) => { setEditingPath(path); setDraft(body); };
 
   const saveEdit = async () => {
     if (!editingPath) return;
@@ -152,57 +154,63 @@ export function MemoryPanel({
     }
   };
 
-
   return (
-    <div className="drawer-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="drawer drawer--wide" data-state="open" style={{ maxWidth: 560 }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.35)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="flex flex-col w-full max-h-[85vh] rounded-2xl border border-border overflow-hidden"
+        style={{ maxWidth: 560, background: "var(--bg-elev)", boxShadow: "var(--ds-shadow-panel)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="drawer__head">
+        <div className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border-soft">
           <div>
-            <div className="drawer__title">{t("memory.title")}</div>
-            {view && <div className="drawer__summary">{t("memory.summary", { facts: facts.length.toString(), docs: (view.docs.length).toString() })}</div>}
+            <div className="text-[15px] font-semibold text-fg">{t("memory.title")}</div>
+            {view && <div className="text-fg-faint text-[11px] mt-0.5">{t("memory.summary", { facts: String(facts.length), docs: String(view.docs.length) })}</div>}
           </div>
-          <button className="drawer__close" onClick={onClose} aria-label={t("common.close")}>×</button>
+          <button
+            className="w-7 h-7 flex items-center justify-center border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
+            ✕
+          </button>
         </div>
-        {/* ── Toolbar: search + type filter + refresh ── */}
+
+        {/* Toolbar: search + type filter */}
         <div className="shrink-0 px-4 py-3 border-b border-border-soft space-y-2.5">
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 flex-1 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_2px_var(--accent-soft)] transition-[border-color,box-shadow] duration-[var(--dur-fast)]">
+            <div className="flex items-center gap-1.5 flex-1 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent transition-colors">
               <Search size={14} />
               <input
                 className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint"
-                placeholder={t("memory.searchPlaceholder") ?? "搜索记忆…"}
+                placeholder={t("memory.searchPlaceholder")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <button
-              className="shrink-0 w-8 h-8 flex items-center justify-center border border-border-soft rounded-md bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft transition-[color,background] duration-[var(--dur-fast)]"
-              onClick={onClose}
-              title={t("memory.refresh") ?? "刷新"}
-            >
-              <RefreshCw size={14} />
-            </button>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <FilterChip active={typeFilter === "all"} label={t("memory.filterAll") ?? "全部"} onClick={() => setTypeFilter("all")} />
+            <FilterChip active={typeFilter === "all"} label={t("memory.allTypes")} onClick={() => setTypeFilter("all")} />
             {factTypes.map((ft) => (
               <FilterChip key={ft} active={typeFilter === ft} label={ft} onClick={() => setTypeFilter(ft)} />
             ))}
           </div>
         </div>
 
-        {/* ── Body: facts + archives + suggestions ── */}
+        {/* Body: facts + archives + suggestions */}
         <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
           {/* Facts */}
           {filteredFacts.length === 0 && facts.length === 0 ? (
             <div className="py-10 text-center">
               <div className="text-fg-faint/50 text-[48px] mb-3">📝</div>
-              <div className="text-fg-dim text-[13px] mb-1">{t("memory.empty") ?? "还没有记忆"}</div>
-              <div className="text-fg-faint text-[11px]">{t("memory.emptyHint") ?? "使用下方的快速添加来创建第一条记忆"}</div>
+              <div className="text-fg-dim text-[13px] mb-1">{t("memory.noFacts")}</div>
             </div>
           ) : filteredFacts.length === 0 ? (
-            <div className="py-10 text-center text-fg-faint text-[13px]">{t("memory.noResults") ?? "无匹配结果"}</div>
+            <div className="py-10 text-center text-fg-faint text-[13px]">{t("memory.noMatches")}</div>
           ) : (
             <div className="flex flex-col gap-2">
               {filteredFacts.map((fact) => {
@@ -220,7 +228,7 @@ export function MemoryPanel({
                   >
                     {/* Card header */}
                     <button
-                      className="w-full flex items-start gap-2.5 px-3 py-2.5 bg-transparent border-0 text-left cursor-pointer hover:bg-bg-soft transition-colors duration-[var(--dur-fast)]"
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 bg-transparent border-0 text-left cursor-pointer hover:bg-bg-soft transition-colors"
                       onClick={() => toggleFact(fact.name)}
                     >
                       <span className="shrink-0 mt-0.5 text-fg-faint">
@@ -229,14 +237,14 @@ export function MemoryPanel({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-fg text-[13px] font-medium truncate">{displayTitle(fact)}</span>
-                          <span className="badge">{fact.type}</span>
+                          <span className="badge badge--muted">{fact.type}</span>
                         </div>
                         {fact.description && (
                           <div className="text-fg-faint text-[11.5px] leading-relaxed mt-0.5 line-clamp-2">{fact.description}</div>
                         )}
                       </div>
                       <button
-                        className="shrink-0 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint/60 cursor-pointer hover:text-err hover:bg-bg-soft transition-colors duration-[var(--dur-fast)]"
+                        className="shrink-0 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint/60 cursor-pointer hover:text-err hover:bg-bg-soft transition-colors"
                         onClick={(e) => { e.stopPropagation(); setConfirmForget(fact.name); }}
                         title={t("memory.forget")}
                       >
@@ -255,14 +263,14 @@ export function MemoryPanel({
                             {links.map((l) => (
                               <button
                                 key={l.name}
-                                className={`px-2 py-0.5 rounded text-[10.5px] border cursor-pointer transition-colors duration-[var(--dur-fast)] ${
+                                className={`px-2 py-0.5 rounded text-[10.5px] border cursor-pointer transition-colors ${
                                   l.exists
                                     ? "border-accent/30 bg-accent-soft text-accent hover:bg-accent/20"
                                     : "border-border-soft bg-transparent text-fg-faint line-through hover:bg-bg-soft"
                                 }`}
                                 onClick={(e) => { e.stopPropagation(); if (l.exists) jumpTo(l.name); }}
                                 disabled={!l.exists}
-                                title={l.exists ? `跳转到 ${l.name}` : `${l.name}（已删除）`}
+                                title={l.exists ? `跳转到 ${l.name}` : t("memory.deadLink", { name: l.name })}
                               >
                                 {l.name}
                               </button>
@@ -280,13 +288,13 @@ export function MemoryPanel({
           {/* Suggestions */}
           {suggestions && (suggestions.memory.length > 0 || suggestions.skills.length > 0) && (
             <div className="mt-4">
-              <div className="text-fg text-[11px] font-semibold uppercase tracking-wider mb-2">{t("memory.suggestions") ?? "建议"}</div>
+              <div className="text-fg text-[11px] font-semibold uppercase tracking-wider mb-2">{t("memory.suggestions")}</div>
               <div className="flex flex-col gap-2">
                 {suggestions.memory.map((s) => (
-                  <div key={s.name} className="mem-suggestion border border-border-soft rounded-lg p-3 bg-bg-soft">
+                  <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionNew") ?? "建议新增"}</span>
-                      <span className="badge">{s.type}</span>
+                      <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionNew")}</span>
+                      <span className="badge badge--muted">{s.type}</span>
                     </div>
                     <div className="text-fg text-[12.5px] font-medium">{s.title || s.name}</div>
                     <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
@@ -294,9 +302,9 @@ export function MemoryPanel({
                   </div>
                 ))}
                 {suggestions.skills.map((s) => (
-                  <div key={s.name} className="mem-suggestion border border-border-soft rounded-lg p-3 bg-bg-soft">
+                  <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-info text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionSkill") ?? "建议技能"}</span>
+                      <span className="text-info text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionSkill")}</span>
                     </div>
                     <div className="text-fg text-[12.5px] font-medium">{s.name}</div>
                     <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
@@ -310,20 +318,17 @@ export function MemoryPanel({
           {archives.length > 0 && (
             <div className="mt-4">
               <button
-                className="flex items-center gap-1.5 text-fg-faint text-[11px] font-semibold uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-fg transition-colors duration-[var(--dur-fast)]"
+                className="flex items-center gap-1.5 text-fg-faint text-[11px] font-semibold uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-fg transition-colors"
                 onClick={() => setArchivesOpen((v) => !v)}
               >
                 {archivesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {t("memory.archived") ?? "已归档"}
+                {t("memory.archived")}
                 <span className="text-fg-faint/60 font-normal">({archives.length})</span>
               </button>
               {archivesOpen && (
                 <div className="mt-2 flex flex-col gap-1.5">
                   {archives.map((a) => (
-                    <div
-                      key={a.name}
-                      className="border border-border-soft rounded-md px-3 py-2 bg-bg-soft/50 opacity-70 hover:opacity-100 transition-opacity duration-[var(--dur-fast)]"
-                    >
+                    <div key={a.name} className="border border-border-soft rounded-md px-3 py-2 bg-bg-soft/50 opacity-70 hover:opacity-100 transition-opacity">
                       <div className="flex items-center gap-2">
                         <span className="text-fg-dim text-[12px] font-medium">{displayTitle(a)}</span>
                         <span className="badge badge--muted">{a.type}</span>
@@ -340,7 +345,7 @@ export function MemoryPanel({
           )}
         </div>
 
-        {/* ── Footer: quick-add + doc files ── */}
+        {/* Footer: quick-add + doc files */}
         <div className="shrink-0 border-t border-border px-4 py-3 space-y-3">
           {/* Quick-add */}
           <div>
@@ -366,7 +371,7 @@ export function MemoryPanel({
                 onKeyDown={(e) => { if (e.key === "Enter") submitNote(); }}
               />
               <button
-                className="px-3 py-1.5 border-0 rounded-md bg-accent text-accent-fg text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-[var(--dur-fast)] disabled:opacity-40 disabled:cursor-default"
+                className="px-3 py-1.5 border-0 rounded-md bg-accent text-accent-fg text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-default"
                 onClick={submitNote}
                 disabled={busy || !note.trim()}
               >
@@ -380,7 +385,7 @@ export function MemoryPanel({
           {view && view.docs.length > 0 && (
             <div>
               <button
-                className="flex items-center gap-1.5 text-fg text-[12px] font-semibold bg-transparent border-0 cursor-pointer py-0.5 hover:text-accent transition-colors duration-[var(--dur-fast)]"
+                className="flex items-center gap-1.5 text-fg text-[12px] font-semibold bg-transparent border-0 cursor-pointer py-0.5 hover:text-accent transition-colors"
                 onClick={() => setDocsOpen((v) => !v)}
               >
                 {docsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -392,19 +397,19 @@ export function MemoryPanel({
                   {view.docs.map((d) => {
                     const editing = editingPath === d.path;
                     return (
-                      <div className="mem-doc border border-border-soft rounded-lg overflow-hidden" key={d.path}>
+                      <div className="border border-border-soft rounded-lg overflow-hidden" key={d.path}>
                         <div className="flex items-center gap-2 px-2.5 py-1.5 bg-bg-soft/50">
-                          <span className={`badge badge--${d.scope}`}>{d.scope}</span>
+                          <span className="badge badge--project">{d.scope}</span>
                           <span className="flex-1 text-fg-dim font-mono text-[10.5px] truncate" title={d.path}>
                             {d.path}
                           </span>
                           {!editing && (
                             <button
-                              className="px-2 py-0.5 text-[10.5px] border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors duration-[var(--dur-fast)]"
+                              className="px-2 py-0.5 text-[10.5px] border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
                               onClick={() => startEdit(d.path, d.body)}
                             >
                               <Pencil size={11} className="inline mr-1" />
-                              {t("common.edit") ?? "编辑"}
+                              {t("common.edit")}
                             </button>
                           )}
                         </div>
@@ -418,18 +423,18 @@ export function MemoryPanel({
                             />
                             <div className="flex justify-end gap-2 mt-1.5">
                               <button
-                                className="px-2.5 py-1 text-[11px] border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors duration-[var(--dur-fast)]"
+                                className="px-2.5 py-1 text-[11px] border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
                                 onClick={() => setEditingPath(null)}
                                 disabled={busy}
                               >
-                                {t("common.cancel") ?? "取消"}
+                                {t("common.cancel")}
                               </button>
                               <button
-                                className="px-2.5 py-1 text-[11px] border-0 rounded bg-accent text-accent-fg font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-[var(--dur-fast)] disabled:opacity-40"
+                                className="px-2.5 py-1 text-[11px] border-0 rounded bg-accent text-accent-fg font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40"
                                 onClick={() => void saveEdit()}
                                 disabled={busy}
                               >
-                                {t("common.save") ?? "保存"}
+                                {t("common.save")}
                               </button>
                             </div>
                           </div>
@@ -445,56 +450,30 @@ export function MemoryPanel({
               )}
             </div>
           )}
-
-          {view?.storeDir && (
-            <div className="text-fg-faint text-[9px] text-center font-mono" title={view.storeDir}>
-              {view.storeDir}
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Confirm forget inline — shown at bottom of card */}
-      {confirmForget && (
-        <div className="ds-modal-overlay" onClick={() => setConfirmForget(null)}>
-          <div
-            className="ds-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-fg text-[13px] mb-3">{t("memory.confirmForget")}</div>
-            <div className="text-fg-faint text-[11px] mb-3 font-mono">{confirmForget}</div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="ds-button-pill"
-                onClick={() => setConfirmForget(null)}
-                disabled={busy}
-              >
-                {t("common.cancel") ?? "取消"}
-              </button>
-              <button
-                className="px-3 py-1.5 text-[12px] border-0 rounded-full bg-err text-white font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all duration-[var(--dur-fast)] disabled:opacity-40"
-                onClick={() => void forget(confirmForget)}
-                disabled={busy}
-              >
-                {t("memory.forget")}
-              </button>
+        {/* Confirm forget */}
+        {confirmForget && (
+          <div className="ds-modal-overlay" onClick={() => setConfirmForget(null)}>
+            <div className="ds-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="text-fg text-[13px] mb-3">{t("memory.confirmForget")}</div>
+              <div className="text-fg-faint text-[11px] mb-3 font-mono">{confirmForget}</div>
+              <div className="flex justify-end gap-2">
+                <button className="ds-button-pill" onClick={() => setConfirmForget(null)} disabled={busy}>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  className="px-3 py-1.5 text-[12px] border-0 rounded-full bg-err text-white font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40"
+                  onClick={() => void forget(confirmForget)}
+                  disabled={busy}
+                >
+                  {t("memory.forget")}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  );
-}
-
-/** 类型筛选小标签 */
-function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      className={`ds-chip ${active ? "ds-chip--accent" : "ds-chip--muted"}`}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
   );
 }

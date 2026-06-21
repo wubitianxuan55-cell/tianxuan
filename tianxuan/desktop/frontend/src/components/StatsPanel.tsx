@@ -363,7 +363,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
           );
         })()}
 
-        {/* ── Token 趋势（Prompt + Completion 双线）── */}
+        {/* ── Token 趋势（Prompt + Completion 双Y轴）── */}
         {history.length > 1 && (() => {
           const recent = history.slice(-20);
           let cumP = 0, cumC = 0;
@@ -375,23 +375,27 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             pCumulative.push(cumP);
             cCumulative.push(cumC);
           }
-          const cumMax = Math.max(...pCumulative, ...cCumulative, 1);
-          const W = 260, H = 88, padL = 40, padR = 8, padT = 6, padB = 18;
+          const pMax = Math.max(...pCumulative, 1);
+          const cMax = Math.max(...cCumulative, 1);
+          const W = 260, H = 88, padL = 40, padR = 40, padT = 6, padB = 18;
           const plotW = W - padL - padR, plotH = H - padT - padB;
-          const toY = (v: number) => padT + plotH - (v / cumMax) * plotH;
+          const pToY = (v: number) => padT + plotH - (v / pMax) * plotH;
+          const cToY = (v: number) => padT + plotH - (v / cMax) * plotH;
           const pPoints: Point[] = pCumulative.map((v, i) => ({
             x: padL + (i / Math.max(1, pCumulative.length - 1)) * plotW,
-            y: toY(v),
+            y: pToY(v),
             label: `轮#${recent[i].turn}: Prompt ${tk(v)}`,
           }));
           const cPoints: Point[] = cCumulative.map((v, i) => ({
             x: padL + (i / Math.max(1, cCumulative.length - 1)) * plotW,
-            y: toY(v),
+            y: cToY(v),
             label: `轮#${recent[i].turn}: Compl ${tk(v)}`,
           }));
           const pPath = pPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
           const cPath = cPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-          const yLabels: [number, string][] = [[0, "0"], [Math.round(cumMax * 0.5), tk(Math.round(cumMax * 0.5))], [cumMax, tk(cumMax)]];
+          const tkK = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K" : String(n);
+          const pYLabels: [number, string][] = [[0, "0"], [Math.round(pMax * 0.5), tkK(Math.round(pMax * 0.5))], [pMax, tkK(pMax)]];
+          const cYLabels: [number, string][] = [[0, "0"], [Math.round(cMax * 0.5), tk(Math.round(cMax * 0.5))], [cMax, tk(cMax)]];
           const xLabels = recent.length >= 3
             ? [{ at: pPoints[0].x, text: `#${recent[0].turn}` }, { at: pPoints[pPoints.length - 1].x, text: `#${recent[recent.length - 1].turn}` }]
             : [];
@@ -405,36 +409,46 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
                 </div>
                 <div className="flex items-center gap-3 text-[9px] text-fg-faint">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded bg-accent" />
-                    Prompt
+                    <span className="w-2 h-0.5 rounded" style={{background:"#22d3ee"}} />
+                    输入
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded bg-ok" />
-                    Compl
+                    <span className="w-2 h-0.5 rounded" style={{background:"#fb923c"}} />
+                    输出
                   </span>
                 </div>
               </div>
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-                {yLabels.map(([_val, label], i) => {
-                  const y = padT + plotH - (i / (yLabels.length - 1)) * plotH;
+                {/* 左轴：输入 */}
+                {pYLabels.map(([_val, label], i) => {
+                  const y = padT + plotH - (i / (pYLabels.length - 1)) * plotH;
                   return (
-                    <g key={`y${i}`}>
+                    <g key={`py${i}`}>
                       <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} />
-                      <text x={padL - 4} y={y + 3} fontSize={9} fill="var(--fg-faint)" textAnchor="end">{label}</text>
+                      <text x={padL - 4} y={y + 3} fontSize={9} fill="#22d3ee" textAnchor="end">{label}</text>
                     </g>
                   );
                 })}
-                {/* Completion 线（在下层） */}
-                <path d={cPath} fill="none" stroke="var(--ok)" strokeWidth={1.5} strokeDasharray="4 3" />
-                {cPoints.map((p, i) => (
-                  <circle key={"c"+i} cx={p.x} cy={p.y} r={1.8} fill="var(--ok)">
+                {/* 右轴：输出 */}
+                {cYLabels.map(([_val, label], i) => {
+                  const y = padT + plotH - (i / (cYLabels.length - 1)) * plotH;
+                  return (
+                    <g key={`cy${i}`}>
+                      <text x={W - padR + 4} y={y + 3} fontSize={9} fill="#fb923c" textAnchor="start">{label}</text>
+                    </g>
+                  );
+                })}
+                {/* 输入线 */}
+                <path d={pPath} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinejoin="round" />
+                {pPoints.map((p, i) => (
+                  <circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="#22d3ee">
                     <title>{p.label}</title>
                   </circle>
                 ))}
-                {/* Prompt 线（在上层） */}
-                <path d={pPath} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" />
-                {pPoints.map((p, i) => (
-                  <circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="var(--accent)">
+                {/* 输出线 */}
+                <path d={cPath} fill="none" stroke="#fb923c" strokeWidth={2} strokeLinejoin="round" />
+                {cPoints.map((p, i) => (
+                  <circle key={"c"+i} cx={p.x} cy={p.y} r={2} fill="#fb923c">
                     <title>{p.label}</title>
                   </circle>
                 ))}

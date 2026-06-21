@@ -1446,6 +1446,16 @@ type WorkspaceChangeView struct {
 }
 
 // MemoryDoc is one loaded doc-memory file for the panel: path, scope, and body.
+// WorkspaceChanges returns the files modified during the current session.
+func (a *App) WorkspaceChanges() []WorkspaceChangeView {
+	changes := a.ctrl.WorkspaceChanges()
+	out := make([]WorkspaceChangeView, len(changes))
+	for i, ch := range changes {
+		out[i] = WorkspaceChangeView{Path: ch.Path, Added: ch.Added, Removed: ch.Removed}
+	}
+	return out
+}
+
 type MemoryDoc struct {
 	Path  string `json:"path"`
 	Scope string `json:"scope"`

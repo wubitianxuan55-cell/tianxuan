@@ -562,7 +562,6 @@ export default function App() {
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
-              onOpenStats={() => { setRightTab("stats"); setWorkspacePanel(true); }}
             />
             </CompactContext.Provider>
           </footer>

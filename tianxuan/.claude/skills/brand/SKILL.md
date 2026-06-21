@@ -1,6 +1,6 @@
 ---
 name: ckm:brand
-description: Brand voice, visual identity, messaging frameworks, asset management, brand consistency. Activate for branded content, tone of voice, marketing assets, brand compliance, style guides.
+description: "当用户处理品牌内容、视觉识别、营销资产时使用——品牌一致性管理"
 argument-hint: "[update|review|create] [args]"
 metadata:
   author: claudekit

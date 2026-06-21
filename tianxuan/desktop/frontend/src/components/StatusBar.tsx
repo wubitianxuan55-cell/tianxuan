@@ -90,69 +90,10 @@ function JobsChip({ jobs }: { jobs: JobView[] }) {
   );
 }
 
-// ─── 缓存率 popover ──────────────────────────────────────────────
-
-function CachePopover({
-  usage, sessionTotal, fontSize, cacheColor, cacheBadge, onOpenStats,
-}: {
-  usage?: WireUsage; sessionTotal: number; fontSize: string; cacheColor: string; cacheBadge: string; onOpenStats?: () => void;
-}) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const denom = (usage?.cacheHitTokens ?? 0) + (usage?.cacheMissTokens ?? 0) || usage?.promptTokens || 1;
-  const nowPct = Math.round(((usage?.cacheHitTokens ?? 0) / denom) * 100);
-
-  return (
-    <div className="relative inline-flex">
-      <button
-        className={`${fontSize} font-semibold px-1.5 py-px rounded border cursor-pointer transition-colors hover:brightness-110 ${cacheColor} ${cacheBadge}`}
-        onClick={() => setOpen((v) => !v)}
-        title={t("status.cacheDetail")}
-      >
-        {t("status.cache", { pct: nowPct })}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-1 z-50 bg-bg-elev-2 border border-border rounded-lg min-w-[240px] overflow-hidden" style={{boxShadow: "var(--ds-shadow-dropdown)"}}>
-            <div className="px-3 py-2 text-[11px] text-fg-faint font-medium border-b border-border-soft">{t("status.cacheDetail")}</div>
-            <div className="px-3 py-2 text-[12px] space-y-1.5">
-              <Row label={t("status.promptTokens")} value={fmtTokens(usage?.promptTokens ?? 0)} />
-              <Row label={t("status.completionTokens")} value={fmtTokens(usage?.completionTokens ?? 0)} />
-              <Row label={t("status.cacheHitTokens")} value={fmtTokens(usage?.cacheHitTokens ?? 0)} cls="text-ok" />
-              <Row label={t("status.cacheMissTokens")} value={fmtTokens(usage?.cacheMissTokens ?? 0)} cls="text-err" />
-              {sessionTotal > 0 && (
-                <Row label={t("status.sessionTotal")} value={fmtTokens(sessionTotal)} border />
-              )}
-            </div>
-            {onOpenStats && (
-              <button
-                className="w-full px-3 py-1.5 text-[11px] text-accent bg-transparent border-0 border-t border-border-soft cursor-pointer hover:bg-bg-elev text-left"
-                onClick={() => { setOpen(false); onOpenStats(); }}
-              >
-                {t("status.viewFullStats")} →
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Row({ label, value, cls, border }: { label: string; value: string; cls?: string; border?: boolean }) {
-  return (
-    <div className={`flex justify-between ${border ? "border-t border-border-soft pt-1.5 mt-0.5" : ""}`}>
-      <span className="text-fg-faint">{label}</span>
-      <span className={`font-mono ${cls ?? "text-fg-dim"}`}>{value}</span>
-    </div>
-  );
-}
-
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export function StatusBar({
-  context, usage, balance, jobs, running, mode, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, onOpenStats,
+  context, usage, balance, jobs, running, mode, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -168,6 +109,7 @@ export function StatusBar({
   onOpenStats?: () => void;
 }) {
   const compact = useCompact();
+  const { t } = useI18n();
   const now = useTick(running);
 
   const elapsedMs = running && turnStartAt ? Math.max(0, now - turnStartAt) : 0;
@@ -284,16 +226,25 @@ export function StatusBar({
           </Tooltip>
         )}
 
-        {/* 缓存率 */}
-        {sessionTotal > 0 && (
-          <CachePopover
-            usage={usage}
-            sessionTotal={sessionTotal}
-            fontSize={fontSize}
-            cacheColor={cacheColor}
-            cacheBadge={cacheBadge}
-            onOpenStats={onOpenStats}
-          />
+        {/* 缓存详情 — 直接平铺 */}
+        {sessionTotal > 0 && usage && (
+          <>
+            <span className="text-border/40 select-none">│</span>
+            <Tooltip label="缓存命中率">
+              <span className={`${fontSize} font-semibold px-1.5 py-px rounded border ${cacheColor} ${cacheBadge}`}>
+                {t("status.cache", { pct: sessionRate })}
+              </span>
+            </Tooltip>
+            <Tooltip label="本轮提示">
+              <span className="text-fg-dim font-mono tabular-nums">{fmtTokens(usage?.promptTokens ?? 0)}</span>
+            </Tooltip>
+            <Tooltip label="缓存命中">
+              <span className="text-ok font-mono tabular-nums">{fmtTokens(usage?.cacheHitTokens ?? 0)}</span>
+            </Tooltip>
+            <Tooltip label="缓存未命中">
+              <span className="text-err font-mono tabular-nums">{fmtTokens(usage?.cacheMissTokens ?? 0)}</span>
+            </Tooltip>
+          </>
         )}
 
         {/* 后台任务 */}

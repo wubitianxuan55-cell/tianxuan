@@ -12,9 +12,21 @@ const IndexMaxChars = 4000
 const missingDescPlaceholder = `(no description — frontmatter is missing a "description:" line; tell the user to add one)`
 
 // indexHeader introduces the skills block in the system prompt: how to invoke a
-// skill, and the inline-vs-subagent distinction.
-const indexHeader = "# Skills — playbooks you can invoke\n\n" +
-	"One-liner index. Each entry is a built-in or a user-authored playbook. Call `run_skill({ name: \"<skill-name>\", arguments: \"<task>\" })` — `name` is JUST the identifier (e.g. `\"explore\"`), NOT the `[🧬 subagent]` tag that follows it. Entries tagged `[🧬 subagent]` spawn an isolated subagent — its tool calls and reasoning never enter your context, only its final answer does; use them for context-heavy work (deep exploration, multi-step research) where you only need the conclusion. Untagged skills are inlined: the body becomes a tool result you read and act on directly. The user can also invoke a skill via `/<name>`."
+// skill, and the inline-vs-subagent distinction. V8.22: changed from permissive
+// "you can invoke" to prescriptive "you MUST consult before acting" to push the
+// model toward skill usage (Reasonix pattern).
+const indexHeader = "# Skills — playbooks you MUST consult before acting\n\n" +
+	"技能是领域知识或工作流编排——使用技能比从零开始更高效、更正确。" +
+	"在开始任何工作之前，先检查是否有匹配的技能。" +
+	"各技能的 description 说明了何时必须使用它" +
+	"（如 \"在任何创造性工作之前必须使用此技能\"）。\n\n" +
+	"每个条目是内置或用户编写的 playbook。" +
+	"调用方式: `run_skill({ name: \"<skill-name>\", arguments: \"<task>\" })` " +
+	"— `name` 只需标识符（如 `\"explore\"`），不要含 `[🧬 subagent]` 标签。" +
+	"标记 `[🧬 subagent]` 的技能启动隔离子代理——其工具调用和推理不会进入你的上下文，" +
+	"仅返回最终结论；用于上下文繁重的工作（深度探索、多步研究），你只需结论。" +
+	"未标记的技能为 inline：正文成为工具结果供你直接阅读执行。" +
+	"用户也可通过 `/<name>` 调用技能。"
 
 // ApplyIndex appends the skills index to basePrompt, or returns it unchanged
 // when there are no skills. Only names + descriptions (+ a subagent tag) are

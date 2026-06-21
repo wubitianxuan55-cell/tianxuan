@@ -1,6 +1,6 @@
 ---
 name: gitnexus-guide
-description: "GitNexus MCP 工具完整参考 — 代码知识图谱查询、影响分析、重构、调试的入口指南。涵盖全部 13 个 MCP 工具、资源 URI 和图 schema。"
+description: "当用户使用GitNexus代码知识图谱时使用——13个MCP工具完整参考"
 ---
 
 # GitNexus 指南

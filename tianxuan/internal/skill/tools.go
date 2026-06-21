@@ -43,7 +43,7 @@ func (*runSkillTool) Name() string { return "run_skill" }
 func (*runSkillTool) ReadOnly() bool { return false }
 
 func (*runSkillTool) Description() string {
-	return "Invoke a playbook from the Skills index pinned in the system prompt. For the built-in subagent skills (explore / research / review / security_review), prefer the dedicated top-level tools of the same name — they're easier to pick and do the same thing. Pass `name` as the BARE identifier (e.g. 'explore'), NOT the `[🧬 subagent]` tag that follows it in the index. `[🧬 subagent]` skills spawn an isolated subagent — only the final distilled answer returns; supply `arguments` describing the concrete task since the subagent has no other context. Untagged skills are inlined: the body becomes a tool result you read and follow."
+	return "Invoke a playbook from the Skills index. Use bare name (e.g. 'explore'), not the [🧬 subagent] tag. Subagent skills spawn isolated loop — only final answer returns, supply arguments as task. Inline skills fold body as tool result. Prefer dedicated top-level tools (explore/review/etc) when available."
 }
 
 func (*runSkillTool) Schema() json.RawMessage {
@@ -190,16 +190,16 @@ func BuiltinSubagentTools(store *Store, runner SubagentRunner) []tool.Tool {
 		toolName, skillName, description, taskDesc string
 	}{
 		{"explore", "explore",
-			"Run a focused read-only codebase investigation in an isolated subagent. Use for broad survey questions across many files — 'find all places that X', 'how does Y work across the project', 'audit Z'. Returns one distilled answer with file:line citations. Its reads + reasoning never enter your context, unlike chained read_file.",
+			"Isolated subagent for read-only codebase investigation. Use for broad survey questions ('how does X work?'). Returns one distilled answer with file:line citations. Spares your context — its reads + reasoning never enter.",
 			"Concrete investigation question. The subagent has none of your context — write a self-contained prompt naming the symbol / pattern / behavior to survey."},
 		{"research", "research",
-			"Combine web_search + web_fetch + code reading in an isolated subagent. Use when the answer needs both an external reference and local verification — 'is X supported by lib Y', 'compare our impl against the spec'. Returns one synthesis citing code (file:line) and web (URL).",
+			"Isolated subagent combining web_search + web_fetch + code reading. Use for questions needing external reference + local code verification ('is X supported by lib Y?'). Returns synthesis with code (file:line) and web (URL) citations.",
 			"Concrete research question. The subagent has none of your context — name the external thing to look up and the local code to compare against."},
 		{"review", "review",
-			"Review the pending changes (current branch diff) in an isolated subagent — flags correctness / security / missing-tests / hidden behavior per file:line. Read-only; you decide what to act on. Use before suggesting a PR-shaped change or after finishing a multi-step edit.",
+			"Isolated subagent reviewing current branch diff — flags correctness, security, missing-tests, hidden behavior per file:line. Read-only. Use before suggesting a PR or after finishing a multi-step edit.",
 			"What to focus the review on (e.g. 'focus on the auth changes' or 'general'). The subagent reads the diff itself."},
 		{"security_review", "security-review",
-			"Security-focused review of the current branch diff in an isolated subagent — injection / authz / secrets / deserialization / path-traversal / crypto, severity-tagged. Read-only. Use when shipping changes that touch auth, input parsing, file IO, or external requests.",
+			"Isolated subagent for security review of current branch diff — injection, authz, secrets, deserialization, path-traversal, crypto, severity-tagged. Read-only. Use when changes touch auth, input parsing, file IO, or external requests.",
 			"Optional scope hint (e.g. 'focus on token handling in internal/auth/') or 'full' for everything in the diff."},
 	}
 	var out []tool.Tool
@@ -239,7 +239,7 @@ func (t *installSkillTool) Description() string {
 	if t.store.HasProjectScope() {
 		scope = "'project' (default) writes to <repo>/.tianxuan/skills/ (this workspace only); 'global' writes to ~/.tianxuan/skills/ (every project)."
 	}
-	return "Author and save a new skill — a reusable playbook future turns invoke via run_skill (or /<name>). Runnable immediately this turn; appears in the pinned Skills index on the next launch. " + scope
+	return "Author and save a new skill — reusable playbook invoked via run_skill or /<name>. Runnable immediately; appears in Skills index on next launch. " + scope
 }
 
 func (*installSkillTool) Schema() json.RawMessage {
@@ -419,7 +419,7 @@ func (*parallelSkillsTool) Name() string { return "parallel_skills" }
 func (*parallelSkillsTool) ReadOnly() bool { return false }
 
 func (*parallelSkillsTool) Description() string {
-	return "并行派发多个子代理技能，所有子代理同时执行，全部完成后返回汇总结果。适用于 2+ 个互相独立的调查/分析任务（如同时探索多个模块、并行审查多个文件）。任务间不应有依赖关系——有依赖时请分次调用 run_skill。"
+	return "并行派发多个子代理技能同时执行，完成后汇总结果。适用于 2+ 个独立任务（如并行探索多模块）。有依赖时请分次调用 run_skill。"
 }
 
 func (*parallelSkillsTool) Schema() json.RawMessage {

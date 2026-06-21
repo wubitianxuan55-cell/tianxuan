@@ -1,0 +1,47 @@
+{
+  "name": "tianxuan-vscode",
+  "displayName": "tianxuan — DeepSeek AI Coding Agent",
+  "description": "VS Code 扩展: 开源 AI Coding Agent，DeepSeek V4 专属，极低 Token 成本",
+  "version": "8.6.0",
+  "publisher": "tianxuan",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Chat", "Programming Languages", "Machine Learning"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "tianxuan.openPanel", "title": "打开 tianxuan 面板", "icon": "$(hubot)" },
+      { "command": "tianxuan.submitSelection", "title": "tianxuan: 发送选中内容" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "tianxuan.submitSelection", "group": "tianxuan" }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tianxuan-sidebar",
+          "title": "tianxuan",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "tianxuan-sidebar": [
+        { "type": "webview", "id": "tianxuan.panel", "name": "聊天" }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
+    "package": "npm run build && vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

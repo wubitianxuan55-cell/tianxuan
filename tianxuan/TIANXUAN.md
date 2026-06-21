@@ -1,5 +1,16 @@
 # tianxuan project memory
 
+> V8.6.0 — God对象拆分+Web/VS Code骨架+死代码大扫除 · 2026-06-21
+## V8.6.0 发布摘要 (2026-06-21)
+**基于**: V8.4.1 · **二进制**: CLI / Desktop · **位置**: `release/v8.6.0/` · **变更**: 17文件 +96/-6629行
+🏗️ Go核心: agent.go 1219→840 (-31%), compact.go 591→369 (-38%), 新增 agent_run/agent_stream/compact_summary 3文件
+🧹 死代码: usePasteHandler.ts(-94) + package-lock.json(-4849) + flow.go墓碑(-2) + styles.css(-535)
+🧩 复用: CloseButton+ToolbarButton 组件 + close-btn/toolbar-btn CSS utility
+🌐 新平台: web/ Web UI (React SPA, HTTP/SSE) + vscode/ VS Code Extension (sidecar)
+🏗️ 构建: KaTeX字体过滤节省876KB + bridge.ts→mock.ts拆分(658→215)
+🔒 缓存安全: 全部通过 — L1/L2 hash一致, 命中率 0%→52%→67%, 峰值93%
+
+
 > V8.4.1 — Token成本优化+统计修复+7组件优化 · 2026-06-21
 
 ## V8.4.1 发布摘要 (2026-06-21)

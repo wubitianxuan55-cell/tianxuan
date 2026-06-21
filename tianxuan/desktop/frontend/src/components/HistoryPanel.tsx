@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pencil, Search, Trash2, Check, X, MessageSquare, Clock } from "lucide-react";
 import { t, useT } from "../lib/i18n";
 import type { SessionMeta } from "../lib/types";
+import { CloseButton } from "./CloseButton";
 import { ResizableDrawer } from "./ResizableDrawer";
 
 export function HistoryPanel({
@@ -66,13 +67,7 @@ export function HistoryPanel({
             </span>
           )}
         </div>
-        <button
-          className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag"
-          onClick={onClose}
-          title={tr("common.close")}
-        >
-          <X size={14} />
-        </button>
+        <CloseButton onClick={onClose} />
       </header>
 
       {/* ── 搜索栏 ── */}

@@ -18,7 +18,7 @@ function PlanBtn({ num, active, title, hint, onClick }: {
       }`}
       onClick={onClick}
     >
-      <span className={`inline-flex items-center justify-center w-[26px] h-[26px] border rounded-[7px] font-mono text-xs font-bold ${
+      <span className={`inline-flex items-center justify-center w-[26px] h-[26px] border rounded-lg font-mono text-xs font-bold ${
         active ? "border-accent bg-accent text-accent-fg" : "border-border text-fg-dim bg-bg"
       }`}>
         {num}

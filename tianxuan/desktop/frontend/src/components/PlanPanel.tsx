@@ -1,5 +1,6 @@
-import { CheckCircle2, FileText, ListTodo, X } from "lucide-react";
+import { CheckCircle2, FileText, ListTodo } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { CloseButton } from "./CloseButton";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { ResizableDrawer } from "./ResizableDrawer";
 import type { Todo } from "../lib/tools";
@@ -34,13 +35,7 @@ export function PlanPanel({
             </span>
           )}
         </div>
-        <button
-          className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag"
-          onClick={onClose}
-          title={tr("common.close")}
-        >
-          <X size={14} />
-        </button>
+        <CloseButton onClick={onClose} />
       </header>
 
       {/* ── Progress bar ── */}

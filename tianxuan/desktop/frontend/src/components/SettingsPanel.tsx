@@ -4,6 +4,7 @@ import { useI18n, useT } from "../lib/i18n";
 import { useUpdater } from "../lib/useUpdater";
 import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
+import { CloseButton } from "./CloseButton";
 import { ResizableDrawer } from "./ResizableDrawer";
 import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug } from "lucide-react";
 
@@ -67,9 +68,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     <ResizableDrawer onClose={onClose} wide>
         <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
           <div className="text-[15px] font-semibold text-fg">{t("settings.title")}</div>
-          <button className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag" onClick={onClose} title={t("common.close")}>
-            <X size={14} />
-          </button>
+          <CloseButton onClick={onClose} />
         </header>
 
         {!s ? (

@@ -17,6 +17,7 @@ import { TodoPanel } from "./components/TodoPanel";
 import { ApprovalModal } from "./components/ApprovalModal";
 import { AskCard } from "./components/AskCard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
+import { ToolbarButton } from "./components/ToolbarButton";
 import { StatusBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
@@ -454,7 +455,7 @@ export default function App() {
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
             <div className="flex items-center gap-2 px-3">
-              {cwd && (<button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag flex items-center gap-1.5 text-fg-dim text-xs py-0.5 px-2" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
+              {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
               <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
@@ -473,9 +474,9 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] no-drag" onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</button>
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</button>
-              <button className="inline-flex items-center gap-[5px] h-[26px] px-[11px] border border-border bg-bg-soft text-fg-dim text-xs rounded-[7px] cursor-pointer transition-[color,border-color,background,transform] duration-[0.12s] hover:text-fg hover:border-fg-faint active:scale-[0.97] disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-dim disabled:hover:border-border no-drag" onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</button>
+              <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
+              <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
+              <ToolbarButton onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
               <ThemeSwitcher theme={themeNow} onSet={applyTheme} onStore={setTheme} />
             </div>
           </header>

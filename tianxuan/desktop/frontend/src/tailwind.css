@@ -162,6 +162,55 @@
   transform: none;
 }
 
+/* ── close-btn — shared close (X) button ───────────────────────────────── */
+@utility close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg-soft);
+  color: var(--color-fg-faint);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.close-btn:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg-faint);
+}
+
+/* ── toolbar-btn — shared toolbar action button ────────────────────────── */
+@utility toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding-left: 11px;
+  padding-right: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg-soft);
+  color: var(--color-fg-dim);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+.toolbar-btn:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg-faint);
+}
+.toolbar-btn:active { transform: scale(0.97); }
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.toolbar-btn:disabled:hover {
+  color: var(--color-fg-dim);
+  border-color: var(--color-border);
+}
+
 /* Drawer resizing cursor lock */
 .drawer--resizing,
 .drawer--resizing * {

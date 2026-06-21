@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { CapabilitiesView, MCPServerInput, ServerView, SkillView } from "../lib/types";
+import { CloseButton } from "./CloseButton";
 import { ResizableDrawer } from "./ResizableDrawer";
 
 // CapabilitiesPanel is the desktop MCP & Skills drawer — the GUI counterpart to
@@ -112,9 +113,7 @@ export function CapabilitiesPanel({
             <div className="text-[15px] font-semibold text-fg">{t("caps.title")}</div>
             {view && <div className="mt-[3px] text-fg-faint text-[11px]">{summary}</div>}
           </div>
-          <button className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag" onClick={onClose} title={t("common.close")}>
-            <X size={14} />
-          </button>
+          <CloseButton onClick={onClose} />
         </header>
 
         {!view ? (
@@ -239,7 +238,7 @@ function ServerGroup({
 }) {
   if (servers.length === 0) return null;
   return (
-    <div className="cap-server-group">
+    <div className="flex flex-col mt-3">
       {servers.map((s) => (
         <ServerRow
           key={s.name}

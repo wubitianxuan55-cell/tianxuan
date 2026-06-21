@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronRight, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useT } from "../lib/i18n";
 import type { MemoryFact, MemoryView } from "../lib/types";
+import { CloseButton } from "./CloseButton";
 
 type LinkInfo = { name: string; exists: boolean };
 
@@ -150,9 +151,7 @@ export function MemoryPanel({
               </span>
             )}
           </div>
-          <button className="inline-flex items-center justify-center w-[26px] h-[26px] border border-border bg-bg-soft text-fg-faint rounded-[7px] cursor-pointer transition-[color,border-color,background] duration-[0.12s] hover:text-fg hover:border-fg-faint no-drag" onClick={onClose} title={t("common.close")}>
-            <X size={14} />
-          </button>
+          <CloseButton onClick={onClose} />
         </header>
 
         {!view?.available ? (

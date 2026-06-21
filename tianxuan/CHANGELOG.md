@@ -1,3 +1,82 @@
+## [8.6.0] — 2026-06-21
+
+### 🏗️ Go 核心 — 上帝对象拆分 + 文件级重组
+
+> 基于 V8.4.1 · 跨越 V8.5.0+V8.6.0 双版迭代 · 17文件 +96/-6629行
+
+| 文件 | 变更 | 说明 |
+|------|------|------|
+| `agent.go` | 1219→840 (**-31%**) | `Run()`+`runDirect()` → `agent_run.go`(226行) |
+| `agent.go` | — | `stream()`+`repairArguments()`+`finishReasonMessage()` → `agent_stream.go`(169行) |
+| `compact.go` | 591→369 (**-38%**) | `BuildCompactSummary`+`truncateText`+`extractKeyFiles` → `compact_summary.go`(231行) |
+| `flow.go` | — | 删除 2 行 KnowledgeGraph 死代码墓碑注释 |
+
+### 🧹 死代码与冗余清理
+
+| 文件 | 变更 | 效果 |
+|------|------|------|
+| `usePasteHandler.ts` | 删除 | -94行（零引用） |
+| `package-lock.json` | 删除 | -4849行（pnpm 项目冲突） |
+| `styles.css` | 1208→673 (**-44%**) | 删除 mem-section(360行)、cap-tabs(141行)、plan-panel__body(14行)、badge变体(4×5)、settings表单(55行)、空注释 |
+| `flow.go` | -2行 | KnowledgeGraph 墓碑 |
+| `notice--warn` | 删除 | 零引用 CSS 类 |
+| `rounded-[7px]` | 2处→`rounded-lg` | 消除 Tailwind 魔法数字 |
+
+### 🧩 复用组件提取
+
+| 组件 | 效果 |
+|------|------|
+| `CloseButton.tsx` | 5个面板中200+字符 className → `<CloseButton />` 1行调用 |
+| `ToolbarButton.tsx` | 6个位置200+字符 className → `<ToolbarButton>...</ToolbarButton>` |
+| `tailwind.css` `close-btn` / `toolbar-btn` | 复用样式集中管理 |
+
+### 🌐 Web 界面 + VS Code 插件（骨架）
+
+| 目录 | 文件 | 说明 |
+|------|------|------|
+| `web/` | 9文件 | React SPA, HTTP/SSE bridge, 100%复用 desktop 组件 |
+| `vscode/` | 5文件 | VS Code Extension, sidecar 启动 `tianxuan serve`, Webview 面板 |
+
+**架构**: 纯外壳层, Go 内核零变动。`web/src/bridge.ts` 通过 HTTP/SSE 替代 Wails IPC; `vscode/src/extension.ts` 启动 `tianxuan serve` 作为子进程。
+
+### 🏗️ 构建优化
+
+| 变更 | 说明 |
+|------|------|
+| KaTeX 字体过滤 | `vite.config.ts` 新增 `stripLegacyFonts` 插件, 删除 dist 产物中 20个woff(336KB)+20个ttf(540KB)=876KB |
+
+### 📊 最终文件行数
+
+| 文件 | 前 | 后 | 变化 |
+|------|-----|-----|:--:|
+| `agent.go` | 1219 | 840 | -31% |
+| `agent_run.go` | — | 226 | new |
+| `agent_stream.go` | — | 169 | new |
+| `compact.go` | 591 | 369 | -38% |
+| `compact_summary.go` | — | 231 | new |
+| `flow.go` | 249 | 247 | -2 |
+| `styles.css` | 1208 | 673 | -44% |
+| `tailwind.css` | 218 | 267 | +49 |
+| `bridge.ts` | 658 | 215 | -67% |
+| `mock.ts` | — | 484 | new |
+
+### 🔒 缓存安全
+
+全部通过:
+- `TestCachePrefixStabilityDiagnostic` — L1/L2 hash 全轮一致 ✅
+- `TestCacheHitPrefixStable` — 命中率 0%→52%→67% ✅
+- `TestCacheHitClimbsWithoutCompaction` — 峰值 93% ✅
+- 10× `cacheBreakDetector` — 5种断裂原因全绿 ✅
+
+### 📦 发布
+
+- CLI: `tianxuan.exe` (`-ldflags="-s -w"`)
+- 桌面端: `tianxuan-desktop.exe` (Wails, Go 1.25)
+- 位置: `release/v8.6.0/`
+- 变更: 17 文件，+96/-6629 行
+
+---
+
 ## [8.4.1] — 2026-06-21
 
 ### 🔧 Go 核心 — Token 成本优化

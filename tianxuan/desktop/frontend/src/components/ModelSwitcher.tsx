@@ -25,7 +25,7 @@ export function ModelSwitcher({ label, onPick }: { label: string; onPick: (name:
 
   return (
     <div className="relative inline-flex">
-      <button className="flex items-center gap-1 px-1.5 py-0.5 border border-border-soft rounded-[7px] bg-transparent text-fg-dim text-[12px] font-medium cursor-pointer no-drag hover:text-fg hover:border-fg-faint" onClick={() => setOpen((v) => !v)} title={t("status.switchModel")}>
+      <button className="flex items-center gap-1 px-1.5 py-0.5 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12px] font-medium cursor-pointer no-drag hover:text-fg hover:border-fg-faint" onClick={() => setOpen((v) => !v)} title={t("status.switchModel")}>
         <span className="max-w-28 truncate font-mono text-[11px]">{label}</span>
         <ChevronsUpDown size={11} />
       </button>

@@ -38,7 +38,6 @@ type FlowLayer struct {
 	store   MessageStore           // V4.0: abstracted message storage
 	rings   *DetailRingBuffer
 	compact CompactPolicy
-	// V5.13: KnowledgeGraph removed — dead code (no callers)
 }
 
 // DetailEntry is a single detail block in the ring buffer.
@@ -208,7 +207,6 @@ func (l *FlowLayer) DetailDir() string { return l.rings.dir }
 // CompactPolicy returns the compaction policy.
 func (l *FlowLayer) CompactPolicy() CompactPolicy { return l.compact }
 
-// V5.13: SetGraph/Graph/QueryGraphContext removed — dead code (KnowledgeGraph deleted)
 
 // SetCompactPolicy updates the compaction policy at runtime.
 func (l *FlowLayer) SetCompactPolicy(p CompactPolicy) { l.compact = p }

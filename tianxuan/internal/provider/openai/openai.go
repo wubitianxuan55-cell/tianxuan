@@ -68,25 +68,65 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	}
 	keyEnv, _ := cfg.Extra["api_key_env"].(string) // for actionable auth errors
 	effort, _ := cfg.Extra["effort"].(string)
+	effort = strings.ToLower(strings.TrimSpace(effort))
+	if effort == "auto" {
+		effort = ""
+	}
+	protocol, _ := cfg.Extra["reasoning_protocol"].(string)
+	protocol = normalizeReasoningProtocol(protocol)
+	deepseek := protocol == "deepseek" || (protocol == "" && IsDeepSeek(cfg.BaseURL))
+	minimax := protocol == "" && IsMiniMax(cfg.BaseURL)
+	switch {
+	case protocol == "none":
+		effort = ""
+	case deepseek:
+		switch effort {
+		case "", "off":
+			effort = "high"
+		case "high", "max":
+		default:
+			return nil, fmt.Errorf("openai: provider %q uses DeepSeek thinking; effort must be high or max", name)
+		}
+	case minimax:
+		switch effort {
+		case "", "auto":
+			effort = "adaptive"
+		case "adaptive", "disabled":
+		default:
+			return nil, fmt.Errorf("openai: provider %q uses MiniMax thinking; effort must be adaptive or disabled", name)
+		}
+	default:
+		if effort != "" {
+			switch effort {
+			case "low", "medium", "high":
+			default:
+				return nil, fmt.Errorf("openai: provider %q: effort must be low, medium, or high", name)
+			}
+		}
+	}
 	return &client{
-		name:    name,
-		apiKey:  cfg.APIKey,
-		keyEnv:  keyEnv,
-		baseURL: strings.TrimRight(cfg.BaseURL, "/"),
-		model:   cfg.Model,
-		effort:  effort,
-				http: getSharedClient(strings.TrimRight(cfg.BaseURL, "/")),
+		name:     name,
+		apiKey:   cfg.APIKey,
+		keyEnv:   keyEnv,
+		baseURL:  strings.TrimRight(cfg.BaseURL, "/"),
+		model:    cfg.Model,
+		effort:   effort,
+		deepseek: deepseek,
+		minimax:  minimax,
+		http:     getSharedClient(strings.TrimRight(cfg.BaseURL, "/")),
 	}, nil
 }
 
 type client struct {
-	name    string
-	apiKey  string
-	keyEnv  string // api_key_env name, surfaced in auth errors
-	baseURL string
-	model   string
-	http    *http.Client
-	effort  string // reasoning_effort forwarded to thinking-capable models; "" = omit
+	name     string
+	apiKey   string
+	keyEnv   string // api_key_env name, surfaced in auth errors
+	baseURL  string
+	model    string
+	http     *http.Client
+	effort   string // reasoning_effort for OpenAI; thinking.type for MiniMax; "" = auto/provider default
+	deepseek bool   // auto-detected: api.deepseek.com or reasoning_protocol=deepseek
+	minimax  bool   // auto-detected: *.minimaxi.com (requires thinking.type, not reasoning_effort)
 }
 
 func (c *client) Name() string { return c.name }
@@ -204,6 +244,16 @@ func isTransientErr(err error) bool {
 	return true
 }
 
+// normalizeReasoningProtocol 规范化 reasoning_protocol 配置值。
+func normalizeReasoningProtocol(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "deepseek", "openai", "none":
+		return strings.ToLower(strings.TrimSpace(raw))
+	default:
+		return ""
+	}
+}
+
 func (c *client) buildRequest(req provider.Request) chatRequest {
 	// Repair tool-call pairing before sending: an interrupted/resumed history can
 	// carry an assistant tool_calls turn whose results never landed, which DeepSeek
@@ -211,17 +261,17 @@ func (c *client) buildRequest(req provider.Request) chatRequest {
 	src := provider.SanitizeToolPairing(req.Messages)
 	msgs := make([]chatMessage, len(src))
 	for i, m := range src {
-		// reasoning_content is deliberately NOT sent back: it's a response-only
-		// field. DeepSeek counts re-sent reasoning as billable prompt input
-		// (measured ~500 extra tokens per turn on a reasoner chain); MiMo accepts
-		// it but does not require it (verified empirically: multi-turn tool-call
-		// sessions work fine without it, saving ~18 tokens/turn). The session
-		// still keeps it (for display/archive); we just don't pay to re-upload it.
 		cm := chatMessage{
 			Role:       string(m.Role),
 			Content:    m.Content,
 			ToolCallID: m.ToolCallID,
 			Name:       m.Name,
+		}
+		// DeepSeek thinking 模式下，带 tool_calls 的 assistant turn 必须回传
+		// reasoning_content，否则返回 400（"reasoning_content … must be passed back"）。
+		// 仅回传 tool_calls 所在的那一轮，不计费的纯文本回复不传——节约 prompt token。
+		if c.deepseek && m.Role == provider.RoleAssistant && len(m.ToolCalls) > 0 {
+			cm.ReasoningContent = m.ReasoningContent
 		}
 		for _, tc := range m.ToolCalls {
 			wire := chatToolCall{ID: tc.ID, Type: "function"}
@@ -240,7 +290,7 @@ func (c *client) buildRequest(req provider.Request) chatRequest {
 		})
 	}
 
-	return chatRequest{
+	out := chatRequest{
 		Model:           c.model,
 		Messages:        msgs,
 		Tools:           tools,
@@ -250,6 +300,23 @@ func (c *client) buildRequest(req provider.Request) chatRequest {
 		MaxTokens:       req.MaxTokens,
 		ReasoningEffort: c.effort,
 	}
+	switch {
+	case c.deepseek:
+		// DeepSeek 的思维链由 thinking.type=enabled 控制（始终开启），
+		// reasoning_effort 调节推理深度。我们绝不对 DeepSeek 关闭 thinking。
+		out.Thinking = &thinkingMode{Type: "enabled"}
+	case c.minimax:
+		// MiniMax M3 使用单一的 thinking.type 字段，合法值为
+		// "adaptive"（默认，开启）和 "disabled"（关闭）。
+		// M3 没有推理深度调节，所以 reasoning_effort 全部省略。
+		t := c.effort
+		if t == "" {
+			t = "adaptive"
+		}
+		out.Thinking = &thinkingMode{Type: t}
+		out.ReasoningEffort = ""
+	}
+	return out
 }
 
 // readStream parses the SSE stream, emits text deltas live, accumulates tool-call
@@ -430,6 +497,10 @@ func normaliseUsage(u *wireUsage) *provider.Usage {
 
 // --- OpenAI-compatible wire protocol ---
 
+type thinkingMode struct {
+	Type string `json:"type"`
+}
+
 type chatRequest struct {
 	Model           string         `json:"model"`
 	Messages        []chatMessage  `json:"messages"`
@@ -439,6 +510,7 @@ type chatRequest struct {
 	Temperature     float64        `json:"temperature,omitempty"`
 	MaxTokens       int            `json:"max_tokens,omitempty"`
 	ReasoningEffort string         `json:"reasoning_effort,omitempty"`
+	Thinking        *thinkingMode  `json:"thinking,omitempty"`
 }
 
 type streamOptions struct {
@@ -453,12 +525,11 @@ type chatMessage struct {
 	// `content`"). An empty string satisfies presence and is accepted by every
 	// OpenAI-compatible backend for all roles (unlike null, which some reject
 	// for a tool message).
-	Content    string         `json:"content"`
-	ToolCalls  []chatToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string         `json:"tool_call_id,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	// no reasoning_content field: it is a response-only signal and is never sent
-	// back upstream — re-uploading it is paid prompt input.
+	Content          string         `json:"content"`
+	ReasoningContent string         `json:"reasoning_content,omitempty"`
+	ToolCalls        []chatToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string         `json:"tool_call_id,omitempty"`
+	Name             string         `json:"name,omitempty"`
 }
 
 type chatTool struct {

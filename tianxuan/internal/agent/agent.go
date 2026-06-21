@@ -379,24 +379,6 @@ func (a *AgentRunner) SetAgentMode(mode string) {
 	}
 }
 
-// CompactNow runs one compaction pass immediately, regardless of the
-// normal compaction threshold. Since V5.0, LLM-based compaction has been
-// replaced by automatic truncation in the run loop — this method exists
-// for API compatibility and returns nil (no error) but performs no action.
-// Use the built-in truncation (≥500K tokens → three-tier compression)
-// instead of explicit compaction.
-func (a *AgentRunner) CompactNow(ctx context.Context, instructions string) error { return nil }
-
-// SummarizeFrom was part of Claude Code's per-turn conversation summarisation.
-// Since V5.0, it is a no-op — automatic truncation in the run loop handles
-// context window pressure. Returns nil for API compatibility.
-func (a *AgentRunner) SummarizeFrom(ctx context.Context, boundary int) error { return nil }
-
-// SummarizeUpTo was part of Claude Code's per-turn conversation summarisation.
-// Since V5.0, it is a no-op — automatic truncation in the run loop handles
-// context window pressure. Returns nil for API compatibility.
-func (a *AgentRunner) SummarizeUpTo(ctx context.Context, boundary int) error { return nil }
-
 // SetMemoryQueue installs the sink the remember/forget tools use to apply a
 // memory change in the current session. The controller wires itself in.
 func (a *AgentRunner) SetMemoryQueue(q memory.Queue) { a.memQueue = q }

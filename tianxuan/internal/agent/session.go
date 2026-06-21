@@ -14,8 +14,9 @@ import (
 // the run-loop goroutine stay lock-free (serial with its own writes); cross-
 // goroutine access goes through Snapshot.
 type Session struct {
-	mu       sync.RWMutex
-	Messages []provider.Message
+	mu             sync.RWMutex
+	Messages       []provider.Message
+	rewriteVersion int // bumped each time the log is rewritten (compact/fold)
 }
 
 // NewSession initializes a session with an optional system prompt.
@@ -64,3 +65,9 @@ func (s *Session) HasContent() bool {
 	}
 	return false
 }
+
+// RewriteVersion returns the current rewrite version.
+func (s *Session) RewriteVersion() int { return s.rewriteVersion }
+
+// IncrementRewrite bumps the rewrite version by 1.
+func (s *Session) IncrementRewrite() { s.rewriteVersion++ }

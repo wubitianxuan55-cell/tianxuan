@@ -1,50 +1,96 @@
-﻿package agent
+package agent
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
-	"tianxuan/internal/strutil"
 )
 
-// CompactionConfig controls the truncation-based history pruning (V5.0).
-// The LLM-based summarization has been removed; with DeepSeek 1M window
-// we simply truncate old messages when the prompt exceeds a high threshold.
+// CompactionConfig controls the LLM-based compaction policy.
+// Compact 生成不可变的摘要 digest，旧摘要原样保留，只有 digest 之后到最近 tail
+// 之间的内容被折叠。这样 [system + firstUser + digest1...N] 作为固定前缀全量 cache hit。
 type CompactionConfig struct {
-	Window        int     // context window in tokens (0 = disabled)
-	Ratio         float64 // trigger ratio (default 0.8)
-	RecentKeep    int     // min recent messages to keep verbatim
-	ArchiveDir    string  // archive directory for saved sessions
-	L2Dir         string  // L2 persistence directory
+	Window          int     // context window in tokens (0 = disabled)
+	Ratio           float64 // trigger ratio (default 0.8)
+	ForceRatio      float64 // force compaction at this high-water mark
+	SoftRatio       float64 // send a one-time notice when reaching this ratio
+	TailTokens      int     // verbatim recent-tail budget in tokens
+	RecentKeep      int     // min recent messages to keep verbatim (fallback)
+	ArchiveDir      string  // archive directory for saved sessions
+	L2Dir           string  // L2 persistence directory
 
-	// Internal state (V5.0: simplified — no LLM-based compact loop)
-	LastPrompt    int  // prompt tokens from last turn
-	TruncateCount int  // how many times we've truncated this session
+	// Internal state
+	LastPrompt   int  // prompt tokens from last turn
+	CompactCount int  // how many times we've compacted this session
+	softNoticed  bool // one-shot soft-ratio notice
 }
 
 const (
-	defaultCompactRatio  = 0.95
-	defaultTailTokens    = 131072 // V5.0: keep 64K tok tail when truncating (1M window)
-	minRecentKeep        = 5     // never keep fewer than 5 recent messages
+	defaultSoftCompactRatio  = 0.5   // ~50% — emit a growing-context notice
+	defaultCompactRatio      = 0.8   // ~80% — trigger compaction
+	defaultCompactForceRatio = 0.9   // ~90% — force compaction
+	defaultCompactTarget     = 0.5   // kept tail never exceeds this fraction
+	defaultTailTokens        = 16384 // verbatim recent-tail budget
+	minCompactMessages       = 2     // skip compaction below this many compactable messages
+	maxPinnedFirstUserTokens = 1500  // cap on pinning the first user turn verbatim
+	pinnedFirstUserWindowFrac = 0.15 // and never pin >15% of the window
+	minRecentKeep            = 5     // never keep fewer recent messages (used in tailFloor + checkpoint)
 )
 
-// maybeCompact checks if the prompt has grown too large and applies history
-// truncation. Priority: legacy truncation first (cache-friendly, preserves
-// prefix structure), budgeted rebuild as fallback when truncation can't
-// reduce context enough.
-//
-// V7.3: swapped fallback order — legacyTruncate first, Budgeted second.
-// Legacy truncation preserves [L1 + prefix + summary + tail] structure
-// so DeepSeek can cache L1 + the first N messages across compactions.
-// Budgeted rebuild produces a completely different message layout and
-// drops cache hit rate from 95% to near 0%.
+// summaryTag wraps the compaction summary so the model can distinguish it from
+// live user input. Subsequent compactions detect the tag and preserve prior digests.
+const (
+	summaryTagOpen  = "<compaction-summary>"
+	summaryTagClose = "</compaction-summary>"
+)
+
+// summaryTimeout bounds one summarizer call.
+const summaryTimeout = 90 * time.Second
+
+// summarySystemPrompt steers the summarizer to produce a structured briefing.
+const summarySystemPrompt = `You are compacting the earlier part of a coding agent's conversation to save context.
+The agent keeps your summary alongside the user's own turns (kept verbatim) and the recent tail; your job is to fold the assistant/tool work into a briefing it can resume from.
+Write under these exact headings, omitting a heading only if it has no content:
+
+## Standing facts & constraints
+Everything the user stated that still governs the work — names, paths, IDs, versions, tokens, preferences, and hard "never do X" rules — in their own words. Be exhaustive; this is the durable contract, so prefer over- to under-including.
+
+## Goal
+The user's request and intent.
+
+## Decisions & rationale
+Key choices made so far and why — so they are not re-litigated or reversed.
+
+## Files & code
+Files read or modified, with the specific facts that matter: signatures, line locations, data shapes, and exact edits applied. Be concrete; this is what lets the agent act without re-reading everything.
+
+## Commands & outcomes
+Commands run (builds, tests, git) and their relevant results — what passed, what failed, and the error text that matters.
+
+## Errors & fixes
+Problems hit and how they were resolved (or not), so the same dead ends are not repeated.
+
+## Pending & next step
+What is still in progress or unstarted, and the single most concrete next action to take.
+
+Rules: be terse — bullet points and fragments, not prose. Preserve identifiers, paths, and numbers exactly. Do NOT invent anything not present in the messages; if something is unknown, leave it out rather than guessing.`
+
+// maybeCompact checks if the prompt has grown too large and applies compaction.
+// Strategy (inspired by Reasonix's three-tier approach):
+//  1. Soft notice at ~50% — one-shot warning, no message change.
+//  2. Prune stale tool results — free, may push prompt below threshold.
+//  3. LLM summary compaction — produces an immutable digest message.
+//  4. Mechanical fold fallback — when summarizer is unreachable.
 func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 	if a.compaction.Window <= 0 {
 		return
@@ -59,370 +105,468 @@ func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 	if prompt == 0 {
 		return
 	}
-	high := int(float64(a.compaction.Window) * a.compaction.Ratio)
+
+	high := int(float64(a.compaction.Window) * a.ratio())
+	soft := int(float64(a.compaction.Window) * a.softRatio())
+
+	// ── Tier 1: Soft notice (no message change) ──
+	if prompt >= soft && prompt < high && !a.compaction.softNoticed {
+		a.compaction.softNoticed = true
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+			Text: fmt.Sprintf("context reached %.0f%% of window; keeping cache-first prefix until compact threshold %.0f%%",
+				a.softRatio()*100, a.ratio()*100)})
+		return
+	}
 	if prompt < high {
 		a.compaction.LastPrompt = prompt
 		a.consecutiveCompacts = 0
 		a.compactStuck = false
 		return
 	}
-
-	// Truncate: keep system + first user + last N messages
-	msgs := a.session.Messages
-	if len(msgs) <= minRecentKeep+2 {
-		return
-	}
-
-	// V5.13: 三级压缩
-	keep := a.compaction.RecentKeep
-	if keep < minRecentKeep {
-		keep = minRecentKeep
-	}
-	mode := "normal"
-	aggressiveThreshold := high + int(float64(a.compaction.Window-high)*0.6)
-	if prompt >= a.compaction.Window {
-		mode = "force"
-		if keep > 1 {
-			keep = 1
-		}
-	} else if prompt >= aggressiveThreshold {
-		mode = "aggressive"
-		if keep > 2 {
-			keep = 2
-		}
-	}
-	if keep > len(msgs)-1 {
-		keep = len(msgs) - 1
-	}
-
-	// V5.9: tool_use/tool_result 配对保护
-	keepFrom := len(msgs) - keep
-	for keepFrom > 1 && keepFrom < len(msgs) {
-		firstPreserved := msgs[keepFrom]
-		if firstPreserved.Role != provider.RoleTool {
-			break
-		}
-		prev := msgs[keepFrom-1]
-		if prev.Role == provider.RoleAssistant && len(prev.ToolCalls) > 0 {
-			break
-		}
-		keepFrom--
-	}
-	keep = len(msgs) - keepFrom
-
-	// V7.3 DSR improve: compactStuck 不静默返回，降级到纯截断（force mode）
-	// 不注入 checkpoint/memory/tasks，最大化缓存连续性
 	if a.compactStuck {
-		a.legacyTruncate(msgs, keepFrom, 1, prompt, "force")
 		return
 	}
 
-	// ─── Strategy ①: Legacy Truncate first (cache-friendly) ─────────────
-	// 保留 [L1] + [前 N 条 prefix] + [摘要] + [tail]
-	// DeepSeek 至少可缓存 L1 + prefix 部分，只断一次
-	prefixCount := 0
-	switch mode {
-	case "normal":
-		prefixCount = a.compaction.RecentKeep
-		if prefixCount > keepFrom-2 {
-			prefixCount = keepFrom - 2
-		}
-	case "aggressive", "force":
-		prefixCount = 2
-		if prefixCount > keepFrom-2 {
-			prefixCount = keepFrom - 2
-		}
-	}
-	if prefixCount < 0 {
-		prefixCount = 0
-	}
+	force := prompt >= int(float64(a.compaction.Window)*a.forceRatio())
 
-	middleStart := 1 + prefixCount
-	if middleStart < 1 {
-		middleStart = 1
-	}
-	summary := BuildCompactSummary(msgs[middleStart:keepFrom])
-
-	prefixEnd := 1 + prefixCount
-	legacyRep := make([]provider.Message, 0, 2+prefixCount+keep)
-	legacyRep = append(legacyRep, msgs[0])
-	if prefixEnd > 1 {
-		legacyRep = append(legacyRep, msgs[1:prefixEnd]...)
-	}
-	if summary != "" {
-		legacyRep = append(legacyRep, provider.Message{
-			Role:    provider.RoleUser,
-			Content: summary,
-		})
-	}
-	legacyRep = append(legacyRep, msgs[keepFrom:]...)
-
-	if len(legacyRep) < len(msgs) {
-		a.session.Replace(legacyRep)
-		a.compaction.TruncateCount++
-		a.compaction.LastPrompt = 0
-		a.consecutiveCompacts = 0
-		a.compactStuck = false
+	// ── Tier 2: Prune stale tool results (free) ──
+	if st, err := a.PruneStaleToolResults(); err == nil && st.Results > 0 {
+		ratio := a.tokPerChar()
+		saved := int(float64(st.SavedChars) * ratio)
 		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-			Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(legacyRep)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
-		a.writeCheckpointFile(mode, summary, nil, len(legacyRep))
+			Text: fmt.Sprintf("pruned %d stale tool results (~%d tokens est.) before compaction", st.Results, saved)})
+		if !force && prompt-saved < high {
+			return
+		}
+	}
+
+	// ── Tier 3: LLM summary compaction ──
+	if err := a.compact(ctx, "auto", "", force); err != nil {
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+			Text: fmt.Sprintf("compaction skipped: %v", err)})
 		return
 	}
 
-	// ─── Strategy ②: Budgeted Rebuild (fallback) ───────────────────────
-	// Legacy truncation didn't reduce context — try budgeted rebuild.
-	cpSummary := BuildCompactSummary(msgs[1:keepFrom])
-	cpTodos := extractTodos(msgs)
+	a.consecutiveCompacts++
+	if a.consecutiveCompacts >= 2 {
+		a.compactStuck = true
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+			Text: fmt.Sprintf("context_window=%d is too small for compaction to help; auto-compaction paused until prompt drops.",
+				a.compaction.Window)})
+	}
+}
 
-	type budgetComponent struct {
-		name       string
-		content    string
-		importance float64
-		budgetPct  float64
+// compact summarizes the older middle of the session and replaces it in place.
+// The session becomes: system + firstUser + (old digests) + new digest + recent tail.
+func (a *AgentRunner) compact(ctx context.Context, trigger, instructions string, force bool) error {
+	msgs := a.session.Messages
+	head, start, ok := a.planCompaction(msgs, minCompactMessages)
+	if !ok {
+		head, start, ok = a.planCompaction(msgs, 1)
+	}
+	if !ok {
+		return nil
+	}
+	region := msgs[head:start]
+
+	// Split: kept (old digests + small user turns) vs fold (into summary).
+	kept, fold := a.partitionFold(region)
+	if len(fold) == 0 {
+		return nil
 	}
 
-	tpc := a.tokPerChar()
-
-	overhead := 0
-	if len(msgs) > 0 {
-		overhead += int(float64(msgChars(msgs[0]))*tpc) + 1
-	}
-	budget := high - overhead - 100
-	if budget < 200 {
-		budget = 200
+	// Economic check: skip if savings too small.
+	if !force && !foldEconomics(fold) {
+		return nil
 	}
 
-	components := []budgetComponent{
-		{name: "recent", content: "", importance: 1.0, budgetPct: 0.45},
-		{name: "checkpoint", content: cpSummary, importance: 0.9, budgetPct: 0.30},
-		{name: "memory", content: a.buildMemoryContext(), importance: 0.7, budgetPct: 0.15},
-		{name: "tasks", content: formatTodosForBudget(cpTodos), importance: 0.5, budgetPct: 0.10},
+	a.sink.Emit(event.Event{Kind: event.CompactionStarted,
+		Compaction: event.Compaction{Trigger: trigger}})
+
+	// Archive the folded messages before summarization.
+	archived := ""
+	if a.compaction.ArchiveDir != "" {
+		path, err := archiveMessages(a.compaction.ArchiveDir, fold)
+		if err != nil {
+			return fmt.Errorf("archive: %w", err)
+		}
+		archived = path
 	}
 
-	totalWeight := 0.0
-	for _, c := range components {
-		totalWeight += c.importance
+	summary, err := a.summarizeWithRetry(ctx, fold, instructions)
+	if err != nil {
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+			Text: "compaction summary unavailable (" + err.Error() + "); folded mechanically"})
+		summary = mechanicalFoldDigest(len(fold), archived)
 	}
 
-	replacement := make([]provider.Message, 0, 2+len(components))
-	replacement = append(replacement, msgs[0])
-	if len(msgs) > 1 && msgs[1].Role == provider.RoleSystem {
-		replacement = append(replacement, msgs[1])
-	}
-
-	sort.Slice(components, func(i, j int) bool {
-		return components[i].importance > components[j].importance
+	compacted := make([]provider.Message, 0, head+len(kept)+1+len(msgs)-start)
+	compacted = append(compacted, msgs[:head]...)
+	compacted = append(compacted, kept...)
+	compacted = append(compacted, provider.Message{
+		Role: provider.RoleUser,
+		Content: summaryTagOpen + "\n" +
+			"Summary of earlier conversation (older messages were compacted to save context):\n" +
+			summary + "\n" +
+			summaryTagClose,
 	})
+	compacted = append(compacted, msgs[start:]...)
+	a.session.Replace(compacted)
+	a.session.IncrementRewrite()
 
-	allocations := make([]int, len(components))
-	for i, c := range components {
-		allocations[i] = int(float64(budget) * (c.importance / totalWeight))
-	}
+	a.sink.Emit(event.Event{Kind: event.CompactionDone,
+		Compaction: event.Compaction{Trigger: trigger, Messages: len(fold), Summary: summary, Archive: archived}})
+	return nil
+}
 
-	tailMsgs := msgs[keepFrom:]
-	usedBudget := 0
-	for i, c := range components {
-		if c.name == "recent" {
-			continue
-		}
-		if c.content == "" {
-			continue
-		}
-		alloc := allocations[i]
-		runes := []rune(c.content)
-		if int(float64(len(runes))*tpc) > alloc {
-			maxRunes := alloc * 4
-			if maxRunes < 50 {
-				maxRunes = 50
-			}
-			if maxRunes < len(runes) {
-				runes = runes[:maxRunes]
-				c.content = string(runes) + "\n[truncated]"
-			}
-		}
-		if c.content != "" {
-			replacement = append(replacement, provider.Message{
-				Role:    provider.RoleUser,
-				Content: "[Context: " + c.name + "]\n" + c.content,
-			})
-		}
-		usedBudget += int(float64(len(c.content)) * tpc)
-	}
+// CompactNow runs one compaction pass immediately.
+func (a *AgentRunner) CompactNow(ctx context.Context, instructions string) error {
+	return a.compact(ctx, "manual", instructions, true)
+}
 
-	recentBudget := budget - usedBudget
-	if recentBudget < 50 {
-		recentBudget = 50
+// SummarizeFrom replaces messages from boundary onward with a single summary.
+func (a *AgentRunner) SummarizeFrom(ctx context.Context, boundary int) error {
+	msgs := a.session.Messages
+	if boundary < 0 || boundary >= len(msgs) {
+		return nil
 	}
-	tailAdded := 0
-	for _, m := range tailMsgs {
-		mTok := int(float64(msgChars(m)) * tpc)
-		if tailAdded+mTok > recentBudget && tailAdded > 0 {
+	fold := msgs[boundary:]
+	if len(fold) == 0 {
+		return nil
+	}
+	summary, err := a.summarizeWithRetry(ctx, fold, "")
+	if err != nil {
+		return err
+	}
+	replacement := make([]provider.Message, boundary+1)
+	copy(replacement, msgs[:boundary])
+	replacement = append(replacement, provider.Message{
+		Role: provider.RoleUser,
+		Content: summaryTagOpen + "\n" +
+			"Summary of previous conversation:\n" + summary + "\n" +
+			summaryTagClose,
+	})
+	a.session.Replace(replacement)
+	a.session.IncrementRewrite()
+	return nil
+}
+
+// SummarizeUpTo replaces messages up to boundary with a single summary.
+func (a *AgentRunner) SummarizeUpTo(ctx context.Context, boundary int) error {
+	msgs := a.session.Messages
+	if boundary <= 0 || boundary > len(msgs) {
+		return nil
+	}
+	head := 0
+	for head < boundary && msgs[head].Role == provider.RoleSystem {
+		head++
+	}
+	fold := msgs[head:boundary]
+	if len(fold) == 0 {
+		return nil
+	}
+	summary, err := a.summarizeWithRetry(ctx, fold, "")
+	if err != nil {
+		return err
+	}
+	compacted := append([]provider.Message(nil), msgs[:head]...)
+	compacted = append(compacted, provider.Message{
+		Role: provider.RoleUser,
+		Content: summaryTagOpen + "\n" +
+			"Summary of earlier conversation:\n" + summary + "\n" +
+			summaryTagClose,
+	})
+	compacted = append(compacted, msgs[boundary:]...)
+	a.session.Replace(compacted)
+	a.session.IncrementRewrite()
+	return nil
+}
+
+// ─── Helper: planCompaction locates the region to compact ───
+
+func (a *AgentRunner) planCompaction(msgs []provider.Message, min int) (head, start int, ok bool) {
+	head = a.pinnedPrefixLen(msgs)
+	budget := defaultTailTokens
+	if a.compaction.Window > 0 {
+		if maxByWin := int(float64(a.compaction.Window) * defaultCompactTarget); maxByWin < budget {
+			budget = maxByWin
+		}
+	}
+	start = tailStart(msgs, head, budget, a.tokPerChar(), a.tailFloor())
+	if start < head {
+		start = head
+	}
+	if start-head < min {
+		return head, start, false
+	}
+	return head, start, true
+}
+
+func (a *AgentRunner) tailFloor() int {
+	if a.compaction.RecentKeep > minRecentKeep {
+		return a.compaction.RecentKeep
+	}
+	return minRecentKeep
+}
+
+// tailStart walks newest→oldest, growing the verbatim tail until the next
+// message would push its token estimate past budgetTokens, then aligns the
+// boundary off any tool result.
+func tailStart(msgs []provider.Message, head, budgetTokens int, tokPerChar float64, minKeep int) int {
+	start := len(msgs)
+	acc := 0
+	for i := len(msgs) - 1; i > head; i-- {
+		c := int(float64(msgChars(msgs[i])) * tokPerChar)
+		if len(msgs)-i > minKeep && acc+c > budgetTokens {
 			break
 		}
-		tailAdded += mTok
-		replacement = append(replacement, m)
+		acc += c
+		start = i
 	}
-
-	if len(replacement) >= len(msgs) {
-		// Budgeted rebuild also didn't reduce context.
-		a.consecutiveCompacts++
-		if a.consecutiveCompacts >= 2 {
-			a.compactStuck = true
-			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-				Text: fmt.Sprintf("context window too small for compaction to help (system prompt + one turn exceeds %.0f%% of %d); raise context_window or shrink tool output. Auto-compaction paused.",
-					a.compaction.Ratio*100, a.compaction.Window)})
-		}
-		return
+	for start > head && start < len(msgs) && msgs[start].Role == provider.RoleTool {
+		start--
 	}
-
-	a.session.Replace(replacement)
-	a.compaction.TruncateCount++
-	a.compaction.LastPrompt = 0
-	a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-		Text: fmt.Sprintf("budgeted rebuild [%s] — %d→%d msgs (checkpoint:%d mem:%d task:%d tail:%d tok)",
-			mode, len(msgs), len(replacement),
-			int(float64(len(cpSummary))*a.tokPerChar()),
-			int(float64(len(a.buildMemoryContext()))*a.tokPerChar()),
-			int(float64(len(formatTodosForBudget(cpTodos)))*a.tokPerChar()), tailAdded)})
-
-	if a.memQueue != nil && cpSummary != "" {
-		a.memQueue.QueueMemory("checkpoint [" + mode + "]: " + truncateText(cpSummary, 300))
-	}
-	a.writeCheckpointFile(mode, cpSummary, cpTodos, len(replacement))
+	return start
 }
 
-// buildMemoryContext returns a compact memory summary string for budgeted injection.
-// Returns empty string when no memory is available.
-func (a *AgentRunner) buildMemoryContext() string {
-	if a.memQueue == nil {
-		return ""
+// ─── Prefix pinning: what stays verbatim ───
+
+func (a *AgentRunner) pinnedPrefixLen(msgs []provider.Message) int {
+	i := 0
+	if i < len(msgs) && msgs[i].Role == provider.RoleSystem {
+		i++
 	}
-	// Memory is stored in session messages; extract recent memory-updates
-	var notes []string
-	for _, m := range a.session.Messages {
-		if strings.Contains(m.Content, "<memory-update>") {
-			notes = append(notes, truncateText(m.Content, 200))
+	if i < len(msgs) && msgs[i].Role == provider.RoleSystem {
+		i++ // L1 + L2
+	}
+	if i < len(msgs) && msgs[i].Role == provider.RoleUser &&
+		!isCompactionSummary(msgs[i]) && a.pinnableUserTurn(msgs[i]) {
+		i++
+	}
+	for i < len(msgs) && isCompactionSummary(msgs[i]) {
+		i++
+	}
+	return i
+}
+
+func (a *AgentRunner) pinnableUserTurn(m provider.Message) bool {
+	budget := maxPinnedFirstUserTokens
+	if a.compaction.Window > 0 {
+		if f := int(float64(a.compaction.Window) * pinnedFirstUserWindowFrac); f < budget {
+			budget = f
 		}
 	}
-	if len(notes) == 0 {
-		return ""
-	}
-	return "Project memory:\n" + joinStr(notes, "\n")
+	return int(float64(msgChars(m))*a.tokPerChar()) <= budget
 }
 
-// formatTodosForBudget formats checkpoint todos for budgeted injection.
-func formatTodosForBudget(todos []checkpointTodo) string {
-	if len(todos) == 0 {
-		return ""
-	}
-	var parts []string
-	parts = append(parts, "Task progress:")
-	for _, t := range todos {
-		icon := "○"
-		switch t.Status {
-		case "completed":
-			icon = "✓"
-		case "in_progress":
-			icon = "▶"
+func isCompactionSummary(m provider.Message) bool {
+	return m.Role == provider.RoleUser &&
+		strings.HasPrefix(strings.TrimLeft(m.Content, "\n "), summaryTagOpen)
+}
+
+// ─── Partition: what to keep vs fold ───
+
+func (a *AgentRunner) partitionFold(region []provider.Message) (kept, fold []provider.Message) {
+	for i, m := range region {
+		if isCompactionSummary(m) || (m.Role == provider.RoleUser && a.pinnableUserTurn(m)) {
+			kept = append(kept, m)
+		} else {
+			fold = append(fold, m)
 		}
-		parts = append(parts, "  "+icon+" "+t.Content)
+		_ = i // suppress unused
 	}
-	return joinStr(parts, "\n")
+	return kept, fold
 }
 
-// V5.0 legacy: simple truncation fallback (used when budgeted rebuild doesn't reduce context).
-func (a *AgentRunner) legacyTruncate(msgs []provider.Message, keepFrom, keep, prompt int, mode string) {
-	prefixCount := 0
-	switch mode {
-	case "normal":
-		prefixCount = a.compaction.RecentKeep
-		if prefixCount > keepFrom-2 { prefixCount = keepFrom - 2 }
-	case "aggressive", "force":
-		prefixCount = 2
-		if prefixCount > keepFrom-2 { prefixCount = keepFrom - 2 }
+// ─── Summarizer ───
+
+func (a *AgentRunner) summarizeWithRetry(ctx context.Context, fold []provider.Message, instructions string) (string, error) {
+	summary, err := a.summarize(ctx, fold, instructions)
+	if err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return summary, err
 	}
-	if prefixCount < 0 { prefixCount = 0 }
-
-	middleStart := 1 + prefixCount
-	if middleStart < 1 { middleStart = 1 }
-	summary := BuildCompactSummary(msgs[middleStart:keepFrom])
-
-	// V7.3: digest marker removed — it served no purpose other than proving
-	// compaction changed the prefix, which the cache miss already proves.
-
-	prefixEnd := 1 + prefixCount
-	replacement := make([]provider.Message, 0, 2+prefixCount+keep)
-	replacement = append(replacement, msgs[0])
-	if prefixEnd > 1 {
-		replacement = append(replacement, msgs[1:prefixEnd]...)
-	}
-	if summary != "" {
-		replacement = append(replacement, provider.Message{
-			Role:    provider.RoleUser,
-			Content: summary,
-		})
-	}
-	replacement = append(replacement, msgs[keepFrom:]...)
-
-	a.session.Replace(replacement)
-	a.compaction.TruncateCount++
-	a.compaction.LastPrompt = 0
-
-	a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-		Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(replacement)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
+	return a.summarize(ctx, fold, instructions)
 }
 
-// writeCheckpointFile persists a structured markdown checkpoint to the
-// archive directory after compaction. Pure side-effect — does not alter
-// the message stream or affect the DeepSeek prefix cache.
-func (a *AgentRunner) writeCheckpointFile(mode, cpSummary string, cpTodos []checkpointTodo, msgCount int) {
-	if a.compaction.ArchiveDir == "" {
-		return
+func (a *AgentRunner) summarize(ctx context.Context, fold []provider.Message, instructions string) (string, error) {
+	if a.prov == nil {
+		return "", fmt.Errorf("no provider available for summarization")
 	}
-	dir := filepath.Join(a.compaction.ArchiveDir, "checkpoints")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return
+	ctx, cancel := context.WithTimeout(ctx, summaryTimeout)
+	defer cancel()
+
+	sysPrompt := summarySystemPrompt
+	if instructions != "" {
+		sysPrompt = instructions + "\n\n" + sysPrompt
 	}
-	ts := time.Now().UTC().Format("2006-01-02T150405")
-	sid := a.sessionID
-	if sid == "" {
-		sid = "session"
+
+	transcript := renderTranscript(fold)
+	req := provider.Request{
+		Messages: []provider.Message{
+			{Role: provider.RoleSystem, Content: sysPrompt},
+			{Role: provider.RoleUser, Content: transcript},
+		},
+		Temperature: 0,
+	}
+
+	ch, err := a.prov.Stream(ctx, req)
+	if err != nil {
+		return "", err
 	}
 
 	var b strings.Builder
-	b.WriteString("# Session Checkpoint\n\n")
-	b.WriteString(fmt.Sprintf("**Mode**: %s  \n", mode))
-	b.WriteString(fmt.Sprintf("**Time**: %s  \n", ts))
-	b.WriteString(fmt.Sprintf("**Messages**: %d (after compaction)  \n", msgCount))
-	b.WriteString(fmt.Sprintf("**Compaction count**: %d  \n\n", a.compaction.TruncateCount))
-
-	if cpSummary != "" {
-		b.WriteString("## Summary\n\n")
-		b.WriteString(cpSummary)
-		b.WriteString("\n\n")
-	}
-
-	if len(cpTodos) > 0 {
-		b.WriteString("## Task Progress\n\n")
-		for _, t := range cpTodos {
-			icon := "○"
-			switch t.Status {
-			case "completed":
-				icon = "✓"
-			case "in_progress":
-				icon = "▶"
+	var usage *provider.Usage
+	for chunk := range ch {
+		switch chunk.Type {
+		case provider.ChunkText:
+			b.WriteString(chunk.Text)
+		case provider.ChunkUsage:
+			usage = chunk.Usage
+		case provider.ChunkDone:
+			s := strings.TrimSpace(b.String())
+			if s == "" {
+				return "", fmt.Errorf("summarizer returned empty output")
 			}
-			b.WriteString(fmt.Sprintf("- %s %s\n", icon, t.Content))
+			return s, nil
+		case provider.ChunkError:
+			return "", chunk.Err
 		}
-		b.WriteString("\n")
 	}
-
-	memCtx := a.buildMemoryContext()
-	if memCtx != "" {
-		b.WriteString("## Memory\n\n")
-		b.WriteString(memCtx)
-		b.WriteString("\n\n")
-	}
-
-	_ = os.WriteFile(filepath.Join(dir, sid+"-"+ts+".md"), []byte(b.String()), 0644)
+	_ = usage
+	return strings.TrimSpace(b.String()), nil
 }
+
+func mechanicalFoldDigest(n int, archive string) string {
+	where := "."
+	if archive != "" {
+		where = " (archived to " + archive + ")."
+	}
+	return fmt.Sprintf("%d earlier message(s) were folded here to free context, but the automatic summary was unavailable%s Ask the user if you need details from before this point.", n, where)
+}
+
+// ─── Token estimation ───
+
+
+
+func estimateTextTokens(s string) int {
+	if s == "" {
+		return 0
+	}
+	bytes := len(s)
+	runes := utf8.RuneCountInString(s)
+	byBytes := (bytes + 3) / 4
+	if runes > byBytes {
+		return runes
+	}
+	return byBytes
+}
+
+func foldEconomics(region []provider.Message) bool {
+	const minFoldTokens = 400
+	return estimateMessagesTokens(region) >= minFoldTokens
+}
+
+func estimateMessagesTokens(msgs []provider.Message) int {
+	total := 0
+	for _, m := range msgs {
+		total += 4
+		total += estimateTextTokens(m.Content)
+		total += estimateTextTokens(m.ReasoningContent)
+		total += estimateTextTokens(m.Name)
+		total += estimateTextTokens(m.ToolCallID)
+		for _, tc := range m.ToolCalls {
+			total += 8
+			total += estimateTextTokens(tc.ID)
+			total += estimateTextTokens(tc.Name)
+			total += estimateTextTokens(tc.Arguments)
+		}
+	}
+	return total
+}
+
+// ─── Transcript rendering ───
+
+func renderTranscript(msgs []provider.Message) string {
+	var b strings.Builder
+	for _, m := range msgs {
+		switch m.Role {
+		case provider.RoleUser:
+			fmt.Fprintf(&b, "[user]\n%s\n\n", m.Content)
+		case provider.RoleAssistant:
+			if m.Content != "" {
+				fmt.Fprintf(&b, "[assistant]\n%s\n", m.Content)
+			}
+			for _, tc := range m.ToolCalls {
+				fmt.Fprintf(&b, "[assistant calls %s] %s\n", tc.Name, summarizeToolArgs(tc.Arguments))
+			}
+			b.WriteString("\n")
+		case provider.RoleTool:
+			fmt.Fprintf(&b, "[tool %s result]\n%s\n\n", m.Name, m.Content)
+		case provider.RoleSystem:
+			fmt.Fprintf(&b, "[system]\n%s\n\n", m.Content)
+		}
+	}
+	return b.String()
+}
+
+func summarizeToolArgs(args string) string {
+	if args == "" {
+		return "(no arguments)"
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fmt.Sprintf("(%d bytes)", len(args))
+	}
+	keys := make([]string, 0, len(parsed))
+	for k := range parsed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return fmt.Sprintf("{%s} (%d keys)", strings.Join(keys, ", "), len(parsed))
+}
+
+func archiveMessages(dir string, msgs []provider.Message) (string, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, time.Now().Format("20060102-150405.000")+".jsonl")
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	enc := json.NewEncoder(f)
+	for _, m := range msgs {
+		if err := enc.Encode(m); err != nil {
+			return "", err
+		}
+	}
+	return path, nil
+}
+
+func (a *AgentRunner) ratio() float64 {
+	if a.compaction.Ratio > 0 {
+		return a.compaction.Ratio
+	}
+	return defaultCompactRatio
+}
+
+func (a *AgentRunner) softRatio() float64 {
+	if a.compaction.SoftRatio > 0 {
+		return a.compaction.SoftRatio
+	}
+	return defaultSoftCompactRatio
+}
+
+func (a *AgentRunner) forceRatio() float64 {
+	if a.compaction.ForceRatio > 0 {
+		return a.compaction.ForceRatio
+	}
+	return defaultCompactForceRatio
+}
+
+// ─── V5.0 legacy: preserved for checkpoint use ───
+
+
+// ─── Todos extraction for backward compatibility ───
+

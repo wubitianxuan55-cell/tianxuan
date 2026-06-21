@@ -87,7 +87,7 @@ func (a *AgentRunner) WriteCheckpoint(dir string) error {
 		Summary:       BuildCompactSummary(msgs[1:keepFrom]),
 		Todos:         extractTodos(msgs),
 		EditFiles:     extractEditFiles(msgs[1:keepFrom]),
-		TruncateCount: a.compaction.TruncateCount,
+		TruncateCount: a.compaction.CompactCount,
 	}
 	if cp.Summary == "" && len(cp.Todos) == 0 && len(cp.EditFiles) == 0 {
 		return nil

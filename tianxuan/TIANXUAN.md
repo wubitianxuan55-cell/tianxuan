@@ -1,6 +1,10 @@
 # tianxuan project memory
 
-> V8.12.0 — 全线桥接打通 · VS Code 全连通 · 2026-06-21
+> V8.15.1 — VS Code cleanup · back to CLI/Desktop only · 2026-06-21
+## V8.15.1 (2026-06-21)
+Reverted V8.13/14/15 · deleted vscode/ · uninstalled VS Code · pure CLI+Desktop now
+
+> V8.12.0 — full bridge · 2026-06-21
 ## V8.12.0 发布摘要 (2026-06-21)
 **基于**: V8.11.0 · **变更**: 2文件 +285/-230行
 🔌 Web bridge 双传输层: 浏览器→fetch, VS Code→postMessage 透明切换

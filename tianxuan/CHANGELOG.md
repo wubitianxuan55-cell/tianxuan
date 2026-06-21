@@ -1,3 +1,17 @@
+## [8.15.1] — 2026-06-21
+
+### 🧹 VS Code 清理 — 回退 V8.13.0/14.0/15.0
+
+> 删除 vscode/ 目录及全部 VS Code 扩展代码，卸载 VS Code
+
+| 变更 | 说明 |
+|------|------|
+| 回退 V8.13.0 | 移除 /complete 端点、InlineCompletionProvider、HoverProvider |
+| 回退 V8.14.0 | 移除 CodeActionProvider、CodeLensProvider、文档/测试生成 |
+| 回退 V8.15.0 | 移除设置项、健康检查、自动重启 |
+| 删除 vscode/ | 扩展源码、构建产物、webview 全部清除 |
+| 卸载 VS Code | 删除便携版 + 用户安装 + 桌面快捷方式 |
+
 ## [8.12.0] — 2026-06-21
 
 ### 🔌 VS Code 全连通 — HTTP/SSE postMessage 代理

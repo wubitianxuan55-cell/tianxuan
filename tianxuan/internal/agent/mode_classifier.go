@@ -148,7 +148,7 @@ func isOrchestrateIntent(text, lower string, runes int) bool {
 			}
 		}
 		if numberedCount >= 3 {
-			score += 3
+			score += 4
 		}
 	}
 
@@ -170,7 +170,7 @@ func isOrchestrateIntent(text, lower string, runes int) bool {
 		score += 2
 	}
 
-	return score >= 5
+	return score >= 4
 }
 
 // ─── 操作动词（与探索意图互斥） ───
@@ -179,8 +179,10 @@ var actionVerbs = []string{
 	"implement", "fix", "refactor", "add", "create",
 	"write", "build", "deploy", "optimize", "remove", "delete",
 	"change", "modify", "update", "replace", "rename",
+	"run", "test", "debug",
 	"实现", "修复", "重构", "创建", "添加", "删除", "优化",
 	"修改", "更新", "替换", "重命名", "新增", "去掉",
+	"运行", "测试", "调试",
 }
 
 // ─── 辅助函数 ───

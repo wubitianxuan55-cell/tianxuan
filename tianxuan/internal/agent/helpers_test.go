@@ -2,9 +2,41 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"sync/atomic"
+	"time"
 
 	"tianxuan/internal/provider"
 )
+
+// fakeTool is a no-op tool whose read-only flag, delay, error, and call counter
+// the test controls.  Used across most agent test files.
+type fakeTool struct {
+	name     string
+	readOnly bool
+	delay    time.Duration
+	err      error
+	calls    *int32 // shared counter to assert all dispatched
+}
+
+func (f fakeTool) Name() string            { return f.name }
+func (f fakeTool) Description() string     { return "" }
+func (f fakeTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
+func (f fakeTool) ReadOnly() bool          { return f.readOnly }
+func (f fakeTool) Execute(ctx context.Context, _ json.RawMessage) (string, error) {
+	if f.calls != nil {
+		atomic.AddInt32(f.calls, 1)
+	}
+	select {
+	case <-time.After(f.delay):
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.name + " done", nil
+}
 
 // mockProvider replays preset chunks and records the last request it received.
 // Used across agent tests (dispatch_test, guards_test, planmode_test, task_test).

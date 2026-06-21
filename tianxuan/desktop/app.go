@@ -211,11 +211,14 @@ func (a *App) Submit(input string) {
 // SubmitDisplay runs input as a turn while recording a shorter UI-only display
 // string for the saved desktop transcript. The model still receives input.
 func (a *App) SubmitDisplay(display, input string) {
-	if a.ctrl == nil {
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl == nil {
 		return
 	}
-	_ = recordSessionDisplay(config.WorkspaceSessionDir(""), a.ctrl.SessionPath(), input, display)
-	a.ctrl.Submit(input)
+	_ = recordSessionDisplay(config.WorkspaceSessionDir(""), ctrl.SessionPath(), input, display)
+	ctrl.Submit(input)
 }
 
 // Cancel aborts the in-flight turn.
@@ -1448,7 +1451,13 @@ type WorkspaceChangeView struct {
 // MemoryDoc is one loaded doc-memory file for the panel: path, scope, and body.
 // WorkspaceChanges returns the files modified during the current session.
 func (a *App) WorkspaceChanges() []WorkspaceChangeView {
-	changes := a.ctrl.WorkspaceChanges()
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl == nil {
+		return nil
+	}
+	changes := ctrl.WorkspaceChanges()
 	out := make([]WorkspaceChangeView, len(changes))
 	for i, ch := range changes {
 		out[i] = WorkspaceChangeView{Path: ch.Path, Added: ch.Added, Removed: ch.Removed}

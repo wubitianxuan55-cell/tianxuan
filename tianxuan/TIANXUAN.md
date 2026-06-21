@@ -1,6 +1,18 @@
 # tianxuan project memory
 
-> V8.22.0 — 技能触发策略强化 · 2026-06-21
+> V8.22.1 — 热修复: 测试套件崩溃 + nil panic + 429重试 + isServerError 补全 · 2026-06-21
+
+## V8.22.1 (2026-06-21)
+
+### Bug 修复 (热修复)
+🔴 agent 测试套件: guards_test.go 删除时带走 fakeTool → 10个测试文件编译失败 → 补回 helpers_test.go
+🔴 WorkspaceChanges + SubmitDisplay: 缺 RLock/nil guard → controller 未就绪时 nil panic
+🟡 sendWithRetry: rateLimitCount 死代码 → 429 只重试3次(应为5次) → 外循环上限修正
+🟡 isServerError: 字符串降级遗漏 501/505+ → 补全
+🔵 mode_classifier: "run" 不在 actionVerbs + 阈值/权重偏保守 → 扩充+调整
+
+### 验证
+✅ go build ✅ go vet ✅ go test ./internal/agent/... (46s) ✅ go test ./internal/provider/... ✅ 缓存 e2e
 
 ## V8.22.0 (2026-06-21)
 

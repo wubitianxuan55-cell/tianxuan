@@ -158,7 +158,14 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 	var lastErr error
 	rateLimitCount := 0
 
-	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
+	// Use the larger of the two MaxAttempts so rate-limited requests get their
+	// full 5 attempts; non-retryable errors still exit early via IsRetryableStatus.
+	maxAttempts := policy.MaxAttempts
+	if rlPolicy.MaxAttempts > maxAttempts {
+		maxAttempts = rlPolicy.MaxAttempts
+	}
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt > 0 {
 			var delay time.Duration
 			if isRateLimit(lastErr) {
@@ -606,6 +613,7 @@ func isServerError(err error) bool {
 		return se.code >= 500 && se.code <= 599
 	}
 	s := err.Error()
-	return strings.Contains(s, "500") || strings.Contains(s, "502") ||
-		strings.Contains(s, "503") || strings.Contains(s, "504")
+	return strings.Contains(s, "500") || strings.Contains(s, "501") ||
+		strings.Contains(s, "502") || strings.Contains(s, "503") ||
+		strings.Contains(s, "504") || strings.Contains(s, "505")
 }

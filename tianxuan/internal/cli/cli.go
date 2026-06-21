@@ -214,6 +214,39 @@ func runServe(args []string) int {
 		return setup(context.Background(), *model, *maxSteps, true, bc)
 	}
 	srv := serve.New(ctrl, bc).WithRebuild(rebuildFn, *model, *maxSteps)
+
+	// Wire the code-completion function: creates a fresh provider per request
+	// (lightweight — only called on explicit user trigger, max 1 per second).
+	completeFn := func(ctx context.Context, req provider.Request) (string, error) {
+		cfg, cerr := config.Load()
+		if cerr != nil {
+			return "", fmt.Errorf("config load: %w", cerr)
+		}
+		ent, ok := cfg.ResolveModel(*model)
+		if !ok {
+			return "", fmt.Errorf("no provider configured")
+		}
+		prov, perr := boot.NewProvider(ent)
+		if perr != nil {
+			return "", fmt.Errorf("create provider: %w", perr)
+		}
+		ch, serr := prov.Stream(ctx, req)
+		if serr != nil {
+			return "", fmt.Errorf("stream: %w", serr)
+		}
+		var sb strings.Builder
+		for chunk := range ch {
+			switch chunk.Type {
+			case provider.ChunkText:
+				sb.WriteString(chunk.Text)
+			case provider.ChunkError:
+				return sb.String(), chunk.Err
+			}
+		}
+		return sb.String(), nil
+	}
+	srv = srv.WithCompletion(completeFn)
+
 	if err := srv.RunGraceful(ctx, *addr); err != nil {
 		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 		return 1

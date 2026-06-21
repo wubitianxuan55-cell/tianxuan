@@ -30,11 +30,12 @@ var webDist embed.FS
 // Server wires a controller to its HTTP surface. The Broadcaster must be the
 // same sink the controller was constructed with, so events reach SSE clients.
 type Server struct {
-	ctrl      *control.Controller
-	bc        *Broadcaster
-	rebuildFn func() (*control.Controller, error)
-	model     string
-	maxSteps  int
+	ctrl       *control.Controller
+	bc         *Broadcaster
+	rebuildFn  func() (*control.Controller, error)
+	completeFn func(ctx context.Context, req provider.Request) (string, error)
+	model      string
+	maxSteps   int
 }
 
 // New builds a Server. bc must be the controller's event sink.
@@ -49,6 +50,14 @@ func (s *Server) WithRebuild(fn func() (*control.Controller, error), model strin
 	s.rebuildFn = fn
 	s.model = model
 	s.maxSteps = maxSteps
+	return s
+}
+
+// WithCompletion attaches a function that sends a lightweight code-completion
+// request to the provider (no agent loop, no session mutation). The function
+// receives a context and a provider.Request and returns the completion text.
+func (s *Server) WithCompletion(fn func(ctx context.Context, req provider.Request) (string, error)) *Server {
+	s.completeFn = fn
 	return s
 }
 
@@ -122,6 +131,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /mcp/remove", s.removeMCPServer)
 	mux.HandleFunc("POST /mcp/retry", s.retryMCPServer)
 	mux.HandleFunc("POST /mcp/enabled", s.setMCPServerEnabled)
+	mux.HandleFunc("POST /complete", s.complete)
 	mux.Handle("GET /assets/", http.FileServer(http.FS(webDist)))
 	return logMiddleware(csrfGuard(mux))
 }
@@ -183,6 +193,55 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 		}
 		return <-errCh
 	}
+}
+
+// complete handles POST /complete — lightweight code completion request.
+// It does NOT mutate the agent session — just calls the provider directly.
+func (s *Server) complete(w http.ResponseWriter, r *http.Request) {
+	if s.completeFn == nil {
+		http.Error(w, "completion not available", http.StatusServiceUnavailable)
+		return
+	}
+	var body struct {
+		Context  string `json:"context"`
+		Language string `json:"language"`
+		File     string `json:"file"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.Context == "" {
+		http.Error(w, "context is required", http.StatusBadRequest)
+		return
+	}
+	lang := body.Language
+	if lang == "" {
+		lang = "code"
+	}
+	sysPrompt := fmt.Sprintf(
+		"You are a code completion assistant. Complete the following %s code. "+
+			"Output ONLY the completion text — no explanation, no markdown, no code fences. "+
+			"The output will be inserted directly at the cursor position.",
+		lang,
+	)
+	req := provider.Request{
+		Messages: []provider.Message{
+			{Role: "system", Content: sysPrompt},
+			{Role: "user", Content: body.Context},
+		},
+		Temperature: 0.2,
+		MaxTokens:   512,
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	text, err := s.completeFn(ctx, req)
+	if err != nil {
+		slog.Warn("serve: completion failed", "err", err)
+		http.Error(w, "completion failed", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"text": text})
 }
 
 func (s *Server) index(w http.ResponseWriter, _ *http.Request) {

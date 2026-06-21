@@ -1,3 +1,30 @@
+## [8.13.0] — 2026-06-21
+
+### 🤖 VS Code 原生 AI 能力 + 编辑器深度集成
+
+> 基于 V8.12.0 · 8源文件 +520/-3900行 · 缓存安全(零L1/L2/L3变更)
+
+| 域 | 变更 |
+|------|------|
+| **代码补全** | Go 新增 POST /complete 端点 + VS Code InlineCompletionItemProvider (300ms防抖+2s限流) |
+| **悬停解释** | HoverProvider: 鼠标悬停标识符→AI解释 |
+| **诊断注入** | getDiagnostics 获取当前文件诊断 → 可附加到提交上下文 |
+| **文件打开** | openWorkspacePath 支持 `file.go:42` 行号定位 |
+| **Diff 预览** | diffPreview 原生命令: 临时文件→VS Code diff 编辑器 |
+| **应用编辑** | applyEdit: webview→extension→WorkspaceEdit 写入文件 |
+| **右键菜单** | 新增 3 个命令: 解释代码 / 审查代码 / 修复问题 |
+| **快捷键** | Ctrl+Shift+T (打开面板) + Ctrl+Shift+Enter (发送选中) |
+| **状态栏** | 状态栏图标，显示运行状态，点击打开面板 |
+| **主题同步** | VS Code 主题变更自动同步到 webview |
+| **Bridge** | GetDiagnostics / GetEditorContext / ApplyEdit / DiffPreview 4 方法 |
+| **订阅消息** | tianxuan:submit-text / tianxuan:theme-changed 生命周期消息 |
+| **构建清理** | 删除 vscode/webview/dist/ 冗余 + 旧版 JS 产物 |
+| **工程化** | package.json version→8.12.0 + activationEvents + build:webview 清理步骤 |
+
+### 📦 发布
+
+- release/v8.13.0/ · CLI 21MB · Web dist · VS Code extension (20KB)
+
 ## [8.12.0] — 2026-06-21
 
 ### 🔌 VS Code 全连通 — HTTP/SSE postMessage 代理

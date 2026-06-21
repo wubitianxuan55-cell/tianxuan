@@ -1,5 +1,17 @@
 # tianxuan project memory
 
+> V8.13.0 — VS Code 原生 AI 能力 · 编辑器深度集成 · 2026-06-21
+## V8.13.0 发布摘要 (2026-06-21)
+**基于**: V8.12.0 · **二进制**: CLI 20MB · **变更**: 8源文件 +520/-3900行
+🤖 InlineCompletionProvider: 代码补全(300ms防抖+2s节流) + POST /complete 端点
+💡 HoverProvider: 鼠标悬停标识符→AI解释
+🔌 编辑器集成: 行号定位/Diff预览/applyEdit/diagnostic注入
+🎛️ 右键菜单: 解释/审查/修复代码 3 命令
+⌨️ 快捷键: Ctrl+Shift+T / Ctrl+Shift+Enter
+📊 状态栏 + 主题同步 + submitSelection 修复
+🧹 构建清理: 删除过期产物 + vscode/webview/dist + build:webview 干净重建
+🔒 缓存安全: 全部L4域 — L1/L2/L3零变更，命中率维持 67%-93%
+
 > V8.12.0 — 全线桥接打通 · VS Code 全连通 · 2026-06-21
 ## V8.12.0 发布摘要 (2026-06-21)
 **基于**: V8.11.0 · **变更**: 2文件 +285/-230行

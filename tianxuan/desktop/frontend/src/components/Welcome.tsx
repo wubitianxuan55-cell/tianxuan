@@ -1,20 +1,9 @@
-import { ArrowUp, FolderOpen, Bug, Lightbulb, Code, Search, FileText, MessageSquare, Clock, Zap, PenTool, TestTube } from "lucide-react";
+import { ArrowUp, FolderOpen, Bug, Code, Search, FileText, MessageSquare, Clock, Zap, PenTool, TestTube } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import type { Meta, SessionMeta } from "../lib/types";
-
-interface StarterCard {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  prompt: string;
-}
-
-function sessionTime(ms: number): string {
-  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
-}
 
 function sessionTitle(session: SessionMeta, fallback: string): string {
   return session.title || session.preview || fallback;
@@ -42,7 +31,7 @@ const QUICK_COMMANDS = [
 
 export function Welcome({
   onPrompt,
-  cwd,
+  cwd: _cwd,
   cwdName,
   sessions,
   onResumeSession,

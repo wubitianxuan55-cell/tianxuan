@@ -60,6 +60,8 @@ export function CapabilitiesPanel({
       await app.AddMCPServer({
         name: "context7",
         transport: "streamable-http",
+        command: "",
+        args: [],
         url: "https://mcp.context7.com/mcp",
         env: {},
       });

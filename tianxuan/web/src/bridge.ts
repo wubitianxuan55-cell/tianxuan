@@ -156,18 +156,94 @@ export const app = {
   // ── slash ──
   SlashArgs: (input: string) => get<SlashArgsResult>(`/slash-args?input=${encodeURIComponent(input)}`),
 
-  // ── workspace / desktop file ops (no-op on web) ──
-  ListWorkspaces: async () => [] as WorkspaceView[],
-  PickWorkspace: async () => "",
-  SwitchWorkspace: async () => "",
-  OpenWorkspacePath: async () => {},
-  RevealWorkspacePath: async () => {},
+// ── workspace / desktop file ops (no-op on web, postMessage in VS Code) ──
+  ListWorkspaces: async () => {
+    if (vscode) {
+      return await vscode.request("listWorkspaces") as WorkspaceView[];
+    }
+    return [] as WorkspaceView[];
+  },
+  PickWorkspace: async () => {
+    if (vscode) {
+      return await vscode.request("pickWorkspace") as string;
+    }
+    return "";
+  },
+  SwitchWorkspace: async (path: string) => {
+    if (vscode) {
+      return await vscode.request("switchWorkspace", { path }) as string;
+    }
+    return "";
+  },
+  OpenWorkspacePath: async (rel: string) => {
+    if (vscode) {
+      await vscode.request("openWorkspacePath", { rel });
+    }
+  },
+  RevealWorkspacePath: async (rel: string) => {
+    if (vscode) {
+      await vscode.request("revealWorkspacePath", { rel });
+    }
+  },
   SavePastedImage: async () => "",
   AttachmentDataURL: async () => "",
 
   // ── updates (no-op on web) ──
-  Version: async () => "8.9.0-web",
+  Version: async () => {
+    if (vscode) {
+      try { return await vscode.request("version") as string; } catch { return "8.10.0-vscode"; }
+    }
+    return "8.10.0-web";
+  },
   CheckUpdate: async () => null,
   ApplyUpdate: async () => {},
   OpenDownloadPage: async () => {},
 };
+
+// ── VS Code 桥接层 ──
+// 当 web 前端运行在 VS Code Webview 内时，通过 postMessage 调用
+// VS Code 原生 API（工作区选择器、文件打开等）。在普通浏览器中
+// vscode 为 null，所有操作 fallback 到 no-op。
+
+interface VSCodeAPI {
+  postMessage(msg: unknown): void;
+  getState(): unknown;
+  setState(state: unknown): void;
+}
+
+declare function acquireVsCodeApi(): VSCodeAPI;
+
+const vscode: {
+  request(method: string, params?: Record<string, unknown>): Promise<unknown>;
+} | null = (() => {
+  if (typeof acquireVsCodeApi === "undefined") return null;
+
+  const api = acquireVsCodeApi();
+  let reqId = 0;
+  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+
+  window.addEventListener("message", (ev: MessageEvent) => {
+    const msg = ev.data;
+    if (msg && typeof msg === "object" && msg.type === "tianxuan:response") {
+      const p = pending.get(msg.id as number);
+      if (p) {
+        pending.delete(msg.id as number);
+        if (msg.error) p.reject(new Error(msg.error as string));
+        else p.resolve(msg.result);
+      }
+    }
+  });
+
+  return {
+    request(method: string, params?: Record<string, unknown>): Promise<unknown> {
+      return new Promise((resolve, reject) => {
+        const id = ++reqId;
+        pending.set(id, { resolve, reject });
+        api.postMessage({ type: "tianxuan:request", id, method, params });
+        setTimeout(() => {
+          if (pending.delete(id)) reject(new Error("timeout"));
+        }, 30000);
+      });
+    },
+  };
+})();

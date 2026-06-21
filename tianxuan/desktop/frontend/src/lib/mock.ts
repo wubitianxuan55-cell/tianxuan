@@ -5,32 +5,19 @@
 // 缓存安全: 纯前端 mock，不触及 Go 内核。
 
 import type {
-  BalanceInfo,
-  CapabilitiesView,
-  CheckpointMeta,
-  CommandInfo,
-  ContextInfo,
-  DirEntry,
-  FilePreview,
-  HistoryMessage,
-  JobView,
   MCPServerInput,
-  MemoryView,
   Meta,
-  ModelInfo,
   ProviderView,
-  QuestionAnswer,
   ServerView,
   SessionMeta,
   SettingsView,
   SkillView,
-  SlashArgsResult,
-  UpdateInfo,
   UpdateProgress,
   WireEvent,
-  WorkspaceView,
 } from "./types";
 import type { AppBindings } from "./bridge";
+
+const EVENT_CHANNEL = "agent:event";
 
 export const mockListeners = new Set<(e: WireEvent) => void>();
 
@@ -58,7 +45,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function makeMockApp(): AppBindings {
+export function makeMockApp(): AppBindings {
   let cancelled = false;
   let cwd = "~/projects/tianxuan"; // mutable so PickWorkspace is visible in dev
   let workspaces = ["~/projects/tianxuan", "~/projects/blade", "~/projects/deepseek-forge", "~/projects/cc-switch-light", "~/projects/SuperRig"];
@@ -233,7 +220,7 @@ function makeMockApp(): AppBindings {
     async Jobs() {
       return []; // browser dev mock has no background jobs
     },
-    async Meta() {
+    async Meta(): Promise<Meta> {
       return {
         label: "mock model · browser dev",
         ready: true,

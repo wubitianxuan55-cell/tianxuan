@@ -41,7 +41,7 @@
 
 ### 📦 发布
 - CLI: `tianxuan.exe` (13.0 MB)
-- 桌面端: `tianxuan-desktop.exe` (11.9 MB)
+- 桌面端: `tianxuan-desktop.exe` (15.4 MB, Wails)
 - 位置: `release/v8.8.0/`
 - 变更: 5 文件，+80/-0 行
 

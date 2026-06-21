@@ -208,8 +208,6 @@ export function openExternal(url: string): void {
 import {
   makeMockApp,
   mockSubscribe,
-  emitMock,
-  mockListeners,
   updaterListeners,
 } from "./mock";
 

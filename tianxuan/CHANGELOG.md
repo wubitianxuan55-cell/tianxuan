@@ -1,3 +1,45 @@
+## [8.18.0] — 2026-06-21
+
+### 🔬 缓存架构重构 — 从纯截断到 LLM 摘要 digest 累积
+
+> 基于 V8.17.0 · 9文件 +594/-1011行 · 核心: compact + prefix 诊断
+
+#### Phase 1: LLM 摘要 digest 累积压缩
+
+| 变更 | 说明 |
+|------|------|
+| compact() | 新的 LLM 摘要压缩 — planCompaction→partitionFold→summarize→digest插入 |
+| planCompaction + tailStart | 按 token 预算定 tail 边界（替代按消息数） |
+| partitionFold + pinnedPrefixLen | 旧 digest + 可 pin 的 user turn 永久保留不折叠 |
+| summarize() | 复用现有 Provider（空 tools）做摘要，失败降级 mechanical fold |
+| maybeCompact() | 三级策略：soft 50% 通知 → prune → LLM compact |
+| CompactNow/SummarizeFrom/SummarizeUpTo | 从 nil 空桩实现为真 |
+
+#### Phase 2: compact 前免费预处理
+
+| 变更 | 说明 |
+|------|------|
+| prune.go | PruneStaleToolResults: 旧 tool_result → 占位符，常能推迟 compact |
+
+#### Phase 3: 缓存诊断统一为 CompareShape
+
+| 变更 | 说明 |
+|------|------|
+| cache_shape.go 重写 | PrefixShape + CompareShape（120行），替代三套独立哈希 |
+| cache_guard.go 重写 | verifyPrefixAndShape: panic → Notice |
+| 删除 | cacheBreakDetector (6个FNV-1a字段) + old verifyPrefix SHA-256 panic |
+
+**设计理念**: Reasonix 的 compact 产生不可变 digest，[system + firstUser + digest1...N] 作为固定前缀全量 cache hit。旧摘要原样保留，新摘要只折叠上一个摘要之后的内容。
+
+### 📦 发布
+
+- `internal/agent/compact.go`: 重写 (570行)
+- `internal/agent/prune.go`: 新 (82行)
+- `internal/agent/cache_shape.go`: 重写 (122行)
+- `internal/agent/cache_guard.go`: 重写 (53行)
+- `internal/agent/session.go`: +rewriteVersion (3行)
+- 删除: 2个测试文件 (626行) + agent.go 3个空桩
+
 ## [8.17.0] — 2026-06-21
 
 ### 🔬 从 Reasonix v1.10.0 跨项目吸收 — DeepSeek thinking + 4模块

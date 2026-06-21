@@ -13,7 +13,7 @@ export function ErrorCard({
   onDismiss: (id: string) => void;
 }) {
   return (
-    <div className="mx-4 my-2 p-2 rounded-lg border border-err/30 border-l-[3px] border-l-err flex gap-2 items-start bg-[color-mix(in_srgb,var(--err)_8%,transparent)]">
+    <div className="mx-4 my-2 p-2 rounded-lg border border-[color-mix(in_srgb,var(--ds-danger)_30%,transparent)] border-l-[3px] border-l-err flex gap-2 items-start" style={{background: "var(--ds-danger-soft)"}}>
       <span className="flex-1 text-xs text-err leading-snug break-words">{item.text}</span>
       <button
         type="button"

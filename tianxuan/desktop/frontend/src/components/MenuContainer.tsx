@@ -12,7 +12,8 @@ export function MenuContainer({
 }) {
   return (
     <div
-      className="absolute bottom-[calc(100%+6px)] left-0 right-0 max-h-[280px] overflow-y-auto bg-bg-elev border border-border rounded-[10px] p-[5px] shadow-[0_12px_32px_rgba(0,0,0,0.4)] z-20 animate-[menu-in_0.12s_ease]"
+      className="absolute bottom-[calc(100%+6px)] left-0 right-0 max-h-[280px] overflow-y-auto bg-bg-elev border border-border rounded-[10px] p-1 z-20 anim-menu-in"
+      style={{boxShadow: "var(--ds-shadow-dropdown)"}}
       role="listbox"
     >
       {children}

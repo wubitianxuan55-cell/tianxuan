@@ -120,6 +120,12 @@ export interface SessionMeta {
   current: boolean;
 }
 
+export interface WorkspaceChangeView {
+  path: string;
+  added: number;
+  removed: number;
+}
+
 export interface WorkspaceView {
   path: string;
   name: string;
@@ -246,6 +252,8 @@ export interface MemoryView {
   scopes: MemoryScope[];
   storeDir: string;
   available: boolean;
+  archives?: MemoryArchive[];
+  suggestions?: MemorySuggestionsView;
 }
 
 // Settings panel payloads (desktop/settings_app.go).
@@ -346,4 +354,33 @@ export interface TCCAReport {
   cacheHitTokens: number;
   cacheMissTokens: number;
   breakCount: number;
+}
+
+export interface MemoryArchive {
+  name: string;
+  title?: string;
+  description: string;
+  type: string;
+  body: string;
+  path?: string;
+  archivedAt?: string;
+}
+
+export interface MemorySuggestion {
+  name: string;
+  title?: string;
+  description: string;
+  type: string;
+  body: string;
+  reason: string;
+}
+
+export interface SkillSuggestion {
+  name: string;
+  description: string;
+}
+
+export interface MemorySuggestionsView {
+  memory: MemorySuggestion[];
+  skills: SkillSuggestion[];
 }

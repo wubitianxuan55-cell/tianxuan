@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown } from "lucide-react";
+import gsap from "gsap";
+import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Item } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -8,6 +10,8 @@ import { ToolCard } from "./ToolCard";
 import { ToolGroup, scanGroups } from "./ToolGroup";
 import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
+
+gsap.registerPlugin(ScrollToPlugin);
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -282,14 +286,15 @@ export function Transcript({
       </div>
       {showScrollDown && (
         <button
-          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg shadow-lg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn px-3 py-1.5"
+          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn px-3 py-1.5"
+          style={{boxShadow: "var(--ds-shadow-accent-btn)"}}
           onClick={() => {
             stick.current = true;
             setShowScrollDown(false);
             const el = scrollRef.current;
             if (el) {
               if (grouped.length > 0) virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
-              el.scrollTop = el.scrollHeight;
+              gsap.to(el, { scrollTop: el.scrollHeight, duration: 0.3, ease: "power2.out" });
             }
           }}
           aria-label="回到底部"

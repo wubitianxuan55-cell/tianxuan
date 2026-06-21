@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"sort"
@@ -154,30 +153,24 @@ func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provi
 // surface as ChunkError without retry, since the model has already started
 // emitting tokens we'd otherwise duplicate.
 func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response, error) {
-	const maxAttempts = 3
-	const maxRateLimitAttempts = 5
+	policy := provider.DefaultRetryPolicy()
+	rlPolicy := provider.RateLimitRetryPolicy()
 	var lastErr error
 	rateLimitCount := 0
 
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
 		if attempt > 0 {
 			var delay time.Duration
 			if isRateLimit(lastErr) {
 				rateLimitCount++
-				// 429: 指数退避 + 大抖动，5s→10s→20s→40s→60s
-				delay = time.Duration(5<<min(rateLimitCount-1, 4)) * time.Second
-				delay += time.Duration(rand.Intn(3000)) * time.Millisecond
-				if rateLimitCount >= maxRateLimitAttempts {
+				if rateLimitCount >= rlPolicy.MaxAttempts {
 					return nil, fmt.Errorf("%s: rate limited after %d attempts", c.name, rateLimitCount)
 				}
+				delay = rlPolicy.Backoff.Duration(rateLimitCount - 1)
 			} else if isServerError(lastErr) {
-				// 5xx: 快速重试，500ms→1s→2s
-				delay = time.Duration(1<<(attempt-1))*500*time.Millisecond +
-					time.Duration(rand.Intn(250))*time.Millisecond
+				delay = policy.Backoff.Duration(attempt - 1)
 			} else {
-				// 网络错误/408: 中等退避，500ms→1s→2s
-				delay = time.Duration(1<<(attempt-1))*500*time.Millisecond +
-					time.Duration(rand.Intn(250))*time.Millisecond
+				delay = policy.Backoff.Duration(attempt - 1)
 			}
 			select {
 			case <-ctx.Done():
@@ -196,7 +189,7 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 
 		resp, err := c.http.Do(httpReq)
 		if err != nil {
-			if !isTransientErr(err) {
+			if !provider.IsTransientNetErr(err) {
 				return nil, fmt.Errorf("%s: request failed: %w", c.name, err)
 			}
 			lastErr = fmt.Errorf("%s: request failed: %w", c.name, err)
@@ -214,37 +207,35 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 			return nil, &provider.AuthError{Provider: c.name, KeyEnv: c.keyEnv, Status: resp.StatusCode}
 		}
-		statusErr := fmt.Errorf("%s: status %d: %s", c.name, resp.StatusCode, strings.TrimSpace(string(msg)))
-		if !isRetryableStatus(resp.StatusCode) {
+		statusErr := &httpStatusError{name: c.name, code: resp.StatusCode, body: strings.TrimSpace(string(msg))}
+		if !provider.IsRetryableStatus(resp.StatusCode) {
 			return nil, statusErr
+		}
+		if d := provider.ParseRetryAfter(resp, 120*time.Second); d > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(d):
+			}
 		}
 		lastErr = statusErr
 	}
 	return nil, lastErr
 }
 
-// isRetryableStatus returns true for HTTP status codes a transient backoff can
-// reasonably recover from: 408 (request timeout), 429 (rate limit), and 5xx.
-// 4xx other than 408/429 (auth, validation, not-found) are caller bugs and
-// won't fix themselves on retry.
-func isRetryableStatus(s int) bool {
-	return s == http.StatusRequestTimeout || s == http.StatusTooManyRequests || (s >= 500 && s <= 599)
+// httpStatusError carries an HTTP status code so retry-classification helpers
+// (isRateLimit, isServerError) can inspect it directly instead of matching error
+// strings, which would break if the error format changed.
+type httpStatusError struct {
+	name string
+	code int
+	body string
 }
 
-// isTransientErr classifies HTTP client errors. ctx cancellation and deadline
-// expiry are caller intent — never retry those. Everything else (DNS failures,
-// connection resets, abrupt EOF, etc.) gets one more shot.
-func isTransientErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	return true
+func (e *httpStatusError) Error() string {
+	return fmt.Sprintf("%s: status %d: %s", e.name, e.code, e.body)
 }
 
-// normalizeReasoningProtocol 规范化 reasoning_protocol 配置值。
 func normalizeReasoningProtocol(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "deepseek", "openai", "none":
@@ -344,12 +335,13 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	// Idle timeout: DeepSeek's SSE stream may pause for 30-60s during reasoning
-	// with no keep-alive frames. After 120s of silence the proxy layer may drop
-	// the connection. We detect this by tracking the last data receipt and
-	// forcibly closing the body when the idle window expires, which causes
-	// scanner.Scan() to fail and readStream to exit cleanly via the error path.
-	const idleTimeout = 120 * time.Second
+	// with no keep-alive frames. We track the last data receipt and:
+	//   - at 60s idle: emit a keepalive notice so the user knows reasoning is in progress
+	//   - at 120s idle: forcibly close the body (hard timeout for true disconnects)
+	const idleNoticeTimeout = 60 * time.Second
+	const idleHardTimeout   = 120 * time.Second
 	lastData := time.Now()
+	keepaliveSent := false
 	idleDone := make(chan struct{})
 	defer close(idleDone)
 	go func() {
@@ -362,14 +354,18 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if time.Since(lastData) > idleTimeout {
+				elapsed := time.Since(lastData)
+				if elapsed > idleHardTimeout {
 					resp.Body.Close()
 					return
+				}
+				if elapsed > idleNoticeTimeout && !keepaliveSent {
+					keepaliveSent = true
+					out <- provider.Chunk{Type: provider.ChunkReasoning, Text: "[reasoning in progress …]"}
 				}
 			}
 		}
 	}()
-
 	for scanner.Scan() {
 		lastData = time.Now()
 		line := strings.TrimSpace(scanner.Text())
@@ -586,15 +582,29 @@ type wireUsage struct {
 }
 
 // isRateLimit 判断错误是否来自 429（Rate Limit）。
+// 优先使用结构化错误（httpStatusError），降级为字符串匹配以兼容非 HTTP 错误。
 func isRateLimit(err error) bool {
-	if err == nil { return false }
+	if err == nil {
+		return false
+	}
+	var se *httpStatusError
+	if errors.As(err, &se) {
+		return se.code == http.StatusTooManyRequests
+	}
 	s := err.Error()
 	return strings.Contains(s, "429") || strings.Contains(s, "rate limit") || strings.Contains(s, "too many")
 }
 
 // isServerError 判断错误是否来自 5xx（服务端错误）。
+// 优先使用结构化错误（httpStatusError），降级为字符串匹配以兼容非 HTTP 错误。
 func isServerError(err error) bool {
-	if err == nil { return false }
+	if err == nil {
+		return false
+	}
+	var se *httpStatusError
+	if errors.As(err, &se) {
+		return se.code >= 500 && se.code <= 599
+	}
 	s := err.Error()
 	return strings.Contains(s, "500") || strings.Contains(s, "502") ||
 		strings.Contains(s, "503") || strings.Contains(s, "504")

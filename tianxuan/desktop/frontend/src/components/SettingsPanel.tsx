@@ -4,7 +4,7 @@ import { useI18n, useT } from "../lib/i18n";
 import { useUpdater } from "../lib/useUpdater";
 import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
-import { CloseButton } from "./CloseButton";
+import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
 import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug } from "lucide-react";
 
@@ -66,13 +66,12 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
 
   return (
     <ResizableDrawer onClose={onClose} wide>
-        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
-          <div className="text-[15px] font-semibold text-fg">{t("settings.title")}</div>
-          <CloseButton onClick={onClose} />
-        </header>
+        <DrawerHeader onClose={onClose}>
+          <DrawerTitle text={t("settings.title")} />
+        </DrawerHeader>
 
         {!s ? (
-          <div className="empty">{t("settings.loading")}</div>
+          <div className="empty-state">{t("settings.loading")}</div>
         ) : (
           <div className="flex-1 min-h-0 flex h-full overflow-y-auto">
             <div className="flex h-full">
@@ -93,7 +92,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
                   filteredTabs.map((id) => (
                     <button
                       key={id}
-                      className={`flex items-center gap-2 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[0.12s] ${
+                      className={`flex items-center gap-2 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[var(--dur-fast)] ${
                         tab === id ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"
                       }`}
                       onClick={() => { setTab(id); setQuery(""); }}
@@ -268,7 +267,7 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
             <div className="border border-border-soft rounded-lg p-3 mb-2" key={p.name}>
               <div className="flex items-center gap-2">
                 <span className="text-fg text-[13px] font-semibold">{p.name}</span>
-                <span className={`badge ${p.keySet ? "badge--project" : "badge--feedback"}`}>
+                <span className={`badge ${p.keySet ? "badge--success" : "badge--warning"}`}>
                   {p.keySet ? t("settings.keySet") : t("settings.noKey")}
                 </span>
                 <span className="flex-1" />
@@ -672,7 +671,7 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
           {themeOptions.map((opt) => (
             <button
               key={opt}
-              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft last:border-r-0 ${theme === opt ? "bg-accent-soft text-accent" : ""}`}
+              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft last:border-r-0 ${theme === opt ? "bg-accent-soft text-accent" : ""}`}
               onClick={() => onTheme(opt)}
             >
               {themeName(opt, t)}

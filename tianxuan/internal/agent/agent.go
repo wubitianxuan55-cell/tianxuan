@@ -393,6 +393,16 @@ func (a *AgentRunner) SetArchive(ar *archive.Store, sessionID string) {
 // controller wires it to its per-session checkpoint store; nil disables capture.
 func (a *AgentRunner) SetPreEditHook(fn func(diff.Change)) { a.onPreEdit = fn }
 
+// PendingDiffs returns the file changes recorded during the current turn.
+// Used by the WorkspacePanel to show session-level file modifications.
+func (a *AgentRunner) PendingDiffs() []diff.Change {
+	a.preMu.Lock()
+	defer a.preMu.Unlock()
+	out := make([]diff.Change, len(a.pendingDiffs))
+	copy(out, a.pendingDiffs)
+	return out
+}
+
 // Session returns the agent's current conversation, useful for persistence
 // hooks that need to read the message log between turns. sessMu serialises this
 // pointer read against SetSession, so a frontend (serve's concurrent /history and

@@ -18,12 +18,12 @@ func TestIsRetryableStatus(t *testing.T) {
 	retry := []int{408, 429, 500, 502, 503, 504, 599}
 	noRetry := []int{200, 400, 401, 403, 404, 422}
 	for _, s := range retry {
-		if !isRetryableStatus(s) {
+		if !provider.IsRetryableStatus(s) {
 			t.Errorf("status %d should be retryable", s)
 		}
 	}
 	for _, s := range noRetry {
-		if isRetryableStatus(s) {
+		if provider.IsRetryableStatus(s) {
 			t.Errorf("status %d should not be retryable", s)
 		}
 	}
@@ -32,16 +32,16 @@ func TestIsRetryableStatus(t *testing.T) {
 // TestIsTransientErr keeps user-intent errors (ctx cancel / deadline) out of
 // the retry path while letting network-level failures through.
 func TestIsTransientErr(t *testing.T) {
-	if isTransientErr(nil) {
+	if provider.IsTransientNetErr(nil) {
 		t.Error("nil error should not be transient")
 	}
-	if isTransientErr(context.Canceled) {
+	if provider.IsTransientNetErr(context.Canceled) {
 		t.Error("ctx canceled should not be transient")
 	}
-	if isTransientErr(context.DeadlineExceeded) {
+	if provider.IsTransientNetErr(context.DeadlineExceeded) {
 		t.Error("ctx deadline should not be transient")
 	}
-	if !isTransientErr(errors.New("connection reset")) {
+	if !provider.IsTransientNetErr(errors.New("connection reset")) {
 		t.Error("generic network-ish error should be transient")
 	}
 }

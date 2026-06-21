@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"tianxuan/internal/agent"
 	"tianxuan/internal/event"
 )
 
@@ -172,4 +173,24 @@ func (c *Controller) maybeClarifyVagueInput(input string) bool {
 		Text: "[Clarify] Your request is brief. What exactly do you want to achieve? " +
 			"You can use read_file/ls/grep to explore — plan mode is read-only."})
 	return true
+}
+
+// maybeAutoMode classifies the user input and sets the agent mode automatically
+// when no mode has been manually selected via /mode. Classification is heuristic
+// and deterministic — same input always yields the same mode, preserving cache
+// stability. Only fires on the first unclassified turn; subsequent turns reuse
+// the locked-in mode. Manual /mode always takes precedence.
+// V8.19: auto-mode classification.
+func (c *Controller) maybeAutoMode(input string) {
+	c.mu.Lock()
+	mode := c.agentMode
+	c.mu.Unlock()
+	if mode != "" {
+		return // manually set via /mode or already classified
+	}
+	classified := agent.ClassifyMode(input)
+	c.SetAgentMode(classified)
+	if classified != "develop" {
+		c.notice("auto mode: " + classified + " (classified from input)")
+	}
 }

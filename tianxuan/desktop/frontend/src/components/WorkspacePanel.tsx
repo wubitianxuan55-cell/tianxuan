@@ -16,7 +16,7 @@ import {
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { loadLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
-import type { DirEntry, FilePreview } from "../lib/types";
+import type { DirEntry, FilePreview, WorkspaceChangeView } from "../lib/types";
 import { CodeViewer } from "./CodeViewer";
 import { Markdown } from "./Markdown";
 
@@ -140,10 +140,17 @@ export function WorkspacePanel({
   const [treeVisible, setTreeVisible] = useState(true);
   const [treeWidth, setTreeWidth] = useState(loadWorkspaceTreeWidth);
   const [treeResizing, setTreeResizing] = useState(false);
+  const [viewMode, setViewMode] = useState<"files" | "changed">("files");
+  const [workspaceChanges, setWorkspaceChanges] = useState<WorkspaceChangeView[] | null>(null);
 
   const loadDir = useCallback(async (dir: string) => {
     const entries = await app.ListDir(dir).catch(() => []);
     setEntriesByDir((prev) => ({ ...prev, [dir]: entries ?? [] }));
+  }, []);
+
+  const loadWorkspaceChanges = useCallback(async () => {
+    const changes = await app.WorkspaceChanges().catch(() => []);
+    setWorkspaceChanges(changes ?? []);
   }, []);
 
   const selectFile = useCallback(
@@ -395,7 +402,7 @@ export function WorkspacePanel({
           <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto overflow-y-hidden flex-1 scrollbar-none">
             {openTabs.map((tab) => (
               <button
-                className={`inline-flex items-center gap-1.5 min-w-[112px] max-w-[180px] h-[30px] px-2.5 border rounded-lg bg-transparent text-fg-dim text-[12.5px] font-medium cursor-pointer shrink-0 no-drag transition-[color,background,border] duration-[0.12s] ${
+                className={`inline-flex items-center gap-1.5 min-w-[112px] max-w-[180px] h-[30px] px-2.5 border rounded-lg bg-transparent text-fg-dim text-[12.5px] font-medium cursor-pointer shrink-0 no-drag transition-[color,background,border] duration-[var(--dur-fast)] ${
                   selectedPath === tab
                     ? "bg-bg-elev text-fg border-fg-faint/30"
                     : "border-border-soft hover:bg-bg-soft hover:text-fg hover:border-fg-faint"
@@ -424,11 +431,11 @@ export function WorkspacePanel({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default no-drag" onClick={onToggleMaximized} title={maximized ? t("workspace.restore") : t("workspace.maximize")}>
+            <button className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default no-drag" onClick={onToggleMaximized} title={maximized ? t("workspace.restore") : t("workspace.maximize")}>
               {maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
             <button
-              className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft no-drag"
+              className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft no-drag"
               onClick={() => setTreeVisible((value) => !value)}
               title={treeVisible ? t("workspace.hideTree") : t("workspace.showTree")}
             >
@@ -470,7 +477,7 @@ export function WorkspacePanel({
           {!selectedPath ? (
             <div className="py-[18px] text-fg-faint text-[13px]">{t("workspace.pickFile")}</div>
           ) : loadingPreview ? (
-            <div className="py-[18px] text-fg-faint text-[13px]">{t("workspace.loading")}</div>
+            <div className="empty-state">{t("workspace.loading")}</div>
           ) : preview?.err ? (
             <div className="py-[18px] text-err text-[13px]">{preview.err}</div>
           ) : preview?.binary ? (
@@ -508,7 +515,20 @@ export function WorkspacePanel({
       <section className="flex flex-col bg-bg-soft">
         <div className="flex items-center justify-end gap-1 h-[42px] px-2 py-[7px_8px_3px] shrink-0">
           <button
-            className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft no-drag"
+            className={`inline-flex items-center justify-center h-7 border-0 rounded-md bg-transparent cursor-pointer transition-[color,background] duration-[var(--dur-fast)] no-drag px-2 text-[11.5px] font-medium gap-1 ${viewMode === "files" ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"}`}
+            onClick={() => { setViewMode("files"); void loadDir(""); }}
+          >
+            <Folder size={13} /> 文件
+          </button>
+          <button
+            className={`inline-flex items-center justify-center h-7 border-0 rounded-md bg-transparent cursor-pointer transition-[color,background] duration-[var(--dur-fast)] no-drag px-2 text-[11.5px] font-medium gap-1 ${viewMode === "changed" ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"}`}
+            onClick={() => { setViewMode("changed"); void loadWorkspaceChanges(); }}
+          >
+            <Columns2 size={13} /> 变更
+          </button>
+          <div className="flex-1" />
+          <button
+            className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft no-drag"
             onClick={hideTreeOrClosePanel}
             title={previewVisible ? t("workspace.hideTree") : t("workspace.close")}
           >
@@ -516,12 +536,42 @@ export function WorkspacePanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 mx-2.5 my-1 mb-2 px-2 h-8 border border-border rounded-lg bg-bg text-fg-faint shrink-0">
-          <Search size={14} />
-          <input ref={filterRef} className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("workspace.filter")} />
-        </div>
+        {viewMode === "files" && (
+          <div className="flex items-center gap-1.5 mx-2.5 my-1 mb-2 px-2 h-8 border border-border rounded-lg bg-bg text-fg-faint shrink-0">
+            <Search size={14} />
+            <input ref={filterRef} className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("workspace.filter")} />
+          </div>
+        )}
         <div className="flex-1 min-h-0 overflow-auto px-1.5 pb-3">
-          {flattened
+          {viewMode === "changed" ? (
+            workspaceChanges === null ? (
+              <div className="empty-state">加载中…</div>
+            ) : workspaceChanges.length === 0 ? (
+              <div className="empty-state">本会话暂无文件变更</div>
+            ) : (
+              workspaceChanges.map((ch) => {
+                const dir = ch.path.includes("/") ? ch.path.slice(0, ch.path.lastIndexOf("/")) : "";
+                return (
+                  <button
+                    className="w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] border-l-transparent"
+                    key={ch.path}
+                    onClick={() => { setViewMode("files"); selectFile(ch.path); }}
+                    title={ch.path}
+                  >
+                    <FileText size={14} className="shrink-0 text-fg-faint" />
+                    <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
+                      <span className="min-w-0 truncate text-fg">{ch.path.split("/").pop()}</span>
+                      {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
+                    </span>
+                    <span className="flex items-center gap-1.5 shrink-0 text-[10.5px] tabular-nums font-mono">
+                      {ch.added > 0 && <span className="text-ok">+{ch.added}</span>}
+                      {ch.removed > 0 && <span className="text-err">-{ch.removed}</span>}
+                    </span>
+                  </button>
+                );
+              })
+            )
+          ) : (flattened
             ? flattened.map(({ path, entry }) => {
                 const cleanPath = path.replace(/\/$/, "");
                 const dir = parentPath(path);
@@ -546,7 +596,7 @@ export function WorkspacePanel({
                   </button>
                 );
               })
-            : renderRows("", 0)}
+            : renderRows("", 0))}
         </div>
       </section>
     </aside>

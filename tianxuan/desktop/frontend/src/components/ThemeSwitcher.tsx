@@ -51,7 +51,7 @@ export function ThemeSwitcher({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-50 min-w-[120px] py-1 bg-bg-elev-2 border border-border rounded-lg shadow-lg">
+          <div className="absolute top-full right-0 mt-1 z-50 min-w-[120px] py-1 bg-bg-elev-2 border border-border rounded-lg" style={{boxShadow: "var(--ds-shadow-dropdown)"}}>
             {themes.map((th) => (
               <button
                 key={th}

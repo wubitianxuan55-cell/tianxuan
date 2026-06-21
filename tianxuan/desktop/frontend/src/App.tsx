@@ -1,5 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { ScrollToPlugin } from "gsap/ScrollToPlugin";
+gsap.registerPlugin(useGSAP, ScrollToPlugin);
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FileText, FolderGit2, FolderTree,
   Settings as SettingsIcon, MessageSquare,
@@ -26,6 +30,8 @@ const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => 
 const CapabilitiesPanel = lazy(() => import("./components/CapabilitiesPanel").then(m => ({ default: m.CapabilitiesPanel })));
 const PlanPanel = lazy(() => import("./components/PlanPanel").then(m => ({ default: m.PlanPanel })));
 import { RuntimePanel } from "./components/RuntimePanel";
+import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
+import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { SkillsPanel } from "./components/SkillsPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { Skeleton } from "./components/Skeleton";
@@ -100,6 +106,9 @@ export default function App() {
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
+  const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
+  const splashHold = !(state.meta?.ready ?? false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const {
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
@@ -265,7 +274,7 @@ export default function App() {
       }
       if (!mod) return;
       if (ke.key === "n" && !state.running) { ke.preventDefault(); void startNewSession(); return; }
-      if (ke.key === "k") { ke.preventDefault(); (document.querySelector("textarea[placeholder]") as HTMLTextAreaElement)?.focus(); return; }
+      if (ke.key === "k") { ke.preventDefault(); setPaletteOpen(true); return; }
       if (ke.key === ",") { ke.preventDefault(); setSettingsOpen(true); return; }
       if (ke.key === "M" && ke.shiftKey) { ke.preventDefault(); void openMemory(); return; }
       if (ke.key === "H" && ke.shiftKey) { ke.preventDefault(); void openHistory(); return; }
@@ -294,6 +303,29 @@ export default function App() {
       : cwd ? `unsaved_${cwd.replace(/[\\/:*?"<>|]/g, "_")}` : "unsaved";
   }, [sidebarSessions, cwd]);
 
+  const paletteItems = useMemo<PaletteItem[]>(() => {
+    const cmds: PaletteItem[] = [
+      { id: "cmd-new", group: t("palette.group.commands") ?? "命令", title: t("topbar.newSession") ?? "新建会话", icon: <SquarePen size={15} />, compact: true, keywords: ["new", "新建"], run: () => void startNewSession() },
+      { id: "cmd-settings", group: t("palette.group.commands") ?? "命令", title: t("topbar.settings") ?? "设置", icon: <SettingsIcon size={15} />, compact: true, keywords: ["settings", "设置"], run: () => setSettingsOpen(true) },
+      { id: "cmd-memory", group: t("palette.group.commands") ?? "命令", title: t("topbar.memory") ?? "记忆", icon: <Brain size={15} />, compact: true, keywords: ["memory", "记忆"], run: () => void openMemory() },
+      { id: "cmd-history", group: t("palette.group.commands") ?? "命令", title: t("topbar.history") ?? "历史", icon: <MessageSquare size={15} />, compact: true, keywords: ["history", "历史"], run: () => void openHistory() },
+      { id: "cmd-files", group: t("palette.group.commands") ?? "命令", title: "文件面板", icon: <FolderGit2 size={15} />, compact: true, keywords: ["files", "文件"], run: () => { setWorkspacePanel(true); setRightTab("files"); } },
+      { id: "cmd-stats", group: t("palette.group.commands") ?? "命令", title: "统计面板", icon: <BarChart3 size={15} />, compact: true, keywords: ["stats", "统计"], run: () => { setWorkspacePanel(true); setRightTab("stats"); } },
+    ];
+    const sessionItems: PaletteItem[] = sidebarSessions.slice(0, 10).map((s) => ({
+      id: `sess-${s.path}`,
+      group: t("palette.group.sessions") ?? "会话",
+      title: sessionTitle(s, t("history.emptySession") ?? "空会话"),
+      hint: s.path,
+      meta: sessionTime(s.modTime),
+      badge: s.current ? "当前" : undefined,
+      icon: <MessageSquare size={15} />,
+      keywords: ["session", "会话"],
+      run: () => { if (!s.current) void onResumeSession(s.path); },
+    }));
+    return [...cmds, ...sessionItems];
+  }, [t, sidebarSessions, startNewSession, openMemory, openHistory, onResumeSession, setWorkspacePanel]);
+
   const layoutStyle = useMemo(
     () =>
       ({
@@ -304,6 +336,7 @@ export default function App() {
   );
   return (
     <ToastProvider>
+    {!splashDone && <StartupSplash hold={splashHold} onDone={() => setSplashDone(true)} />}
     <div className="app">
       <div
         className={[
@@ -319,9 +352,10 @@ export default function App() {
         style={layoutStyle}
       >
         <aside
-          className={`flex flex-col min-w-0 pt-[50px] pb-3 bg-sidebar-bg border-r border-border-soft select-none overflow-hidden drag-region ${
+          className={`flex flex-col min-w-0 pt-[50px] pb-3 border-r border-border-soft select-none overflow-hidden drag-region ${
             sidebarCollapsed ? "items-center px-2" : "px-2.5"
           }`}
+          style={{background: "var(--ds-gradient-sidebar)"}}
           aria-label="tianxuan navigation"
         >
           {/* Brand */}
@@ -331,7 +365,7 @@ export default function App() {
             <img src={logo} alt="" className="w-6 h-6 rounded-md" />
             {!sidebarCollapsed && <span>tianxuan</span>}
             <button
-              className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover no-drag ${
+              className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover no-drag ${
                 sidebarCollapsed ? "ml-0" : "ml-auto"
               } ${
                 sidebarExpandBlocked ? "!text-fg-faint !bg-transparent !cursor-not-allowed opacity-55" : ""
@@ -347,9 +381,10 @@ export default function App() {
 
           {/* New session button */}
           <button
-            className={`w-full min-w-0 border border-border rounded-lg bg-bg-elev text-fg font-medium cursor-pointer transition-[color,background,transform] duration-[0.12s] hover:bg-sidebar-hover hover:text-fg active:scale-[0.98] disabled:opacity-55 disabled:cursor-default flex items-center gap-2.5 h-9 px-2.5 mb-3 no-drag ${
-              sidebarCollapsed ? "justify-center w-10 h-10 !rounded-[10px] !p-0 !gap-0" : ""
+            className={`w-full min-w-0 border-0 rounded-full bg-accent text-accent-fg font-semibold cursor-pointer transition-all duration-[var(--dur-fast)] hover:brightness-110 active:scale-[0.97] disabled:opacity-40 disabled:cursor-default flex items-center gap-2 h-9 px-3 mb-3 no-drag ${
+              sidebarCollapsed ? "justify-center w-9 h-9 !rounded-full !p-0 !gap-0" : ""
             }`}
+            style={{boxShadow: "var(--ds-shadow-accent-btn)"}}
             onClick={() => void startNewSession()}
             disabled={state.running}
             title={state.running ? t("common.busyHint") : t("topbar.newSession")}
@@ -364,7 +399,7 @@ export default function App() {
               <div className="flex items-center gap-2 px-1 pb-2 pl-2.5">
                 <div className="flex-1 min-w-0 text-fg-faint font-mono text-[11px] uppercase tracking-wider">{t("sidebar.conversations")}</div>
                 <button
-                  className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
+                  className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
                   onClick={() => void openHistory()}
                   disabled={state.running}
                   title={state.running ? t("common.busyHint") : t("topbar.history")}
@@ -405,12 +440,12 @@ export default function App() {
           <nav className={`flex flex-col gap-0.5 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
             sidebarCollapsed ? "items-center w-full !pt-0 !pb-3" : ""
           }`}>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => void openMemory()} title={t("topbar.memory")}>
               <Brain size={15} />
               {!sidebarCollapsed && <span>{t("topbar.memory")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${
+              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${
                 sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""
               } ${showPlan ? "text-accent bg-accent-soft hover:bg-accent-soft" : ""}`}
               onClick={() => setShowPlan((v) => !v)}
@@ -419,12 +454,12 @@ export default function App() {
               <FileText size={15} />
               {!sidebarCollapsed && <span>{t("plan.title")}</span>}
             </button>
-            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
+            <button className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`} onClick={() => setCapsOpen(true)} title={t("caps.title")}>
               <Blocks size={15} />
               {!sidebarCollapsed && <span>{t("caps.title")}</span>}
             </button>
             <button
-              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[0.12s] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-40 disabled:cursor-default ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+              className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-40 disabled:cursor-default ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
               onClick={() => setSettingsOpen(true)}
               disabled={state.running}
               title={state.running ? t("common.busyHint") : t("topbar.settings")}
@@ -450,7 +485,7 @@ export default function App() {
         />
 
         <section className="chat-pane">
-          <header className="flex flex-shrink-0 items-center gap-3 px-12 bg-bg border-b border-border-soft shadow-[0_1px_3px_rgba(0,0,0,0.06)] select-none drag-region transition-all duration-200">
+          <header className="flex flex-shrink-0 items-center gap-3 px-12 border-b border-border-soft select-none drag-region transition-all duration-200" style={{background: "var(--ds-gradient-topbar)", boxShadow: "var(--ds-shadow-topbar)"}}>
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
@@ -460,7 +495,7 @@ export default function App() {
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
                     key={level}
-                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default transition-[color,background] duration-[0.12s] ${
+                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default transition-[color,background] duration-[var(--dur-fast)] ${
                       thinkLevel === level ? "text-accent font-semibold bg-accent/15 shadow-[inset_0_1px_2px_var(--accent-soft)]" : ""
                     }`}
                     onClick={() => handleThinkLevelChange(level)}
@@ -503,6 +538,7 @@ export default function App() {
           <footer className={`shrink-0 border-t border-border-soft bg-bg px-8 ${compactMode ? "pt-2 pb-0.5" : "pt-3 pb-1"}`}>
             <CompactContext.Provider value={compactMode}>
             {showTodos && <TodoPanel todos={todos} onDismiss={() => setDismissedTodo(todoItem!.id)} />}
+            <div className="composer-glow">
             <Composer
               running={state.running}
               mode={mode}
@@ -513,6 +549,7 @@ export default function App() {
               onPickFolder={switchFolder}
               disabled={state.meta?.ready === false || state.approval != null}
             />
+            </div>
             <StatusBar
               context={state.context}
               usage={state.usage}
@@ -556,28 +593,28 @@ export default function App() {
         <div className="flex flex-col min-w-0 overflow-hidden border-l border-border-soft bg-bg transition-all duration-200">
           <div className="flex items-center border-b border-border-soft overflow-hidden shrink">
             <button
-              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "files" ? "text-accent border-accent" : ""}`}
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "files" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("files")}
             >
               <FolderTree size={13} />
               <span>文件</span>
             </button>
             <button
-              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "runtime" ? "text-accent border-accent" : ""}`}
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "runtime" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("runtime")}
             >
               <Cpu size={13} />
               <span>工具</span>
             </button>
             <button
-              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "skills" ? "text-accent border-accent" : ""}`}
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "skills" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("skills")}
             >
               <Blocks size={13} />
               <span>技能</span>
             </button>
             <button
-              className={`flex items-center gap-[5px] px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[0.15s] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("stats")}
             >
               <BarChart3 size={13} />
@@ -676,6 +713,12 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      <CommandPalette
+        open={paletteOpen}
+        items={paletteItems}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
     </ToastProvider>
   );

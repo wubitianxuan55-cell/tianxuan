@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Circle, Loader, X } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
+import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import type { Todo } from "../lib/tools";
 
 const statusIcon = (status: string) => {
@@ -19,6 +20,8 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
   const t = useT();
   const compact = useCompact();
   const [open, setOpen] = useState(true);
+  const listRef = useRef<HTMLUListElement>(null);
+  useGSAPCollapse(listRef, open);
   if (todos.length === 0) return null;
 
   const done = todos.filter((t) => t.status === "completed").length;
@@ -30,7 +33,7 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
   const itemTextSize = compact ? "text-[11.5px]" : "text-[12.5px]";
 
   return (
-    <div className="max-w-[--maxw] mx-auto mb-2 border border-border rounded-[9px] bg-bg-soft overflow-hidden shadow-sm">
+    <div className="max-w-[--maxw] mx-auto mb-2 border border-border rounded-[9px] bg-bg-soft overflow-hidden" style={{boxShadow: "var(--ds-shadow-card)"}}>
       {/* Thin progress bar */}
       <div className="h-[3px] bg-border-soft">
         <div
@@ -66,49 +69,47 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
       </div>
 
       {/* List */}
-      {open && (
-        <ul className="m-0 p-0 list-none border-t border-border-soft">
-          {todos.map((t, i) => {
-            const isPhase = t.level === 0;
-            const isSub = t.level != null && t.level > 0;
-            return (
-              <li
-                key={i}
-                className={`relative flex items-center gap-2.5 ${itemPx} ${itemPy} border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
-                  t.status === "in_progress"
-                    ? "bg-accent-soft"
-                    : "bg-transparent hover:bg-bg-elev"
-                } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
+      <ul ref={listRef} className="m-0 p-0 list-none border-t border-border-soft" style={{ overflow: "hidden" }}>
+        {todos.map((t, i) => {
+          const isPhase = t.level === 0;
+          const isSub = t.level != null && t.level > 0;
+          return (
+            <li
+              key={i}
+              className={`relative flex items-center gap-2.5 ${itemPx} ${itemPy} border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
+                t.status === "in_progress"
+                  ? "bg-accent-soft"
+                  : "bg-transparent hover:bg-bg-elev"
+              } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
+            >
+              {/* Left accent strip for in-progress items */}
+              {t.status === "in_progress" && !isSub && (
+                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm" />
+              )}
+              {/* Sub-item border trail */}
+              {isSub && (
+                <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
+              )}
+
+              {statusIcon(t.status)}
+
+              <span
+                className={`min-w-0 leading-relaxed ${
+                  isPhase ? "font-medium text-fg" : "text-fg-dim"
+                } ${
+                  t.status === "completed"
+                    ? "line-through text-fg-faint"
+                    : t.status === "in_progress"
+                      ? "text-fg font-medium"
+                      : ""
+                } ${itemTextSize}`}
               >
-                {/* Left accent strip for in-progress items */}
-                {t.status === "in_progress" && !isSub && (
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm" />
-                )}
-                {/* Sub-item border trail */}
-                {isSub && (
-                  <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
-                )}
-
-                {statusIcon(t.status)}
-
-                <span
-                  className={`min-w-0 leading-relaxed ${
-                    isPhase ? "font-medium text-fg" : "text-fg-dim"
-                  } ${
-                    t.status === "completed"
-                      ? "line-through text-fg-faint"
-                      : t.status === "in_progress"
-                        ? "text-fg font-medium"
-                        : ""
-                  } ${itemTextSize}`}
-                >
-                  {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

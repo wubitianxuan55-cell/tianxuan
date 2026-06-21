@@ -102,6 +102,7 @@ export function Composer({
   // 计时
   const turnStartAt = useStore(useCallback((s) => s.turnStartAt, []));
   const turnActive = useStore(useCallback((s) => s.turnActive, []));
+  const turnTokens = useStore(useCallback((s) => s.turnTokens, []));
   const [elapsed, setElapsed] = useState(0);
   const [finalElapsed, setFinalElapsed] = useState<number | null>(null);
   useEffect(() => {
@@ -210,6 +211,16 @@ export function Composer({
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
     if (files.length > 0) { e.preventDefault(); void attachImageFiles(files); return; }
+    // Detect screenshot/image in clipboard (no file object, just image data).
+    const hasImageData = Array.from(e.clipboardData.items).some(
+      (it) => it.type.startsWith("image/")
+    );
+    if (hasImageData) {
+      // Notify: screenshot paste is detected but needs Go-side SaveClipboardImage.
+      // The user can drag-drop the image or save it as a file first.
+      e.preventDefault();
+      return;
+    }
     const pasted = e.clipboardData.getData("text");
     if (!shouldFoldPaste(pasted)) return;
     e.preventDefault();
@@ -339,13 +350,15 @@ export function Composer({
         <div className="flex items-center gap-1.5 pb-1.5 pl-1 text-fg-faint text-[11px] tabular-nums font-mono">
           <Clock size={11} className="text-accent" />
           <span>{displayElapsed.toFixed(1)}s</span>
+          {turnTokens > 0 && <span className="text-fg-faint/70">{turnTokens} tok</span>}
         </div>
       )}
 
       {/* ── 工作区切换菜单 ── */}
       {workspaceMenuOpen && cwd && (
         <div
-          className="absolute left-2.5 bottom-12 z-40 w-[min(320px,82vw)] p-2.5 border border-border rounded-xl bg-bg-elev shadow-[0_16px_42px_rgba(0,0,0,0.18)] animate-[menu-in_0.1s_ease] no-drag"
+          className="absolute left-2.5 bottom-12 z-40 w-[min(320px,82vw)] p-2.5 border border-border rounded-xl bg-bg-elev anim-menu-in no-drag"
+          style={{boxShadow: "var(--ds-shadow-dropdown)"}}
           ref={workspaceMenuRef}
         >
           <label className="flex items-center gap-[7px] px-2 py-1.5 mb-1 border border-border-soft rounded-md bg-bg-soft focus-within:border-accent transition-colors">
@@ -420,7 +433,7 @@ export function Composer({
 
       {/* ── 输入卡片 ── */}
       <div
-        className={`relative border border-border bg-bg-elev rounded-xl overflow-hidden transition-[border-color,box-shadow] duration-[0.15s] focus-within:border-fg-faint focus-within:shadow-[0_0_0_3px_var(--accent-soft)] ${composerHeight !== null ? "flex flex-col" : ""} ${composerResizing ? "cursor-ns-resize" : ""}`}
+        className={`relative border border-border-soft bg-bg-elev rounded-2xl overflow-hidden transition-[border-color,box-shadow] duration-[var(--dur-base)] focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] ${composerHeight !== null ? "flex flex-col" : ""} ${composerResizing ? "cursor-ns-resize" : ""}`}
         style={{ ...(composerHeight !== null ? { height: "var(--composer-height)" } : {}), ...composerCardStyle }}
         ref={composerCardRef}
       >
@@ -447,12 +460,13 @@ export function Composer({
             rows={1} disabled={disabled}
           />
           {running && (
-            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[0.12s] bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95" onClick={handleCancel} title={t("composer.stop")}>
+            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95" onClick={handleCancel} title={t("composer.stop")}>
               <Square size={14} fill="currentColor" />
             </button>
           )}
           <button
-            className={`inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[0.12s] active:scale-95 ${running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100`}
+            className={`inline-flex items-center justify-center w-[32px] h-[32px] border-0 rounded-full cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] active:scale-95 ${running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none`}
+            style={!running && !disabled ? {boxShadow: "var(--ds-shadow-accent-btn)"} : undefined}
             onClick={submit}
             disabled={disabled || pendingPaste > 0 || (!text.trim() && attachments.length === 0 && (!running || queueLen === 0))}
             title={running ? (queueLen > 0 ? `排队发送 (${queueLen})` : t("composer.queue")) : t("composer.send")}
@@ -470,7 +484,7 @@ export function Composer({
           {cwd && (
             <div className="relative inline-flex min-w-0" ref={workspaceAnchorRef}>
               <button
-                className={`inline-flex items-center gap-1.5 max-w-60 px-2 py-1 border-0 rounded-md bg-transparent text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[0.12s] hover:text-fg hover:bg-bg-soft disabled:cursor-default disabled:opacity-60 no-drag ${workspaceMenuOpen ? "text-fg bg-bg-soft" : ""}`}
+                className={`inline-flex items-center gap-1.5 max-w-60 px-2 py-1 border-0 rounded-md bg-transparent text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft disabled:cursor-default disabled:opacity-60 no-drag ${workspaceMenuOpen ? "text-fg bg-bg-soft" : ""}`}
                 onClick={() => { if (!running) setWorkspaceMenuOpen((o) => !o); }}
                 disabled={running}
                 title={running ? t("common.busyHint") : t("status.switchFolder", { cwd })}
@@ -486,7 +500,7 @@ export function Composer({
           <div className="flex gap-[3px]">
             {(["normal", "plan", "yolo"] as Mode[]).map((m) => (
               <button key={m} type="button"
-                className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[0.12s] active:scale-[0.97] ${mode === m ? "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]" : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[var(--dur-fast)] active:scale-[0.97] ${mode === m ? "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]" : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"}`}
                 onClick={() => { if (mode === m) return; const order: Mode[] = ["normal", "plan", "yolo"]; const steps = (order.indexOf(m) - order.indexOf(mode) + 3) % 3; for (let i = 0; i < steps; i++) onCycleMode(); }}
                 title={m === "plan" ? t("composer.modePlan") : m === "yolo" ? t("composer.modeYolo") : t("composer.modeNormal")}
               >

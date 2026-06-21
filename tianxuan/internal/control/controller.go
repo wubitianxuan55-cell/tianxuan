@@ -344,6 +344,7 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	if c.isPlanMode() && c.maybeClarifyVagueInput(raw) {
 		return nil // question emitted, wait for user response
 	}
+	c.maybeAutoMode(raw)
 	c.maybeAutoPlan(ctx, raw)
 
 	// V3.0 Phase 5: ContextManager handles first-turn orchestration.
@@ -845,6 +846,14 @@ func (c *Controller) SessionCache() (hit, miss int) {
 		return 0, 0
 	}
 	return c.executor.SessionCache()
+}
+
+// WorkspaceChanges returns the files modified during the current session.
+func (c *Controller) WorkspaceChanges() []diff.Change {
+	if c.executor == nil {
+		return nil
+	}
+	return c.executor.PendingDiffs()
 }
 
 // Balance queries the active provider's wallet balance, or (nil, nil) when the

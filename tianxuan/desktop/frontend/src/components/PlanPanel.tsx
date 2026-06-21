@@ -1,6 +1,6 @@
 import { CheckCircle2, FileText, ListTodo } from "lucide-react";
 import { useT } from "../lib/i18n";
-import { CloseButton } from "./CloseButton";
+import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { ResizableDrawer } from "./ResizableDrawer";
 import type { Todo } from "../lib/tools";
@@ -24,19 +24,15 @@ export function PlanPanel({
 
   return (
     <ResizableDrawer onClose={onClose}>
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between shrink-0 px-4 py-3.5 bg-bg-elev border-b border-border">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <FileText size={16} className="text-accent shrink-0" />
-          <span className="text-[15px] font-semibold text-fg truncate">{tr("plan.title")}</span>
-          {total > 0 && (
-            <span className="text-[11px] font-mono text-fg-faint bg-bg-soft px-1.5 py-0.5 rounded shrink-0">
-              {done}/{total}
-            </span>
-          )}
-        </div>
-        <CloseButton onClick={onClose} />
-      </header>
+      <DrawerHeader onClose={onClose}>
+        <FileText size={16} className="text-accent shrink-0" />
+        <DrawerTitle text={tr("plan.title")} />
+        {total > 0 && (
+          <span className="text-[11px] font-mono text-fg-faint bg-bg-soft px-1.5 py-0.5 rounded shrink-0">
+            {done}/{total}
+          </span>
+        )}
+      </DrawerHeader>
 
       {/* ── Progress bar ── */}
       {total > 0 && (

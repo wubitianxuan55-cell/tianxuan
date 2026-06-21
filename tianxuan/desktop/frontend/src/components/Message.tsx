@@ -1,8 +1,9 @@
-import { memo, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
+import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import type { Item } from "../lib/store";
 
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
@@ -31,11 +32,11 @@ export const UserMessage = memo(function UserMessage({
       <div className={`bg-accent-soft text-fg rounded-xl rounded-br-md shadow-sm leading-relaxed whitespace-pre-wrap break-words max-w-[85%] ${compact ? "px-3 py-1.5 text-[13px]" : "px-4 py-2 text-[14px]"}`}>{displayText}</div>
       {canRewind && (
         <div className="relative shrink-0 ml-auto">
-          <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-all duration-[0.12s] active:scale-90" title={t("rewind.label")} onClick={onToggle}>
+          <button className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-elev transition-all duration-[var(--dur-fast)] active:scale-90" title={t("rewind.label")} onClick={onToggle}>
             ⟲
           </button>
           {open && (
-            <div className="absolute bottom-full right-0 mb-1 z-30 min-w-[140px] py-1 bg-bg-elev-2 border border-border rounded-lg shadow-lg">
+            <div className="absolute bottom-full right-0 mb-1 z-30 min-w-[140px] py-1 bg-bg-elev-2 border border-border rounded-lg" style={{boxShadow: "var(--ds-shadow-dropdown)"}}>
               <button className="w-full text-left px-3 py-1.5 border-0 bg-transparent text-fg-dim text-[12px] cursor-pointer hover:bg-bg-soft hover:text-fg" onClick={() => rewind("both")}>{t("rewind.both")}</button>
               <button className="w-full text-left px-3 py-1.5 border-0 bg-transparent text-fg-dim text-[12px] cursor-pointer hover:bg-bg-soft hover:text-fg" onClick={() => rewind("conversation")}>{t("rewind.conversation")}</button>
               <button className="w-full text-left px-3 py-1.5 border-0 bg-transparent text-fg-dim text-[12px] cursor-pointer hover:bg-bg-soft hover:text-fg" onClick={() => rewind("code")}>{t("rewind.code")}</button>
@@ -54,42 +55,50 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
   const t = useT();
   const compact = useCompact();
   const thinkOnly = !!item.reasoning && !item.text;
-  const [open, setOpen] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const reasoningBodyRef = useRef<HTMLDivElement>(null);
+  useGSAPCollapse(reasoningBodyRef, reasoningOpen);
+
+  // Keep collapsed by default; user clicks to expand.
+  const toggleReasoning = useCallback(() => {
+    setReasoningOpen((v) => !v);
+  }, []);
+
   const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
+  const reasoningRunning = item.streaming && !item.text;
 
   return (
     <div className={`relative ${compact ? "py-0.5" : "py-1"} ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
       {item.reasoning && (
         <div className="mb-1">
           <button
+            type="button"
             className="flex items-center gap-1.5 text-fg-faint text-[11px] font-medium bg-transparent border-0 cursor-pointer py-0.5 hover:text-fg-dim select-none"
-            onClick={() => setOpen((v) => !v)}
+            data-running={reasoningRunning ? "" : undefined}
+            onClick={toggleReasoning}
+            aria-expanded={reasoningOpen}
           >
             <ChevronRight
-              className={`shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+              className={`shrink-0 transition-transform duration-200 ${reasoningOpen ? "rotate-90" : ""}`}
               size={12}
             />
-            <span className="text-fg-faint/70">
-              {item.streaming ? `${t("msg.thinking")}…` : `${t("msg.thinking")} (${reasoningLines} 段)`}
+            <span>{t("msg.thinking")}</span>
+            <span className="text-fg-faint/50">
+              {reasoningRunning ? t("msg.thinkingRunning") ?? "…" : `${reasoningLines} 段`}
             </span>
           </button>
-          <div
-            className={`grid transition-all duration-300 ease-in-out ${
-              open ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
-            }`}
-          >
-            <div className="overflow-hidden min-h-0">
-              <div className={`pl-3 ml-1 border-l-2 border-accent/30 bg-accent/[0.03] rounded-sm text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[300px] py-1" : "max-h-[500px] py-1.5"}`}>
-                {item.reasoning}
-              </div>
+          <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
+            <div className={`pl-3 ml-1 border-l-2 border-accent/30 bg-accent/[0.03] rounded-sm text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[300px] py-1" : "max-h-[500px] py-1.5"}`}>
+              {item.reasoning}
             </div>
           </div>
         </div>
       )}
       {item.text && (
+        <div className={item.streaming ? "ds-shiny-text" : ""}>
         <MemoMarkdown text={item.text} streaming={item.streaming} />
+        </div>
       )}
-
     </div>
   );
 });

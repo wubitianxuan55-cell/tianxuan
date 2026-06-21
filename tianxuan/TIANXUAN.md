@@ -1,6 +1,21 @@
 # tianxuan project memory
 
-> V8.18.0 — 缓存架构重构: LLM摘要digest累积 · 2026-06-21
+> V8.21.0 — 设计系统落地 + UI 全面优化 · 2026-06-21
+
+## V8.21.0 (2026-06-21)
+
+### 设计系统落地
+🎨 CSS 配方类: btn-primary/btn-secondary/card/badge + 5 语义变体
+🎨 32 组件迁移硬编码 → --ds-* 令牌（0 硬编码色值/阴影残留）
+🎨 系统配色统一: 渐变 token 化 + 抽屉背景对齐 + 边框/遮罩统一
+
+### UI 优化
+🔧 DrawerHeader 共享组件: 统一 5 面板 header
+🔧 动画类化: anim-drawer-in/out + anim-menu-in + 30+ duration → var(--dur-*)
+🔧 流式文本可见性修复: -webkit-text-fill-color 覆盖
+🔧 输入框圆角 28px → 16px · 思考卡/工具卡默认折叠
+📁 新增: DrawerHeader.tsx · CommandPalette.tsx · Tooltip.tsx · gsapAnimations.ts
+📁 51文件 +1962/-732 · Go 核心零变更
 
 ## V8.18.0 (2026-06-21)
 

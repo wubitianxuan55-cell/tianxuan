@@ -3,7 +3,7 @@ import { X, Globe } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { CapabilitiesView, MCPServerInput, ServerView, SkillView } from "../lib/types";
-import { CloseButton } from "./CloseButton";
+import { DrawerHeader, DrawerTitle, DrawerSubtitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
 
 // CapabilitiesPanel is the desktop MCP & Skills drawer — the GUI counterpart to
@@ -129,29 +129,28 @@ export function CapabilitiesPanel({
 
   return (
     <ResizableDrawer onClose={onClose} subtle>
-        <header className="flex items-center justify-between px-4 py-3.5 bg-bg-elev border-b border-border">
+        <DrawerHeader onClose={onClose}>
           <div>
-            <div className="text-[15px] font-semibold text-fg">{t("caps.title")}</div>
-            {view && <div className="mt-[3px] text-fg-faint text-[11px]">{summary}</div>}
+            <DrawerTitle text={t("caps.title")} />
+            {view && <DrawerSubtitle text={summary} />}
           </div>
-          <CloseButton onClick={onClose} />
-        </header>
+        </DrawerHeader>
 
         {!view ? (
-          <div className="empty">{t("caps.loading")}</div>
+          <div className="empty-state">{t("caps.loading")}</div>
         ) : (
-          <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-[22px]">
+          <div className="overflow-y-auto px-4 py-3.5 flex flex-col gap-5">
             {err && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{err}</div>}
 
             <div className="flex border-b border-border-soft mb-3" role="tablist" aria-label={t("caps.title")}>
               <button
-                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[0.12s] ${
+                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[var(--dur-fast)] ${
                   tab === "servers" ? "text-accent border-accent" : "text-fg-dim border-transparent hover:text-fg hover:border-fg-faint"
                 }`}
                 role="tab" aria-selected={tab === "servers"} onClick={() => setTab("servers")}
               >{t("caps.connectorsTab")}</button>
               <button
-                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[0.12s] ${
+                className={`flex-1 px-4 py-2 border-0 border-b-2 bg-transparent text-[13px] font-medium cursor-pointer transition-[color,border] duration-[var(--dur-fast)] ${
                   tab === "skills" ? "text-accent border-accent" : "text-fg-dim border-transparent hover:text-fg hover:border-fg-faint"
                 }`}
                 role="tab" aria-selected={tab === "skills"} onClick={() => setTab("skills")}
@@ -316,7 +315,7 @@ function FailedServersNotice({
 }) {
   const t = useT();
   return (
-    <div className="mb-3 p-3 border border-err/20 rounded-lg bg-[color-mix(in_srgb,var(--err)_6%,transparent)]" role="status">
+    <div className="mb-3 p-3 border border-err/20 rounded-lg" role="status" style={{background: "var(--ds-danger-soft)"}}>
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-err text-sm font-semibold">{t("caps.failureTitle", { failed: servers.length })}</div>
@@ -426,8 +425,8 @@ function ServerRow({
               ) : (
                 <label className="inline-flex cursor-pointer no-drag" title={s.status === "connected" ? t("caps.disable") : t("caps.enable")}>
                   <input type="checkbox" className="peer absolute opacity-0 w-0 h-0" checked={s.status === "connected"} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
-                  <span className="relative w-[30px] h-[17px] rounded-full bg-border transition-colors duration-[0.14s] peer-checked:bg-ok peer-disabled:opacity-50 peer-checked:[&>span]:translate-x-[13px]">
-                    <span className="absolute top-0.5 left-0.5 w-[13px] h-[13px] rounded-full bg-bg-elev transition-transform duration-[0.14s]" />
+                  <span className="relative w-[30px] h-[17px] rounded-full bg-border transition-colors duration-[var(--dur-base)] peer-checked:bg-ok peer-disabled:opacity-50 peer-checked:[&>span]:translate-x-[13px]">
+                    <span className="absolute top-0.5 left-0.5 w-[13px] h-[13px] rounded-full bg-bg-elev transition-transform duration-[var(--dur-base)]" />
                   </span>
                 </label>
               )}
@@ -491,7 +490,7 @@ function SkillRow({
   const canExpand = summary !== skill.description;
   return (
     <button
-      className={`w-full text-left border border-border-soft rounded-lg p-3 bg-transparent cursor-pointer transition-[border-color,background] duration-[0.12s] hover:border-accent/30 hover:bg-bg-soft active:bg-bg-elev ${
+      className={`w-full text-left border border-border-soft rounded-lg p-3 bg-transparent cursor-pointer transition-[border-color,background] duration-[var(--dur-fast)] hover:border-accent/30 hover:bg-bg-soft active:bg-bg-elev ${
         expanded ? "border-accent/30 bg-bg-elev" : ""
       }`}
       type="button"
@@ -504,10 +503,10 @@ function SkillRow({
         <span className="flex-1 min-w-0 flex flex-col gap-0.5">
           <span className="text-fg text-[13px] font-semibold font-mono">{skill.name}</span>
           <span className="flex items-center gap-1">
-            <span className={`text-[10px] px-1.5 py-px rounded font-medium ${
-              skill.scope === "project" ? "bg-ok/15 text-ok" : "bg-fg-faint/15 text-fg-faint"
+            <span className={`badge ${
+              skill.scope === "project" ? "badge--success" : "badge--muted"
             }`}>{skillScopeLabel(skill.scope, t)}</span>
-            {skill.runAs === "subagent" && <span className="text-[10px] px-1.5 py-px rounded font-medium bg-accent/15 text-accent">{t("caps.subagent")}</span>}
+            {skill.runAs === "subagent" && <span className="badge badge--accent">{t("caps.subagent")}</span>}
           </span>
         </span>
       </div>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Pencil, Search, Trash2, Check, X, MessageSquare, Clock } from "lucide-react";
 import { t, useT } from "../lib/i18n";
 import type { SessionMeta } from "../lib/types";
-import { CloseButton } from "./CloseButton";
+import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
 
 export function HistoryPanel({
@@ -57,22 +57,18 @@ export function HistoryPanel({
 
   return (
     <ResizableDrawer onClose={onClose}>
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between shrink-0 px-4 py-3.5 bg-bg-elev border-b border-border">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-[15px] font-semibold text-fg">{tr("history.title")}</span>
-          {hasSessions && (
-            <span className="text-fg-faint text-[11px] bg-bg-soft px-2 py-0.5 rounded-full font-mono">
-              {sessions.length}
-            </span>
-          )}
-        </div>
-        <CloseButton onClick={onClose} />
-      </header>
+      <DrawerHeader onClose={onClose}>
+        <DrawerTitle text={tr("history.title")} />
+        {hasSessions && (
+          <span className="text-fg-faint text-[11px] bg-bg-soft px-2 py-0.5 rounded-full font-mono">
+            {sessions.length}
+          </span>
+        )}
+      </DrawerHeader>
 
       {/* ── 搜索栏 ── */}
       <div className="shrink-0 px-4 py-3 border-b border-border-soft bg-bg-soft/30">
-        <label className="flex items-center gap-1.5 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_2px_var(--accent-soft)] transition-[border-color,box-shadow] duration-[0.12s]">
+        <label className="flex items-center gap-1.5 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_2px_var(--accent-soft)] transition-[border-color,box-shadow] duration-[var(--dur-fast)]">
           <Search size={14} />
           <input
             className="flex-1 border-0 outline-none bg-transparent text-fg text-[13px] placeholder:text-fg-faint"
@@ -122,7 +118,7 @@ export function HistoryPanel({
                 </div>
                 {g.items.map((s) => (
                   <div
-                    className={`group flex items-start gap-1 px-2 py-2.5 rounded-lg transition-colors duration-[0.12s] ${
+                    className={`group flex items-start gap-1 px-2 py-2.5 rounded-lg transition-colors duration-[var(--dur-fast)] ${
                       s.current
                         ? "bg-sidebar-active border-l-[3px] border-l-accent"
                         : "border-l-[3px] border-l-transparent hover:bg-bg-soft"

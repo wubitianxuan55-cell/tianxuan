@@ -49,7 +49,7 @@ export function CopyButton({
   };
   return (
     <button
-      className={`inline-flex items-center gap-[5px] bg-bg-elev-2 border border-border text-fg-faint rounded-md py-[3px] px-[7px] text-[11px] cursor-pointer transition-[color,border-color] duration-[0.12s] hover:text-fg hover:border-fg-faint ${className ?? ""}`}
+      className={`inline-flex items-center gap-1 bg-bg-elev-2 border border-border text-fg-faint rounded-md py-0.5 px-1.5 text-[11px] cursor-pointer transition-[color,border-color] duration-[var(--dur-fast)] hover:text-fg hover:border-fg-faint ${className ?? ""}`}
       onClick={copy}
       title={t("msg.copy")}
       aria-label={t("msg.copy")}

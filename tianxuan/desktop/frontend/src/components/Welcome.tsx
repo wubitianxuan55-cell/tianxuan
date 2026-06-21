@@ -94,37 +94,38 @@ export function Welcome({
 
       {/* Logo + Tagline */}
       <img src={logo} className={`rounded-[10px] mb-3 ${compact ? "w-8 h-8" : "w-10 h-10"}`} alt="tianxuan" />
-      <div className={`text-fg-dim mb-7 ${compact ? "text-[12.5px]" : "text-[13.5px]"}`}>{t("welcome.tagline")}</div>
+      <div className={`text-fg-dim mb-7 ${compact ? "text-[13px]" : "text-[14px]"}`} style={{fontFamily: "var(--ds-font-display)", fontWeight: 500, letterSpacing: "-0.01em"}}>{t("welcome.tagline")}</div>
 
       {/* 智能输入框 */}
-      <div className="w-full border border-border rounded-xl bg-bg-soft shadow-sm hover:border-fg-faint focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-soft)] transition-all duration-[0.15s]">
+      <div className="w-full border border-border-soft bg-bg-elev rounded-2xl shadow-[var(--ds-shadow-composer)] hover:border-fg-faint/30 focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] transition-all duration-[var(--dur-base)]">
         <textarea
           ref={taRef}
-          className={`w-full resize-none border-0 bg-transparent text-fg leading-relaxed outline-none placeholder:text-fg-faint px-4 pt-4 pb-2 ${compact ? "text-[13px] min-h-[64px]" : "text-[14px] min-h-[80px]"} max-h-[160px]`}
+          className={`w-full resize-none border-0 bg-transparent text-fg leading-relaxed outline-none placeholder:text-fg-faint px-5 pt-5 pb-2 ${compact ? "text-[13px] min-h-[64px]" : "text-[14px] min-h-[80px]"} max-h-[160px]`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={cwdName ? `在 ${cwdName}/ 中提问…` : t("composer.placeholder")}
           rows={2}
         />
-        <div className="flex items-center justify-between px-3 pb-3">
+        <div className="flex items-center justify-between px-4 pb-4">
           <span className={`text-fg-faint ${compact ? "text-[10px]" : "text-[11px]"}`}>
-            <kbd className="font-mono text-fg-dim bg-bg-elev-2 border border-border rounded px-1 py-px text-[10px]">/</kbd> 命令
-            <span className="mx-1.5">·</span>
-            <kbd className="font-mono text-fg-dim bg-bg-elev-2 border border-border rounded px-1 py-px text-[10px]">@</kbd> 文件
-            <span className="mx-1.5">·</span>
-            <kbd className="font-mono text-fg-dim bg-bg-elev-2 border border-border rounded px-1 py-px text-[10px]">↵</kbd> 发送
+            <kbd className="ds-kbd">/</kbd> 命令
+            <span className="mx-1.5 text-fg-faint/40">·</span>
+            <kbd className="ds-kbd">@</kbd> 文件
+            <span className="mx-1.5 text-fg-faint/40">·</span>
+            <kbd className="ds-kbd">↵</kbd> 发送
           </span>
           <button
-            className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[0.12s] active:scale-95 ${
+            className={`inline-flex items-center justify-center w-8 h-8 border-0 rounded-full cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] active:scale-95 ${
               text.trim()
                 ? "bg-accent text-accent-fg hover:brightness-110"
                 : "bg-bg-elev-2 text-fg-faint"
             }`}
+            style={text.trim() ? {boxShadow: "var(--ds-shadow-accent-btn)"} : undefined}
             onClick={handleSubmit}
             disabled={!text.trim()}
           >
-            <ArrowUp size={15} />
+            <ArrowUp size={16} />
           </button>
         </div>
       </div>
@@ -152,7 +153,7 @@ export function Welcome({
         {QUICK_COMMANDS.map((cmd) => (
           <button
             key={cmd.label}
-            className={`flex items-center gap-2 text-left font-[inherit] bg-bg-soft border border-border-soft text-fg-dim rounded-lg hover:text-fg hover:border-accent-soft hover:bg-bg-elev hover:-translate-y-px transition-all ${compact ? "p-2 text-[11px]" : "p-2.5 text-[12px]"}`}
+            className={`flex items-center gap-2 text-left font-[inherit] bg-bg-elev border border-border-soft text-fg-dim rounded-xl hover:text-fg hover:border-accent/20 hover:bg-bg-elev hover:-translate-y-px hover:shadow-[var(--ds-shadow-card)] transition-all ${compact ? "p-2 text-[11px]" : "p-2.5 text-[12px]"}`}
             onClick={() => onPrompt(cmd.prompt)}
             title={cmd.prompt}
           >

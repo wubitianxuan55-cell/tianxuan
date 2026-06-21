@@ -6,6 +6,7 @@ import type { DictKey } from "./en";
 
 export const zh: Record<DictKey, string> = {
   // 通用动词 / 框架
+  "app.splashSubtitle": "AI 编程助手",
   "common.close": "关闭",
   "common.cancel": "取消",
   "common.save": "保存",
@@ -348,6 +349,8 @@ export const zh: Record<DictKey, string> = {
 
   // 助手消息
   "msg.thinking": "思考过程",
+  "msg.thinkingRunning": "思考中",
+  "msg.thinkingDone": "已完成",
   "msg.copy": "复制",
   "msg.copyAll": "复制全部",
   "rewind.label": "回滚 / 分叉 / 摘要…",
@@ -394,4 +397,21 @@ export const zh: Record<DictKey, string> = {
   "updater.failed": "更新失败：{msg}",
   "updater.retry": "重试",
   "updater.dismiss": "稍后",
+
+  // command palette
+  "palette.placeholder": "搜索命令、会话…",
+  "palette.empty": "无匹配结果",
+  "palette.group.commands": "命令",
+  "palette.group.sessions": "会话",
+
+  // memory panel — 新增键
+  "memory.filterAll": "全部",
+  "memory.empty": "还没有记忆",
+  "memory.emptyHint": "使用下方的快速添加来创建第一条记忆",
+  "memory.noResults": "无匹配结果",
+  "memory.refresh": "刷新",
+  "memory.suggestions": "建议",
+  "memory.suggestionNew": "建议新增",
+  "memory.suggestionSkill": "建议技能",
+  "memory.archived": "已归档",
 };

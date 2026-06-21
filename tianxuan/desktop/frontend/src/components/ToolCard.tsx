@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Ban,
   Check,
@@ -13,6 +13,7 @@ import { DiffView } from "./DiffView";
 import { ICONS, mcpOr } from "./tool_icons";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
+import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { diffsFor, subjectOf, summarize } from "../lib/tools";
 import type { Item } from "../lib/store";
 
@@ -58,23 +59,11 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
   const [open, setOpen] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
 
-  // 延迟折叠：完成后等 500ms 再自动折叠（紧凑模式 300ms）
-  const collapseTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const wasRunning = useRef(false);
-  useEffect(() => {
-    if (item.status === "running") {
-      wasRunning.current = true;
-      if (collapseTimer.current) clearTimeout(collapseTimer.current);
-    } else if (wasRunning.current && (item.status === "done" || item.status === "error" || item.status === "stopped")) {
-      wasRunning.current = false;
-      const timer = setTimeout(() => setOpen(false), compact ? 300 : 500);
-      collapseTimer.current = timer;
-    }
-    return () => { if (collapseTimer.current) clearTimeout(collapseTimer.current); };
-  }, [item.status, compact]);
+  // 用户点击展开，不做自动展开/折叠
+  const effectiveOpen = open;
 
-  // 运行中自动展开
-  const effectiveOpen = open || item.status === "running";
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useGSAPCollapse(bodyRef, effectiveOpen && expandable);
 
   const quiet =
     item.readOnly && !hasNested && item.status !== "error" && item.status !== "stopped";
@@ -91,12 +80,13 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
 
   return (
     <div className={`my-0.5 rounded-lg overflow-hidden border transition-colors duration-300 ${
-      item.status === "error" && !item.recoverable ? "border-err/40 bg-[color-mix(in_srgb,var(--err)_6%,transparent)]" :
+      item.status === "error" && !item.recoverable ? "border-err/40" :
       item.status === "error" && item.recoverable ? "border-fg-faint/30" :
       item.status === "running" ? "border-accent/30 bg-accent/[0.02] shadow-[0_0_8px_var(--accent-soft)]" :
       item.status === "stopped" ? "border-border-soft opacity-70" :
       "border-border-soft"
-    } ${quiet ? "border-transparent bg-transparent" : ""}`}>
+    } ${quiet ? "border-transparent bg-transparent" : ""}`}
+    style={item.status === "error" && !item.recoverable ? {background: "var(--ds-danger-soft)"} : undefined} data-tone={item.status === "error" && !item.recoverable ? "danger" : item.status === "running" ? "info" : item.status === "done" ? "success" : item.status === "stopped" ? "warning" : undefined}>
       <div
         className={`flex items-center gap-2 ${rowPx} ${rowPy} text-fg-dim ${fontSize} select-none ${
           expandable ? "cursor-pointer hover:bg-bg-soft" : ""
@@ -129,10 +119,8 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
         </span>
       </div>
 
-      <div className={`grid transition-all duration-200 ease-in-out ${
-        effectiveOpen && expandable ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-      }`}>
-        <div className="overflow-hidden min-h-0">
+      <div ref={bodyRef} style={{ overflow: "hidden" }}>
+        <div>
           {diffs.map((d, i) => (
             <div className="px-2 pb-2" key={i}>
               {d.label && <div className="text-[10px] text-fg-faint uppercase tracking-wider mb-1">{d.label}</div>}

@@ -2,6 +2,12 @@
 // 仅在 Wails 环境不可用时加载（pnpm dev 模式），
 // 模拟 tianxuan 后端的响应，让整个 UI 可独立开发调试。
 //
+// 场景系统：通过 URL 参数切换 mock 行为，无需修改代码。
+//   ?mock=fresh     空状态：无工作区、无会话、无 API key
+//   ?mock=running   模拟活跃流式输出（工具执行中 / 思考中）
+//   ?mock=demo      默认：完整 mock 数据（等同于不传参数）
+//   ?platform=darwin|windows|linux 覆盖平台检测
+//
 // 缓存安全: 纯前端 mock，不触及 Go 内核。
 
 import type {
@@ -45,10 +51,29 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ── 场景系统（URL 参数驱动）────────────────────────────────────────────────
+
+export function mockScenario(): "demo" | "fresh" | "running" {
+  if (typeof window === "undefined") return "demo";
+  const value = new URLSearchParams(window.location.search).get("mock")?.trim().toLowerCase();
+  if (value === "fresh" || value === "empty" || value === "first-run") return "fresh";
+  if (value === "running" || value === "busy" || value === "streaming") return "running";
+  return "demo";
+}
+
+export function browserPlatformOverride(): "darwin" | "windows" | "linux" | "" {
+  if (typeof window === "undefined" || window.runtime) return "";
+  const value = new URLSearchParams(window.location.search).get("platform");
+  return value === "darwin" || value === "windows" || value === "linux" ? value : "";
+}
+
 export function makeMockApp(): AppBindings {
+  const scenario = mockScenario();
+  const freshMock = scenario === "fresh";
+  const runningMock = scenario === "running";
   let cancelled = false;
   let cwd = "~/projects/tianxuan"; // mutable so PickWorkspace is visible in dev
-  let workspaces = ["~/projects/tianxuan", "~/projects/blade", "~/projects/deepseek-forge", "~/projects/cc-switch-light", "~/projects/SuperRig"];
+  let workspaces = freshMock ? [] : ["~/projects/tianxuan", "~/projects/blade", "~/projects/deepseek-forge", "~/projects/cc-switch-light", "~/projects/SuperRig"];
   const day = 86_400_000;
   const t0 = Date.now();
   // Mutable so MCP add/remove/retry are observable in browser dev.
@@ -82,7 +107,7 @@ export function makeMockApp(): AppBindings {
     return cwd;
   };
   // Mutable so delete/rename are observable in browser dev.
-  const sessions: SessionMeta[] = [
+  const sessions: SessionMeta[] = freshMock ? [] : [
     { path: "/mock/sessions/a.jsonl", preview: "fix the login bug in auth.go", turns: 12, modTime: t0 - 3_600_000, current: true },
     { path: "/mock/sessions/b.jsonl", preview: "refactor the payment module", turns: 5, modTime: t0 - 6 * 3_600_000, current: false },
     { path: "/mock/sessions/c.jsonl", preview: "write the README and badges", turns: 8, modTime: t0 - day - 3_600_000, current: false },
@@ -92,13 +117,13 @@ export function makeMockApp(): AppBindings {
   const settings: SettingsView = {
     defaultModel: "deepseek-flash",
     providers: [
-      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: true, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000 },
+      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000 },
       { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000 },
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
     agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent." },
-    configPath: "~/projects/tianxuan/tianxuan.toml",
+    configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
   };
@@ -108,6 +133,7 @@ export function makeMockApp(): AppBindings {
       emit({ kind: "turn_started" });
       await delay(300);
       if (cancelled) return;
+      if (runningMock) await delay(1500); // simulate existing reasoning in progress
       const isPoetry = /(诗|古诗|词)/.test(input);
       const isCodeReq = !isPoetry && /(写|创建|程序|代码|函数|排序)/.test(input);
       const think = isPoetry ? "用户想写诗，直接创作即可。"
@@ -336,6 +362,7 @@ export function makeMockApp(): AppBindings {
     async OpenWorkspacePath(rel: string) {
       console.info("mock OpenWorkspacePath", rel);
     },
+    async WorkspaceChanges() { return []; },
     async RevealWorkspacePath(rel: string) {
       console.info("mock RevealWorkspacePath", rel);
     },

@@ -133,12 +133,13 @@ export function AskCard({
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
       <div
         ref={cardRef}
-        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 pt-7 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
-        style={
-          pos
+        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl p-5 pt-7 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
+        style={{
+          boxShadow: "var(--ds-shadow-panel)",
+          ...(pos
             ? { position: "absolute", left: pos.x, top: pos.y }
-            : { visibility: "hidden" } // 等待 useLayoutEffect 计算位置后再显示
-        }
+            : { visibility: "hidden" })
+        }}
       >
         {/* 拖拽手柄 */}
         <div
@@ -204,13 +205,13 @@ export function AskCard({
         ))}
         <div className="flex justify-end gap-2 pt-1 border-t border-border-soft">
           <button
-            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-[0.12s] hover:text-fg hover:border-border hover:bg-bg-soft hover:-translate-y-px active:scale-[0.98]"
+            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-[var(--dur-fast)] hover:text-fg hover:border-border hover:bg-bg-soft hover:-translate-y-px active:scale-[0.98]"
             onClick={onDismiss}
           >
             {t("ask.justChat")}
           </button>
           <button
-            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-[0.12s] enabled:hover:brightness-110 enabled:hover:-translate-y-px enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-default"
+            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-[var(--dur-fast)] enabled:hover:brightness-110 enabled:hover:-translate-y-px enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-default"
             onClick={submit}
             disabled={!allAnswered}
           >

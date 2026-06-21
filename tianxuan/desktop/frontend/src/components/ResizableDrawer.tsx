@@ -135,15 +135,15 @@ export function ResizableDrawer({
       {/* positioning layer */}
       <div className="absolute inset-0 flex justify-end pointer-events-none">
       <aside
-        className={"relative flex flex-col h-full bg-bg-elev border-l border-border shadow-[-18px_0_48px_rgba(0,0,0,0.46)] pointer-events-auto " + (
-          exiting ? "animate-[drawer-out_0.12s_ease_forwards]" : "animate-[drawer-in_0.14s_ease]"
+        className={"relative flex flex-col h-full bg-bg-elev border-l border-border pointer-events-auto " + (
+          exiting ? "anim-drawer-out" : "anim-drawer-in"
         ) + (resizing ? " drawer--resizing" : "") + " " + (
           wide
             ? "w-[min(var(--drawer-width,720px),94vw)]"
             : "w-[min(var(--drawer-width,440px),92vw)]"
         )}
         onClick={(e) => e.stopPropagation()}
-        style={style}
+        style={{...style, boxShadow: "var(--ds-shadow-panel)"}}
       >
         <button
           className="absolute top-0 bottom-0 left-[-4px] z-[4] w-2 p-0 border-0 bg-transparent cursor-col-resize no-drag group"
@@ -159,7 +159,7 @@ export function ResizableDrawer({
           onDoubleClick={() => saveWidth(config.defaultWidth)}
           title={t("drawer.resize")}
         >
-          <span className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-[background,box-shadow] duration-[0.12s] group-hover:bg-accent group-hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] group-focus-visible:bg-accent group-focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] pointer-events-none" />
+          <span className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-[background,box-shadow] duration-[var(--dur-fast)] group-hover:bg-accent group-hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] group-focus-visible:bg-accent group-focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_24%,transparent)] pointer-events-none" />
         </button>
         {children}
       </aside>

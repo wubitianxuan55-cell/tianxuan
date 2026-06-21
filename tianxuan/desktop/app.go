@@ -1438,6 +1438,13 @@ func (a *App) AttachmentDataURL(path string) (string, error) {
 
 // --- memory panel (frontend ⇄ controller) ---
 
+// WorkspaceChangeView is a single file change recorded during a session.
+type WorkspaceChangeView struct {
+	Path   string `json:"path"`
+	Added  int    `json:"added"`
+	Removed int   `json:"removed"`
+}
+
 // MemoryDoc is one loaded doc-memory file for the panel: path, scope, and body.
 type MemoryDoc struct {
 	Path  string `json:"path"`

@@ -4,7 +4,7 @@ import type { WireApproval } from "../lib/types";
 
 // ─── 审批选项按钮的共享布局 ─────────────────────────────────────
 
-const btnBase = "grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] rounded-lg text-fg p-[7px_9px] text-left cursor-pointer transition-all duration-[0.12s]";
+const btnBase = "grid grid-cols-[28px_1fr] items-center gap-2.5 w-full min-h-[46px] rounded-lg text-fg p-1.5 px-2 text-left cursor-pointer transition-all duration-[var(--dur-fast)]";
 
 function PlanBtn({ num, active, title, hint, onClick }: {
   num: number; active?: boolean; title: string; hint: string; onClick: () => void;
@@ -81,7 +81,10 @@ export function ApprovalModal({
     <div className="plan-approval-dock" aria-live="polite">
       <div
         ref={cardRef}
-        className="border border-border rounded-xl bg-bg-elev shadow-[0_8px_32px_rgba(0,0,0,0.14)] p-4 outline-none focus-visible:border-accent transition-shadow duration-200 hover:shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
+        className="border border-border rounded-xl bg-bg-elev p-4 outline-none focus-visible:border-accent transition-shadow duration-200"
+        style={{boxShadow: "var(--ds-shadow-card)"}}
+        onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.boxShadow = "var(--ds-shadow-card-hover)"}
+        onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.boxShadow = "var(--ds-shadow-card)"}
         role="dialog" aria-modal="false" tabIndex={-1}
         aria-labelledby={isPlanApproval ? "plan-approval-title" : "tool-approval-title"}
       >

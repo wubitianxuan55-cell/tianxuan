@@ -38,7 +38,7 @@ export function Skeleton() {
 
 function Card({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 bg-bg-soft border border-border-soft rounded-lg transition-[border-color,background] duration-[0.12s] hover:border-fg-faint hover:bg-bg-elev">
+    <div className="flex items-center gap-2.5 px-3 py-2.5 bg-bg-soft border border-border-soft rounded-lg transition-[border-color,background] duration-[var(--dur-fast)] hover:border-fg-faint hover:bg-bg-elev">
       <span className="text-fg-faint shrink-0">{icon}</span>
       <div className="flex flex-col min-w-0">
         <span className="text-[13px] font-medium text-fg truncate">{title}</span>

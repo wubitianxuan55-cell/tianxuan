@@ -5,6 +5,7 @@
 
 export const en = {
   // shared verbs / chrome
+  "app.splashSubtitle": "AI coding agent",
   "common.close": "Close",
   "common.cancel": "Cancel",
   "common.save": "Save",
@@ -347,6 +348,8 @@ export const en = {
 
   // assistant message
   "msg.thinking": "thinking",
+  "msg.thinkingRunning": "thinking…",
+  "msg.thinkingDone": "done",
   "msg.copy": "Copy",
   "msg.copyAll": "Copy all",
   "rewind.label": "Rewind / fork / summarize…",
@@ -393,6 +396,23 @@ export const en = {
   "updater.failed": "Update failed: {msg}",
   "updater.retry": "Retry",
   "updater.dismiss": "Later",
+
+  // command palette
+  "palette.placeholder": "Search commands, sessions…",
+  "palette.empty": "No matches",
+  "palette.group.commands": "Commands",
+  "palette.group.sessions": "Sessions",
+
+  // memory panel — new additions
+  "memory.filterAll": "All",
+  "memory.empty": "No memories yet",
+  "memory.emptyHint": "Use quick-add below to create your first memory",
+  "memory.noResults": "No matches",
+  "memory.refresh": "Refresh",
+  "memory.suggestions": "Suggestions",
+  "memory.suggestionNew": "Suggested",
+  "memory.suggestionSkill": "Suggested Skill",
+  "memory.archived": "Archived",
 };
 
 export type DictKey = keyof typeof en;

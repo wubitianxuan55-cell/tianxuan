@@ -51,7 +51,7 @@ export function StreamingIndicator({
   const cfg = stageConfig[stage];
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50 backdrop-blur-sm">
+    <div className="sticky top-0 z-10 flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50">
       {/* 滚动色条 — 高 3px，顶对齐 */}
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-border-soft overflow-hidden">
         <div className={`h-full rounded-r-sm animate-pulse ${

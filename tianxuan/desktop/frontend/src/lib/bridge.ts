@@ -7,6 +7,7 @@
 
 import type {
   BalanceInfo,
+  WorkspaceChangeView,
   CapabilitiesView,
   CheckpointMeta,
   CommandInfo,
@@ -32,6 +33,10 @@ import type {
 
 // AppBindings mirrors desktop/app.go's exported method set. Keep in sync by hand
 // (or regenerate with `wails generate module` and import wailsjs instead).
+//
+// Compile-time drift check: when a Go method is added/renamed but AppBindings is
+// not updated, the type assertion below catches it at build time.  Fix: add the
+// missing method to AppBindings, then run `pnpm typecheck`.
 export interface AppBindings {
   Submit(input: string): Promise<void>;
   SubmitDisplay(display: string, input: string): Promise<void>;
@@ -85,6 +90,8 @@ export interface AppBindings {
   ListDir(rel: string): Promise<DirEntry[]>;
   ReadFile(rel: string): Promise<FilePreview>;
   OpenWorkspacePath(rel: string): Promise<void>;
+  // WorkspaceChanges returns files modified during this session by the agent.
+  WorkspaceChanges(): Promise<WorkspaceChangeView[]>;
   RevealWorkspacePath(rel: string): Promise<void>;
   SavePastedImage(dataUrl: string): Promise<string>;
   AttachmentDataURL(path: string): Promise<string>;
@@ -208,4 +215,14 @@ import {
   mockSubscribe,
   updaterListeners,
 } from "./mock";
+
+// ── compile-time drift check ──────────────────────────────────────────────
+// _CheckGenToApp errors when a generated Go method has no TS counterpart in
+// AppBindings. Fix: add the missing method to AppBindings, then `pnpm typecheck`.
+// Methods intentionally excluded from the frontend can be listed in the Exclude
+// union to silence the check.
+import type * as GeneratedApp from "../../wailsjs/go/main/App";
+
+type AssertNever<T extends never> = T;
+export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow">>;
 

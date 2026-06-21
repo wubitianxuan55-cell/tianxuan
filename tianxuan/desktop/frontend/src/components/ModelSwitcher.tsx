@@ -32,7 +32,7 @@ export function ModelSwitcher({ label, onPick }: { label: string; onPick: (name:
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 max-h-64 overflow-y-auto bg-bg-elev-2 border border-border rounded-lg shadow-[0_6px_24px_rgba(0,0,0,0.3)] z-20 p-1" role="listbox">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 max-h-64 overflow-y-auto bg-bg-elev-2 border border-border rounded-lg z-20 p-1" role="listbox" style={{boxShadow: "var(--ds-shadow-dropdown)"}}>
             {models.length === 0 && <div className="px-3 py-4 text-fg-faint text-xs text-center">{t("status.noModels")}</div>}
             {models.map((m) => (
               <button

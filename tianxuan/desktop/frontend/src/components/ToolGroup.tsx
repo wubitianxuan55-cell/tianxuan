@@ -29,7 +29,7 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
   return (
     <div className="my-1 border border-border-soft rounded-lg overflow-hidden bg-bg-elev/30">
       <div
-        className={`flex items-center gap-2 ${rowPx} ${rowPy} cursor-pointer hover:bg-bg-elev/60 text-fg-dim transition-colors duration-[0.12s]`}
+        className={`flex items-center gap-2 ${rowPx} ${rowPy} cursor-pointer hover:bg-bg-elev/60 text-fg-dim transition-colors duration-[var(--dur-fast)]`}
         onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
       >
         <ChevronRight

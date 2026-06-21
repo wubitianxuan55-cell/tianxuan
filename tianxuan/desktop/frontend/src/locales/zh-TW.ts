@@ -5,6 +5,7 @@ import type { DictKey } from "./en";
 
 export const zhTW: Record<DictKey, string> = {
   //  shared verbs / chrome
+  "app.splashSubtitle": "AI 程式助手",
   "common.close": "關閉",
   "common.cancel": "取消",
   "common.save": "儲存",
@@ -346,6 +347,8 @@ export const zhTW: Record<DictKey, string> = {
 
   // assistant message
   "msg.thinking": "思考中",
+  "msg.thinkingRunning": "思考中…",
+  "msg.thinkingDone": "已完成",
   "msg.copy": "複製",
   "msg.copyAll": "複製全部",
   "rewind.label": "回退 / 分支 / 摘要…",
@@ -392,4 +395,21 @@ export const zhTW: Record<DictKey, string> = {
   "updater.failed": "更新失敗：{msg}",
   "updater.retry": "重試",
   "updater.dismiss": "稍後再說",
+
+  // command palette
+  "palette.placeholder": "搜尋命令、工作階段…",
+  "palette.empty": "無匹配結果",
+  "palette.group.commands": "命令",
+  "palette.group.sessions": "工作階段",
+
+  // memory panel — 新增鍵
+  "memory.filterAll": "全部",
+  "memory.empty": "還沒有記憶",
+  "memory.emptyHint": "使用下方的快速新增來建立第一條記憶",
+  "memory.noResults": "無匹配結果",
+  "memory.refresh": "重新整理",
+  "memory.suggestions": "建議",
+  "memory.suggestionNew": "建議新增",
+  "memory.suggestionSkill": "建議技能",
+  "memory.archived": "已歸檔",
 };

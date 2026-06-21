@@ -145,6 +145,11 @@ type AgentRunner struct {
 	sessCacheHit  atomic.Int64
 	cacheBreakCount atomic.Int64 // V5.30: ������Ѵ���
 	sessCacheMiss atomic.Int64
+	// V8.12: lastShape holds the most recent cache-shape fingerprint, written
+	// by the run loop every turn and read by TCCAReport. Not emitted as a Notice
+	// -- users fetch it on demand via /tcca-report.
+	lastShape   *CacheShape
+	lastShapeMu sync.Mutex
 
 
 	// V5.31: ����������Ƚضϼ�����output_continue.go��

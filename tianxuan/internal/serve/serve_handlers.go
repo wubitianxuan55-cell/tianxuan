@@ -956,7 +956,7 @@ func (s *Server) slashArgs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) tccaReport(w http.ResponseWriter, _ *http.Request) {
 	r := s.ctrl.TCCAReport()
-	writeJSON(w, map[string]any{
+	resp := map[string]any{
 		"l1Size":          r.L1Size,
 		"l2Size":          r.L2Size,
 		"l3Version":       r.L3Version,
@@ -970,7 +970,19 @@ func (s *Server) tccaReport(w http.ResponseWriter, _ *http.Request) {
 		"cacheHitTokens":  r.CacheHitTokens,
 		"cacheMissTokens": r.CacheMissTokens,
 		"breakCount":      r.BreakCount,
-	})
+	}
+	if shape := s.ctrl.LastCacheShape(); shape != nil {
+		resp["lastShape"] = map[string]any{
+			"kind":       shape.Kind,
+			"msgCount":   shape.MsgCount,
+			"roles":      shape.Roles,
+			"sysHash":    shape.SysHash,
+			"toolsHash":  shape.ToolsHash,
+			"prefixHash": shape.PrefixHash,
+			"tailHash":   shape.TailHash,
+		}
+	}
+	writeJSON(w, resp)
 }
 
 // ── helpers ────────────────────────────────────────────────────────────

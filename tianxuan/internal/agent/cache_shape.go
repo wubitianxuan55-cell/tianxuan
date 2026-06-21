@@ -105,7 +105,16 @@ func (a *AgentRunner) computeCacheShape(kind string) *CacheShape {
 	return cs
 }
 
-// formatCacheShape renders the shape as a compact human+model-readable notice.
+// LastCacheShape returns the most recent cache-shape fingerprint (nil before
+// the first turn). Thread-safe; intended for TCCAReport.
+func (a *AgentRunner) LastCacheShape() *CacheShape {
+	a.lastShapeMu.Lock()
+	defer a.lastShapeMu.Unlock()
+	return a.lastShape
+}
+
+// format renders the shape as a compact human+model-readable notice.
+// Deprecated: no longer emitted as a Notice; kept for logging/debugging.
 func (cs *CacheShape) format() string {
 	var b strings.Builder
 	b.WriteString("prefix-cache shape [" + cs.Kind + "]: ")

@@ -491,7 +491,7 @@ function AccordionRuleList({
         className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-0 text-left cursor-pointer hover:bg-bg-soft transition-colors"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="text-[10px] text-fg-faint transition-transform duration-150" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+        <span className={`text-[10px] text-fg-faint transition-transform duration-150 ${open ? "rotate-90" : "rotate-0"}`}>▶</span>
         <span className="text-fg-dim text-[12px] font-medium">{listLabel}</span>
         {count > 0 && (
           <span className="ml-auto text-[10px] font-mono text-fg-faint bg-bg-elev px-1.5 py-px rounded">{count}</span>

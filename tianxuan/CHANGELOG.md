@@ -1,34 +1,25 @@
 ## [8.7.0] — 2026-06-21
 
-### 🎨 前端 UI 优化 — Welcome 智能主页 + 内联 style 消除 + 微交互
+### 🎨 前端 UI 优化 — Welcome 智能主页 + 内联 style 消除 + 微交互 + ToolCard 图标提取
 
-> 基于 V8.6.0 · 7文件 +63/-75行 · 纯前端零 Go 变更
+> 基于 V8.6.0 · 9文件 +131/-157行 · 纯前端零 Go 变更
 
 | 变更 | 文件 | 说明 |
 |------|------|------|
-| 智能主页重做 | `Welcome.tsx` | 6个快捷命令网格(探索/修复/功能/审查/测试/文档)、项目语境增强、最近会话卡片化+相对时间显示、首次引导3步横幅 |
-| 内联 style 消除 | `JumpBar/PlanPanel/StatsPanel/StreamingIndicator/Welcome/WorkspacePanel` | 16处→10处（剩余全为运行时动态值） |
-| 滚动按钮增强 | `Transcript.tsx` | 动画反弹+文字标签、替换圆形图标为药丸按钮 |
-
-### 📐 技术细节
-
-| 文件 | 前 | 后 | 说明 |
-|------|-----|-----|------|
-| `JumpBar.tsx` | `style={{maxHeight,overflowY,scrollbarWidth}}` | Tailwind `overflow-y-auto` | 条件类名替代 3 个动态 style |
-| `PlanPanel.tsx` | `style={{width,background}}` | Tailwind `w-full bg-ok w-0` + CSS变量渐变 | 100%用 bg-ok,中间用CSS变量 |
-| `StreamingIndicator` | `style={{width,background}}` | Tailwind `w-1/4 bg-warning / w-[40%] bg-err / w-[60%] bg-info` | 三态完全消除 style |
-| `StatsPanel` | `style={{background:"var(--accent)"}}` | `bg-accent bg-ok` | Tailwind 色值令牌 |
-| `Welcome` | `style={{minHeight,maxHeight}}` | `min-h-[64px] compact:min-h-[80px] max-h-[160px]` | compact 自适应 |
+| 智能主页重做 | `Welcome.tsx` | 6快捷命令网格+项目语境+会话卡片+引导 |
+| 内联 style 消除 | 6文件 | 16→10处：JumpBar/PlanPanel/StreamingIndicator/StatsPanel/Welcome/SettingsPanel |
+| ToolCard 图标提取 | `ToolCard.tsx`→`tool_icons.ts` | ICONS 70行映射提取，ToolCard 271→189 (-30%) |
+| 滚动按钮增强 | `Transcript.tsx` | 动画反弹+文字标签 |
 
 ### 🔒 缓存安全
 
 - Go 内核零变更 ✅
-- 纯前端 CSS + React 组件 ✅
 
 ### 📦 发布
 
+- CLI: `tianxuan.exe` (13MB)
 - 位置: `release/v8.7.0/`
-- 变更: 7 文件，+63/-75 行
+- 变更: 9 文件，+131/-157 行
 
 ---
 

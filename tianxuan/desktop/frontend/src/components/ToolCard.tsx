@@ -1,104 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Activity,
-  ArrowRightLeft,
   Ban,
-  BookOpen,
-  Brain,
-  Bug,
   Check,
-  CheckCircle,
   ChevronRight,
-  Clock,
   Eye,
   EyeOff,
-  FilePen,
-  FileText,
-  FolderOpen,
-  GitBranch,
-  Globe,
-  Hourglass,
-  Layers,
-  Lightbulb,
-  List,
-  ListTree,
   Loader2,
-  Pencil,
-  Plug,
-  PlusCircle,
-  Search,
-  Sparkles,
-  SquareTerminal,
-  Trash2,
-  Wrench,
   X,
-  Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { CodeViewer } from "./CodeViewer";
 import { DiffView } from "./DiffView";
+import { ICONS, mcpOr } from "./tool_icons";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { diffsFor, subjectOf, summarize } from "../lib/tools";
 import type { Item } from "../lib/store";
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
-
-const ICONS: Record<string, LucideIcon> = {
-  // 文件读写
-  edit_file: FilePen,
-  multi_edit: FilePen,
-  write_file: FilePen,
-  read_file: FileText,
-  delete_range: Trash2,
-  delete_symbol: Trash2,
-  notebook_edit: FilePen,
-  // Shell
-  bash: SquareTerminal,
-  bash_output: SquareTerminal,
-  kill_shell: Ban,
-  // 文件浏览
-  ls: FolderOpen,
-  glob: Search,
-  grep: Search,
-  // 网络
-  web_fetch: Globe,
-  web_search: Globe,
-  // 子代理
-  task: ListTree,
-  run_skill: Zap,
-  parallel_skills: Layers,
-  install_skill: PlusCircle,
-  // Git
-  git_status: GitBranch,
-  git_diff: GitBranch,
-  git_log: GitBranch,
-  git_commit: GitBranch,
-  // LSP
-  lsp_diagnostics: Bug,
-  lsp_definition: ArrowRightLeft,
-  lsp_references: List,
-  lsp_hover: Lightbulb,
-  lsp_completion: Sparkles,
-  lsp_rename: Pencil,
-  // 记忆 / 知识
-  memory_search: Brain,
-  remember: Brain,
-  read_skill: BookOpen,
-  // 诊断 / 时间
-  doctor: Activity,
-  time: Clock,
-  wait: Hourglass,
-  // 计划
-  complete_step: CheckCircle,
-  // 交互
-  ask: List,
-};
-
-/** MCP 工具（`mcp__<server>__<tool>`）统一用插头图标 */
-function mcpOr(name: string): LucideIcon {
-  return name.startsWith("mcp__") ? Plug : Wrench;
-}
 
 function pretty(json: string): string {
   try {

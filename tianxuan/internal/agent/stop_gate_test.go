@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"tianxuan/internal/strutil"
 	"tianxuan/internal/provider"
 )
 
@@ -12,7 +13,7 @@ import (
 func makeTodoMsg(statuses ...string) provider.Message {
 	todos := make([]map[string]string, len(statuses))
 	for i, s := range statuses {
-		todos[i] = map[string]string{"content": "task " + itoa(i+1), "status": s}
+		todos[i] = map[string]string{"content": "task " + strutil.Itoa(i+1), "status": s}
 	}
 	args, _ := json.Marshal(map[string]any{"todos": todos})
 	return provider.Message{

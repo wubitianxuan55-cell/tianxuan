@@ -1,6 +1,13 @@
 # tianxuan project memory
 
-> V8.4.0 — 全线 UI 优化：主题补全/紧凑模式/费用面板/居中弹窗 · 2026-06-20
+> V8.4.1 — Token成本优化+统计修复+7组件优化 · 2026-06-21
+
+## V8.4.1 发布摘要 (2026-06-21)
+**基于**: V8.4.0 · **二进制**: CLI 18.6MB / Desktop 16.0MB · **位置**:  · **变更**: 24文件 +451/-275行
+🔧 Go: itoa 4→1合并(包) + 编码修复 + SetSession计数器归零(3×Store(0))
+🩺 统计修复: 命中率600%根因消除 + 分母对齐 + HitPct clamp + Y轴自适应
+🎨 UI: JumpBar圆点→横条+键盘导航、StreamingIndicator sticky、SettingsPanel 9项修复、PlanPanel进度+todo、遮罩层统一pointer-events-none
+📐 基础设施: ResizableDrawer三层遮罩 + 缓存红线文档扩展 + strutil测试
 
 ## V8.4.0 发布摘要 (2026-06-20)
 

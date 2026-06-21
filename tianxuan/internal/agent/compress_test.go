@@ -3,6 +3,8 @@ package agent
 import (
 	"strings"
 	"testing"
+
+	"tianxuan/internal/strutil"
 )
 
 // TestCompressGrepGroupsByFile 验证 grep 结果按文件分组，每文件保留首尾。
@@ -65,7 +67,7 @@ func TestCompressGrepGlobalCap(t *testing.T) {
 			fname = string(rune('a'+f/26-1)) + string(rune('a'+f%26)) + ".go"
 		}
 		for l := 1; l <= 10; l++ {
-			lines = append(lines, fname+":"+itoa(l)+": line content here some text")
+			lines = append(lines, fname+":"+strutil.Itoa(l)+": line content here some text")
 		}
 	}
 	input := strings.Join(lines, "\n")

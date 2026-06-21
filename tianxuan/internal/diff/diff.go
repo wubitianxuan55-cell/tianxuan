@@ -10,7 +10,11 @@
 // a naive longest-common-subsequence walk.
 package diff
 
-import "strings"
+import (
+	"strings"
+
+	"tianxuan/internal/strutil"
+)
 
 // Kind classifies what a change does to a file's existence, so a UI can label
 // it ("new file", "modified", "deleted") without diffing to find out.
@@ -65,7 +69,7 @@ func Build(path, oldText, newText string, kind Kind) Change {
 		// Change too large for an O(N²) line diff (a big rewrite). Give cheap,
 		// order-insensitive tallies and omit the unreadable diff.
 		c.Added, c.Removed = approxTally(oldLines, newLines)
-		c.Diff = "(diff omitted: change too large to render — +" + itoa(c.Added) + " / -" + itoa(c.Removed) + " lines)"
+		c.Diff = "(diff omitted: change too large to render — +" + strutil.Itoa(c.Added) + " / -" + strutil.Itoa(c.Removed) + " lines)"
 		return c
 	}
 
@@ -387,23 +391,7 @@ func writeHunkHeader(b *strings.Builder, refs []lineRef, h hunk) {
 // when count is 1, matching unified-diff convention.
 func rangeSpec(start, count int) string {
 	if count == 1 {
-		return itoa(start)
+		return strutil.Itoa(start)
 	}
-	return itoa(start) + "," + itoa(count)
-}
-
-// itoa is a tiny non-allocating-path integer formatter kept local so the
-// package imports only strings.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
+	return strutil.Itoa(start) + "," + strutil.Itoa(count)
 }

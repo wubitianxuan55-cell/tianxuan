@@ -115,7 +115,7 @@ function MiniAreaChart({
 
 // ─── 命中率大号展示 ────────────────────────────────────────────
 function HitPct({ hit, total }: { hit: number; total: number }) {
-  const rate = total > 0 ? (hit / total) * 100 : 0;
+  const rate = total > 0 ? Math.min(100, (hit / total) * 100) : 0;
   return (
     <div className="flex items-baseline gap-2">
       <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
@@ -276,7 +276,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             <span className="text-border mx-1.5">·</span>
             <span>成本 {cash(totalCost)}</span>
           </div>
-          {sessionPromptTk > 0 && <HitPct hit={sessionHit} total={sessionPromptTk} />}
+          {sessionPrompt > 0 && <HitPct hit={sessionHit} total={sessionPrompt} />}
         </div>
 
         {/* ── 本轮 ── */}
@@ -318,11 +318,16 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         {stepHistory.length > 1 && (() => {
           const recent = stepHistory.slice(-20);
           const rates = recent.map(r => r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0);
-          const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin;
-          const padding = spread <= 3 ? 2 : Math.max(5, spread * 0.15);
-          const minRate = Math.max(0, Math.floor((dataMin - padding) / 5) * 5);
-          const maxRate = Math.min(100, Math.ceil((dataMax + padding) / 5) * 5);
-          const range = maxRate - minRate || 1;
+          const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
+          // 自适应步长：窄范围用细粒度，避免 98-100% 数据被压平成 95-100%
+          let step: number, padding: number;
+          if (spread <= 2)     { step = 1; padding = 0.5; }
+          else if (spread <= 5) { step = 2; padding = 1.0; }
+          else                  { step = 5; padding = Math.max(5, spread * 0.15); }
+          const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
+          const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
+          const rawRange = maxRate - minRate || 1;
+          const range = Math.max(rawRange, step); // 确保至少一个步长的刻度间距
           const W = 260, H = 80, padL = 30, padR = 8, padT = 8, padB = 16;
           const plotW = W - padL - padR, plotH = H - padT - padB;
           const points: Point[] = recent.map((r, i) => {
@@ -331,11 +336,13 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             const y = padT + plotH - ((rate - minRate) / range) * plotH;
             return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
           });
-          const yLabels: [number, string][] = [
-            [minRate, `${minRate}%`],
-            [Math.round(minRate + range * 0.5), `${Math.round(minRate + range * 0.5)}%`],
-            [maxRate, `${maxRate}%`],
-          ];
+          const yLabels: [number, string][] = (() => {
+            const mid = Math.round(minRate + range * 0.5);
+            const labels: [number, string][] = [[minRate, `${minRate}%`]];
+            if (mid !== minRate && mid !== maxRate) labels.push([mid, `${mid}%`]);
+            if (maxRate !== minRate) labels.push([maxRate, `${maxRate}%`]);
+            return labels;
+          })();
           const xLabels = [
             { at: points[0].x, text: `#${recent[0].step}` },
             { at: points[Math.floor(points.length / 2)].x, text: `#${recent[Math.floor(recent.length / 2)].step}` },

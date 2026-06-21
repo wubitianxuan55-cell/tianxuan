@@ -127,18 +127,21 @@ export function ResizableDrawer({
   );
 
   return (
-    <div
-      className={`fixed inset-0 flex justify-end z-90 ${subtle ? "bg-bg/16" : "bg-bg/60"}`}
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 z-90">
+      {/* transparent click-to-close layer */}
+      <div className="absolute inset-0" onClick={handleClose} />
+      {/* visual backdrop only — does not intercept scroll */}
+      <div className={"absolute inset-0 pointer-events-none " + (subtle ? "bg-bg/16" : "bg-bg/60")} />
+      {/* positioning layer */}
+      <div className="absolute inset-0 flex justify-end pointer-events-none">
       <aside
-        className={`relative flex flex-col h-full bg-bg-elev border-l border-border shadow-[-18px_0_48px_rgba(0,0,0,0.46)] ${
+        className={"relative flex flex-col h-full bg-bg-elev border-l border-border shadow-[-18px_0_48px_rgba(0,0,0,0.46)] pointer-events-auto " + (
           exiting ? "animate-[drawer-out_0.12s_ease_forwards]" : "animate-[drawer-in_0.14s_ease]"
-        } ${resizing ? "drawer--resizing" : ""} ${
+        ) + (resizing ? " drawer--resizing" : "") + " " + (
           wide
             ? "w-[min(var(--drawer-width,720px),94vw)]"
             : "w-[min(var(--drawer-width,440px),92vw)]"
-        }`}
+        )}
         onClick={(e) => e.stopPropagation()}
         style={style}
       >
@@ -160,6 +163,7 @@ export function ResizableDrawer({
         </button>
         {children}
       </aside>
+      </div>
     </div>
   );
 }

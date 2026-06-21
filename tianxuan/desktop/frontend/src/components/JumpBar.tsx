@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import type React from "react";
 import type { Item } from "../lib/store";
 
@@ -8,15 +8,14 @@ interface JumpBarProps {
 }
 
 /**
- * JumpBar — a thin right-edge navigation strip showing each user turn as a dot.
- * Hover shows a preview of the user's message; click scrolls to that turn.
+ * JumpBar — 右侧轮次导航横条。每个用户消息对应一条横条，
+ * 显示轮次编号。↑↓ 键盘导航，点击滚动到对应轮次。
+ * 轮次超过 15 时容器可滚动，始终显示活跃轮次。
  */
 export function JumpBar({ items, threadEl }: JumpBarProps) {
-  const [hovered, setHovered] = useState<number | null>(null);
   const [active, setActive] = useState<number | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewY, setPreviewY] = useState(0);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   // Extract user messages with their turn number
   const turns = useMemo(() => {
@@ -36,83 +35,92 @@ export function JumpBar({ items, threadEl }: JumpBarProps) {
     if (turns.length > 0) setActive(turns[turns.length - 1].turn);
   }, [turns]);
 
-  // Scroll active dot into view
+  // Scroll active into view inside the bar
   useEffect(() => {
-    if (active === null || !barRef.current) return;
-    const el = barRef.current.querySelector(`[data-turn="${active}"]`);
-    el?.scrollIntoView({ block: "nearest" });
+    activeRef.current?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  if (turns.length <= 1) return null;
-
-  const onMove = (e: React.MouseEvent) => {
-    const rect = barRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const relY = e.clientY - rect.top;
-    setPreviewY(relY);
-    const turnIdx = Math.round((relY / rect.height) * (turns.length - 1));
-    const clamped = Math.max(0, Math.min(turns.length - 1, turnIdx));
-    const turn = turns[clamped]?.turn ?? null;
-    setHovered(turn);
-    setShowPreview(true);
-  };
-
-  const scrollTo = (turn: number) => {
+  const scrollTo = useCallback((turn: number) => {
     setActive(turn);
     if (threadEl) {
       const el = threadEl.querySelector(`[data-turn="${turn}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  };
+  }, [threadEl]);
 
-  const hoverText = hovered !== null
-    ? turns.find((v) => v.turn === hovered)?.text ?? null
-    : null;
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (turns.length <= 1) return;
+    const currentIdx = active !== null ? turns.findIndex(t => t.turn === active) : -1;
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowDown")     nextIdx = Math.min(turns.length - 1, currentIdx + 1);
+    else if (e.key === "ArrowUp")  nextIdx = Math.max(0, currentIdx - 1);
+    else if (e.key === "Home")     nextIdx = 0;
+    else if (e.key === "End")      nextIdx = turns.length - 1;
+    else return;
+    e.preventDefault();
+    if (nextIdx !== null) scrollTo(turns[nextIdx].turn);
+  }, [active, turns, scrollTo]);
+
+  if (turns.length <= 1) return null;
 
   return (
     <div
-      ref={barRef}
-      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 z-10 py-2"
-      onMouseMove={onMove}
-      onMouseLeave={() => { setHovered(null); setShowPreview(false); }}
+      className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col items-stretch z-10 w-[22px]"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
     >
-      {turns.map((item) => {
-        const isActive = active === item.turn;
-        const isHovered = hovered === item.turn;
-        return (
-          <button
-            key={item.turn}
-            type="button"
-            className={`relative w-[6px] h-[6px] rounded-full border-0 cursor-pointer p-0 shrink-0 transition-all duration-150 ${
-              isActive
-                ? "bg-accent scale-125 shadow-[0_0_4px_var(--accent)]"
-                : isHovered
-                  ? "bg-fg-dim scale-150"
-                  : "bg-border hover:bg-fg-dim hover:scale-[1.6]"
-            }`}
-            data-turn={item.turn}
-            onClick={(e) => { e.preventDefault(); scrollTo(item.turn); }}
-            title={item.text.slice(0, 60)}
-          >
-            {/* Active ring pulse */}
-            {isActive && (
-              <span className="absolute inset-[-3px] rounded-full border border-accent/30 animate-pulse pointer-events-none" />
-            )}
-          </button>
-        );
-      })}
+      {/* 轮次计数 */}
+      <div className="text-center text-[9px] text-fg-faint/50 font-mono leading-none mb-0.5 select-none">
+        {turns.length}
+      </div>
 
-      {showPreview && hoverText && (
-        <div
-          className="absolute right-[calc(100%+10px)] max-w-64 px-2.5 py-1.5 bg-bg-elev-2 border border-border rounded-lg text-[11px] text-fg-dim leading-snug whitespace-pre-wrap break-words shadow-[0_4px_16px_rgba(0,0,0,0.25)] pointer-events-none z-20 animate-[menu-in_0.1s_ease]"
-          style={{
-            top: Math.max(0, Math.min(previewY - 18, (barRef.current?.clientHeight ?? 200) - 48)),
-          }}
-        >
-          <span className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mr-1">#{hovered}</span>
-          {hoverText}
-        </div>
-      )}
+      {/* 横条列表——超过 15 轮可滚动 */}
+      <div
+        ref={barRef}
+        className="flex flex-col gap-[3px] items-stretch"
+        style={{
+          maxHeight: turns.length > 15 ? "calc(100vh - 280px)" : "none",
+          overflowY: turns.length > 15 ? "auto" : "visible",
+          scrollbarWidth: "none",
+        }}
+      >
+        {turns.map((item) => {
+          const isActive = active === item.turn;
+          return (
+            <button
+              key={item.turn}
+              ref={isActive ? activeRef : undefined}
+              type="button"
+              data-turn={item.turn}
+              tabIndex={-1}
+              onClick={(e) => { e.preventDefault(); scrollTo(item.turn); }}
+              title={`#${item.turn}: ${item.text}`}
+              className={`relative h-[11px] min-h-[11px] rounded-sm border-0 cursor-pointer transition-all duration-150 ${
+                isActive
+                  ? "bg-accent shadow-[0_0_6px_var(--accent)]"
+                  : "bg-border hover:bg-fg-dim hover:shadow-[0_0_3px_var(--border)]"
+              }`}
+            >
+              {/* 轮次编号 */}
+              <span className={`absolute inset-0 flex items-center justify-center text-[7.5px] font-bold select-none leading-none pointer-events-none ${
+                isActive ? "text-accent-fg" : "text-fg-faint/60"
+              }`}>
+                {item.turn}
+              </span>
+              {/* 活跃光晕 */}
+              {isActive && (
+                <span className="absolute inset-[-2px] rounded-sm border border-accent/40 animate-pulse pointer-events-none" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 底部提示 */}
+      <div className="text-center text-[8px] text-fg-faint/30 font-mono leading-none mt-0.5 select-none">
+        ↑↓
+      </div>
     </div>
   );
 }

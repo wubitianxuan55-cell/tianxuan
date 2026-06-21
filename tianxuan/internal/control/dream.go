@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/strutil"
 	"tianxuan/internal/agent"
 )
 
@@ -286,7 +287,7 @@ func (c *Controller) createSkillTemplates(patterns []string) int {
 		if i >= 5 {
 			break
 		}
-		name := "auto-pattern-" + itoaForSkill(i+1)
+		name := "auto-pattern-" + strutil.Itoa(i+1)
 		tools := strings.Split(strings.ReplaceAll(p, " -> ", ","), ",")
 		for j := range tools {
 			tools[j] = strings.TrimSpace(tools[j])
@@ -402,18 +403,4 @@ func findRepeatedPatterns(seq []string, minLen int) []string {
 		}
 	}
 	return out
-}
-
-func itoaForSkill(n int) string {
-	if n <= 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }

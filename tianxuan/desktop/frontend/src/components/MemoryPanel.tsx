@@ -132,8 +132,14 @@ export function MemoryPanel({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out]" onClick={handleBackdrop}>
-      <div className="flex flex-col w-full max-w-2xl max-h-[88vh] bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] animate-[scaleIn_.2s_ease-out] overflow-hidden">
+    <div className="fixed inset-0 z-50">
+      {/* 不可见点击-关闭层 */}
+      <div className="absolute inset-0" onClick={handleBackdrop} />
+      {/* 仅视觉遮罩 —— 不拦截滚轮 */}
+      <div className="absolute inset-0 bg-bg/60 pointer-events-none animate-[fadeIn_.15s_ease-out]" />
+      {/* 居中布局 */}
+      <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
+      <div className="flex flex-col w-full max-w-2xl max-h-[88vh] bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] animate-[scaleIn_.2s_ease-out] overflow-hidden pointer-events-auto">
         {/* ── Header ── */}
         <header className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border">
           <div className="flex items-center gap-3 min-w-0">
@@ -343,6 +349,7 @@ export function MemoryPanel({
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

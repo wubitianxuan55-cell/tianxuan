@@ -35,6 +35,8 @@ import (
 	"os"
 	"strings"
 	"unicode/utf8"
+
+	"tianxuan/internal/strutil"
 )
 
 // version is overridable via -ldflags "-X main.version=...". Reported in
@@ -100,7 +102,7 @@ func serve(in *os.File, out *os.File) error {
 }
 
 func handleLine(line []byte, w *bufio.Writer) error {
-	line = trimSpace(line)
+	line = strutil.TrimSpace(line)
 	if len(line) == 0 {
 		return nil
 	}
@@ -344,6 +346,3 @@ func countLines(s string) int {
 }
 
 // trimSpace trims leading/trailing ASCII whitespace without pulling in bytes.
-func trimSpace(b []byte) []byte {
-	return []byte(strings.TrimSpace(string(b)))
-}

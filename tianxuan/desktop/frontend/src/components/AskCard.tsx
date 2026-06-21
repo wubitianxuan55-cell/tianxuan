@@ -46,8 +46,8 @@ export function AskCard({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out]">
-      <div className="flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 animate-[scaleIn_.2s_ease-out]">
+    <div className="fixed inset-0 flex items-center justify-center bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
+      <div className="flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.35)] p-5 animate-[scaleIn_.2s_ease-out] pointer-events-auto">
         {ask.questions.map((q) => (
           <div className="flex flex-col gap-3" key={q.id}>
             {q.header && (

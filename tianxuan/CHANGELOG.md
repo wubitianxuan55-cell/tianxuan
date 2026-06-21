@@ -1,3 +1,53 @@
+## [8.4.1] — 2026-06-21
+
+### 🔧 Go 核心 — Token 成本优化
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| `itoa` 去重 4→1 | `strutil/strutil.go` (新建) + 10 文件 | 4 处重复 int→string 零分配实现合并为 `strutil.Itoa`，删除 ~35 行重复代码 |
+| `trimSpace` 去重 | `strutil/strutil.go` + `plugin-example` | 示例插件低效实现（2次 string/byte 转换）→ 零分配切片法 |
+| 编码修复 | `batch_executor.go`, `cache_guard.go` | 4 处 UTF-8 乱码注释恢复正常中文 |
+
+**缓存安全性**：10 个 cache break detector 测试 + `strutil.Itoa` 0..100000 逐字节验证，确认不影响 DeepSeek 前缀缓存。
+
+### 🩺 Bug 修复 — 统计面板命中率异常
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| `SetSession` 计数器归零 | `agent.go:451-453` | `sessCacheHit/sessCacheMiss/cacheBreakCount` 随会话切换 `Store(0)`。根因：跨会话累积 → 命中率 600% |
+| StatsPanel 分母对齐 | `StatsPanel.tsx:279` | Session 总览分母从 `sessionPromptTk(localStorage)` → `sessionPrompt(后端值)`, 与分子同源 |
+| HitPct 防御性 clamp | `StatsPanel.tsx:118` | `Math.min(100, ...)` 防止未来类似 bug 显示荒谬数值 |
+| 条件守卫统一 | `StatsPanel.tsx:279` | 显示条件从 `sessionPromptTk > 0` → `sessionPrompt > 0` |
+
+### 🎨 桌面端 UI — 7 组件优化
+
+| 组件 | 变更 |
+|------|------|
+| **JumpBar** | 小圆点→小横条：点击面积 6.7×，内嵌轮次编号，>15轮可滚动，↑↓/Home/End 键盘导航 |
+| **StreamingIndicator** | `relative`→`sticky top-0 z-10 backdrop-blur-sm`，滚动时始终可见 |
+| **ThinkLevel 选择器** | 选中态增强：`bg-accent/15 font-semibold shadow-[inset_0_1px_2px]`，与 Composer 模式按钮和主题统一 |
+| **SettingsPanel** | 9 项修复：编辑按钮 onClick 修复、导航加搜索+图标、Active Provider 布局重做、Permissions 折叠面板、Agent 字段独立行、ProviderEditor fieldset 分组、删除无用统计卡片 |
+| **AskCard** | 遮罩 `pointer-events-none` → 背后对话窗口可滚动 |
+| **MemoryPanel** | 三层结构：点击关闭层+视觉遮罩(`pointer-events-none`)+面板(`pointer-events-auto`) → 可滚动 |
+| **PlanPanel** | 进度条+完成计数+活跃步骤指示器+三态 Footer+空态图标引导，传入 `todos` 数据 |
+
+### 📐 基础设施
+
+| 变更 | 说明 |
+|------|------|
+| `ResizableDrawer` | `fixed inset-0` 遮罩拆为三层（同 MemoryPanel 模式），所有抽屉面板背后可滚动 |
+| 缓存红线文档 | AGENTS.md 从 5 条 L1/L2 约束扩展为 6 条完整消息前缀不变性，新增 3 个关键文件到监控清单 |
+| 新增测试 | `strutil/strutil_test.go` — `TestItoaIdenticalToOriginals` 验证 0..100000 与旧实现逐字节一致 |
+
+### 📦 发布
+
+- CLI: `tianxuan.exe` (18.6 MB, `-ldflags="-s -w"`)
+- 桌面端: `tianxuan-desktop.exe` (16.0 MB, Go 1.26.3)
+- 位置: `release/v8.4.1/`
+- 变更: 24 文件，+451/-275 行
+
+---
+
 ## [8.4.0] — 2026-06-20
 
 ### 🎨 桌面端 UI — 全线优化 22 轮

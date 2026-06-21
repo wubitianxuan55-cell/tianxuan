@@ -459,8 +459,8 @@ export default function App() {
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
                     key={level}
-                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default ${
-                      thinkLevel === level ? "text-accent bg-accent-soft" : ""
+                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default transition-[color,background] duration-[0.12s] ${
+                      thinkLevel === level ? "text-accent font-semibold bg-accent/15 shadow-[inset_0_1px_2px_var(--accent-soft)]" : ""
                     }`}
                     onClick={() => handleThinkLevelChange(level)}
                     disabled={state.running}
@@ -670,6 +670,7 @@ export default function App() {
         {showPlan && (
           <PlanPanel
             planContent={planMarkdown}
+            todos={todos}
             onClose={() => setShowPlan(false)}
           />
         )}

@@ -8,6 +8,7 @@ import (
 
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/strutil"
 )
 
 // CompactionConfig controls the truncation-based history pruning (V5.0).
@@ -160,7 +161,7 @@ func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 		a.consecutiveCompacts = 0
 		a.compactStuck = false
 		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-			Text: "history truncated [" + mode + "] - " + itoa(len(msgs)) + " -> " + itoa(len(legacyRep)) + " messages, prefix " + itoa(prefixCount) + " kept"})
+			Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(legacyRep)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
 		return
 	}
 
@@ -363,7 +364,7 @@ func (a *AgentRunner) legacyTruncate(msgs []provider.Message, keepFrom, keep, pr
 	a.compaction.LastPrompt = 0
 
 	a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-		Text: "history truncated [" + mode + "] - " + itoa(len(msgs)) + " -> " + itoa(len(replacement)) + " messages, prefix " + itoa(prefixCount) + " kept"})
+		Text: "history truncated [" + mode + "] - " + strutil.Itoa(len(msgs)) + " -> " + strutil.Itoa(len(replacement)) + " messages, prefix " + strutil.Itoa(prefixCount) + " kept"})
 }
 
 // buildCompactSummary 从被截断的消息中提取确定性摘要（V5.9: claw-code 风格）。
@@ -439,9 +440,9 @@ func BuildCompactSummary(truncated []provider.Message) string {
 
 	// 概览
 	sb.WriteString("- Scope: ")
-	sb.WriteString(itoa(len(truncated)))
+	sb.WriteString(strutil.Itoa(len(truncated)))
 	sb.WriteString(" messages compacted, ")
-	sb.WriteString(itoa(turnCount))
+	sb.WriteString(strutil.Itoa(turnCount))
 	sb.WriteString(" turns\n")
 
 	// 最近用户请求（最后 3 条）
@@ -503,7 +504,7 @@ func BuildCompactSummary(truncated []provider.Message) string {
 			}
 			sb.WriteString(t.name)
 			sb.WriteString("×")
-			sb.WriteString(itoa(t.count))
+			sb.WriteString(strutil.Itoa(t.count))
 		}
 		sb.WriteString("\n")
 	}
@@ -587,18 +588,4 @@ func extractKeyFiles(msg provider.Message) []string {
 		}
 	}
 	return files
-}
-
-func itoa(n int) string {
-	if n <= 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }

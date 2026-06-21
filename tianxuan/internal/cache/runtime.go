@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"tianxuan/internal/strutil"
 )
 
 // RuntimeLayer is the L2 cache domain — session-stable context injected as a
@@ -349,22 +351,6 @@ func (rc *RuntimeLayer) verboseSystemPrompt() string {
 	// Controller 通过 TurnTailHints() 在 turn-tail 注入。
 	return strings.Join(parts, "\n\n")
 }
-
-// itoa 是 int 到 string 的快速转换（无 fmt 依赖），用于紧凑格式中的数值字段。
-func itoa(n int) string {
-	if n <= 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
-}
-
 // compactSystemPrompt 是紧凑格式 L2 系统提示（V5.30+）。
 // 使用 @p/@w/@g 前缀的 KV 行替代 Markdown 列表，token 减少约 60%。
 // 完全确定性——相同输入→相同输出，不破坏前缀缓存稳定性。
@@ -386,7 +372,7 @@ func (rc *RuntimeLayer) compactSystemPrompt() string {
 			sb.WriteString(" dir=" + strings.Join(rc.project.TopDirs, ","))
 		}
 		if rc.project.TotalFiles > 0 {
-			sb.WriteString(" files=" + itoa(rc.project.TotalFiles))
+			sb.WriteString(" files=" + strutil.Itoa(rc.project.TotalFiles))
 		}
 		lines = append(lines, sb.String())
 	}

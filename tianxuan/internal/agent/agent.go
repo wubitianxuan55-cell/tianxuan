@@ -445,6 +445,12 @@ func (a *AgentRunner) SetSession(s *Session) {
 	// the baseline rather than panic on mismatch.
 	a.prefixFingerprintSet = false
 	a.lastToolFingerprintSet = false
+	// V8.4.1: reset session-level cache counters to prevent cross-session
+	// accumulation from producing hit rates > 100%. sessCacheHit/sessCacheMiss
+	// increment on every API call and must reset when starting a new session.
+	a.sessCacheHit.Store(0)
+	a.sessCacheMiss.Store(0)
+	a.cacheBreakCount.Store(0)
 }
 
 // LastUsage returns the most recent per-turn token telemetry the provider

@@ -3,6 +3,8 @@ package agent
 import (
 	"sort"
 	"strings"
+
+	"tianxuan/internal/strutil"
 )
 
 // grepMatch 表示一条 grep 匹配行。
@@ -332,7 +334,7 @@ func compressTree(raw string) string {
 			// 计算子条目数量
 			childCount := countChildren(lines, depth)
 			out.WriteString(" [")
-			out.WriteString(itoa(childCount))
+			out.WriteString(strutil.Itoa(childCount))
 			out.WriteString(" hidden — 依赖/构建目录]\n")
 		} else {
 			out.WriteString(line)
@@ -458,7 +460,7 @@ func formatGrepOutput(selected map[string][]grepMatch, original map[string][]gre
 		if len(orig) > len(ms) {
 			omitted := len(orig) - len(ms)
 			out.WriteString("[... and ")
-			out.WriteString(itoa(omitted))
+			out.WriteString(strutil.Itoa(omitted))
 			out.WriteString(" more matches in ")
 			out.WriteString(f)
 			out.WriteString("]\n")

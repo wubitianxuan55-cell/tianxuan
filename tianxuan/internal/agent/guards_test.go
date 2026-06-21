@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"tianxuan/internal/strutil"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
@@ -56,11 +57,11 @@ func TestTruncateToolOutputKeepsSignalLines(t *testing.T) {
 	// 构造超限输出，中间夹一条 error 行
 	var sb strings.Builder
 	for i := 0; i < 500; i++ {
-		sb.WriteString("line " + itoa(i) + ": normal output text\n")
+		sb.WriteString("line " + strutil.Itoa(i) + ": normal output text\n")
 	}
 	sb.WriteString("ERROR: something went wrong at line 501\n")
 	for i := 502; i < 1000; i++ {
-		sb.WriteString("line " + itoa(i) + ": normal output text\n")
+		sb.WriteString("line " + strutil.Itoa(i) + ": normal output text\n")
 	}
 	out, _ := truncateToolOutput(sb.String())
 	if !strings.Contains(out, "ERROR") {

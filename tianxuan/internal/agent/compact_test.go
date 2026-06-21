@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"tianxuan/internal/strutil"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 )
@@ -22,8 +23,8 @@ func TestMaybeCompact_NilUsage_FallbackToLastPrompt(t *testing.T) {
 	// 构建有很多消息的会话，使截断能够触发
 	s := NewSession("system")
 	for i := 0; i < 100; i++ {
-		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + itoa(i)})
-		s.Add(provider.Message{Role: provider.RoleAssistant, Content: "reply " + itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + strutil.Itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleAssistant, Content: "reply " + strutil.Itoa(i)})
 	}
 	a.session = s
 	a.compaction.LastPrompt = 90000 // 90% of window — 超过 80% 触发阈值
@@ -44,7 +45,7 @@ func TestMaybeCompact_NilUsage_LowLastPrompt_NoOp(t *testing.T) {
 	a := testAgent(100000, 0.8, 5)
 	s := NewSession("system")
 	for i := 0; i < 50; i++ {
-		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + strutil.Itoa(i)})
 	}
 	a.session = s
 	a.compaction.LastPrompt = 50000 // 50% of window — 低于 80% 触发阈值
@@ -65,8 +66,8 @@ func TestMaybeCompact_WithUsage_StillWorks(t *testing.T) {
 	a := testAgent(100000, 0.8, 5)
 	s := NewSession("system")
 	for i := 0; i < 200; i++ {
-		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + itoa(i)})
-		s.Add(provider.Message{Role: provider.RoleAssistant, Content: "reply " + itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + strutil.Itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleAssistant, Content: "reply " + strutil.Itoa(i)})
 	}
 	a.session = s
 	original := len(s.Messages)
@@ -84,7 +85,7 @@ func TestMaybeCompact_WindowZero_NoOp(t *testing.T) {
 	a := testAgent(0, 0.8, 5)
 	s := NewSession("system")
 	for i := 0; i < 100; i++ {
-		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + itoa(i)})
+		s.Add(provider.Message{Role: provider.RoleUser, Content: "msg " + strutil.Itoa(i)})
 	}
 	a.session = s
 	original := len(s.Messages)

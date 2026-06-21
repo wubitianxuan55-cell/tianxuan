@@ -5,7 +5,7 @@ import { useUpdater } from "../lib/useUpdater";
 import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
 import { ResizableDrawer } from "./ResizableDrawer";
-import { X } from "lucide-react";
+import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug } from "lucide-react";
 
 type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
 
@@ -22,6 +22,25 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
   const [err, setErr] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>(getTheme());
   const [tab, setTab] = useState<SettingsTab>("models");
+  const [query, setQuery] = useState("");
+
+  // V8.4.1: 图标映射 + 搜索过滤
+  const TAB_ICONS: Record<SettingsTab, React.ReactNode> = {
+    models: <Cpu size={14} />,
+    providers: <Plug size={14} />,
+    permissions: <Shield size={14} />,
+    sandbox: <Box size={14} />,
+    agent: <Bot size={14} />,
+    appearance: <Palette size={14} />,
+    updates: <CloudUpload size={14} />,
+  };
+  const filteredTabs = query.trim() && s
+    ? SETTINGS_TABS.filter((id) => {
+        const label = settingsTabLabel(id, t).toLowerCase();
+        const meta = settingsTabMeta(id, s, t).toLowerCase();
+        return label.includes(query.toLowerCase()) || meta.includes(query.toLowerCase());
+      })
+    : SETTINGS_TABS;
 
   const reload = async () => setS(await app.Settings().catch(() => null));
   useEffect(() => {
@@ -58,19 +77,36 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
         ) : (
           <div className="flex-1 min-h-0 flex h-full overflow-y-auto">
             <div className="flex h-full">
-              <nav className="flex flex-col gap-1 w-[180px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0" aria-label={t("settings.title")}>
-                {SETTINGS_TABS.map((id) => (
-                  <button
-                    key={id}
-                    className={`flex flex-col gap-0.5 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[0.12s] ${
-                      tab === id ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"
-                    }`}
-                    onClick={() => setTab(id)}
-                  >
-                    <span className="text-[13px] font-medium">{settingsTabLabel(id, t)}</span>
-                    <small className="text-[11px] text-fg-faint">{settingsTabMeta(id, s, t)}</small>
-                  </button>
-                ))}
+              <nav className="flex flex-col gap-1 w-[200px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0" aria-label={t("settings.title")}>
+                {/* 搜索 */}
+                <div className="relative mb-1.5">
+                  <input
+                    className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] pl-7 pr-2 py-1 outline-none placeholder:text-fg-faint/50 focus:border-accent transition-colors"
+                    placeholder="搜索…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <svg className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint/40" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+                {filteredTabs.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-[11px] text-fg-faint">无匹配</div>
+                ) : (
+                  filteredTabs.map((id) => (
+                    <button
+                      key={id}
+                      className={`flex items-center gap-2 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[0.12s] ${
+                        tab === id ? "text-accent bg-accent-soft" : "text-fg-dim hover:text-fg hover:bg-bg-soft"
+                      }`}
+                      onClick={() => { setTab(id); setQuery(""); }}
+                    >
+                      <span className="shrink-0 opacity-70">{TAB_ICONS[id]}</span>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[13px] font-medium">{settingsTabLabel(id, t)}</span>
+                        <small className="text-[11px] text-fg-faint truncate">{settingsTabMeta(id, s, t)}</small>
+                      </div>
+                    </button>
+                  ))
+                )}
               </nav>
               <main className="flex-1 min-w-0 overflow-y-auto px-5 py-2.5">
                 {err && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{err}</div>}
@@ -168,12 +204,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
 
   return (
     <section className="mb-3">
-      <div className="flex items-center justify-between px-1 pb-1.5">
-        <div className="text-fg text-sm font-semibold">{t("settings.tab.models")}</div>
-        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onManageProviders}>
-          {t("settings.manageProviders")}
-        </button>
-      </div>
+      <div className="text-fg text-sm font-semibold px-1 pb-1.5">{t("settings.tab.models")}</div>
 
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] shrink-0">{t("settings.defaultModel")}</label>
@@ -191,23 +222,15 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
         </select>
       </div>
 
-      <div className="border border-border-soft rounded-lg p-3 mb-2">
-        <div>
-          <span>{t("settings.activeProvider")}</span>
-          <strong>{defaultProvider || t("common.none")}</strong>
-          <small>{defaultModel || defaultRef || t("common.none")}</small>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <div className="border border-border-soft rounded-lg p-3">
-          <span>{t("settings.providers")}</span>
-          <strong>{s.providers.length}</strong>
-        </div>
-        <div className="border border-border-soft rounded-lg p-3">
-          <span>{t("settings.availableModels")}</span>
-          <strong>{refs.length}</strong>
-        </div>
+      <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg mb-3">
+        <span className="text-fg-faint text-[11px] shrink-0">{t("settings.activeProvider")}</span>
+        <span className="text-[11px] font-semibold text-fg">{defaultProvider || t("common.none")}</span>
+        <span className="text-border mx-0.5">·</span>
+        <span className="text-[11px] font-mono text-fg-dim">{defaultModel || defaultRef || t("common.none")}</span>
+        <span className="flex-1" />
+        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onManageProviders}>
+          {t("settings.manageProviders")}
+        </button>
       </div>
     </section>
   );
@@ -250,7 +273,7 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
                   {p.keySet ? t("settings.keySet") : t("settings.noKey")}
                 </span>
                 <span className="flex-1" />
-                <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors">
+                <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={() => setEditing(p.name)}>
                   {t("common.edit")}
                 </button>
                 <button
@@ -262,10 +285,10 @@ function ProvidersSection({ s, busy, apply }: SectionProps) {
                   {t("common.delete")}
                 </button>
               </div>
-              <div className="text-fg-faint text-[11px] mt-1">
-                <span>{p.kind}</span>
-                <span>{p.baseUrl}</span>
-                <span>{p.models.join(", ")}</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-fg-faint text-[11px] mt-1">
+                <span className="font-mono text-[10px]">{p.kind}</span>
+                <span className="truncate max-w-[260px]" title={p.baseUrl}>{p.baseUrl}</span>
+                <span className="truncate max-w-[260px]" title={p.models.join(", ")}>{p.models.join(", ")}</span>
               </div>
               <KeyField apiKeyEnv={p.apiKeyEnv} busy={busy} onSet={(v) => apply(() => app.SetProviderKey(p.apiKeyEnv, v))} />
             </div>
@@ -333,24 +356,36 @@ function ProviderEditor({
 
   return (
     <div className="flex flex-col gap-2 p-3 border border-border-soft rounded-lg mb-2">
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
-      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerKind")}</label>
-      <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
-        {kindOptions.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </select>
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
-      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerBalanceUrl")}</label>
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
-      <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.balanceUrlHint")}</div>
-      <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerContextWindow")}</label>
-      <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
-      <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.contextWindowHint")}</div>
+      {/* 基本设置 */}
+      <fieldset className="border border-border-soft rounded-md p-2.5">
+        <legend className="text-fg-faint text-[10px] font-medium px-1">基本设置</legend>
+        <div className="flex flex-col gap-2">
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
+          <div className="flex items-center gap-3">
+            <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerKind")}</label>
+            <select className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
+              {kindOptions.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
+        </div>
+      </fieldset>
+      {/* 高级设置 */}
+      <fieldset className="border border-border-soft rounded-md p-2.5">
+        <legend className="text-fg-faint text-[10px] font-medium px-1">高级设置</legend>
+        <div className="flex flex-col gap-2">
+          <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerBalanceUrl")}</label>
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
+          <div className="text-fg-faint text-[10px]">{t("settings.balanceUrlHint")}</div>
+          <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerContextWindow")}</label>
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
+          <div className="text-fg-faint text-[10px]">{t("settings.contextWindowHint")}</div>
+        </div>
+      </fieldset>
       <div className="flex gap-2 mt-2">
         <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
@@ -410,11 +445,12 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
       </div>
       <div className="flex flex-col gap-2">
         {(["deny", "ask", "allow"] as const).map((list) => (
-          <RuleList
+          <AccordionRuleList
             key={list}
             list={list}
             rules={s.permissions[list]}
             busy={busy}
+            defaultOpen={list === "deny" || (list === "ask" && s.permissions.deny.length === 0)}
             onAdd={(rule) => apply(() => app.AddPermissionRule(list, rule))}
             onRemove={(rule) => apply(() => app.RemovePermissionRule(list, rule))}
           />
@@ -422,6 +458,74 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
       </div>
       <div className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.ruleForm")}</div>
     </section>
+  );
+}
+
+function AccordionRuleList({
+  list,
+  rules,
+  busy,
+  defaultOpen,
+  onAdd,
+  onRemove,
+}: {
+  list: string;
+  rules: string[];
+  busy: boolean;
+  defaultOpen: boolean;
+  onAdd: (rule: string) => Promise<void>;
+  onRemove: (rule: string) => Promise<void>;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(defaultOpen);
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const r = draft.trim();
+    if (r) { void onAdd(r); setDraft(""); }
+  };
+  const listLabel = list === "deny" ? "🚫 deny（拒绝）" : list === "ask" ? "❓ ask（询问）" : "✅ allow（允许）";
+  const count = rules.length;
+
+  return (
+    <div className="border border-border-soft rounded-lg overflow-hidden mb-1.5">
+      <button
+        className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-0 text-left cursor-pointer hover:bg-bg-soft transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="text-[10px] text-fg-faint transition-transform duration-150" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+        <span className="text-fg-dim text-[12px] font-medium">{listLabel}</span>
+        {count > 0 && (
+          <span className="ml-auto text-[10px] font-mono text-fg-faint bg-bg-elev px-1.5 py-px rounded">{count}</span>
+        )}
+      </button>
+      {open && (
+        <div className="px-3 pb-2 border-t border-border-soft">
+          <div className="flex flex-wrap gap-1.5 py-2">
+            {rules.length === 0 && <span className="text-fg-faint text-[11px] italic">{t("common.none")}</span>}
+            {rules.map((r) => (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-border-soft rounded text-fg-dim text-[11px] bg-bg-soft" key={r}>
+                {r}
+                <button className="ml-0.5 w-4 h-4 flex items-center justify-center border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:bg-bg-elev transition-colors" disabled={busy} onClick={() => void onRemove(r)} title={t("common.delete")}>
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
+              placeholder={t("settings.addRule", { list })}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+            />
+            <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors shrink-0" disabled={busy || !draft.trim()} onClick={add}>
+              {t("common.add")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -533,11 +637,14 @@ function AgentSection({ s, busy, apply }: SectionProps) {
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold">{t("settings.agent")}</div>
       <div className="flex items-center gap-3 mb-2.5">
-        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.temperature")}</label>
-        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-narrow" value={temp} onChange={(e) => setTemp(e.target.value)} disabled={busy} inputMode="decimal" />
-        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.maxSteps")}</label>
-        <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent set-narrow" value={steps} onChange={(e) => setSteps(e.target.value)} disabled={busy} inputMode="numeric" />
-        <span className="text-fg-faint text-[10px] mt-1 px-1">{t("settings.unlimited")}</span>
+        <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.temperature")}</label>
+        <input className="w-[70px] bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent text-center" value={temp} onChange={(e) => setTemp(e.target.value)} disabled={busy} inputMode="decimal" />
+        <span className="text-fg-faint text-[10px]">0.0–1.0</span>
+      </div>
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.maxSteps")}</label>
+        <input className="w-[70px] bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent text-center" value={steps} onChange={(e) => setSteps(e.target.value)} disabled={busy} inputMode="numeric" />
+        <span className="text-fg-faint text-[10px]">{t("settings.unlimited")}</span>
       </div>
       <div className="text-fg-dim text-[12px] font-medium mb-1">{t("settings.systemPrompt")}</div>
       <textarea className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] p-2.5 outline-none resize-y min-h-[120px] focus:border-accent" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={busy} spellCheck={false} />

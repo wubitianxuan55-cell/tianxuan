@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"tianxuan/internal/strutil"
 	"tianxuan/internal/provider"
 )
 
@@ -125,11 +126,11 @@ func (d *cacheBreakDetector) check(u *provider.Usage) string {
 		return "" // ��������
 	}
 
-	// ��϶���ԭ��
+	// 诊断断裂原因
 	reason := d.diagnose()
 	d.lastRead = u.CacheHitTokens
-	return "[cache break #" + itoa(d.callCount) + ": " +
-		itoa(d.lastRead+drop) + "��" + itoa(u.CacheHitTokens) +
+	return "[cache break #" + strutil.Itoa(d.callCount) + ": " +
+		strutil.Itoa(d.lastRead+drop) + "→" + strutil.Itoa(u.CacheHitTokens) +
 		" tok (" + reason + ")]"
 }
 
@@ -172,7 +173,7 @@ func fnv1a(s string) uint64 {
 
 // hashTools ���㹤�� schemas ����Ϲ�ϣ��
 func hashTools(tools []provider.ToolSchema) uint64 {
-	h := fnv1a(itoa(len(tools)))
+	h := fnv1a(strutil.Itoa(len(tools)))
 	for _, t := range tools {
 		h ^= fnv1a(t.Name)
 		h ^= fnv1a(t.Description)

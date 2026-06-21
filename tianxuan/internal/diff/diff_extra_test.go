@@ -3,6 +3,8 @@ package diff
 import (
 	"strings"
 	"testing"
+
+	"tianxuan/internal/strutil"
 )
 
 // --- splitLines ---
@@ -175,8 +177,8 @@ func TestItoa(t *testing.T) {
 		{1000, "1000"},
 	}
 	for _, c := range cases {
-		if got := itoa(c.n); got != c.want {
-			t.Errorf("itoa(%d) = %q, want %q", c.n, got, c.want)
+		if got := strutil.Itoa(c.n); got != c.want {
+			t.Errorf("strutil.Itoa(%d) = %q, want %q", c.n, got, c.want)
 		}
 	}
 }

@@ -38,7 +38,7 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 
 	for i, c := range calls {
 		if suppressed[i] {
-			continue // ������ ToolDispatch �¼�
+			continue // 跳过 ToolDispatch 事件
 		}
 		t, ok := a.tools.Get(c.Name)
 		a.sink.Emit(event.Event{Kind: event.ToolDispatch, Tool: event.Tool{
@@ -51,7 +51,7 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 
 	results := make([]string, len(calls))
 	outcomes := make([]toolOutcome, len(calls))
-	// V5.13 fix: Ԥ����䱻���Ƶ��õĽ��
+	// V5.13 fix: 预填充被抑制调用的结果
 	for i := range calls {
 		if suppressed[i] {
 			results[i] = "suppressed: duplicate tool call (param storm breaker)"

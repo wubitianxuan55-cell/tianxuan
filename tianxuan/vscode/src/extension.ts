@@ -18,21 +18,10 @@ let statusBar: vscode.StatusBarItem;
 function createStatusBar(context: vscode.ExtensionContext): void {
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = "tianxuan.openPanel";
-  statusBar.text = "$(hubot) tianxuan";
-  statusBar.tooltip = "打开 tianxuan AI 面板";
+  statusBar.tooltip = "tianxuan 启动中...";
+  statusBar.text = "$(loading~spin) tianxuan";
   statusBar.show();
   context.subscriptions.push(statusBar);
-}
-
-function setStatusRunning(running: boolean): void {
-  if (!statusBar) return;
-  if (running) {
-    statusBar.text = "$(loading~spin) tianxuan";
-    statusBar.backgroundColor = undefined;
-  } else {
-    statusBar.text = "$(hubot) tianxuan";
-    statusBar.backgroundColor = undefined;
-  }
 }
 
 // ── 辅助函数 ──────────────────────────────────────────────────────────
@@ -111,33 +100,22 @@ function sendTheme(webview: vscode.Webview): void {
   webview.postMessage({ type: "tianxuan:theme-changed", theme: getVSThemeKind() });
 }
 
-// ── Sidecar 生命周期 ──
+// ── Sidecar 生命周期 ──────────────────────────────────────────────────
+// 启动 serve 进程 + 10 秒心跳 + 断连自动重启 + 端口冲突检测
 
-function startSidecar(context: vscode.ExtensionContext): void {
-  const bin = getBinaryPath(context);
-  if (!bin) {
-    vscode.window.showErrorMessage("tianxuan: 找不到二进制文件，请确认已安装 tianxuan CLI");
-    return;
-  }
-  const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-  sidecar = cp.spawn(bin, ["serve", "--port", String(sidecarPort)], {
-    cwd,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  sidecar.stdout?.on("data", (d: Buffer) => console.log(`[tianxuan] ${d}`));
-  sidecar.stderr?.on("data", (d: Buffer) => console.error(`[tianxuan] ${d}`));
-  sidecar.on("exit", (code: number | null) => {
-    console.log(`[tianxuan] 退出: ${code}`);
-    sidecar = null;
-  });
-  vscode.window.setStatusBarMessage(`$(hubot) tianxuan 已启动: ${sidecarPort}`, 5000);
-}
-
-function stopSidecar(): void {
-  if (sidecar) { sidecar.kill("SIGTERM"); sidecar = null; }
-}
+let sidecarHealthy = false;
+let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+let consecutiveFailures = 0;
+const MAX_FAILURES = 3;
+const HEALTH_INTERVAL_MS = 10000;
+const HEALTH_TIMEOUT_MS = 5000;
+const STARTUP_TIMEOUT_MS = 8000;
+const MAX_PORT_ATTEMPTS = 5;
 
 function getBinaryPath(context: vscode.ExtensionContext): string | null {
+  // 优先级: 设置 → 环境变量 → 内置 bin/ → 系统 PATH
+  const cfgBin = vscode.workspace.getConfiguration("tianxuan.sidecar").get<string>("binary") || "";
+  if (cfgBin) return cfgBin;
   const envPath = process.env.TIANXUAN_BIN;
   if (envPath) return envPath;
   const bundled = path.join(context.extensionPath, "bin", process.platform === "win32" ? "tianxuan.exe" : "tianxuan");
@@ -145,12 +123,172 @@ function getBinaryPath(context: vscode.ExtensionContext): string | null {
   return process.platform === "win32" ? "tianxuan.exe" : "tianxuan";
 }
 
+function spawnSidecar(context: vscode.ExtensionContext, port: number): cp.ChildProcess | null {
+  const bin = getBinaryPath(context);
+  if (!bin) return null;
+  const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+  const proc = cp.spawn(bin, ["serve", "--port", String(port)], {
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let startFailed = false;
+  proc.stdout?.on("data", (d: Buffer) => console.log(`[tianxuan] ${d}`));
+  proc.stderr?.on("data", (d: Buffer) => {
+    const msg = d.toString();
+    console.error(`[tianxuan] ${msg}`);
+    // 端口冲突检测
+    if (!startFailed && /address already in use/i.test(msg)) {
+      startFailed = true;
+    }
+  });
+  proc.on("exit", (code: number | null) => {
+    console.log(`[tianxuan] 退出: ${code}`);
+    if (proc === sidecar) {
+      sidecarHealthy = false;
+      updateStatusBar();
+    }
+  });
+  return proc;
+}
+
+async function checkHealth(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(serveURLForPort(port, "/health"), { timeout: HEALTH_TIMEOUT_MS }, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => { req.destroy(); resolve(false); });
+  });
+}
+
+async function startSidecar(context: vscode.ExtensionContext): Promise<void> {
+  const configPort = vscode.workspace.getConfiguration("tianxuan.sidecar").get<number>("port") || 8080;
+  const bin = getBinaryPath(context);
+  if (!bin) {
+    vscode.window.showErrorMessage("tianxuan: 找不到 CLI 二进制文件。请在设置中配置 tianxuan.sidecar.binary");
+    return;
+  }
+
+  updateStatusBar("starting");
+  let port = configPort;
+  let success = false;
+
+  for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS && !success; attempt++) {
+    if (attempt > 0) port = configPort + attempt;
+    sidecar = spawnSidecar(context, port);
+
+    // 等待首次健康检查通过
+    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 300));
+      if (await checkHealth(port)) {
+        success = true;
+        break;
+      }
+      // 如果进程已退出（端口冲突），立即尝试下一个端口
+      if (!sidecar || sidecar.exitCode !== null) break;
+    }
+  }
+
+  if (success) {
+    sidecarPort = port;
+    sidecarHealthy = true;
+    consecutiveFailures = 0;
+    updateStatusBar("healthy");
+    vscode.window.setStatusBarMessage(`$(hubot) tianxuan 已启动: ${sidecarPort}`, 3000);
+
+    // 启动心跳
+    if (healthCheckTimer) clearInterval(healthCheckTimer);
+    healthCheckTimer = setInterval(async () => {
+      const ok = await checkHealth(sidecarPort);
+      if (ok) {
+        if (!sidecarHealthy) { sidecarHealthy = true; updateStatusBar("healthy"); }
+        consecutiveFailures = 0;
+      } else {
+        consecutiveFailures++;
+        if (consecutiveFailures >= MAX_FAILURES) {
+          console.log("[tianxuan] 健康检查连续失败，重启中...");
+          updateStatusBar("starting");
+          await restartSidecar(context);
+        } else {
+          sidecarHealthy = false;
+          updateStatusBar("unhealthy");
+        }
+      }
+    }, HEALTH_INTERVAL_MS);
+  } else {
+    updateStatusBar("error");
+    vscode.window.showErrorMessage(
+      `tianxuan: 无法启动 serve 进程（尝试了 ${MAX_PORT_ATTEMPTS} 个端口，从 ${configPort} 开始）。请检查二进制路径和端口占用。`,
+    );
+  }
+}
+
+async function restartSidecar(context: vscode.ExtensionContext): Promise<void> {
+  stopSidecar();
+  await new Promise((r) => setTimeout(r, 1000));
+  await startSidecar(context);
+}
+
+function stopSidecar(): void {
+  if (healthCheckTimer) { clearInterval(healthCheckTimer); healthCheckTimer = null; }
+  if (sidecar) {
+    sidecar.kill("SIGTERM");
+    // 3 秒后仍存活则强制杀死
+    const pid = sidecar.pid;
+    setTimeout(() => {
+      try {
+        if (pid) process.kill(pid, 0); // 检查是否存在
+        if (pid) process.kill(pid, "SIGKILL");
+      } catch { /* 进程已退出 */ }
+    }, 3000);
+    sidecar = null;
+  }
+  sidecarHealthy = false;
+  consecutiveFailures = 0;
+}
+
+// ── 状态栏增强 ────────────────────────────────────────────────────────
+
+function updateStatusBar(state?: "healthy" | "starting" | "unhealthy" | "error"): void {
+  if (!statusBar) return;
+  switch (state) {
+    case "healthy":
+      statusBar.text = "$(hubot) tianxuan";
+      statusBar.tooltip = `tianxuan 运行中 :${sidecarPort}`;
+      statusBar.backgroundColor = undefined;
+      break;
+    case "starting":
+      statusBar.text = "$(loading~spin) tianxuan";
+      statusBar.tooltip = "tianxuan 启动中...";
+      statusBar.backgroundColor = undefined;
+      break;
+    case "unhealthy":
+      statusBar.text = "$(warning) tianxuan";
+      statusBar.tooltip = "tianxuan 连接异常（心跳超时）";
+      statusBar.backgroundColor = undefined;
+      break;
+    case "error":
+      statusBar.text = "$(error) tianxuan";
+      statusBar.tooltip = "tianxuan 未运行";
+      statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+      break;
+    default:
+      statusBar.text = sidecarHealthy ? "$(hubot) tianxuan" : "$(error) tianxuan";
+      statusBar.backgroundColor = sidecarHealthy ? undefined : new vscode.ThemeColor("statusBarItem.errorBackground");
+  }
+}
+
+function serveURLForPort(port: number, p: string): string {
+  return `http://127.0.0.1:${port}${p}`;
+}
+
 // ── HTTP 代理 ─────────────────────────────────────────────────────────
 // 向 tianxuan serve 发出 HTTP 请求，返回 { status, body }。
 // webview 因 CSP 限制不能直接 fetch localhost，所有调用经此代理。
 
 function serveURL(p: string): string {
-  return `http://127.0.0.1:${sidecarPort}${p}`;
+  return serveURLForPort(sidecarPort, p);
 }
 
 async function proxyFetch(method: string, path: string, body?: unknown): Promise<{ status: number; body: string }> {
@@ -496,12 +634,14 @@ function createWebviewPanel(context: vscode.ExtensionContext): vscode.WebviewPan
 
 // ── 激活入口 ──────────────────────────────────────────────────────────
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log("[tianxuan] VS Code 扩展已激活");
-  startSidecar(context);
 
-  // 状态栏
+  // 状态栏（先显示启动中）
   createStatusBar(context);
+
+  // 启动 sidecar（异步，等待首次健康检查）
+  await startSidecar(context);
 
   // 主题变更 → 广播到所有已打开的 webview（sidebar view 可能尚未创建，ok）
   context.subscriptions.push(
@@ -667,6 +807,10 @@ export function activate(context: vscode.ExtensionContext) {
           position: vscode.Position,
           _context: vscode.InlineCompletionContext,
         ): Promise<vscode.InlineCompletionList> {
+          // 设置开关
+          if (!vscode.workspace.getConfiguration("tianxuan.completion").get<boolean>("enabled", true)) {
+            return new vscode.InlineCompletionList([]);
+          }
           // 节流检查
           const now = Date.now();
           if (now - lastCompletionTs < completionThrottle) {
@@ -796,6 +940,10 @@ export function activate(context: vscode.ExtensionContext) {
       { pattern: "**" },
       {
         async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+          // 设置开关
+          if (!vscode.workspace.getConfiguration("tianxuan.codeLens").get<boolean>("enabled", true)) {
+            return [];
+          }
           const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
             "vscode.executeDocumentSymbolProvider", document.uri,
           );

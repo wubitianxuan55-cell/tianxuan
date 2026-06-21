@@ -1,3 +1,25 @@
+## [8.15.0] — 2026-06-21
+
+### 🛡️ VS Code 健壮性补全 — 设置项 + 健康检查 + 自动重启
+
+> 基于 V8.14.0 · 2源文件 +130/-25行 · 缓存安全(零Go变更)
+
+| 域 | 变更 |
+|------|------|
+| **设置项** | `tianxuan.completion.enabled` / `tianxuan.codeLens.enabled` / `tianxuan.sidecar.port` / `tianxuan.sidecar.binary` |
+| **健康检查** | 每 10s 对 GET /health 心跳（5s 超时），连续 3 次失败 → 自动重启 |
+| **端口管理** | 端口冲突自动递增（8080→8081→…→8084），最多 5 次尝试 |
+| **异步启动** | `startSidecar` 改为 async，等待首次 /health 返回 200（最多 8s 超时） |
+| **优雅关闭** | SIGTERM → 等 3s → 仍存活则 SIGKILL |
+| **状态栏增强** | healthy=hubot · starting=loading~spin · unhealthy=warning · error=红色 |
+| **二进制路径** | 优先级: 设置 → TIANXUAN_BIN 环境变量 → 内置 bin/ → 系统 PATH |
+| **补全开关** | 读取 `tianxuan.completion.enabled`，关闭时立即返回空列表 |
+| **CodeLens 开关** | 读取 `tianxuan.codeLens.enabled`，关闭时返回空数组 |
+
+### 📦 发布
+
+- release/v8.15.0/ · CLI 20MB · VS Code extension 1.18MB · extension.js 36KB
+
 ## [8.14.0] — 2026-06-21
 
 ### ⚡ VS Code 智能编码动作体系

@@ -50,6 +50,31 @@
       "tianxuan-sidebar": [
         { "type": "webview", "id": "tianxuan.panel", "name": "聊天" }
       ]
+    },
+    "configuration": {
+      "title": "tianxuan",
+      "properties": {
+        "tianxuan.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用内联代码补全（自动在输入 . ( 空格后触发）"
+        },
+        "tianxuan.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "在函数上方显示 解释/测试/文档 内联操作"
+        },
+        "tianxuan.sidecar.port": {
+          "type": "number",
+          "default": 8080,
+          "description": "tianxuan serve 端口号（修改后需重启 VS Code）"
+        },
+        "tianxuan.sidecar.binary": {
+          "type": "string",
+          "default": "",
+          "description": "tianxuan CLI 二进制路径（留空则依次检查环境变量、内置 bin/、系统 PATH）"
+        }
+      }
     }
   },
   "scripts": {

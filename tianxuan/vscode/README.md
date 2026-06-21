@@ -1,6 +1,6 @@
 # tianxuan VS Code Extension
 
-> V8.14.0 — 智能编码动作体系
+> V8.15.0 — 健壮性补全
 
 ## 架构
 

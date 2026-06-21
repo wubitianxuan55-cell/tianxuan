@@ -1,6 +1,6 @@
 # tianxuan VS Code Extension
 
-> V8.13.0 — 全面 AI 编码助手增强
+> V8.14.0 — 智能编码动作体系
 
 ## 架构
 
@@ -11,6 +11,8 @@ VS Code Extension (TypeScript) ──HTTP/SSE──▶ tianxuan serve (Go)
    │
    ├── InlineCompletionProvider (代码补全)
    ├── HoverProvider (悬停解释)
+   ├── CodeActionProvider (Quick Fix 修复)
+   ├── CodeLensProvider (函数内联操作)
    ├── Webview Panel (完整聊天 UI)
    └── Sidebar View (侧边栏聊天)
 ```
@@ -21,15 +23,22 @@ VS Code Extension (TypeScript) ──HTTP/SSE──▶ tianxuan serve (Go)
 
 ## 功能
 
-| 功能 | 快捷键 | 说明 |
+| 功能 | 触发方式 | 说明 |
 |------|--------|------|
-| 打开聊天面板 | `Ctrl+Shift+T` | 在编辑器旁打开 tianxuan 对话面板 |
-| 发送选中内容 | `Ctrl+Shift+Enter` | 将选中代码发送给 tianxuan 处理 |
-| 内联代码补全 | 自动 | 输入暂停 300ms 后自动触发，从 Go 端获取补全建议 |
-| 悬停解释 | 悬停 | 鼠标悬停在标识符上时显示 AI 解释 |
-| 解释代码 | 右键菜单 | 用 tianxuan 解释选中代码 |
-| 审查代码 | 右键菜单 | 用 tianxuan 审查选中代码 |
-| 修复问题 | 右键菜单 | 用 tianxuan 修复选中代码中的问题 |
+| 打开聊天面板 | `Ctrl+Shift+T` / 侧边栏 | 完整对话面板 |
+| 发送选中内容 | `Ctrl+Shift+Enter` / 右键 | 发送代码到 tianxuan |
+| **Quick Fix 修复** | 灯泡 (Ctrl+.) | 诊断错误→AI 修复→diff 预览 |
+| **生成文档注释** | 右键 / CodeLens `$(book)` | JSDoc/GoDoc/docstring |
+| **生成单元测试** | 右键 / CodeLens `$(beaker)` | 推断框架→生成测试→diff |
+| **解释函数** | CodeLens `$(hubot)` | 聊天面板中解释 |
+| 解释代码 | 右键菜单 | 解释选中代码 |
+| 审查代码 | 右键菜单 | 审查选中代码 |
+| 修复问题 | 右键菜单 | 修复选中代码 |
+| **解释终端错误** | 命令面板 | 粘贴错误→中文解释 |
+| 内联代码补全 | 自动(. `(` 空格 300ms) | 语义边界+防抖触发 |
+| 悬停解释 | 鼠标悬停 | AI 解释标识符 |
+| Diff 预览 | AI 建议 | diff 编辑器预览 |
+| 应用编辑 | webview→extension | 写入文件 |
 
 ## 开发
 
@@ -47,7 +56,7 @@ npm run build:webview    # 构建 Web UI 并复制到 webview/
 | 命令 | 说明 |
 |------|------|
 | `npm run compile` | `tsc -p ./` — 类型检查 |
-| `npm run build` | `esbuild` 打包 extension.js（~17KB）|
+| `npm run build` | `esbuild` 打包 extension.js（~31KB）|
 | `npm run build:webview` | 构建 Web 前端 + 复制到 webview 产物目录 |
 | `npm run package` | 全量构建 + `vsce package` 生成 .vsix |
 

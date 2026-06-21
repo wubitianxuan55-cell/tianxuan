@@ -35,6 +35,66 @@ function setStatusRunning(running: boolean): void {
   }
 }
 
+// ── 辅助函数 ──────────────────────────────────────────────────────────
+
+// 获取光标下的函数/方法签名（通过 DocumentSymbolProvider）
+async function getSymbolAtCursor(
+  document: vscode.TextDocument,
+  position: vscode.Position,
+): Promise<{ name: string; kind: string; range: vscode.Range } | null> {
+  const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+    "vscode.executeDocumentSymbolProvider",
+    document.uri,
+  );
+  if (!symbols || symbols.length === 0) return null;
+  function find(ss: vscode.DocumentSymbol[]): vscode.DocumentSymbol | null {
+    for (const s of ss) {
+      if (s.range.contains(position)) return s;
+      const child = find(s.children);
+      if (child) return child;
+    }
+    return null;
+  }
+  const sym = find(symbols);
+  if (!sym) return null;
+  return { name: sym.name, kind: vscode.SymbolKind[sym.kind], range: sym.range };
+}
+
+// 根据语言 ID 推断测试框架
+function getTestFramework(languageId: string): string {
+  switch (languageId) {
+    case "go": return "testing";
+    case "typescript": case "typescriptreact": return "vitest";
+    case "javascript": case "javascriptreact": return "jest";
+    case "python": return "pytest";
+    case "rust": return "#[test]";
+    case "java": return "JUnit 5";
+    case "csharp": return "xUnit";
+    case "cpp": case "c": return "Google Test";
+    default: return "the standard test framework";
+  }
+}
+
+// 判断字符是否语义边界（补全触发点）
+function isCompletionBoundary(char: string): boolean {
+  return char === "." || char === "(" || char === " " || char === "\n" || char === ":" || char === ">";
+}
+
+// diff 预览辅助（供命令使用，不走 webview postMessage）
+async function vscodeProxyForCmds(original: string, modified: string, title: string): Promise<void> {
+  const os = require("os");
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tianxuan-diff-"));
+  const origPath = path.join(tmpDir, "original.diff");
+  const modPath = path.join(tmpDir, "modified.diff");
+  fs.writeFileSync(origPath, original, "utf-8");
+  fs.writeFileSync(modPath, modified, "utf-8");
+  await vscode.commands.executeCommand("vscode.diff",
+    vscode.Uri.file(origPath), vscode.Uri.file(modPath), title);
+  setTimeout(() => {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* */ }
+  }, 5000);
+}
+
 // ── 主题同步 ──────────────────────────────────────────────────────────
 
 function getVSThemeKind(): "dark" | "light" {
@@ -513,6 +573,72 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // ── 生成文档注释 ───────────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.generateDocstring", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const pos = editor.selection.active;
+      const sym = await getSymbolAtCursor(editor.document, pos);
+      if (!sym) {
+        vscode.window.showInformationMessage("tianxuan: 请将光标放在函数/类上");
+        return;
+      }
+      const funcText = editor.document.getText(sym.range);
+      const lid = editor.document.languageId;
+      const prompt = `Generate documentation comment for this ${lid} code. Use ${lid}-appropriate doc syntax. Output ONLY the comment — no code fences.\nCode:\n\`\`\`${lid}\n${funcText}\n\`\`\``;
+      try {
+        const resp = await proxyFetch("POST", "/complete", { context: prompt, language: lid, file: editor.document.fileName });
+        if (resp.status >= 400 || !resp.body) return;
+        const data = JSON.parse(resp.body) as { text?: string };
+        if (!data.text) return;
+        const insertPos = new vscode.Position(sym.range.start.line, 0);
+        const indent = editor.document.lineAt(sym.range.start.line).text.match(/^(\s*)/)?.[1] || "";
+        const indented = data.text.split("\n").map((l: string) => indent + l).join("\n") + "\n";
+        await editor.edit((eb) => eb.insert(insertPos, indented));
+      } catch { /* ignore */ }
+    })
+  );
+
+  // ── 生成单元测试 ───────────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.generateTest", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const pos = editor.selection.active;
+      const sym = await getSymbolAtCursor(editor.document, pos);
+      if (!sym) {
+        vscode.window.showInformationMessage("tianxuan: 请将光标放在函数/类上");
+        return;
+      }
+      const funcText = editor.document.getText(sym.range);
+      const lid = editor.document.languageId;
+      const framework = getTestFramework(lid);
+      const prompt = `Write unit test(s) for this function using ${framework}. Include edge cases. Output ONLY test code — no code fences.\nFunction:\n\`\`\`${lid}\n${funcText}\n\`\`\``;
+      try {
+        const resp = await proxyFetch("POST", "/complete", { context: prompt, language: lid, file: editor.document.fileName });
+        if (resp.status >= 400 || !resp.body) return;
+        const data = JSON.parse(resp.body) as { text?: string };
+        if (!data.text) return;
+        await vscodeProxyForCmds("", data.text, sym.name + " — Unit Test (" + framework + ")");
+      } catch { /* ignore */ }
+    })
+  );
+
+  // ── 终端错误解释 ───────────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.explainTerminal", async () => {
+      const text = await vscode.window.showInputBox({
+        prompt: "粘贴终端错误信息（选中终端文本 Ctrl+C 后粘贴）",
+        placeHolder: "粘贴错误输出...",
+      });
+      if (!text) return;
+      const prompt = "请用中文解释以下错误并给出修复建议：\n\`\`\`\n" + text + "\n\`\`\`";
+      const panel = createWebviewPanel(context);
+      panel.webview.postMessage({ type: "tianxuan:submit-text", text: prompt });
+    })
+  );
+
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("tianxuan.panel", {
       resolveWebviewView(webviewView) {
@@ -526,54 +652,57 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // ── Inline 代码补全 ─────────────────────────────────────────────────
-  // 注册补全提供器：用户输入暂停 300ms 后，自动请求 Go 端 /complete。
+  // 注册补全提供器：用户输入在语义边界处暂停 300ms 后触发。
 
-  let completionTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastCompletionRequest = 0;
-  const COMPLETION_DEBOUNCE_MS = 300;
-  const COMPLETION_THROTTLE_MS = 2000; // 两次补全之间至少隔 2 秒
+  const completionThrottle = 2000; // 两次补全之间至少隔 2 秒
+  let lastCompletionTs = 0;
+  let completionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
-      { pattern: "**" }, // 所有文件类型
+      { pattern: "**" },
       {
         async provideInlineCompletionItems(
           document: vscode.TextDocument,
           position: vscode.Position,
+          _context: vscode.InlineCompletionContext,
         ): Promise<vscode.InlineCompletionList> {
-          // 节流：两次补全至少间隔 COMPLETION_THROTTLE_MS
+          // 节流检查
           const now = Date.now();
-          if (now - lastCompletionRequest < COMPLETION_THROTTLE_MS) {
+          if (now - lastCompletionTs < completionThrottle) {
             return new vscode.InlineCompletionList([]);
           }
-
-          // 获取光标前后上下文（前 50 行 + 后 20 行）
-          const startLine = Math.max(0, position.line - 50);
-          const endLine = Math.min(document.lineCount - 1, position.line + 20);
-          const beforeRange = new vscode.Range(startLine, 0, position.line, position.character);
-          const afterRange = new vscode.Range(position.line, position.character, endLine, document.lineAt(endLine).text.length);
-          const before = document.getText(beforeRange);
-          const after = document.getText(afterRange);
-          const context = before + "〈CURSOR〉" + after;
-
-          try {
-            lastCompletionRequest = now;
-            const resp = await proxyFetch("POST", "/complete", {
-              context,
-              language: document.languageId,
-              file: document.fileName,
-            });
-            if (resp.status >= 400) return new vscode.InlineCompletionList([]);
-            const data = JSON.parse(resp.body) as { text?: string };
-            if (!data.text || data.text.trim().length === 0) {
+          // 语义边界检查：只在特定字符后触发补全
+          if (position.character > 0) {
+            const charBefore = document.lineAt(position.line).text[position.character - 1];
+            if (!isCompletionBoundary(charBefore)) {
               return new vscode.InlineCompletionList([]);
             }
-            return new vscode.InlineCompletionList([
-              new vscode.InlineCompletionItem(data.text),
-            ]);
-          } catch {
-            return new vscode.InlineCompletionList([]);
           }
+
+          // 防抖：延迟 300ms，期间有新输入则取消
+          return new Promise((resolve) => {
+            if (completionDebounceTimer) clearTimeout(completionDebounceTimer);
+            completionDebounceTimer = setTimeout(async () => {
+              lastCompletionTs = Date.now();
+              const startLine = Math.max(0, position.line - 50);
+              const endLine = Math.min(document.lineCount - 1, position.line + 20);
+              const beforeRange = new vscode.Range(startLine, 0, position.line, position.character);
+              const afterRange = new vscode.Range(position.line, position.character, endLine, document.lineAt(endLine).text.length);
+              const ctxText = document.getText(beforeRange) + "〈CURSOR〉" + document.getText(afterRange);
+              try {
+                const resp = await proxyFetch("POST", "/complete", { context: ctxText, language: document.languageId, file: document.fileName });
+                if (resp.status >= 400) { resolve(new vscode.InlineCompletionList([])); return; }
+                const data = JSON.parse(resp.body) as { text?: string };
+                if (!data.text || data.text.trim().length === 0) {
+                  resolve(new vscode.InlineCompletionList([])); return;
+                }
+                resolve(new vscode.InlineCompletionList([new vscode.InlineCompletionItem(data.text)]));
+              } catch {
+                resolve(new vscode.InlineCompletionList([]));
+              }
+            }, 300);
+          });
         },
       },
     )
@@ -615,6 +744,132 @@ export function activate(context: vscode.ExtensionContext) {
         },
       },
     )
+  );
+
+  // ── Quick Fix 代码动作 (CodeActionProvider) ────────────────────────
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { pattern: "**" },
+      {
+        async provideCodeActions(
+          _document: vscode.TextDocument,
+          _range: vscode.Range | vscode.Selection,
+          ctx: vscode.CodeActionContext,
+        ): Promise<vscode.CodeAction[]> {
+          const diags = ctx.diagnostics.filter(
+            (d) => d.severity === vscode.DiagnosticSeverity.Error || d.severity === vscode.DiagnosticSeverity.Warning,
+          );
+          if (diags.length === 0) return [];
+          const d = diags[0];
+          const action = new vscode.CodeAction(
+            "$(hubot) tianxuan 修复: " + d.message.slice(0, 60),
+            vscode.CodeActionKind.QuickFix,
+          );
+          action.diagnostics = [d];
+          action.command = { command: "tianxuan.quickFix", title: "tianxuan 修复", arguments: [_document, d] };
+          return [action];
+        },
+      },
+    )
+  );
+
+  // Quick Fix 执行命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.quickFix", async (document: vscode.TextDocument, d: vscode.Diagnostic) => {
+      const startLine = Math.max(0, d.range.start.line - 15);
+      const endLine = Math.min(document.lineCount - 1, d.range.end.line + 15);
+      const code = document.getText(new vscode.Range(startLine, 0, endLine, document.lineAt(endLine).text.length));
+      const prompt = `Fix this ${document.languageId} code issue: "${d.message}". Output only corrected code — no markdown, no explanation.\nCode:\n\`\`\`${document.languageId}\n${code}\n\`\`\``;
+      try {
+        const resp = await proxyFetch("POST", "/complete", { context: prompt, language: document.languageId, file: document.fileName });
+        if (resp.status >= 400 || !resp.body) return;
+        const data = JSON.parse(resp.body) as { text?: string };
+        if (!data.text) return;
+        await vscodeProxyForCmds(code, data.text, "tianxuan 修复: " + d.message.slice(0, 60));
+      } catch { /* ignore */ }
+    })
+  );
+
+  // ── CodeLens ────────────────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(
+      { pattern: "**" },
+      {
+        async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+          const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+            "vscode.executeDocumentSymbolProvider", document.uri,
+          );
+          if (!symbols || symbols.length === 0) return [];
+          const lenses: vscode.CodeLens[] = [];
+          function collect(ss: vscode.DocumentSymbol[]) {
+            for (const s of ss) {
+              if (s.kind === vscode.SymbolKind.Function || s.kind === vscode.SymbolKind.Method) {
+                const pos = new vscode.Position(s.range.start.line, s.range.start.character);
+                lenses.push(new vscode.CodeLens(new vscode.Range(pos, pos), {
+                  title: "$(hubot) 解释", command: "tianxuan.explainFunction", arguments: [document, s],
+                }));
+                lenses.push(new vscode.CodeLens(new vscode.Range(pos, pos), {
+                  title: "$(beaker) 测试", command: "tianxuan.generateTestForSymbol", arguments: [document, s],
+                }));
+                lenses.push(new vscode.CodeLens(new vscode.Range(pos, pos), {
+                  title: "$(book) 文档", command: "tianxuan.generateDocForSymbol", arguments: [document, s],
+                }));
+              }
+              collect(s.children);
+            }
+          }
+          collect(symbols);
+          return lenses;
+        },
+      },
+    )
+  );
+
+  // CodeLens: 解释函数
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.explainFunction", (document: vscode.TextDocument, sym: vscode.DocumentSymbol) => {
+      const funcText = document.getText(sym.range);
+      const prompt = "请解释以下 " + document.languageId + " 函数：\n\`\`\`" + document.languageId + "\n" + funcText + "\n\`\`\`";
+      const panel = createWebviewPanel(context);
+      panel.webview.postMessage({ type: "tianxuan:submit-text", text: prompt });
+    })
+  );
+
+  // CodeLens: 生成测试
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.generateTestForSymbol", async (document: vscode.TextDocument, sym: vscode.DocumentSymbol) => {
+      const funcText = document.getText(sym.range);
+      const lid = document.languageId;
+      const framework = getTestFramework(lid);
+      const prompt = `Write unit test(s) for this function using ${framework}. Include edge cases. Output ONLY test code — no code fences.\nFunction:\n\`\`\`${lid}\n${funcText}\n\`\`\``;
+      try {
+        const resp = await proxyFetch("POST", "/complete", { context: prompt, language: lid, file: document.fileName });
+        if (resp.status >= 400 || !resp.body) return;
+        const data = JSON.parse(resp.body) as { text?: string };
+        if (!data.text) return;
+        await vscodeProxyForCmds("", data.text, sym.name + " — Unit Test (" + framework + ")");
+      } catch { /* ignore */ }
+    })
+  );
+
+  // CodeLens: 生成文档
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tianxuan.generateDocForSymbol", async (document: vscode.TextDocument, sym: vscode.DocumentSymbol) => {
+      const funcText = document.getText(sym.range);
+      const lid = document.languageId;
+      const prompt = `Generate documentation comment for this ${lid} code. Use ${lid}-appropriate doc syntax. Output ONLY the comment — no code fences.\nCode:\n\`\`\`${lid}\n${funcText}\n\`\`\``;
+      try {
+        const resp = await proxyFetch("POST", "/complete", { context: prompt, language: lid, file: document.fileName });
+        if (resp.status >= 400 || !resp.body) return;
+        const data = JSON.parse(resp.body) as { text?: string };
+        if (!data.text) return;
+        const insertPos = new vscode.Position(sym.range.start.line, 0);
+        const editor = await vscode.window.showTextDocument(document, { preview: false });
+        const indent = document.lineAt(sym.range.start.line).text.match(/^(\s*)/)?.[1] || "";
+        const indented = data.text.split("\n").map((l: string) => indent + l).join("\n") + "\n";
+        await editor.edit((eb) => eb.insert(insertPos, indented));
+      } catch { /* ignore */ }
+    })
   );
 }
 

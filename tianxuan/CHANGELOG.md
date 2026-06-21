@@ -1,3 +1,22 @@
+## [8.14.0] — 2026-06-21
+
+### ⚡ VS Code 智能编码动作体系
+
+> 基于 V8.13.0 · 2源文件 +150/-20行 · 缓存安全(零L1/L2/L3变更)
+
+| 域 | 变更 |
+|------|------|
+| **Quick Fix** | CodeActionProvider: 检测 error/warning → AI 修复 → diff 预览 |
+| **文档注释** | 右键菜单 + CodeLens: 函数/类上方生成 JSDoc/GoDoc/docstring |
+| **单元测试** | 右键菜单 + CodeLens: 推断测试框架 → 生成测试 → diff 预览 |
+| **CodeLens** | 函数上方显示 解释/测试/文档 三个内联操作 |
+| **终端解释** | 命令面板: 粘贴终端错误 → AI 中文解释 + 修复建议 |
+| **补全增强** | 防抖(300ms setTimeout) + 语义边界触发(. ( 空格等) + 节流检查 |
+
+### 📦 发布
+
+- release/v8.14.0/ · CLI 20MB · VS Code extension 1.17MB · extension.js 31KB
+
 ## [8.13.0] — 2026-06-21
 
 ### 🤖 VS Code 原生 AI 能力 + 编辑器深度集成

@@ -1,5 +1,16 @@
 # tianxuan project memory
 
+> V8.14.0 — VS Code 智能编码动作体系 · 2026-06-21
+## V8.14.0 发布摘要 (2026-06-21)
+**基于**: V8.13.0 · **二进制**: CLI 20MB · **变更**: 2源文件 +262/-35行
+⚡ Quick Fix: CodeActionProvider — 诊断错误→AI修复→diff预览
+📝 文档注释: 右键菜单+CodeLens — 生成JSDoc/GoDoc/docstring
+🧪 单元测试: 右键菜单+CodeLens — 推断框架→生成测试→diff预览
+🔍 CodeLens: 函数上方 $(hubot)解释 · $(beaker)测试 · $(book)文档
+🖥️ 终端解释: 粘贴错误→AI中文解释+修复建议
+🎯 补全增强: 300ms防抖(真实setTimeout) + 语义边界触发(. ( 空格)
+🔒 缓存安全: 全部L4域 — L1/L2/L3零变更，不新增Go端点
+
 > V8.13.0 — VS Code 原生 AI 能力 · 编辑器深度集成 · 2026-06-21
 ## V8.13.0 发布摘要 (2026-06-21)
 **基于**: V8.12.0 · **二进制**: CLI 20MB · **变更**: 8源文件 +520/-3900行

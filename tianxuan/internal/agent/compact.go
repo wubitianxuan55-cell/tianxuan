@@ -365,20 +365,19 @@ func isCompactionSummary(m provider.Message) bool {
 }
 
 // ─── Partition: what to keep vs fold ───
-// V9.1: 引入 messageImportance() 评分——错误消息、硬约束、编辑操作优先保留。
-// keepThreshold=0.35，确保相同消息始终产生相同保留决策，不破坏缓存前缀。
+// partitionFold splits the compaction region into kept (prefix-stable) and fold.
+// 缓存前缀不变性：只保留结构性条件——现有 digest 和可 pin 的短 user turn。
+// 禁止基于消息内容（如重要性评分）做保留决策，否则 kept 区膨胀破坏前缀。
 
 func (a *AgentRunner) partitionFold(region []provider.Message) (kept, fold []provider.Message) {
-	for i, m := range region {
+	for _, m := range region {
 		keep := isCompactionSummary(m) ||
-			(m.Role == provider.RoleUser && a.pinnableUserTurn(m)) ||
-			messageImportance(m) >= keepThreshold
+			(m.Role == provider.RoleUser && a.pinnableUserTurn(m))
 		if keep {
 			kept = append(kept, m)
 		} else {
 			fold = append(fold, m)
 		}
-		_ = i // suppress unused
 	}
 	return kept, fold
 }
@@ -404,14 +403,8 @@ func (a *AgentRunner) summarize(ctx context.Context, fold []provider.Message, in
 	if instructions != "" {
 		sysPrompt = instructions + "\n\n" + sysPrompt
 	}
-	// V9.1: 注入确定性结构化摘要作为LLM摘要的引导上下文。
-	// BuildCompactSummary 完全确定性，不影响缓存稳定性；
-	// 它提供消息统计/编辑文件/工具使用/待办项等结构化预览，
-	// 让摘要LLM聚焦于细微决策和错误修复，而非重复基础统计。
-	if structured := BuildCompactSummary(fold); structured != "" {
-		sysPrompt = "Pre-computed structured context from the folded messages:\n" +
-			structured + "\n\n" + sysPrompt
-	}
+	// 缓存前缀不变性：禁止向 summarizer prompt 注入任何动态内容（含 BuildCompactSummary），
+	// 否则摘要输出变化 → 注入的 user 消息变化 → 前缀断裂。
 
 	transcript := renderTranscript(fold)
 	req := provider.Request{

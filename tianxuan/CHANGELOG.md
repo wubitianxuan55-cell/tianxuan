@@ -1,3 +1,47 @@
+## [9.1.0] — 2026-06-22
+
+### 🚀 V9.1: Headroom 借鉴四项上下文压缩优化 + V9.0 模式统一
+
+> 基于 V8.22.1 · 26文件 +741/-107 · 核心: 压缩增强 + 模式统一
+
+#### V9.0: 模式统一（explore/develop/orchestrate + YOLO toggle）
+
+| 变更 | 说明 |
+|------|------|
+| app.go SetAgentMode/AgentMode | Go 桥接新增 agentMode 切换方法 + Meta.AgentMode 字段 |
+| bridge.ts + types.ts + mock.ts | TS 全栈接口同步 |
+| useModeManager + store | 状态管理: agentMode 状态 + setAgentMode + toggleYolo |
+| Composer + StatusBar | UI: 三模式按钮 + 底栏 agentMode badge + YOLO 开关 |
+| i18n zh/en/zh-TW | 新增探索/开发/编排 + YOLO 标签键 |
+
+#### V9.1: 压缩优化（借鉴 Headroom 源码）
+
+| 变更 | 文件 | 说明 |
+|------|------|------|
+| JSON 结构掩码压缩 | compress_json.go (新增 230行) | tokenize→mask→span压缩, 键名保留/长值压缩, Headroom json_handler.py 移植 |
+| SmartCompress JSON 路由 | compress.go (+6行) | 默认分支新增 JSON 检测，命中后走结构感知压缩 |
+| 重要性评分折叠 | compact_summary.go (+55行) | messageImportance() 确定性评分: 错误+0.5/硬约束+0.4/编辑+0.2 |
+| partitionFold 增强 | compact.go | keep=isCompactionSummary||pinnableUserTurn||importance≥0.35 |
+| 结构化摘要引导 | compact.go (+6行) | BuildCompactSummary 注入摘要 prompt, LLM聚焦决策不重复统计 |
+| CCR 可逆压缩 | ccr/ccr.go (新增) | 文件存储 Write/Read/Summary, 8-char hash key |
+| retrieve 工具 | builtin/retrieve.go (新增) | LLM 按 hash 取回 prune 压缩的原始数据 |
+| prune CCR 标记 | prune.go | 旧占位符→CCR检索键+信号摘要, 无需重跑命令 |
+
+#### 缓存安全验证
+
+```
+✅ L1 系统提示词 hash: 所有轮次一致 (b59ff604b3e8)
+✅ L2 运行时上下文 hash: 所有轮次一致 (e3b0c44298fc)
+✅ prefix STABLE across 3 requests
+✅ compaction 后缓存恢复: 14% → 96%
+✅ 真实 DeepSeek API 10轮: 52% 命中率
+```
+
+#### 构建产物
+
+- tianxuan.exe 16.6 MB (CLI, CGO_ENABLED=0)
+- 26 files changed, +741/-107
+
 ## [8.18.0] — 2026-06-21
 
 ### 🔬 缓存架构重构 — 从纯截断到 LLM 摘要 digest 累积

@@ -1,6 +1,23 @@
 # tianxuan project memory
 
-> V8.23.0 — 桌面端 agentMode 自由切换: explore/develop/orchestrate 全栈贯通 · 2026-06-22
+> V9.1.0 — 四项上下文压缩优化(借鉴Headroom) + V9.0 模式统一 · 2026-06-22
+
+## V9.1.0 (2026-06-22)
+
+### 压缩优化（借鉴 Headroom）
+📦 JSON结构掩码压缩: tokenize→mask→span, 键名保留/长值压缩（借鉴 json_handler.py）
+📦 重要性评分折叠: 错误+0.5/硬约束+0.4/编辑+0.2, keepThreshold=0.35
+📦 结构化摘要引导: BuildCompactSummary 注入 LLM 摘要 prompt
+📦 CCR可逆压缩: .tianxuan/ccr/ + retrieve 工具, hash取回原文
+📦 缓存零破坏: L1/L2 hash 所有轮次一致
+
+### V9.0: 模式统一
+🎛️ Go: app.go SetAgentMode/AgentMode · TS: bridge/types/mock/store
+🎛️ UI: Composer三模式按钮 · StatusBar agentMode badge · YOLO toggle
+🎛️ i18n: zh/en/zh-TW 新增模式标签键
+
+### 验证
+✅ go build ✅ go vet ✅ go test ✅ 缓存e2e
 
 ## V8.23.0 (2026-06-22)
 

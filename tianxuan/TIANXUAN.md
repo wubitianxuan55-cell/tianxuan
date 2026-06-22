@@ -1,6 +1,29 @@
 # tianxuan project memory
 
-> V9.1.0 — 四项上下文压缩优化(借鉴Headroom) + V9.0 模式统一 · 2026-06-22
+> V8.23.0 — 精确回退V9.1/V9.2破坏性变更，保留agentMode模式统一 · 2026-06-22
+
+## V8.23.0 (2026-06-22)
+
+### 🔙 V9.1/V9.2 精确摘除
+
+| 删除 | 说明 |
+|------|------|
+| compress_json.go | JSON结构掩码压缩 |
+| ccr/ccr.go | CCR可逆压缩 |
+| retrieve.go | retrieve工具 |
+| anysearch.go | AnySearch API |
+| compress/prune/boot/webfetch/websearch | 调用点回退 |
+| compact_summary.go | messageImportance/keepThreshold死代码 |
+
+### ✅ 保留 (V8.22 + V8.23)
+
+- V8.23 agentMode三模式切换 (explore/develop/orchestrate + YOLO)
+- V8.22 技能强制触发 / L1 Token精简 / 面板全面优化
+- V8.22.1 热修复 (fakeTool / RLock guard / 429重试 / isServerError)
+
+### 构建产物
+- release/v8.23.0/tianxuan.exe (16MB)
+- release/v8.23.0/tianxuan-desktop.exe (16MB)
 
 ## V9.1.0 (2026-06-22)
 

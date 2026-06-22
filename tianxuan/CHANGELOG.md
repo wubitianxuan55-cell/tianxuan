@@ -1,3 +1,38 @@
+## [8.23.0] — 2026-06-22
+
+### 🔙 V9.1/V9.2 精确摘除
+
+> 基于 V8.22.1 热修复后的 578af78，移除 V9.1/V9.2 破坏缓存前缀的变更，仅保留 V8.23 agentMode 模式统一。
+
+#### 删除的 V9.1/V9.2 模块
+| 文件 | 功能 | 来源 |
+|------|------|------|
+| compress_json.go | JSON结构掩码压缩 | V9.1 |
+| ccr/ccr.go | CCR可逆压缩 | V9.1 |
+| retrieve.go | retrieve检索工具 | V9.1 |
+| anysearch.go | AnySearch API客户端 | V9.2 |
+
+#### 回退的调用点
+| 文件 | 回退内容 |
+|------|---------|
+| compress.go | 移除isJSON→compressJSON分支 |
+| prune.go | 恢复V8.22.1纯占位符截断 |
+| boot.go | 删除ccr.SetDir/SetCCRDir |
+| webfetch.go | 删除AnySearch extract主路径 |
+| websearch.go | 删除AnySearch search主路径 |
+| compact_summary.go | 删除messageImportance/keepThreshold死代码 |
+
+#### 保留的 V8.23 功能
+- app.go SetAgentMode/AgentMode + Meta.AgentMode
+- useModeManager + types/bridge/mock/store 全栈同步
+- Composer 三模式按钮 + YOLO 独立开关
+- StatusBar agentMode badge
+- i18n 模式标签键
+
+### 构建产物
+- release/v8.23.0/tianxuan.exe (16MB, CLI)
+- release/v8.23.0/tianxuan-desktop.exe (16MB, Wails)
+
 ## [9.1.0] — 2026-06-22
 
 ### 🚀 V9.1: Headroom 借鉴四项上下文压缩优化 + V9.0 模式统一

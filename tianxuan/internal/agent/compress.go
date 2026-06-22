@@ -417,12 +417,6 @@ func SmartCompress(toolName, raw string) string {
 	case "directory_tree", "list_directory":
 		return compressTree(raw)
 	default:
-		// V9.1: JSON结构感知压缩
-		if isJSON(raw) {
-			if compressed := compressJSON(raw); compressed != "" {
-				return compressed
-			}
-		}
 		if limit, ok := toolCompressLimits[toolName]; ok {
 			return compressByLimit(raw, limit.maxLines, limit.maxBytes)
 		}

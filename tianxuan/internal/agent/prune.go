@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"tianxuan/internal/ccr"
 	"tianxuan/internal/provider"
 )
 
@@ -16,14 +15,13 @@ type PruneStats struct {
 }
 
 const (
-	prunedMarker = "[pruned ccr:"
+	prunedMarker  = "[elided tool result — "
 	minPruneBytes = 1024
 )
 
 // PruneStaleToolResults elides tool-result content older than the protected
-// recent tail. Originals are stored in CCR so the LLM can retrieve them on
-// demand via the `retrieve` tool — no need to re-run the command.
-// V9.1: CCR marker replaces old "re-run the tool" instruction.
+// recent tail, archiving the originals first. Idempotent; a no-op when
+// compaction is disabled (no context window).
 func (a *AgentRunner) PruneStaleToolResults() (PruneStats, error) {
 	var st PruneStats
 	if a.compaction.Window <= 0 {
@@ -59,10 +57,7 @@ func (a *AgentRunner) PruneStaleToolResults() (PruneStats, error) {
 	next := append([]provider.Message(nil), msgs...)
 	for _, i := range idx {
 		m := next[i]
-		key := ccr.Write(m.Content)
-		summary := summarizeCCRContent(m.Content)
-		placeholder := fmt.Sprintf("%s%s, %s · %d bytes, use retrieve(key=%q) to get full output]",
-			prunedMarker, m.Name, summary, len(m.Content), key)
+		placeholder := fmt.Sprintf("%s%s, %d bytes dropped to save context; re-run the tool if the data is needed again]", prunedMarker, m.Name, len(m.Content))
 		st.SavedChars += len(m.Content) - len(placeholder)
 		m.Content = placeholder
 		next[i] = m
@@ -71,35 +66,4 @@ func (a *AgentRunner) PruneStaleToolResults() (PruneStats, error) {
 	a.session.Replace(next)
 	a.session.IncrementRewrite()
 	return st, nil
-}
-
-// summarizeCCRContent extracts a short signal summary from tool output.
-func summarizeCCRContent(s string) string {
-	lines := strings.Split(s, "\n")
-	signals := make([]string, 0, 3)
-	for _, line := range lines {
-		for _, kw := range []string{"FATAL", "ERROR", "FAIL", "panic", "PASS", "ok", "exit status"} {
-			if strings.Contains(line, kw) {
-				signals = append(signals, strings.TrimSpace(line))
-				break
-			}
-		}
-		if len(signals) >= 3 {
-			break
-		}
-	}
-	if len(signals) > 0 {
-		return strings.Join(signals, " | ")
-	}
-	// Fallback: first meaningful line
-	for _, line := range lines {
-		t := strings.TrimSpace(line)
-		if len(t) > 5 && !strings.HasPrefix(t, "#") && !strings.HasPrefix(t, "//") {
-			if len(t) > 100 {
-				t = t[:100]
-			}
-			return t
-		}
-	}
-	return fmt.Sprintf("%d bytes", len(s))
 }

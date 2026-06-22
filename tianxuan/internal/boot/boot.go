@@ -20,6 +20,7 @@ import (
 	"tianxuan/internal/agent"
 	"tianxuan/internal/archive"
 	"tianxuan/internal/cache"
+	"tianxuan/internal/ccr"
 	"tianxuan/internal/codegraph"
 	"tianxuan/internal/command"
 	"tianxuan/internal/config"
@@ -392,6 +393,11 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		Dispatcher: toolDispatcher,
 	}, sink)
 	executor.SetDispatcherPlanMode()
+
+	// V9.1: CCR (Compress-Cache-Retrieve) storage for reversible tool output compression
+	ccrDir := filepath.Join(cwd, ".tianxuan", "ccr")
+	ccr.SetDir(ccrDir)
+	builtin.SetCCRDir(ccrDir)
 
 	// V7.0: session archive for cross-session Dream/Distill
 	archiveDir := filepath.Join(cwd, ".tianxuan", "archive")

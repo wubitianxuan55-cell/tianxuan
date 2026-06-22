@@ -94,7 +94,7 @@ export default function App() {
     saveDoc,
   } = useController();
   const t = useT();
-  const { mode, setMode, thinkLevel, themeNow, setTheme, switchingModel, cycleMode, handleThinkLevelChange, switchModel } = useModeManager(setPlan, setBypass, setModel);
+  const { agentMode, setAgentMode, yolo, toggleYolo, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, setBypass, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
@@ -541,11 +541,13 @@ export default function App() {
             <div className="composer-glow">
             <Composer
               running={state.running}
-              mode={mode}
               cwd={state.meta?.cwd}
               onSend={handleSend}
               onCancel={cancel}
-              onCycleMode={cycleMode}
+              agentMode={agentMode}
+              onSetAgentMode={setAgentMode}
+              yolo={yolo}
+              onToggleYolo={toggleYolo}
               onPickFolder={switchFolder}
               disabled={state.meta?.ready === false || state.approval != null}
             />
@@ -556,7 +558,8 @@ export default function App() {
               balance={state.balance}
               jobs={state.jobs}
               running={state.running}
-              mode={mode}
+              agentMode={agentMode}
+              yolo={yolo}
               bridgeAlive={bridgeAlive}
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
@@ -651,8 +654,8 @@ export default function App() {
             approval={state.approval}
             onAnswer={(allow, session) => {
               // Approving an exit_plan_mode plan leaves plan mode (the controller
-              // flips the executor; mirror it here for the indicator).
-              if (state.approval!.tool === "exit_plan_mode" && allow) setMode("normal");
+              // flips the executor internally; V9.0 unified mode stays unchanged).
+              if (state.approval!.tool === "exit_plan_mode" && allow) { /* backend handles */ }
               approve(state.approval!.id, allow, session);
             }}
             onRevisePlan={(text) => {

@@ -144,11 +144,12 @@ export interface Meta {
   eventChannel: string;
   cwd: string;
   bypass?: boolean; // YOLO mode on (auto-approve every tool call)
+  agentMode?: string; // "explore"|"develop"|"orchestrate"
 }
 
-// Mode is the input mode cycled by Shift+Tab: normal → plan (read-only) → yolo
-// (auto-approve every tool call; deny rules still apply).
-export type Mode = "normal" | "plan" | "yolo";
+// AgentMode is the unified runtime mode (V9.0: Mode + AgentMode merged).
+// explore: read-only research; develop: full-tool development; orchestrate: plan→execute→verify
+export type AgentMode = "explore" | "develop" | "orchestrate";
 
 export interface CommandInfo {
   name: string; // without the leading slash

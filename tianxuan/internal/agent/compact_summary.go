@@ -183,7 +183,59 @@ func BuildCompactSummary(truncated []provider.Message) string {
 	return sb.String()
 }
 
-// truncateText 截断文本到 maxChars 字符，超长加 …。
+// messageImportance 是对单条消息重要性的确定性评分函数。
+// 返回 0.0-1.0 的分值；高于 0.35 的消息在折叠时优先保留。
+// 完全确定性：相同输入 → 相同输出，不影响缓存稳定性。
+func messageImportance(m provider.Message) float64 {
+	score := 0.0
+
+	// 工具结果包含错误信号 → 必须保留上下文
+	if m.Role == provider.RoleTool {
+		for _, kw := range []string{"FATAL", "ERROR", "panic", "PANIC", "Permission denied", "permission denied", "Access denied"} {
+			if strings.Contains(m.Content, kw) {
+				score += 0.5
+				break
+			}
+		}
+		// 编译/测试失败
+		for _, kw := range []string{"FAIL", "exit status 1", "build failed", "test failed"} {
+			if strings.Contains(m.Content, kw) {
+				score += 0.3
+				break
+			}
+		}
+		// 长内容 → 略降优先级（更倾向折叠冗长成功结果）
+		if len(m.Content) > 2000 {
+			score -= 0.15
+		}
+	}
+
+	// 用户消息包含硬约束
+	if m.Role == provider.RoleUser {
+		lower := strings.ToLower(m.Content)
+		for _, kw := range []string{"不要", "禁止", "必须", "never", "must", "don't", "do not", "绝对不能"} {
+			if strings.Contains(lower, kw) {
+				score += 0.4
+				break
+			}
+		}
+	}
+
+	// Assistant 编辑操作 → 保留关键决策
+	if m.Role == provider.RoleAssistant {
+		for _, tc := range m.ToolCalls {
+			switch tc.Name {
+			case "edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol":
+				score += 0.2
+			}
+		}
+	}
+
+	return score
+}
+
+// keepThreshold 是 messageImportance 评分的保留阈值。
+const keepThreshold = 0.35
 func truncateText(s string, maxChars int) string {
 	s = strings.TrimSpace(s)
 	if s == "" {

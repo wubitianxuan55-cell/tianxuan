@@ -10,7 +10,8 @@
   - 在编写实现代码之前，通过 Plan 模式制定方案——Plan 模式确保只读探索
   - 涉及 GitNexus 代码图谱操作时，使用 gitnexus-guide 技能获取完整工具参考
   - 涉及 UI/UX 设计时，使用 ui-ux-pro-max 或 ui-styling 技能获取设计系统数据
-- **当前版本**: V8.22.0 (2026-06-21)
+- **当前版本**: V8.23.0 (2026-06-22)
+- V8.23.0: 桌面端 agentMode 自由切换 — Go 桥接 + TS 全栈 + Composer/StatusBar UI + i18n
 - V8.22.0: 技能触发策略强化 + L1 Token 优化 — Reasonix push-based 五层机制 + 描述精简 ~2,700 tok/会话
 - V8.18.0: 缓存架构重构 — compact 从纯截断改为 LLM 摘要 digest 累积 + PrefixShape 诊断统一
 - V8.17.0: 跨项目吸收 — DeepSeek thinking 注入 + retrieval/sysproxy/netclient/proc 4 模块

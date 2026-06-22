@@ -1,6 +1,6 @@
-// 模式管理 hook — normal/plan/yolo + thinkLevel → 温度 + 主题 + 模型切换
+// 模式管理 hook — V9.0 统一模式：explore/develop/orchestrate + YOLO toggle + thinkLevel
 import { useState, useCallback } from "react";
-import type { Mode } from "../lib/types";
+import type { AgentMode } from "../lib/types";
 import { getTheme } from "../lib/theme";
 import type { Theme } from "../lib/theme";
 import { app } from "../lib/bridge";
@@ -12,38 +12,41 @@ export function useModeManager(
   setBypass: (on: boolean) => void,
   setModel: (name: string) => Promise<void>,
 ) {
-  const [mode, setMode] = useState<Mode>("normal");
+  const [agentMode, setAgentModeState] = useState<AgentMode>("develop");
+  const [yolo, setYoloState] = useState(false);
   const [thinkLevel, setThinkLevel] = useState<"fast" | "normal" | "deep">("normal");
   const [themeNow, setTheme] = useState<Theme>(getTheme);
   const [switchingModel, setSwitchingModel] = useState(false);
 
-  const applyMode = useCallback(
-    (m: Mode) => {
-      setMode(m);
-      setPlan(m === "plan");
-      setBypass(m === "yolo");
-    },
-    [setPlan, setBypass],
-  );
+  const setAgentMode = useCallback((m: AgentMode) => {
+    setAgentModeState(m);
+    app.SetAgentMode(m).catch(() => {});
+    // Sync plan flag: explore/orchestrate → plan mode; develop → full tools
+    if (m === "explore" || m === "orchestrate") setPlan(true);
+    else setPlan(false);
+    // YOLO only available in develop/orchestrate; turn off if switching to explore
+    if (m === "explore") {
+      setYoloState(false);
+      app.SetBypass(false).catch(() => {});
+    }
+  }, [setPlan]);
 
-  const cycleMode = useCallback(() => {
-    setMode(prev => {
-      const next = prev === "normal" ? "plan" as Mode : prev === "plan" ? "yolo" as Mode : "normal" as Mode;
-      setPlan(next === "plan");
-      setBypass(next === "yolo");
+  const toggleYolo = useCallback(() => {
+    setYoloState(prev => {
+      const next = !prev;
+      app.SetBypass(next).catch(() => {});
+      setBypass(next);
       return next;
     });
-  }, [setPlan, setBypass]);
+  }, [setBypass]);
 
   const handleThinkLevelChange = useCallback(async (level: string) => {
     setThinkLevel(level as "fast" | "normal" | "deep");
     const temp = THINK_TEMPS[level] ?? 0.3;
-    // 先读取当前设置，保留用户配置的 maxSteps 和 systemPrompt，只改 temperature
     try {
       const settings = await app.Settings();
       app.SetAgentParams(temp, settings.agent.maxSteps, settings.agent.systemPrompt).catch(() => {});
     } catch {
-      // Settings 读取失败时回退：只设温度，步数和提示词用 0（后端会用默认值）
       app.SetAgentParams(temp, 0, "").catch(() => {});
     }
   }, []);
@@ -53,11 +56,9 @@ export function useModeManager(
       setSwitchingModel(true);
       await setModel(name);
       setSwitchingModel(false);
-      if (mode === "plan") setPlan(true);
-      else if (mode === "yolo") setBypass(true);
     },
-    [setModel, mode, setPlan, setBypass],
+    [setModel],
   );
 
-  return { mode, setMode, thinkLevel, themeNow, setTheme, switchingModel, applyMode, cycleMode, handleThinkLevelChange, switchModel };
+  return { agentMode, setAgentMode, yolo, toggleYolo, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel };
 }

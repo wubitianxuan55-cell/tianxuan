@@ -3,7 +3,7 @@ import { Cpu, Wallet, Coins } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
-import type { BalanceInfo, ContextInfo, JobView, Mode, WireUsage } from "../lib/types";
+import type { BalanceInfo, ContextInfo, JobView, WireUsage } from "../lib/types";
 
 // ─── 模型价格表（与 StatsPanel 共用逻辑）─────────────────────────
 
@@ -93,14 +93,15 @@ function JobsChip({ jobs }: { jobs: JobView[] }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export function StatusBar({
-  context, usage, balance, jobs, running, mode, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
+  context, usage, balance, jobs, running, agentMode, yolo, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
   balance?: BalanceInfo;
   jobs?: JobView[];
   running: boolean;
-  mode: Mode;
+  agentMode?: string;
+  yolo?: boolean;
   turnStartAt: number;
   turnTokens: number;
   sessionTotal?: number;
@@ -214,15 +215,21 @@ export function StatusBar({
 
       {/* ── 右: badge 区 ── */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* 模式 */}
-        {mode === "yolo" && (
-          <Tooltip label="YOLO 模式：自动批准所有工具">
-            <span className="ds-chip ds-chip--accent">YOLO</span>
-          </Tooltip>
+        {/* 统一模式 badge */}
+        {agentMode && agentMode !== "" && (
+          <span className={`${fontSize} px-1.5 py-px rounded border font-medium ${
+            agentMode === "explore" ? "text-info bg-info/10 border-info/20" :
+            agentMode === "orchestrate" ? "text-accent bg-accent-soft border-accent/30" :
+            "text-ok bg-ok/10 border-ok/20"
+          }`}>
+            {agentMode === "explore" ? "探索" : agentMode === "develop" ? "开发" : "编排"}
+          </span>
         )}
-        {mode === "plan" && (
-          <Tooltip label="Plan 模式：只读探索">
-            <span className="ds-chip ds-chip--muted">PLAN</span>
+
+        {/* YOLO badge */}
+        {yolo && (
+          <Tooltip label="YOLO：自动批准所有工具">
+            <span className="ds-chip ds-chip--accent">YOLO</span>
           </Tooltip>
         )}
 

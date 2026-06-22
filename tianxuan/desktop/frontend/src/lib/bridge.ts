@@ -44,6 +44,8 @@ export interface AppBindings {
   Approve(id: string, allow: boolean, session: boolean): Promise<void>;
   AnswerQuestion(id: string, answers: QuestionAnswer[]): Promise<void>;
   SetPlanMode(on: boolean): Promise<void>;
+  SetAgentMode(mode: string): Promise<void>;
+  AgentMode(): Promise<string>;
   Compact(): Promise<void>;
   NewSession(): Promise<void>;
   History(): Promise<HistoryMessage[]>;

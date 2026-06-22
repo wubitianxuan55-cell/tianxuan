@@ -4,7 +4,7 @@ import { ArrowUp, Check, ChevronDown, Clock, Eye, FileText, FolderGit2, FolderPl
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
-import type { CommandInfo, DirEntry, Mode, SlashArgItem, SlashArgsResult, WorkspaceView } from "../lib/types";
+import type { CommandInfo, DirEntry, SlashArgItem, SlashArgsResult, WorkspaceView } from "../lib/types";
 import { useStore } from "../lib/store";
 import { SlashMenu } from "./SlashMenu";
 import { ArgMenu } from "./ArgMenu";
@@ -53,11 +53,12 @@ function loadComposerHeight(): number | null {
 }
 
 export function Composer({
-  running, mode, cwd, onSend, onCancel, onCycleMode, onPickFolder, disabled,
+  running, cwd, onSend, onCancel, agentMode, onSetAgentMode, yolo, onToggleYolo, onPickFolder, disabled,
 }: {
-  running: boolean; mode: Mode; cwd?: string;
+  running: boolean; cwd?: string;
   onSend: (displayText: string, submitText?: string) => void;
-  onCancel: () => string | undefined; onCycleMode: () => void;
+  onCancel: () => string | undefined; agentMode?: string; onSetAgentMode?: (m: "explore" | "develop" | "orchestrate") => void;
+  yolo?: boolean; onToggleYolo?: () => void;
   onPickFolder: (path?: string) => Promise<string>; disabled?: boolean;
 }) {
   const t = useT();
@@ -302,7 +303,6 @@ export function Composer({
   // ── 键盘处理 ──
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const composing = e.nativeEvent.isComposing;
-    if (e.key === "Tab" && e.shiftKey && !composing) { e.preventDefault(); onCycleMode(); return; }
     if (menuMode && !composing) {
       if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => (i + 1) % menuCount); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => (i - 1 + menuCount) % menuCount); return; }
@@ -496,25 +496,42 @@ export function Composer({
             </div>
           )}
 
-          {/* 模式按钮 */}
+          {/* 统一模式按钮（V9.0：Mode + AgentMode 合并） */}
           <div className="flex gap-[3px]">
-            {(["normal", "plan", "yolo"] as Mode[]).map((m) => (
-              <button key={m} type="button"
-                className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[var(--dur-fast)] active:scale-[0.97] ${mode === m ? "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]" : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"}`}
-                onClick={() => { if (mode === m) return; const order: Mode[] = ["normal", "plan", "yolo"]; const steps = (order.indexOf(m) - order.indexOf(mode) + 3) % 3; for (let i = 0; i < steps; i++) onCycleMode(); }}
-                title={m === "plan" ? t("composer.modePlan") : m === "yolo" ? t("composer.modeYolo") : t("composer.modeNormal")}
-              >
-                <span className={`w-2 h-2 rounded-full ${m === "normal" ? "bg-info" : m === "plan" ? "bg-warning" : "bg-err"}`} />
-                {m === "normal" ? t("composer.modeNormal") : m === "plan" ? t("composer.modePlan") : t("composer.modeYolo")}
-              </button>
-            ))}
+            {(["explore", "develop", "orchestrate"] as const).map((am) => {
+              const labels: Record<string, string> = { explore: t("composer.modeExplore"), develop: t("composer.modeDevelop"), orchestrate: t("composer.modeOrchestrate") };
+              const descs: Record<string, string> = { explore: t("composer.modeExploreDesc"), develop: t("composer.modeDevelopDesc"), orchestrate: t("composer.modeOrchestrateDesc") };
+              return (
+                <button key={am} type="button"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[var(--dur-fast)] active:scale-[0.97] ${
+                    agentMode === am ? "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]" : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"
+                  }`}
+                  onClick={() => { if (agentMode !== am && onSetAgentMode) onSetAgentMode(am); }}
+                  title={descs[am]}
+                >
+                  {labels[am]}
+                </button>
+              );
+            })}
           </div>
 
-          {/* 快捷提示 */}
+          {/* YOLO 开关（V9.0：独立 toggle，仅在 develop/orchestrate 下可见） */}
+          {agentMode !== "explore" && onToggleYolo && (
+            <button type="button"
+              className={`flex items-center gap-1.5 px-2 py-0.5 border rounded text-[10px] cursor-pointer transition-[color,background,border] duration-[var(--dur-fast)] ${
+                yolo ? "text-err bg-err/10 border-err/20" : "text-fg-faint border-border-soft/50 hover:text-fg-dim hover:bg-bg-soft"
+              }`}
+              onClick={onToggleYolo}
+              title={t("composer.yoloToggleDesc")}
+            >
+              {yolo ? "⚡ YOLO" : t("composer.yoloToggle")}
+            </button>
+          )}
+
+{/* 快捷提示 */}
           <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-1.5">
             <span>/ 命令</span>
             <span>@ 文件</span>
-            <span>Shift+Tab 切换</span>
           </span>
         </div>
       </div>

@@ -176,6 +176,8 @@ export function makeMockApp(): AppBindings {
     async Approve() {},
     async AnswerQuestion() {},
     async SetPlanMode() {},
+    async SetAgentMode(_mode: string) {},
+    async AgentMode() { return "develop"; },
     async Compact() {},
     async NewSession() {},
     async Checkpoints() {
@@ -253,6 +255,7 @@ export function makeMockApp(): AppBindings {
         eventChannel: EVENT_CHANNEL,
         cwd,
         bypass: settings.bypass,
+        agentMode: "develop",
       };
     },
     async Commands() {

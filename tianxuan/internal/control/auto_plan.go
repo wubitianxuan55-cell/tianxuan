@@ -37,38 +37,46 @@ func normalizeAutoPlan(mode string) string {
 }
 
 func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
-	if c.shouldAutoPlan(ctx, input) {
-		c.SetPlanMode(true)
-		c.notice("auto plan: task looks multi-step; drafting a plan first")
-	}
-}
-
-func (c *Controller) shouldAutoPlan(ctx context.Context, input string) bool {
 	c.mu.Lock()
 	mode := c.autoPlan
-	plan := c.planMode
+	am := c.agentMode
 	classifier := c.classifier
 	c.mu.Unlock()
-	if mode == autoPlanOff || plan {
-		return false
+
+	// V9.0: If already in a planning mode (explore/orchestrate), skip.
+	// Only auto-switch from develop mode.
+	if am != "" && am != "develop" {
+		return
 	}
+	if mode == autoPlanOff {
+		return
+	}
+
 	score := autoPlanScore(input)
 	if score <= 0 {
-		return false
+		return
 	}
 	if classifier != nil && score <= 2 {
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
 		needsPlan, reason, err := classifier.NeedsPlan(ctx, input, score)
 		if err == nil {
-			if needsPlan && reason != "" {
-				c.notice("auto plan classifier: " + reason)
+			if needsPlan {
+				if reason != "" {
+					c.notice("auto plan classifier: " + reason)
+				}
+				c.SetAgentMode("orchestrate")
+				c.notice("auto mode: switched to orchestrate (multi-step task detected)")
+				return
 			}
-			return needsPlan
+			return
 		}
 		c.notice("auto plan classifier failed; falling back to heuristic: " + err.Error())
 	}
-	return score >= 1
+	if score >= 1 {
+		c.SetAgentMode("orchestrate")
+		c.notice("auto mode: switched to orchestrate (multi-step task detected)")
+	}
 }
 
 func autoPlanScore(input string) int {

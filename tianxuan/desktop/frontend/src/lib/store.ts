@@ -223,6 +223,7 @@ export function useController() {
   const answerQuestion = useCallback((id: string, answers: QuestionAnswer[]) => { dispatch({ type: "clearAsk" }); app.AnswerQuestion(id, answers).catch(() => {}); }, [dispatch]);
   const setPlan = useCallback((on: boolean) => { app.SetPlanMode(on).catch(() => {}); }, []);
   const setBypass = useCallback((on: boolean) => { app.SetBypass(on).catch(() => {}); }, []);
+  const setAgentMode = useCallback((mode: string) => { app.SetAgentMode(mode).catch(() => {}); }, []);
   const newSession = useCallback(async () => { await app.NewSession().catch(() => {}); dispatch({ type: "reset" }); }, [dispatch]);
   const listSessions = useCallback((): Promise<SessionMeta[]> => app.ListSessions().catch(() => []), []);
   const resumeSession = useCallback(async (path: string) => { const ms = await app.ResumeSession(path).catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
@@ -239,5 +240,5 @@ export function useController() {
   const saveDoc = useCallback(async (path: string, body: string) => { await app.SaveDoc(path, body).catch(() => {}); }, []);
   const rewind = useCallback(async (turn: number, scope: string) => { if (scope === "fork") await app.Fork(turn).catch(() => {}); else if (scope === "summ-from") await app.SummarizeFrom(turn).catch(() => {}); else if (scope === "summ-upto") await app.SummarizeUpTo(turn).catch(() => {}); else await app.Rewind(turn, scope).catch(() => {}); const ms = await app.History().catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
 
-  return { state, send, cancel, approve, answerQuestion, setPlan, setBypass, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc };
+  return { state, send, cancel, approve, answerQuestion, setPlan, setBypass, setAgentMode, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc };
 }

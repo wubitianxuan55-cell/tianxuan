@@ -1,6 +1,18 @@
 # tianxuan project memory
 
-> V8.22.1 — 热修复: 测试套件崩溃 + nil panic + 429重试 + isServerError 补全 · 2026-06-21
+> V8.23.0 — 桌面端 agentMode 自由切换: explore/develop/orchestrate 全栈贯通 · 2026-06-22
+
+## V8.23.0 (2026-06-22)
+
+### 桌面端 agentMode 自由切换
+🎛️ Go 桥接: app.go 新增 SetAgentMode/AgentMode + Meta.AgentMode — 12 文件, +100/-9
+🎛️ TS 接口: bridge.ts + types.ts + mock.ts 完整同步
+🎛️ 状态管理: useModeManager + store 新增 agentMode 状态 + setAgentMode
+🎛️ UI: Composer 新增探索/开发/编排按钮 · StatusBar 底栏 agentMode badge
+🎛️ i18n: zh/en/zh-TW 新增 4 个键
+
+### 验证
+✅ go build ✅ go vet ✅ npx tsc --noEmit ✅ wails build (10.8s)
 
 ## V8.22.1 (2026-06-21)
 

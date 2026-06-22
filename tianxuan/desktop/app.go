@@ -736,7 +736,8 @@ type Meta struct {
 	StartupErr   string `json:"startupErr,omitempty"`
 	EventChannel string `json:"eventChannel"`
 	Cwd          string `json:"cwd"`
-	Bypass       bool   `json:"bypass"` // YOLO mode on (auto-approve every tool call)
+	Bypass       bool   `json:"bypass"`     // YOLO mode on (auto-approve every tool call)
+	AgentMode    string `json:"agentMode"`  // "explore"|"develop"|"orchestrate"
 }
 
 // Meta reports the model label, readiness, any startup error, the working
@@ -750,6 +751,10 @@ func (a *App) Meta() Meta {
 	ctrl := a.ctrl
 	a.mu.RUnlock()
 	cwd, _ := os.Getwd()
+	agentMode := ""
+	if ctrl != nil {
+		agentMode = ctrl.AgentMode()
+	}
 	return Meta{
 		Label:        label,
 		Ready:        ready,
@@ -757,7 +762,30 @@ func (a *App) Meta() Meta {
 		EventChannel: eventChannel,
 		Cwd:          cwd,
 		Bypass:       ctrl != nil && ctrl.Bypass(),
+		AgentMode:    agentMode,
 	}
+}
+
+// SetAgentMode switches the agent runtime mode: "explore" (read-only research),
+// "develop" (full tools, default), or "orchestrate" (plan→execute→verify).
+func (a *App) SetAgentMode(mode string) {
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl != nil {
+		ctrl.SetAgentMode(mode)
+	}
+}
+
+// AgentMode returns the current agent runtime mode, for the status-bar indicator.
+func (a *App) AgentMode() string {
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl != nil {
+		return ctrl.AgentMode()
+	}
+	return ""
 }
 
 // SetBypass toggles YOLO mode for the session: auto-approve every tool call

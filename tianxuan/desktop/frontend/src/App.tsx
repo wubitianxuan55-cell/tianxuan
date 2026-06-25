@@ -105,6 +105,7 @@ export default function App() {
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
+  const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
   const splashHold = !(state.meta?.ready ?? false);
@@ -528,8 +529,8 @@ export default function App() {
               <Skeleton />
             ) : (
               <>
-                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
-                {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} />}
+                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
+                {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />}
               </>
             )}
             </CompactContext.Provider>

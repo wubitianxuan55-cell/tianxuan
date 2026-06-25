@@ -71,6 +71,7 @@ export function Transcript({
   onRewind,
   running,
   onThreadEl,
+  onScrollToTurnReady,
   cwd,
   cwdName,
   sessions,
@@ -82,6 +83,7 @@ export function Transcript({
   onRewind?: (turn: number, scope: string) => void;
   running: boolean;
   onThreadEl?: (el: HTMLElement | null) => void;
+  onScrollToTurnReady?: (fn: (turn: number) => void) => void;
   cwd?: string;
   cwdName?: string;
   sessions?: import('../lib/types').SessionMeta[];
@@ -97,12 +99,27 @@ export function Transcript({
   // stick tracks whether the view is pinned to the bottom; once the user scrolls
   // up to read, we stop yanking them back down.
   const stick = useRef(true);
+  const lastAutoScrollRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
   // 预处理：合并连续推理 + 扫描工具组
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
 
-  // 虚拟滚动 — 动态高度测量 + 5 条预渲染
+  // turn → groupedIndex 映射：供 JumpBar 通过虚拟滚动定位到指定轮次
+  const turnToIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    let turn = 0;
+    for (let i = 0; i < grouped.length; i++) {
+      const g = grouped[i];
+      const it = g.kind === "group" ? null : g.item;
+      if (it && it.kind === "user") {
+        map.set(turn, i);
+        turn++;
+      }
+    }
+    return map;
+  }, [grouped]);
+
   const virtualizer = useVirtualizer({
     count: grouped.length,
     getScrollElement: useCallback(() => scrollRef.current, []),
@@ -110,10 +127,30 @@ export function Transcript({
     overscan: 12,  // V5.30: 增到12减少快速滚动空白
   });
 
+  // 用 ref 保存最新的 turnToIndex 和 virtualizer，scrollToTurn 闭包引用它们
+  const turnToIndexRef = useRef(turnToIndex);
+  turnToIndexRef.current = turnToIndex;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  // 真正的 scrollToTurn 函数，稳定引用
+  const scrollToTurnRef = useRef((turn: number) => {
+    const idx = turnToIndexRef.current.get(turn);
+    if (idx != null) {
+      stick.current = true;
+      virtualizerRef.current.scrollToIndex(idx, { align: "start" });
+    }
+  });
+
+  // 暴露 scrollToTurn 给父组件（JumpBar 使用）
+  useEffect(() => {
+    onScrollToTurnReady?.(scrollToTurnRef.current);
+  }, [onScrollToTurnReady]);
+
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (el) {
-        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         stick.current = atBottom;
         setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight + 200);
     }
@@ -125,14 +162,22 @@ export function Transcript({
   const contentVersion = scrollVersion(items);
   useEffect(() => {
     if (!stick.current) return;
+    // 节流：两次自动滚动至少间隔 100ms，给用户滚轮操作留出响应窗口
+    const now = Date.now();
+    if (now - lastAutoScrollRef.current < 100) return;
+    lastAutoScrollRef.current = now;
+
     const el = scrollRef.current;
     if (!el) return;
     // 虚拟滚动模式下，虚拟列表总高度变化时也要滚动到底部
     if (grouped.length > 0) {
       virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
     }
+    // rAF 兜底：等布局完成后再次确认滚动到底部，但仅在用户未手动滚离时
     const id = requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
+      if (stick.current) {
+        el.scrollTop = el.scrollHeight;
+      }
     });
     return () => cancelAnimationFrame(id);
   }, [contentVersion, grouped.length, virtualizer]);

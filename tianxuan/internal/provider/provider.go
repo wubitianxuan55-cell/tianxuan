@@ -80,6 +80,25 @@ const interruptedToolResult = "[no result: the previous turn was interrupted bef
 // tool_call 鍜?tool_result 涔嬮棿鐨?assistant 鏂囨湰/reasoning 绛?
 // 妗ユ帴娑堟伅涓嶅啀闃绘柇閰嶅鎵弿銆?
 func SanitizeToolPairing(msgs []Message) []Message {
+	// V10.0 Fast Path: skip repair when no assistant tool_calls or orphan tools.
+	needsRepair := false
+	for i, m := range msgs {
+		if m.Role == RoleAssistant && len(m.ToolCalls) > 0 {
+			needsRepair = true
+			break
+		}
+		if m.Role == RoleTool {
+			prev := i > 0 && msgs[i-1].Role == RoleAssistant && len(msgs[i-1].ToolCalls) > 0
+			if !prev {
+				needsRepair = true
+				break
+			}
+		}
+	}
+	if !needsRepair {
+		return msgs
+	}
+
 	out := make([]Message, 0, len(msgs))
 	for i := 0; i < len(msgs); {
 		m := msgs[i]

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"tianxuan/internal/provider"
+	"sync/atomic"
 )
 
 
@@ -120,6 +121,7 @@ type client struct {
 	name     string
 	apiKey   string
 	keyEnv   string // api_key_env name, surfaced in auth errors
+	authed   atomic.Bool // V10.0: a request has succeeded — gate transient-401 retry
 	baseURL  string
 	model    string
 	http     *http.Client
@@ -152,11 +154,16 @@ func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provi
 // header phase; once we hand the response to readStream, mid-stream failures
 // surface as ChunkError without retry, since the model has already started
 // emitting tokens we'd otherwise duplicate.
+// maxAuthRetries bounds how many times a 401/403 is retried for a key that
+// has previously authenticated (transient auth failures from gateways).
+const maxAuthRetries = 2
+
 func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response, error) {
 	policy := provider.DefaultRetryPolicy()
 	rlPolicy := provider.RateLimitRetryPolicy()
 	var lastErr error
 	rateLimitCount := 0
+	authRetries := 0
 
 	// Use the larger of the two MaxAttempts so rate-limited requests get their
 	// full 5 attempts; non-retryable errors still exit early via IsRetryableStatus.
@@ -203,6 +210,7 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 			continue
 		}
 		if resp.StatusCode == http.StatusOK {
+			c.authed.Store(true)
 			return resp, nil
 		}
 		msg, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
@@ -212,7 +220,13 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			return nil, &provider.AuthError{Provider: c.name, KeyEnv: c.keyEnv, Status: resp.StatusCode}
+			authErr := &provider.AuthError{Provider: c.name, KeyEnv: c.keyEnv, Status: resp.StatusCode}
+			if c.authed.Load() && authRetries < maxAuthRetries {
+				authRetries++
+				lastErr = authErr
+				continue
+			}
+			return nil, authErr
 		}
 		statusErr := &httpStatusError{name: c.name, code: resp.StatusCode, body: strings.TrimSpace(string(msg))}
 		if !provider.IsRetryableStatus(resp.StatusCode) {

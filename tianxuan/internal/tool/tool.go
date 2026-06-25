@@ -91,21 +91,30 @@ func LookupBuiltin(name string) (Tool, bool) {
 type Registry struct {
 	tools  map[string]Tool
 	order  []string
-	hidden map[string]bool // V6.0 P8: hidden from schema but still callable
+	hidden map[string]bool            // V6.0 P8: hidden from schema but still callable
+	canon     map[string]json.RawMessage // V10.0: schema canonicalized once on Add, reused by Schemas()
+	suspended map[string]bool            // V10.0: MCP prefixes temporarily disabled per-session
 }
 
 // NewRegistry returns an empty registry.
 func NewRegistry() *Registry {
-	return &Registry{tools: map[string]Tool{}, hidden: map[string]bool{}}
+	return &Registry{tools: map[string]Tool{}, hidden: map[string]bool{}, canon: map[string]json.RawMessage{}, suspended: map[string]bool{}}
 }
 
 // Add inserts (or replaces) a tool, preserving first-seen order.
+// V10.0: canonicalizes the schema once here — Schemas() reuses the cached result.
 func (r *Registry) Add(t Tool) {
 	name := t.Name()
 	if _, ok := r.tools[name]; !ok {
 		r.order = append(r.order, name)
 	}
+	for prefix := range r.suspended {
+		if strings.HasPrefix(name, prefix) {
+			return // silently reject — prefix is suspended
+		}
+	}
 	r.tools[name] = t
+	r.canon[name] = provider.CanonicalizeSchema(t.Schema())
 }
 
 // Hide removes a tool from the model-visible schema list without unregistering it.
@@ -161,6 +170,7 @@ func (r *Registry) RemovePrefix(prefix string) int {
 	for _, name := range r.order {
 		if strings.HasPrefix(name, prefix) {
 			delete(r.tools, name)
+			delete(r.canon, name)
 			removed++
 			continue
 		}
@@ -168,6 +178,32 @@ func (r *Registry) RemovePrefix(prefix string) int {
 	}
 	r.order = kept
 	return removed
+}
+
+// SuspendPrefix unregisters every tool whose name starts with prefix, and
+// prevents future Add calls for that prefix until ResumePrefix is called.
+// Used for per-session MCP disables — an in-flight background handshake
+// may attempt to re-add tools for the suspended prefix.
+func (r *Registry) SuspendPrefix(prefix string) int {
+	r.suspended[prefix] = true
+	kept := r.order[:0]
+	removed := 0
+	for _, name := range r.order {
+		if strings.HasPrefix(name, prefix) {
+			delete(r.tools, name)
+			delete(r.canon, name)
+			removed++
+			continue
+		}
+		kept = append(kept, name)
+	}
+	r.order = kept
+	return removed
+}
+
+// ResumePrefix allows future Add calls for a previously suspended prefix.
+func (r *Registry) ResumePrefix(prefix string) {
+	delete(r.suspended, prefix)
 }
 
 // Get looks up a tool by name.
@@ -190,7 +226,7 @@ func (r *Registry) Names() []string {
 // When a tool implements CompactDescriptor, the compact versions are used
 // instead of the full Description + Schema, reducing per-turn prompt tokens.
 // V6.0 P8: hidden tools are excluded from the schema list.
-// V6.0 P8: hidden tools are excluded from the schema list.
+// V10.0: standard schemas use pre-canonicalized cache from Add().
 func (r *Registry) Schemas() []provider.ToolSchema {
 	return r.FilteredSchemas(nil)
 }
@@ -221,16 +257,23 @@ func (r *Registry) FilteredSchemas(names []string) []provider.ToolSchema {
 		}
 		t := r.tools[name]
 		desc := t.Description()
-		schema := t.Schema()
 		if cd, ok := t.(CompactDescriptor); ok {
 			desc = cd.CompactDescription()
-			schema = cd.CompactSchema()
+			schema := cd.CompactSchema()
+			// Compact schemas are context-dependent — canonicalize inline.
+			out = append(out, provider.ToolSchema{
+				Name:        t.Name(),
+				Description: desc,
+				Parameters:  provider.CanonicalizeSchema(schema),
+			})
+		} else {
+			// Standard schema — use pre-canonicalized cache from Add().
+			out = append(out, provider.ToolSchema{
+				Name:        t.Name(),
+				Description: desc,
+				Parameters:  r.canon[name],
+			})
 		}
-		out = append(out, provider.ToolSchema{
-			Name:        t.Name(),
-			Description: desc,
-			Parameters:  provider.CanonicalizeSchema(schema),
-		})
 	}
 	return out
 }

@@ -81,7 +81,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	// V6.0: �����ٻ����ѡ���������ʾģ�ͼ�����м���
 			a.maybeRecallReminder()
 
-			for step := 0; a.maxSteps <= 0 || step < a.maxSteps; step++ {
+			graceRound := false
+		for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
 		text, reasoning, signature, calls, usage, err := a.stream(ctx, step+1)
 		if err != nil {
 			a.preWG.Wait() // drain any in-flight pre-execution goroutines before returning
@@ -156,6 +157,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 
 		if len(calls) == 0 {
 			// V7.0: ��բ��ֹͣ������ֹģ����ǰֹͣ
+			// V10.0: Grace Round — model produced summary, done.
+			if graceRound {
+				return nil
+			}
+
 			// Gate 1: task gate �� ���δ�������
 			if a.taskGate() {
 				continue
@@ -221,6 +227,18 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		// V6.0 P2: �ظ������⡪������ 3 ����ͬ���ߵ���ʱע�� nudge
 		if a.detectRepeatedSteps(calls) {
 			continue // nudge injected, skip compaction and continue loop
+		}
+
+
+		// V10.0: Grace Round — when maxSteps is reached, give one extra final turn.
+		if a.maxSteps > 0 && step+1 >= a.maxSteps && !graceRound {
+			graceRound = true
+			nudge := "Do not call any more tools — your tool-call round limit (agent.max_steps) has been reached. Instead, synthesize a final answer from all the work already completed: summarize what was accomplished, what remains to be done, and any decisions the user should make."
+			a.session.Add(provider.Message{
+				Role:    provider.RoleUser,
+				Content: nudge,
+			})
+			continue
 		}
 
 			// V7.1: no mid-turn compaction �� cache grows monotonically within each turn

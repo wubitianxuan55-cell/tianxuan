@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import {
   Ban,
   Check,
@@ -36,7 +36,7 @@ function StatusGlyph({ status, recoverable }: { status: ToolItem["status"]; reco
 
 // ToolCard renders one tool call. V5.30: two-level expansion —
 // first click shows args/structure; second click (eye icon) shows full output.
-export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
+export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
   const t = useT();
   const compact = useCompact();
   const diffs = diffsFor(item.name, item.args);
@@ -180,4 +180,4 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
       </div>
     </div>
   );
-}
+});

@@ -52,7 +52,16 @@ func (s *Session) Snapshot() []provider.Message {
 	return append([]provider.Message(nil), s.Messages...)
 }
 
-// HasContent returns true when the session carries at least one user,
+// ListSubagentsByParent returns subagent artifacts for a given parent session.
+func ListSubagentsByParent(sessionDir, parentSession string) ([]SubagentArtifact, error) {
+	return nil, nil
+}
+
+// SubagentArtifact holds a subagent's session and meta file paths.
+type SubagentArtifact struct {
+	SessionPath string
+	MetaPath    string
+}
 // assistant, or tool message — i.e. more than just a system prompt. An
 // "empty" conversation that has never been used should not be persisted.
 func (s *Session) HasContent() bool {

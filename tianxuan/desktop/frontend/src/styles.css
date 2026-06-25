@@ -1536,3 +1536,9 @@ body::after {
 .tooltip:hover::after {
   opacity: 1;
 }
+
+/* ── anchored popover ────────────────────────────────────────── */
+.anchored-popover {
+  position: fixed;
+  z-index: 50;
+}

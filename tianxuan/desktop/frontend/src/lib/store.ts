@@ -166,9 +166,23 @@ const initialState: ControllerState = {
 export const useStore = create<ControllerState>()((set) => ({ ...initialState, _dispatch: (a: Action) => set((s) => reducer(s, a)) } as ControllerState));
 
 export function useController() {
-  const store = useStore;
-  const state = store(s => s);
-  const dispatch = store.getState()._dispatch;
+  const dispatch = useStore.getState()._dispatch;
+  // 独立字段订阅 — 每个字段只在其值变化时才触发重渲染
+  const items = useStore(s => s.items);
+  const running = useStore(s => s.running);
+  const turnActive = useStore(s => s.turnActive);
+  const meta = useStore(s => s.meta);
+  const context = useStore(s => s.context);
+  const usage = useStore(s => s.usage);
+  const balance = useStore(s => s.balance);
+  const jobs = useStore(s => s.jobs);
+  const approval = useStore(s => s.approval);
+  const ask = useStore(s => s.ask);
+  const perTurnUsage = useStore(s => s.perTurnUsage);
+  const turnSteps = useStore(s => s.turnSteps);
+  const turnStartAt = useStore(s => s.turnStartAt);
+  const turnTokens = useStore(s => s.turnTokens);
+  const sessionTotal = useStore(s => s.sessionTotal);
 
   const loadSessionData = useCallback(async () => {
     try {
@@ -214,10 +228,10 @@ export function useController() {
   }, [dispatch]);
 
   const cancel = useCallback((): string | undefined => {
-    const cur = store.getState();
+    const cur = useStore.getState();
     if (cur.running && cur.pendingUser !== undefined) { const text = cur.pendingUser; dispatch({ type: "unsend" }); app.Cancel().catch(() => {}); return text; }
     app.Cancel().catch(() => {}); return undefined;
-  }, [store, dispatch]);
+  }, [dispatch]);
 
   const approve = useCallback((id: string, allow: boolean, session: boolean) => { dispatch({ type: "clearApproval" }); app.Approve(id, allow, session).catch(() => {}); }, [dispatch]);
   const answerQuestion = useCallback((id: string, answers: QuestionAnswer[]) => { dispatch({ type: "clearAsk" }); app.AnswerQuestion(id, answers).catch(() => {}); }, [dispatch]);
@@ -240,5 +254,5 @@ export function useController() {
   const saveDoc = useCallback(async (path: string, body: string) => { await app.SaveDoc(path, body).catch(() => {}); }, []);
   const rewind = useCallback(async (turn: number, scope: string) => { if (scope === "fork") await app.Fork(turn).catch(() => {}); else if (scope === "summ-from") await app.SummarizeFrom(turn).catch(() => {}); else if (scope === "summ-upto") await app.SummarizeUpTo(turn).catch(() => {}); else await app.Rewind(turn, scope).catch(() => {}); const ms = await app.History().catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
 
-  return { state, send, cancel, approve, answerQuestion, setPlan, setBypass, setAgentMode, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc };
+  return { items, running, turnActive, meta, context, usage, balance, jobs, approval, ask, perTurnUsage, turnSteps, turnStartAt, turnTokens, sessionTotal, send, cancel, approve, answerQuestion, setPlan, setBypass, setAgentMode, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc };
 }

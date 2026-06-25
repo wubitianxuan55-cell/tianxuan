@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronDown,
@@ -110,7 +110,7 @@ function formatBytes(n: number): string {
   return `${n} B`;
 }
 
-export function WorkspacePanel({
+export const WorkspacePanel = memo(function WorkspacePanel({
   open,
   cwd,
   maximized,
@@ -601,4 +601,4 @@ export function WorkspacePanel({
       </section>
     </aside>
   );
-}
+});

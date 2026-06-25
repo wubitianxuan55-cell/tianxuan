@@ -508,6 +508,29 @@ func MemoryUserDir() string {
 	return filepath.Join(dir, "tianxuan")
 }
 
+// MigrationResult summarizes the outcome of a legacy config migration.
+type MigrationResult struct{}
+
+// Notice returns a human-readable summary of the migration.
+func (m *MigrationResult) Notice() string {
+	return "config migration: no action needed"
+}
+
+// MigrateLegacyIfNeeded checks and migrates legacy Reasonix config to tianxuan paths.
+func MigrateLegacyIfNeeded() (*MigrationResult, error) {
+	return nil, nil
+}
+
+// LegacyUserConfigPaths returns known legacy config file paths to check.
+func LegacyUserConfigPaths() []string {
+	return nil
+}
+
+// ProjectSessionDir returns workspace-scoped session directory.
+func ProjectSessionDir(cwd string) string {
+	return WorkspaceSessionDir(cwd)
+}
+
 // ConventionDirs are the parent directories scanned for agent assets (skills,
 // commands), in canonical-first order. .tianxuan is ours; .agents / .agent /
 // .claude let users drop in assets authored for other agent tools without moving

@@ -71,7 +71,8 @@ function NewSessionToast({ done }: { done: boolean }) {
 
 export default function App() {
   const {
-    state,
+    items, running, meta, context, usage, balance, jobs,
+    approval, ask, perTurnUsage, turnSteps, turnStartAt, turnTokens, sessionTotal,
     send,
     cancel,
     approve,
@@ -108,7 +109,7 @@ export default function App() {
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
-  const splashHold = !(state.meta?.ready ?? false);
+  const splashHold = !(meta?.ready ?? false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const {
@@ -130,16 +131,16 @@ export default function App() {
     onReconnect(() => { refreshMeta(); });
   }, [onReconnect, refreshMeta]);
 
-  const { todoItem, todos, showTodos, setDismissedTodo } = useTodoExtractor(state.items);
+  const { todoItem, todos, showTodos, setDismissedTodo } = useTodoExtractor(items);
 
-  const planMarkdown = usePlanExtractor(state.items);
+  const planMarkdown = usePlanExtractor(items);
 
   useEffect(() => {
-    if (!pendingPlanRevision || state.running) return;
+    if (!pendingPlanRevision || running) return;
     const text = pendingPlanRevision;
     setPendingPlanRevision(null);
     send(text);
-  }, [pendingPlanRevision, send, state.running]);
+  }, [pendingPlanRevision, send, running]);
 
   // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
   // panel reflects what landed on disk.
@@ -155,7 +156,7 @@ export default function App() {
   // custom commands, bare /model and the other read-only management verbs
   // (/skill, /hooks, /mcp) — goes straight to Submit, which the controller
   // resolves (a turn, or a listing Notice).
-  const cwd = state.meta?.cwd;
+  const cwd = meta?.cwd;
   const cwdName = cwd ? cwd.split(/[/\\]/).filter(Boolean).pop() || cwd : "";
 
   const handleSend = useCallback(
@@ -201,7 +202,7 @@ export default function App() {
   // 表现为统计面板全部清零。侧边栏列表由用户显式操作驱动刷新。
   useEffect(() => {
     // sidebar session list refresh is driven by explicit user actions
-  }, [state.running, state.items.length, refreshSessions]);
+  }, [running, items.length, refreshSessions]);
 
 
   // History drawer: opening fetches the saved-session list; picking one resumes it
@@ -264,7 +265,7 @@ export default function App() {
       const ke = e as globalThis.KeyboardEvent;
       const mod = ke.ctrlKey || ke.metaKey, t = ke.target as HTMLElement;
       const inInput = t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable;
-      if (ke.key === "Escape" && !inInput && !state.running) {
+      if (ke.key === "Escape" && !inInput && !running) {
         if (capsOpen) { ke.preventDefault(); setCapsOpen(false); return; }
         if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); return; }
         if (memView !== null) { ke.preventDefault(); setMemView(null); return; }
@@ -274,7 +275,7 @@ export default function App() {
         return;
       }
       if (!mod) return;
-      if (ke.key === "n" && !state.running) { ke.preventDefault(); void startNewSession(); return; }
+      if (ke.key === "n" && !running) { ke.preventDefault(); void startNewSession(); return; }
       if (ke.key === "k") { ke.preventDefault(); setPaletteOpen(true); return; }
       if (ke.key === ",") { ke.preventDefault(); setSettingsOpen(true); return; }
       if (ke.key === "M" && ke.shiftKey) { ke.preventDefault(); void openMemory(); return; }
@@ -284,7 +285,7 @@ export default function App() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [state.running, capsOpen, settingsOpen, memView, histView, showPlan, workspacePanelOpen]);
+  }, [running, capsOpen, settingsOpen, memView, histView, showPlan, workspacePanelOpen]);
 
   const sidebarToggleTitle = sidebarExpandBlocked
     ? t("sidebar.expandBlocked")
@@ -292,7 +293,7 @@ export default function App() {
       ? t("sidebar.expand")
       : t("sidebar.collapse");
 
-  const { toolCounts, skillCounts } = useToolStats(state.items);
+  const { toolCounts, skillCounts } = useToolStats(items);
 
   // 当前会话标识：直接使用 Go 后端生成的 .jsonl 文件路径作为 key。
   // 每个会话文件对应唯一的 localStorage key：新会话自然空数据开始，
@@ -387,8 +388,8 @@ export default function App() {
             }`}
             style={{boxShadow: "var(--ds-shadow-accent-btn)"}}
             onClick={() => void startNewSession()}
-            disabled={state.running}
-            title={state.running ? t("common.busyHint") : t("topbar.newSession")}
+            disabled={running}
+            title={running ? t("common.busyHint") : t("topbar.newSession")}
           >
             <SquarePen size={15} />
             {!sidebarCollapsed && <span>{t("topbar.newSession")}</span>}
@@ -402,8 +403,8 @@ export default function App() {
                 <button
                   className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
                   onClick={() => void openHistory()}
-                  disabled={state.running}
-                  title={state.running ? t("common.busyHint") : t("topbar.history")}
+                  disabled={running}
+                  title={running ? t("common.busyHint") : t("topbar.history")}
                 >
                   {t("sidebar.viewAll")}
                 </button>
@@ -422,7 +423,7 @@ export default function App() {
                       }`}
                       key={session.path}
                     >
-                      <button className="flex items-start gap-2.5 flex-1 min-w-0 bg-transparent border-0 text-inherit cursor-pointer py-1 text-left disabled:cursor-default" onClick={() => void onResumeSession(session.path)} disabled={state.running||session.current} title={session.path}>
+                      <button className="flex items-start gap-2.5 flex-1 min-w-0 bg-transparent border-0 text-inherit cursor-pointer py-1 text-left disabled:cursor-default" onClick={() => void onResumeSession(session.path)} disabled={running||session.current} title={session.path}>
                         <MessageSquare size={14} className={`shrink-0 mt-0.5 ${session.current ? "text-accent" : "text-fg-faint"}`} />
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-[12.5px] leading-[1.35] font-medium ${session.current ? "text-accent" : ""}`}>{sessionTitle(session, t("history.emptySession"))}</span>
@@ -462,8 +463,8 @@ export default function App() {
             <button
               className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-40 disabled:cursor-default ${sidebarCollapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
               onClick={() => setSettingsOpen(true)}
-              disabled={state.running}
-              title={state.running ? t("common.busyHint") : t("topbar.settings")}
+              disabled={running}
+              title={running ? t("common.busyHint") : t("topbar.settings")}
             >
               <SettingsIcon size={15} />
               {!sidebarCollapsed && <span>{t("topbar.settings")}</span>}
@@ -488,10 +489,10 @@ export default function App() {
         <section className="chat-pane">
           <header className="flex flex-shrink-0 items-center gap-3 px-12 border-b border-border-soft select-none drag-region transition-all duration-200" style={{background: "var(--ds-gradient-topbar)", boxShadow: "var(--ds-shadow-topbar)"}}>
             <div className="flex items-center gap-2 min-w-0">
-              <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
+              <ModelSwitcher label={meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
             <div className="flex items-center gap-2 px-3">
-              {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
+              {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
               <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
                 {(["fast", "normal", "deep"] as const).map(level => (
                   <button
@@ -500,7 +501,7 @@ export default function App() {
                       thinkLevel === level ? "text-accent font-semibold bg-accent/15 shadow-[inset_0_1px_2px_var(--accent-soft)]" : ""
                     }`}
                     onClick={() => handleThinkLevelChange(level)}
-                    disabled={state.running}
+                    disabled={running}
                     title={level === "fast" ? "快速思考" : level === "normal" ? "标准思考" : "深度思考"}
                   >
                     {level === "fast" ? "快速" : level === "normal" ? "标准" : "深度"}
@@ -511,26 +512,26 @@ export default function App() {
             <div className="flex-1" />
             <div className="flex items-center gap-2">
               <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
-              <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
-              <ToolbarButton onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
+              <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(items))} disabled={items.length===0}>导出</ToolbarButton>
+              <ToolbarButton onClick={() => void startNewSession()} disabled={running||items.length===0}>清空</ToolbarButton>
               <ThemeSwitcher theme={themeNow} onSet={applyTheme} onStore={setTheme} />
             </div>
           </header>
 
-          {state.meta?.startupErr && (
-            <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("topbar.startupError", { msg: state.meta.startupErr })}</div>
+          {meta?.startupErr && (
+            <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("topbar.startupError", { msg: meta.startupErr })}</div>
           )}
 
           <UpdateBanner />
           <NewSessionToast done={newSessionDone} />
           <main className="main">
             <CompactContext.Provider value={compactMode}>
-            {(state.meta?.ready === false && !state.meta?.startupErr) || switchingModel ? (
+            {(meta?.ready === false && !meta?.startupErr) || switchingModel ? (
               <Skeleton />
             ) : (
               <>
-                <Transcript items={state.items} onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
-                {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />}
+                <Transcript items={items} onPrompt={send} onRewind={rewind} running={running} onThreadEl={setThreadEl} onScrollToTurnReady={setScrollToTurn} cwd={meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={meta} />
+                {items.length > 1 && <JumpBar items={items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />}
               </>
             )}
             </CompactContext.Provider>
@@ -541,8 +542,8 @@ export default function App() {
             {showTodos && <TodoPanel todos={todos} onDismiss={() => setDismissedTodo(todoItem!.id)} />}
             <div className="composer-glow">
             <Composer
-              running={state.running}
-              cwd={state.meta?.cwd}
+              running={running}
+              cwd={meta?.cwd}
               onSend={handleSend}
               onCancel={cancel}
               agentMode={agentMode}
@@ -550,22 +551,22 @@ export default function App() {
               yolo={yolo}
               onToggleYolo={toggleYolo}
               onPickFolder={switchFolder}
-              disabled={state.meta?.ready === false || state.approval != null}
+              disabled={meta?.ready === false || approval != null}
             />
             </div>
             <StatusBar
-              context={state.context}
-              usage={state.usage}
-              balance={state.balance}
-              jobs={state.jobs}
-              running={state.running}
+              context={context}
+              usage={usage}
+              balance={balance}
+              jobs={jobs}
+              running={running}
               agentMode={agentMode}
               yolo={yolo}
               bridgeAlive={bridgeAlive}
-              turnStartAt={state.turnStartAt}
-              turnTokens={state.turnTokens}
-              sessionTotal={state.sessionTotal}
-              model={state.meta?.label}
+              turnStartAt={turnStartAt}
+              turnTokens={turnTokens}
+              sessionTotal={sessionTotal}
+              model={meta?.label}
             />
             </CompactContext.Provider>
           </footer>
@@ -628,7 +629,7 @@ export default function App() {
             {rightTab === "files" ? (
               <WorkspacePanel
                 open={workspacePanelOpen}
-                cwd={state.meta?.cwd}
+                cwd={meta?.cwd}
                 maximized={workspacePanelMaximized}
                 panelWidth={workspacePanelMaximized ? viewportWidth - effectiveSidebarWidth : effectiveWorkspacePanelWidth}
                 onClose={() => setWorkspacePanel(false)}
@@ -644,34 +645,32 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel usage={usage} perTurnUsage={perTurnUsage} turnSteps={turnSteps} context={context} model={meta?.label} sessionKey={currentSessionKey} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
           </div>
         </div>
       )}
 
-      {state.approval && (
+      {approval && (
           <ApprovalModal
-            approval={state.approval}
+            approval={approval}
             onAnswer={(allow, session) => {
-              // Approving an exit_plan_mode plan leaves plan mode (the controller
-              // flips the executor internally; V9.0 unified mode stays unchanged).
-              if (state.approval!.tool === "exit_plan_mode" && allow) { /* backend handles */ }
-              approve(state.approval!.id, allow, session);
+              if (approval!.tool === "exit_plan_mode" && allow) { /* backend handles */ }
+              approve(approval!.id, allow, session);
             }}
             onRevisePlan={(text) => {
               setPendingPlanRevision(text);
-              approve(state.approval!.id, false, false);
+              approve(approval!.id, false, false);
             }}
           />
         )}
       </div>
 
-      {state.ask && (
+      {ask && (
         <AskCard
-          ask={state.ask}
+          ask={ask}
           onAnswer={answerQuestion}
-          onDismiss={() => answerQuestion(state.ask!.id, [])}
+          onDismiss={() => answerQuestion(ask!.id, [])}
         />
       )}
 

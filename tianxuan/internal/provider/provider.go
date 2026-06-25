@@ -248,6 +248,16 @@ func (p *Pricing) Symbol() string {
 	return p.Currency
 }
 
+// MemoryCitation is a reference to a memory entry for frontend display.
+type MemoryCitation struct {
+	ID        string
+	Source    string
+	LineStart int
+	LineEnd   int
+	Note      string
+	Kind      string
+}
+
 // Chunk is a single streamed event. Read the field matching Type.
 type Chunk struct {
 	Type      ChunkType

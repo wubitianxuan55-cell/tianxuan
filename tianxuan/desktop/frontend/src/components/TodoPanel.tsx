@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Circle, Loader, X } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -16,7 +16,7 @@ const statusIcon = (status: string) => {
   }
 };
 
-export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () => void }) {
+export const TodoPanel = memo(function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () => void }) {
   const t = useT();
   const compact = useCompact();
   const [open, setOpen] = useState(true);
@@ -112,4 +112,4 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
       </ul>
     </div>
   );
-}
+});

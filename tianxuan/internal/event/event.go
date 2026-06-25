@@ -11,7 +11,11 @@
 // line prefixes — fragile, and lossy for any frontend richer than a terminal.
 package event
 
-import "tianxuan/internal/provider"
+import (
+	"tianxuan/internal/evidence"
+	"tianxuan/internal/nilutil"
+	"tianxuan/internal/provider"
+)
 
 // Kind tags an Event. Read the field(s) documented for that kind.
 type Kind int
@@ -63,6 +67,27 @@ const (
 	// Summary so the placeholder still resolves. Replaces the older plain Notice
 	// so a sink can render a distinct, expandable card.
 	CompactionDone
+	// ToolProgress streams a chunk of a still-running tool's combined output
+	// (Tool: ID + Output = the new chunk). Emitted between ToolDispatch and
+	// ToolResult for long tools like bash so a frontend can show live progress.
+	ToolProgress
+	// MCPSurfaceReady fires once per server when its background-loaded surface
+	// (prompts or resources) finishes after startup. Lets UIs refresh /mcp
+	// status without polling. Text carries "<server>: <surface> ready (<count>
+	// items)".
+	MCPSurfaceReady
+	// Retrying fires before each backoff sleep while the provider re-attempts the
+	// connection+header phase after a transient failure (RetryAttempt of RetryMax).
+	Retrying
+	// Steer fires when a mid-turn steer message is consumed from the queue and
+	// injected as a user message.
+	Steer
+	// MemoryCompilerStatsEvent carries content-free Memory v5 participation metrics.
+	MemoryCompilerStatsEvent
+	// GuardianAssessment reports the outcome of a guardian sub-agent safety review.
+	GuardianAssessment
+	// KindCount is a sentinel one past the last real Kind.
+	KindCount
 )
 
 // Level classifies a Notice so sinks can style or filter it.
@@ -73,110 +98,177 @@ const (
 	LevelWarn
 )
 
-// Tool describes a tool call for ToolDispatch / ToolResult events. On dispatch
-// only ID/Name/Args/ReadOnly are set; on result Output/Err/Truncated are filled
-// in. Args is the raw JSON arguments — a sink compacts it for display.
-type Tool struct {
-	ID        string
-	Name      string
-	Args      string
-	Output    string // ToolResult: the result text fed to the model
-	Err       string // ToolResult: non-empty when the call failed or was blocked
-	// Recoverable is true when the error is one the agent can fix on the next
-	// turn (bad arguments, wrong file path, command exit code) — not a genuine
-	// system fault (unknown tool, permission block, panic). Frontends render
-	// recoverable errors muted (strikethrough, no red) so the user isn't alarmed.
-	Recoverable bool
-	ReadOnly  bool
-	Truncated bool // ToolResult: Output was head+tailed before display/model
-	// Partial marks an early ToolDispatch emitted when a call begins (ID/Name set,
-	// Args still streaming) so a frontend can show the card immediately; a second,
-	// full ToolDispatch (Partial false, Args set) follows when the call completes.
-	Partial bool
-	// ParentID, when set, is the ID of the tool call that spawned this one — a
-	// sub-agent's calls carry the parent `task` call's ID so a frontend can nest
-	// them under it. Empty for top-level calls.
-	ParentID string
+// Profile carries the subagent model/effort resolved for this call.
+type Profile struct {
+	Model  string
+	Effort string
 }
 
-// Approval identifies a pending tool-call approval for an ApprovalRequest
-// event. ID correlates the request with the controller's Approve(ID, …) reply.
+// Tool describes a tool call for ToolDispatch / ToolResult events.
+type Tool struct {
+	ID         string
+	Name       string
+	Args       string
+	Output     string
+	Err        string
+	Recoverable bool
+	ReadOnly   bool
+	Truncated  bool
+	DurationMs int64
+	Partial   bool
+	ParentID  string
+	FileDiff
+	Profile *Profile
+}
+
+// FileDiff is a previewed change carried on a writer tool call.
+type FileDiff struct {
+	Diff    string
+	Added   int
+	Removed int
+}
+
+// Approval identifies a pending tool-call approval.
 type Approval struct {
 	ID      string
 	Tool    string
 	Subject string
+	Reason  string
 }
 
-// AskOption is one choice the user can pick for an AskQuestion.
+// AskOption is one choice the user can pick.
 type AskOption struct {
 	Label       string
-	Description string // optional one-line explanation shown under the label
+	Description string
 }
 
-// AskQuestion is one structured question the `ask` tool puts to the user.
+// AskQuestion is one structured question.
 type AskQuestion struct {
-	ID      string // stable per-question id, so answers correlate back
-	Header  string // short label (the tab title)
-	Prompt  string // the question text
+	ID      string
+	Header  string
+	Prompt  string
 	Options []AskOption
-	Multi   bool // allow selecting more than one option
+	Multi   bool
 }
 
-// Ask carries an AskRequest: a batch of questions and the ID that correlates the
-// controller's AnswerQuestion(ID, …) reply.
+// Ask carries an AskRequest.
 type Ask struct {
 	ID        string
 	Questions []AskQuestion
 }
 
-// Compaction carries a context-compaction pass for the CompactionStarted /
-// CompactionDone events. On CompactionStarted only Trigger is set. On
-// CompactionDone, Messages/Summary/Archive are filled in (an aborted pass leaves
-// Summary empty). Trigger is "auto" (the prompt reached the window threshold) or
-// "manual" (the user ran /compact).
+// Compaction carries a context-compaction pass.
 type Compaction struct {
-	Trigger  string // "auto" | "manual"
-	Messages int    // Done: how many messages were folded into the summary
-	Summary  string // Done: the briefing the agent keeps relying on
-	Archive  string // Done: path the dropped originals were archived to ("" if none)
-	Quality  string // V3.2: post-hoc quality assessment (human-readable one-liner)
+	Trigger  string
+	Messages int
+	Summary  string
+	Archive  string
 }
 
-// AskAnswer is the user's reply to one AskQuestion: the chosen option label(s)
-// (a free-typed answer is carried as a single Selected entry).
+// GuardianResult carries the outcome of a guardian sub-agent safety review.
+type GuardianResult struct {
+	ID                string
+	Tool              string
+	Subject           string
+	Outcome           string
+	RiskLevel         string
+	UserAuthorization string
+	Rationale         string
+	DurationMs        int64
+	Usage             *provider.Usage
+	Pricing           *provider.Pricing
+}
+
+// AskAnswer is the user's reply to one AskQuestion.
 type AskAnswer struct {
 	QuestionID string
 	Selected   []string
 }
 
-// Event is one increment in a turn's event stream. Read the field(s) documented
-// for Kind; the others are zero.
-type Event struct {
-	Kind      Kind
-	Text      string            // Reasoning / Text / Message / Notice / Phase
-	Reasoning string            // Message: the full reasoning chain
-	Tool      Tool              // ToolDispatch / ToolResult
-	Usage     *provider.Usage   // Usage
-	Pricing   *provider.Pricing // Usage: for cost display (nil = omit cost)
-	// SessionHit/SessionMiss carry cumulative cache tokens across the whole
-	// session (Usage events only), so a frontend can show the aggregate hit-rate
-	// — which doesn't crater on a short turn or after compaction — alongside
-	// Usage's single-turn numbers.
-	SessionHit  int        // Usage: cumulative cache-hit prompt tokens this session
-	SessionMiss int        // Usage: cumulative cache-miss prompt tokens this session
-	Turn        int        // Usage: 会话 API 调用轮次（从 1 开始，由 AgentRunner 维护）
-	Level       Level      // Notice
-	Approval    Approval   // ApprovalRequest
-	Ask         Ask        // AskRequest
-	Err         error      // TurnDone: non-nil on failure
-	Compaction  Compaction // Compaction
+// CacheDiagnostics describes whether and why the cacheable prefix changed.
+type CacheDiagnostics struct {
+	PrefixHash          string
+	PrefixChanged       bool
+	PrefixChangeReasons []string
+	SystemHash          string
+	ToolsHash           string
+	LogRewriteVersion   int
+	ToolSchemaTokens    int
+	CacheMissTokens     int
+	CacheHitTokens      int
 }
 
-// Sink consumes a turn's events. The agent calls Emit serially from its run
-// loop (tool execution may fan out across goroutines, but emission does not),
-// so an implementation need not be safe for concurrent Emit. Emit must not
-// block indefinitely — a channel-backed sink should be buffered or drained by
-// a live reader.
+// Usage source constants for billable call tracking.
+const (
+	UsageSourceExecutor   = "executor"
+	UsageSourcePlanner    = "planner"
+	UsageSourceSubagent   = "subagent"
+	UsageSourceCompaction = "compaction"
+	UsageSourceClassifier = "classifier"
+	UsageSourceTitle      = "title"
+)
+
+// Event is one increment in a turn's event stream.
+type Event struct {
+	Kind             Kind
+	Text             string
+	Reasoning        string
+	MemoryCitations  []provider.MemoryCitation
+	MemoryCompiler   *MemoryCompilerStats
+	Tool             Tool
+	Usage            *provider.Usage
+	Pricing          *provider.Pricing
+	Source           string
+	UsageSource      string
+	CacheDiagnostics *CacheDiagnostics
+	SessionHit       int
+	SessionMiss      int
+	Turn             int
+	Level            Level
+	Approval         Approval
+	Ask              Ask
+	Err              error
+	Compaction       Compaction
+	Guardian         GuardianResult
+	RetryAttempt     int
+	RetryMax         int
+}
+
+// MemoryCompilerStats is limited to counts and token estimates.
+// It must never carry memory text, prompts, tool output, paths, or IDs.
+type MemoryCompilerStats struct {
+	Injected         bool
+	UsefulIR         bool
+	CompiledTokens   int
+	IROverheadTokens int
+	MemoryReferences int
+	Constraints      int
+	RiskNotes        int
+	ExecutionSteps   int
+	TotalNodes       int
+	HighSignalNodes  int
+	ToolResultNodes  int
+	DecisionNodes    int
+	StrategyCount    int
+	LearningCount    int
+}
+
+// ReadinessAuditSink is an optional sink capability.
+type ReadinessAuditSink interface {
+	RecordReadinessAudit(evidence.ReadinessAudit)
+}
+
+// RecordReadinessAudit forwards a readiness audit receipt to sinks that opt in.
+func RecordReadinessAudit(s Sink, a evidence.ReadinessAudit) {
+	if nilutil.IsNil(s) {
+		return
+	}
+	if rs, ok := s.(ReadinessAuditSink); ok {
+		rs.RecordReadinessAudit(a)
+	}
+}
+
+// Sink consumes a turn's events.
 type Sink interface {
 	Emit(Event)
 }
@@ -191,6 +283,5 @@ func (f FuncSink) Emit(e Event) {
 	}
 }
 
-// Discard is a Sink that drops every event. Useful in tests and for runs that
-// only care about the final session state.
+// Discard is a Sink that drops every event.
 var Discard Sink = FuncSink(func(Event) {})

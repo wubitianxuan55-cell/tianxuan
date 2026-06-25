@@ -1,4 +1,75 @@
-## [8.23.0] — 2026-06-22
+## [9.4.0] — 2026-06-25
+
+### 🚀 V9.4.0: V1.12.0 功能对齐 — 后端模块移植 + 前端组件补齐 + 渲染性能优化
+
+> 基于 V9.3.0 · 多轮会话累计 40+ 新文件
+
+#### 后端新模块（移植自 DeepSeek-Reasonix V1.12.0）
+
+| 模块 | 说明 |
+|------|------|
+| `internal/system` | 架构锁、系统合约、v6 隔离 |
+| `internal/store` | 会话持久化路径统一管理 |
+| `internal/planmode` | Plan 模式策略门控 + Marker + bash 安全检查 |
+| `internal/eventwire` | V1.12.0 完整前端事件 JSON 合约 |
+| `internal/fileref` | 文件引用搜索 |
+| `internal/mcpdiag` | MCP 服务器认证诊断 |
+| `internal/controlsemantics` | 控制层类型、语义路由、验证器、层守卫（4 子包） |
+| `internal/controlplane` | 分布式控制平面：仲裁、共识、控制图、控制器节点、动态权重（5 子包） |
+| `internal/equilibrium` | 全局均衡器：收敛检测、震荡探测、稳定窗口、反中心化守卫（5 子包） |
+| `internal/memorycompiler` | Memory v5 编译器核心 Runtime + Compile 方法 + 完整类型体系（60+ 类型） |
+| `internal/fileutil` | AtomicWriteFile 工具 |
+| `internal/fileutil/encoding` | GBK/GB18030/UTF-16 编码检测与转换 |
+| `internal/migration` | 旧版本配置和会话迁移工具 |
+| `runtime/*` (5 桩包) | canary, resource, rollback, sandbox, snapshot 类型桩 |
+
+#### 基础类型扩展
+
+| 包 | 扩展内容 |
+|------|---------|
+| `internal/event` | +6 事件类型（ToolProgress/Retrying/Steer/Guardian/MemoryCompiler/MCPSurfaceReady）、GuardianResult、CacheDiagnostics、MemoryCompilerStats |
+| `internal/provider` | + MemoryCitation |
+| `internal/evidence` | + ReadinessAudit |
+| `internal/config` | + MigrationResult、MigrateLegacyIfNeeded 等 |
+| `internal/agent/branch.go` | + BranchMeta 字段扩展（Scope/WorkspaceRoot/TopicTitle 等）、DefaultScope |
+| `internal/agent/migrate.go` | + v0.x→v1+ 会话迁移引擎（30KB） |
+| `internal/agent/session.go` | + ListSubagentsByParent |
+
+#### 前端新组件
+
+| 组件 | 说明 |
+|------|------|
+| `AnchoredPopover.tsx` | 通用定位弹出框（Portal 渲染 + ResizeObserver + 动画阶段管理） |
+| `ContextMenu.tsx` | 右键菜单（Portal 渲染 + 键盘导航） |
+| `EffortSwitcher.tsx` | 思考力度切换器（快速/标准/深度） |
+
+#### 渲染性能优化
+
+- **Zustand Store**: `useController()` 从全量 `store(s => s)` 改为 14 个独立字段选择器
+- **React.memo**: 9 个高频组件添加浅比较保护（Transcript/Composer/StatusBar/JumpBar/ToolCard/ModelSwitcher/TodoPanel/WorkspacePanel/StatsPanel）
+- **App.tsx**: 全部 40+ 处 `state.xxx` 引用替换为独立变量
+
+#### 缓存破坏验证
+
+```
+✅ L1 系统提示词: 零修改 (boot/)
+✅ L2 运行时上下文: 零修改 (agent.go)
+✅ 工具注册表: 零修改 (tool/)
+✅ 全量编译通过 (go build ./...)
+```
+
+## [9.3.0] — 2026-06-25
+
+### 🔧 修复滚动锁定 + 模型下拉方向 + JumpBar跳转失效
+
+#### 修复
+- **滚动锁定**: Transcript 自动滚动节流（100ms）+ rAF 兜底
+- **模型下拉方向**: 从 `bottom-full` 改为 `top-full`（弹出框朝下展开）
+- **JumpBar**: 使用虚拟滚动 `scrollToIndex` 替代 DOM 查询跳转
+
+#### 构建产物
+- release/v9.3.0/tianxuan.exe (16MB, CLI)
+- release/v9.3.0/tianxuan-desktop.exe (16MB, Wails)
 
 ### 🔙 V9.1/V9.2 精确摘除
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { ArrowUp, Check, ChevronDown, Clock, Eye, FileText, FolderGit2, FolderPlus, Search, Square, Trash2, X } from "lucide-react";
 import { app } from "../lib/bridge";
@@ -52,7 +52,7 @@ function loadComposerHeight(): number | null {
   return loadOptionalLayoutSize("composerHeight", clampComposerHeight);
 }
 
-export function Composer({
+export const Composer = memo(function Composer({
   running, cwd, onSend, onCancel, agentMode, onSetAgentMode, yolo, onToggleYolo, onPickFolder, disabled,
 }: {
   running: boolean; cwd?: string;
@@ -537,7 +537,7 @@ export function Composer({
       </div>
     </div>
   );
-}
+});
 
 /** 粘贴块操作按钮 */
 function ActionBtn({ title, danger, onClick, children }: { title: string; danger?: boolean; onClick: () => void; children: React.ReactNode }) {

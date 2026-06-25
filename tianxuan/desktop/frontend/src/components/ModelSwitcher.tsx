@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
@@ -6,7 +6,7 @@ import type { ModelInfo } from "../lib/types";
 
 // ModelSwitcher is the header model picker: the model label becomes a button
 // that opens a dropdown listing configured providers.
-export function ModelSwitcher({ label, onPick }: { label: string; onPick: (name: string) => void }) {
+export const ModelSwitcher = memo(function ModelSwitcher({ label, onPick }: { label: string; onPick: (name: string) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -48,4 +48,4 @@ export function ModelSwitcher({ label, onPick }: { label: string; onPick: (name:
       )}
     </div>
   );
-}
+});

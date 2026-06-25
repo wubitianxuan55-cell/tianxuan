@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Gauge, TrendingUp, Zap } from "lucide-react";
 import type { WireUsage, ContextInfo } from "../lib/types";
 
@@ -124,7 +124,7 @@ function HitPct({ hit, total }: { hit: number; total: number }) {
   );
 }
 
-export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, toolCounts, skillCounts }: {
+export const StatsPanel = memo(function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, toolCounts, skillCounts }: {
   usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string;
   sessionKey: string; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
 }) {
@@ -508,4 +508,4 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
       )}
     </div>
   );
-}
+});

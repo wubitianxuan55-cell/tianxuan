@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Cpu, Wallet, Coins } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
@@ -92,7 +92,7 @@ function JobsChip({ jobs }: { jobs: JobView[] }) {
 
 // ─── StatusBar ──────────────────────────────────────────────────
 
-export function StatusBar({
+export const StatusBar = memo(function StatusBar({
   context, usage, balance, jobs, running, agentMode, yolo, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
 }: {
   context: ContextInfo;
@@ -269,4 +269,4 @@ export function StatusBar({
       </div>
     </div>
   );
-}
+});

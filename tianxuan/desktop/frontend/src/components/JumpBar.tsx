@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { memo, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import type React from "react";
 import type { Item } from "../lib/store";
 
@@ -13,7 +13,7 @@ interface JumpBarProps {
  * 显示轮次编号。↑↓ 键盘导航，点击滚动到对应轮次。
  * 轮次超过 15 时容器可滚动，始终显示活跃轮次。
  */
-export function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
+export const JumpBar = memo(function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
   const [active, setActive] = useState<number | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
@@ -122,4 +122,4 @@ export function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
       </div>
     </div>
   );
-}
+});

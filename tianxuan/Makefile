@@ -5,7 +5,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # with any change to the integration in internal/codegraph.
 CODEGRAPH_VERSION := v0.9.7
 
-.PHONY: build vet fmt test hooks cross clean e2e-codegraph
+.PHONY: build vet fmt test hooks cross clean e2e-codegraph wails-desktop wails-desktop-upx
 
 build:
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan ./cmd/tianxuan
@@ -31,6 +31,19 @@ cross:
 		echo "build $$os/$$arch"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" -o dist/tianxuan-$$os-$$arch$$ext ./cmd/tianxuan; \
 	done
+
+# wails-desktop builds the Wails desktop app with stripped symbols.
+# Requires: pnpm (frontend), wails CLI v2.12+.
+wails-desktop:
+	cd desktop/frontend && npx vite build
+	cd desktop && wails build -ldflags "$(LDFLAGS)"
+	@echo "Desktop: build/bin/tianxuan-desktop.exe"
+
+# wails-desktop-upx builds the desktop app and compresses with UPX.
+# Requires: upx (https://upx.github.io/).
+wails-desktop-upx: wails-desktop
+	upx --best --lzma desktop/build/bin/tianxuan-desktop.exe
+	@echo "Desktop: build/bin/tianxuan-desktop.exe (UPX compressed)"
 
 clean:
 	rm -rf bin dist

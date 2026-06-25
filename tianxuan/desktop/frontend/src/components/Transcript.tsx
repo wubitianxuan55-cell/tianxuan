@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown } from "lucide-react";
 import gsap from "gsap";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
@@ -65,7 +65,7 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
   return out;
 }
 
-export function Transcript({
+export const Transcript = memo(function Transcript({
   items,
   onPrompt,
   onRewind,
@@ -350,7 +350,7 @@ export function Transcript({
       )}
     </div>
   );
-}
+});
 
 type CompactionItem = Extract<Item, { kind: "compaction" }>;
 

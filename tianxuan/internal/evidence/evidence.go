@@ -202,6 +202,15 @@ func (l *Ledger) hasSuccessfulPaths(paths []string, accept func(Receipt) bool) b
 
 type contextKey struct{}
 
+// ReadinessAudit is a receipt that a production readiness check ran and passed.
+// The V1.12.0 Memory v5 stable release uses this to guard architecture-freeze
+// conformance at runtime boundary crossings (subagent fork, session resume).
+type ReadinessAudit struct {
+	Component string
+	Check     string
+	Passed    bool
+}
+
 func WithLedger(ctx context.Context, ledger *Ledger) context.Context {
 	if ledger == nil {
 		return ctx

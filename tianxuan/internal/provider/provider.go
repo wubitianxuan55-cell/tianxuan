@@ -302,9 +302,11 @@ type Config struct {
 // surface it verbatim instead of dumping a raw status body. Providers should
 // return this (rather than a generic status error) for auth failures.
 type AuthError struct {
-	Provider string // the provider instance name, e.g. "deepseek"
-	KeyEnv   string // the api_key_env the key is read from, when known
-	Status   int    // the HTTP status (401 or 403)
+	Provider  string // the provider instance name, e.g. "deepseek"
+	KeyEnv    string // the api_key_env the key is read from, when known
+	KeySource string // human-readable description of where the key was configured
+	HasKey    bool   // whether a key value was actually present
+	Status    int    // the HTTP status (401 or 403)
 }
 
 func (e *AuthError) Error() string {

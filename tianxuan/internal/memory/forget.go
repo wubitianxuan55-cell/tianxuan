@@ -44,7 +44,7 @@ func (t forgetTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 	if in.Name == "" {
 		return "", fmt.Errorf("name is required")
 	}
-	if err := t.store.Delete(in.Name); err != nil {
+	if _, err := t.store.Archive(in.Name); err != nil {
 		return "", err
 	}
 	if q, ok := QueueFromContext(ctx); ok {

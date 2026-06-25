@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"tianxuan/internal/frontmatter"
 )
@@ -119,21 +120,43 @@ func (s Store) Save(m Memory) (string, error) {
 	return path, nil
 }
 
-// Delete removes a memory file and its MEMORY.md line — the model's `forget`
-// path and the user's way to prune a stale fact. A missing file is not an error;
-// the goal state (gone) holds either way.
-func (s Store) Delete(name string) error {
+// Archive moves a memory file to .archive/ instead of permanently deleting it,
+// so wrong memories remain traceable and recoverable. The MEMORY.md index line
+// is still removed. A missing file is not an error.
+func (s Store) Archive(name string) (string, error) {
 	if s.Dir == "" {
-		return fmt.Errorf("memory store unavailable (no user config dir)")
+		return "", fmt.Errorf("memory store unavailable (no user config dir)")
 	}
 	name = slug(name)
 	if name == "" {
-		return fmt.Errorf("memory needs a name")
+		return "", fmt.Errorf("memory needs a name")
 	}
-	if err := os.Remove(filepath.Join(s.Dir, name+".md")); err != nil && !os.IsNotExist(err) {
-		return err
+	file := name + ".md"
+	src := filepath.Join(s.Dir, file)
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return "", nil // nothing to archive
 	}
-	return s.flushIndex(s.indexLinesExcept(name))
+	archiveDir := filepath.Join(s.Dir, ".archive")
+	if err := os.MkdirAll(archiveDir, 0700); err != nil {
+		return "", err
+	}
+	ts := time.Now().UTC().Format("20060102-150405.000")
+	dest := filepath.Join(archiveDir, ts+"-"+file)
+	if err := os.Rename(src, dest); err != nil {
+		return "", err
+	}
+	if err := s.flushIndex(s.indexLinesExcept(name)); err != nil {
+		return dest, err
+	}
+	return dest, nil
+}
+
+
+// Delete removes a memory — it archives first, then removes the index line.
+// Uses Archive internally so wrong memories remain traceable in .archive/.
+func (s Store) Delete(name string) error {
+	_, err := s.Archive(name)
+	return err
 }
 
 // render serializes a memory to frontmatter + body. The frontmatter mirrors the

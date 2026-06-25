@@ -422,24 +422,31 @@ func (a *AgentRunner) summarize(ctx context.Context, fold []provider.Message, in
 
 	var b strings.Builder
 	var usage *provider.Usage
-	for chunk := range ch {
-		switch chunk.Type {
-		case provider.ChunkText:
-			b.WriteString(chunk.Text)
-		case provider.ChunkUsage:
-			usage = chunk.Usage
-		case provider.ChunkDone:
-			s := strings.TrimSpace(b.String())
-			if s == "" {
-				return "", fmt.Errorf("summarizer returned empty output")
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case chunk, ok := <-ch:
+			if !ok {
+				if usage != nil && usage.TotalTokens > 0 {
+					a.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: a.pricing})
+				}
+				s := strings.TrimSpace(b.String())
+				if s == "" {
+					return "", fmt.Errorf("summarizer returned empty output")
+				}
+				return s, nil
 			}
-			return s, nil
-		case provider.ChunkError:
-			return "", chunk.Err
+			switch chunk.Type {
+			case provider.ChunkText:
+				b.WriteString(chunk.Text)
+			case provider.ChunkUsage:
+				usage = chunk.Usage
+			case provider.ChunkError:
+				return "", chunk.Err
+			}
 		}
 	}
-	_ = usage
-	return strings.TrimSpace(b.String()), nil
 }
 
 func mechanicalFoldDigest(n int, archive string) string {

@@ -38,6 +38,11 @@ func (a *AgentRunner) PruneStaleToolResults() (PruneStats, error) {
 		if m.Role != provider.RoleTool || len(m.Content) < minPruneBytes || strings.HasPrefix(m.Content, prunedMarker) {
 			continue
 		}
+		// V10.0: KeepErrors preserves critical failure information — build/test
+		// errors must reach compact() verbatim so the model can fix them.
+		if a.keepPolicy&KeepErrors != 0 && isErrorMessage(m) {
+			continue
+		}
 		idx = append(idx, i)
 	}
 	if len(idx) == 0 {

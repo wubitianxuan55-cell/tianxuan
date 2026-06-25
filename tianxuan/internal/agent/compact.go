@@ -33,6 +33,7 @@ type CompactionConfig struct {
 	LastPrompt   int  // prompt tokens from last turn
 	CompactCount int  // how many times we've compacted this session
 	softNoticed  bool // one-shot soft-ratio notice
+	KeepPolicy KeepPolicy // V10.0: messages to retain verbatim during compaction (0=none)
 }
 
 const (
@@ -291,8 +292,15 @@ func (a *AgentRunner) planCompaction(msgs []provider.Message, min int) (head, st
 		if maxByWin := int(float64(a.compaction.Window) * defaultCompactTarget); maxByWin < budget {
 			budget = maxByWin
 		}
+		start = tailStart(msgs, head, budget, a.tokPerChar(), a.tailFloor())
+	} else {
+		// V10.0: no window configured — fall back to message-count tail
+		// so manual /compact and unchecked providers still work.
+		start = len(msgs) - a.tailFloor()
+		for start > head && start < len(msgs) && msgs[start].Role == provider.RoleTool {
+			start--
+		}
 	}
-	start = tailStart(msgs, head, budget, a.tokPerChar(), a.tailFloor())
 	if start < head {
 		start = head
 	}
@@ -370,16 +378,119 @@ func isCompactionSummary(m provider.Message) bool {
 // 禁止基于消息内容（如重要性评分）做保留决策，否则 kept 区膨胀破坏前缀。
 
 func (a *AgentRunner) partitionFold(region []provider.Message) (kept, fold []provider.Message) {
-	for _, m := range region {
-		keep := isCompactionSummary(m) ||
-			(m.Role == provider.RoleUser && a.pinnableUserTurn(m))
-		if keep {
+	policyKeep := keepIndexes(region, a.keepPolicy)
+	for i, m := range region {
+		if policyKeep[i] || isCompactionSummary(m) || (m.Role == provider.RoleUser && a.pinnableUserTurn(m)) {
 			kept = append(kept, m)
 		} else {
 			fold = append(fold, m)
 		}
 	}
 	return kept, fold
+}
+
+// ─── KeepPolicy helpers ───
+
+// keepIndexes returns a bool slice indicating which messages in region should be
+// kept verbatim due to KeepPolicy. Retention only applies since the latest digest;
+// older kept messages are allowed to fold on the next pass.
+func keepIndexes(region []provider.Message, policy KeepPolicy) []bool {
+	keep := make([]bool, len(region))
+	policyStart := 0
+	for i, m := range region {
+		if isCompactionSummary(m) {
+			policyStart = i + 1
+		}
+	}
+	for i, m := range region {
+		if i >= policyStart && shouldKeepMessage(m, policy) {
+			keep[i] = true
+		}
+	}
+	// When a tool result or assistant message is kept, keep its entire
+	// tool-call group so the pairing stays intact.
+	for i, m := range region {
+		if !keep[i] {
+			continue
+		}
+		switch m.Role {
+		case provider.RoleTool:
+			if j := findToolCaller(region, i, m.ToolCallID); j >= 0 {
+				keepToolCallGroup(region, keep, j)
+			}
+		case provider.RoleAssistant:
+			keepToolCallGroup(region, keep, i)
+		}
+	}
+	return keep
+}
+
+func keepToolCallGroup(region []provider.Message, keep []bool, assistantIndex int) {
+	if assistantIndex < 0 || assistantIndex >= len(region) {
+		return
+	}
+	m := region[assistantIndex]
+	if m.Role != provider.RoleAssistant || len(m.ToolCalls) == 0 {
+		return
+	}
+	keep[assistantIndex] = true
+	ids := toolCallIDs(m)
+	for j := assistantIndex + 1; j < len(region) && region[j].Role == provider.RoleTool; j++ {
+		if ids[region[j].ToolCallID] {
+			keep[j] = true
+		}
+	}
+}
+
+func shouldKeepMessage(m provider.Message, policy KeepPolicy) bool {
+	if policy&KeepErrors != 0 && isErrorMessage(m) {
+		return true
+	}
+	if policy&KeepUserMarked != 0 && isUserMarked(m) {
+		return true
+	}
+	return false
+}
+
+func isErrorMessage(m provider.Message) bool {
+	if m.Role != provider.RoleTool {
+		return false
+	}
+	s := strings.TrimSpace(strings.ToLower(m.Content))
+	return strings.HasPrefix(s, "error:") || strings.HasPrefix(s, "blocked:")
+}
+
+func isUserMarked(m provider.Message) bool {
+	if m.Role != provider.RoleUser {
+		return false
+	}
+	s := strings.TrimSpace(strings.ToLower(m.Content))
+	return strings.HasPrefix(s, "[[keep]]") ||
+		strings.HasPrefix(s, "[keep]") ||
+		strings.HasPrefix(s, "<keep>") ||
+		strings.HasPrefix(s, "<!-- keep -->")
+}
+
+func findToolCaller(region []provider.Message, toolIndex int, id string) int {
+	for i := toolIndex - 1; i >= 0; i-- {
+		if region[i].Role != provider.RoleAssistant {
+			continue
+		}
+		for _, tc := range region[i].ToolCalls {
+			if tc.ID == id {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func toolCallIDs(m provider.Message) map[string]bool {
+	ids := make(map[string]bool, len(m.ToolCalls))
+	for _, tc := range m.ToolCalls {
+		ids[tc.ID] = true
+	}
+	return ids
 }
 
 // ─── Summarizer ───

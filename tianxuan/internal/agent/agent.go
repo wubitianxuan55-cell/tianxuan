@@ -112,6 +112,22 @@ type ToolHooks interface {
 // wired into the main loop. In ModeDirect it runs the model directly; in
 // ModePlanner it delegates classification and planning to a Planner before
 // handing off to the executor (itself).
+// KeepPolicy is a bitmask controlling which messages are preserved verbatim
+// during compaction. Zero means no special retention — only digest summaries
+// and small user turns are kept.
+type KeepPolicy int
+
+const (
+	// KeepErrors preserves tool results that start with "error:" or "blocked:"
+	// so critical failure information (build errors, test failures) is never
+	// summarized away — the model needs those details to fix the problem.
+	KeepErrors KeepPolicy = 1 << iota
+	// KeepUserMarked preserves user messages prefixed with [[keep]], [keep],
+	// <keep>, or <!-- keep --> markers, letting the user pin facts that must
+	// survive compaction.
+	KeepUserMarked
+)
+
 type AgentRunner struct {
 	prov        provider.Provider
 	tools       *tool.Registry
@@ -242,6 +258,7 @@ type AgentRunner struct {
 
 	// compaction groups context-window and compression settings (V5.0: truncation only).
 	compaction CompactionConfig
+	keepPolicy KeepPolicy // V10.0: messages to retain verbatim during compaction
 
 	// V7.0 DSR: compact stuck detection �� when the kept tail alone exceeds the
 	// trigger threshold, compaction can never reduce the prompt below it. After 2
@@ -596,6 +613,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		jobs:       opts.Jobs,
 		evidence:   evidence.NewLedger(),
 		compaction: comp,
+		keepPolicy: comp.KeepPolicy,
 		dispatcher: opts.Dispatcher,
 		ctxMgr:     opts.CtxMgr,
 		auditFunc:  opts.AuditFunc,

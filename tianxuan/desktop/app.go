@@ -75,6 +75,9 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.sink.ctx = ctx
 
+	// Drain and log any crash from a prior session.
+	a.flushPendingCrash()
+
 	// 居中窗口避免被任务栏遮挡底部（状态栏 + 输入框）
 	runtime.WindowCenter(ctx)
 
@@ -86,6 +89,19 @@ func (a *App) startup(ctx context.Context) {
 
 	// Start system tray — close minimizes to tray, not exit.
 	go runTray(ctx)
+}
+
+// domReady fires after the frontend has loaded and rendered. Restore saved
+// window geometry and show the window (StartHidden keeps it invisible until now).
+func (a *App) domReady(ctx context.Context) {
+	if saved, ok := loadWindowState(); ok {
+		if saved.Maximised {
+			runtime.WindowMaximise(ctx)
+		} else if saved.X > 0 || saved.Y > 0 {
+			runtime.WindowSetPosition(ctx, saved.X, saved.Y)
+		}
+	}
+	runtime.WindowShow(ctx)
 }
 
 // buildController runs the full initialization sequence in a background goroutine:
@@ -184,6 +200,8 @@ func (a *App) buildController() {
 
 // shutdown snapshots the conversation and stops plugin subprocesses on close.
 func (a *App) shutdown(context.Context) {
+	// Save window geometry before the webview tears down.
+	a.saveWindowStateSync()
 	a.mu.RLock()
 	ctrl := a.ctrl
 	a.mu.RUnlock()

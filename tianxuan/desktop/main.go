@@ -39,30 +39,50 @@ var version = "dev"
 func main() {
 	app := NewApp()
 
+	// Restore saved window size, or fall back to the default.
+	width, height := 1400, 820
+	if saved, ok := loadWindowState(); ok {
+		if saved.Width > 0 {
+			width = saved.Width
+		}
+		if saved.Height > 0 {
+			height = saved.Height
+		}
+	}
+
 	err := wails.Run(&options.App{
 		Title:     "Tianxuan",
-		Width:     1400,
-		Height:    820,
-		MinWidth:  900,
-		MinHeight: 520,
-		MaxWidth:  2560,
-		MaxHeight: 1440,
+		Width:     width,
+		Height:    height,
+		MinWidth:  760,
+		MinHeight: 480,
 		// Match the dark UI shell so first paint (before CSS loads) doesn't flash
-		// white — particularly visible on WebKitGTK. Uses the dark theme's --bg
-		// colour (#1a1a2e = RGB 26,26,46).
-		BackgroundColour: &options.RGBA{R: 26, G: 26, B: 46, A: 255},
-		AssetServer:      &assetserver.Options{Assets: assets},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		OnBeforeClose:    app.beforeClose,
-		Bind:             []any{app},
+		// white — particularly visible on WebKitGTK.
+		BackgroundColour:   &options.RGBA{R: 26, G: 26, B: 46, A: 255},
+		AssetServer:        &assetserver.Options{Assets: assets},
+		OnStartup:          app.startup,
+		OnDomReady:         app.domReady,
+		OnBeforeClose:      app.beforeClose,
+		OnShutdown:         app.shutdown,
+		Bind:               []any{app},
+		SingleInstanceLock: singleInstanceLock(app),
+
+		// Start hidden — domReady positions and shows the window after restoring
+		// geometry, so the user never sees the default size/position flash.
+		StartHidden: true,
+
+		// Native OS file drops: the webview enables drag-and-drop for the
+		// composer to receive file paths.
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
 
 		// --- per-platform adaptation (see desktop/README.md for the rationale) ---
 		Mac: &mac.Options{
 			// Inset traffic-lights over a frameless-feeling header; the frontend
 			// leaves a drag region at the top (CSS --wails-draggable).
-			TitleBar:   mac.TitleBarHiddenInset(),
-			Appearance: mac.NSAppearanceNameDarkAqua,
+			TitleBar: mac.TitleBarHiddenInset(),
+			// Follow the OS appearance so the title bar matches light/dark system
+			// preference instead of being locked to dark.
+			Appearance: mac.DefaultAppearance,
 		},
 		Windows: &windows.Options{
 			// Follow the OS light/dark setting; the frontend also honors

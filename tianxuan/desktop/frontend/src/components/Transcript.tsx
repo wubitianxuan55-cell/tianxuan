@@ -13,12 +13,17 @@ import { Welcome } from "./Welcome";
 
 gsap.registerPlugin(ScrollToPlugin);
 
+// ── 滚动参数 ──────────────────────────────────────────────────────────
+const BOTTOM_THRESHOLD_PX = 80; // 距底部 80px 以内视为"在底部"
+const SCROLL_DURATION = 0.12;   // GSAP 滚动动画时长(s)
+
+function isNearBottom(el: HTMLElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+}
+
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
-// scrollVersion returns a lightweight signal that changes whenever the
-// transcript grows (new items or streaming updates). Instead of iterating all
-// items (O(n)), it uses just the count and the last item's identity — enough
-// to trigger scroll-to-bottom on new content without heavy per-frame work.
+// scrollVersion: 轻量级内容变化信号，只用最后一项的标识 + 流式状态。
 function scrollVersion(items: Item[]): string {
   const n = items.length;
   if (n === 0) return "0";
@@ -33,13 +38,10 @@ function scrollVersion(items: Item[]): string {
   }
 }
 
-// mergeConsecutiveReasoning collapses adjacent assistant items that have ONLY
-// reasoning (no text) into one, so the model thinking in several bursts without
-// tools in between renders as a single card instead of many.
+// mergeConsecutiveReasoning: 合并连续纯推理消息，减少渲染碎片。
 function mergeConsecutiveReasoning(items: Item[]): Item[] {
   const out: Item[] = [];
   for (const it of items) {
-    // 跳过不可见项（phase/notice/隐藏tool），找上一个可合并的思考卡
     let prevIdx = out.length - 1;
     while (prevIdx >= 0) {
       const pi = out[prevIdx];
@@ -49,13 +51,8 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
     }
     const prev = prevIdx >= 0 ? out[prevIdx] : null;
     if (
-      prev &&
-      prev.kind === "assistant" &&
-      it.kind === "assistant" &&
-      !prev.text &&
-      !it.text &&
-      !prev.streaming &&
-      !it.streaming
+      prev && prev.kind === "assistant" && it.kind === "assistant" &&
+      !prev.text && !it.text && !prev.streaming && !it.streaming
     ) {
       out[prevIdx] = { ...prev, reasoning: prev.reasoning + "\n\n" + it.reasoning };
     } else {
@@ -66,17 +63,8 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
 }
 
 export function Transcript({
-  items,
-  onPrompt,
-  onRewind,
-  running,
-  onThreadEl,
-  onScrollToTurnReady,
-  cwd,
-  cwdName,
-  sessions,
-  onResumeSession,
-  meta,
+  items, onPrompt, onRewind, running, onThreadEl, onScrollToTurnReady,
+  cwd, cwdName, sessions, onResumeSession, meta,
 }: {
   items: Item[];
   onPrompt: (text: string) => void;
@@ -86,36 +74,123 @@ export function Transcript({
   onScrollToTurnReady?: (fn: (turn: number) => void) => void;
   cwd?: string;
   cwdName?: string;
-  sessions?: import('../lib/types').SessionMeta[];
+  sessions?: import("../lib/types").SessionMeta[];
   onResumeSession?: (path: string) => Promise<void>;
-  meta?: import('../lib/types').Meta;
+  meta?: import("../lib/types").Meta;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const resizeFrame = useRef<number | null>(null);
+  const layoutScrollFrames = useRef<number[]>([]);
 
   useEffect(() => {
     onThreadEl?.(scrollRef.current);
     return () => onThreadEl?.(null);
   }, [onThreadEl]);
-  // stick tracks whether the view is pinned to the bottom; once the user scrolls
-  // up to read, we stop yanking them back down.
-  const stick = useRef(true);
-  const lastAutoScrollRef = useRef(0);
+
+  // 清理动画和 rAF
+  useEffect(() => {
+    return () => {
+      if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
+      for (const frame of layoutScrollFrames.current) cancelAnimationFrame(frame);
+      layoutScrollFrames.current = [];
+    };
+  }, []);
+
   const [showScrollDown, setShowScrollDown] = useState(false);
 
-  // 预处理：合并连续推理 + 扫描工具组
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = isNearBottom(el);
+    stick.current = atBottom;
+    setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight + 200);
+  }, []);
+
+  // ── 智能滚动：GSAP 驱动，无节流 ──────────────────────────────────
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!stick.current) return;
+    if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
+    resizeFrame.current = requestAnimationFrame(() => {
+      resizeFrame.current = null;
+      if (!stick.current) return;
+      gsap.to(el, {
+        scrollTo: { y: "max" },
+        duration: SCROLL_DURATION,
+        ease: "none",
+        overwrite: "auto",
+      });
+    });
+  }, []);
+
+  // 新问题提交时强制到底
+  const onNewQuestion = useCallback(() => {
+    stick.current = true;
+    setShowScrollDown(false);
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  // 布局后多帧确认滚动（工具结果展开等场景）
+  const scrollToBottomAfterLayout = useCallback((frames = 4) => {
+    for (const frame of layoutScrollFrames.current) cancelAnimationFrame(frame);
+    layoutScrollFrames.current = [];
+    const el = scrollRef.current;
+    if (!el) return;
+    // 先立即设置
+    stick.current = true;
+    el.scrollTop = el.scrollHeight;
+    let remaining = frames;
+    const tick = () => {
+      if (remaining <= 0) return;
+      const frame = requestAnimationFrame(() => {
+        layoutScrollFrames.current = layoutScrollFrames.current.filter((id) => id !== frame);
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        remaining -= 1;
+        tick();
+      });
+      layoutScrollFrames.current.push(frame);
+    };
+    tick();
+  }, []);
+
+  // ── 内容变化时自动跟随 ──────────────────────────────────────────
+  const contentVersion = scrollVersion(items);
+  const prevItemsLen = useRef(items.length);
+  useEffect(() => {
+    if (items.length > prevItemsLen.current) {
+      onNewQuestion();
+    }
+    prevItemsLen.current = items.length;
+  }, [items.length, onNewQuestion]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [contentVersion, scrollToBottom]);
+
+  // ── ResizeObserver：工具结果展开/折叠时保持底部 ──────────────────
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (!stick.current) return;
+      scrollToBottom();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollToBottom]);
+
+  // ── 预处理 ──────────────────────────────────────────────────────
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
 
-  // turn → groupedIndex 映射：供 JumpBar 通过虚拟滚动定位到指定轮次
   const turnToIndex = useMemo(() => {
     const map = new Map<number, number>();
     let turn = 0;
     for (let i = 0; i < grouped.length; i++) {
       const g = grouped[i];
       const it = g.kind === "group" ? null : g.item;
-      if (it && it.kind === "user") {
-        map.set(turn, i);
-        turn++;
-      }
+      if (it && it.kind === "user") { map.set(turn, i); turn++; }
     }
     return map;
   }, [grouped]);
@@ -124,16 +199,14 @@ export function Transcript({
     count: grouped.length,
     getScrollElement: useCallback(() => scrollRef.current, []),
     estimateSize: useCallback(() => 120, []),
-    overscan: 12,  // V5.30: 增到12减少快速滚动空白
+    overscan: 12,
   });
 
-  // 用 ref 保存最新的 turnToIndex 和 virtualizer，scrollToTurn 闭包引用它们
   const turnToIndexRef = useRef(turnToIndex);
   turnToIndexRef.current = turnToIndex;
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
 
-  // 真正的 scrollToTurn 函数，稳定引用
   const scrollToTurnRef = useRef((turn: number) => {
     const idx = turnToIndexRef.current.get(turn);
     if (idx != null) {
@@ -141,49 +214,22 @@ export function Transcript({
       virtualizerRef.current.scrollToIndex(idx, { align: "start" });
     }
   });
-
-  // 暴露 scrollToTurn 给父组件（JumpBar 使用）
   useEffect(() => {
     onScrollToTurnReady?.(scrollToTurnRef.current);
   }, [onScrollToTurnReady]);
 
-  const onScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (el) {
-        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        stick.current = atBottom;
-        setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight + 200);
-    }
-}, []);
-
-  // Follow new content by setting scrollTop directly inside rAF so layout has
-  // settled first — together with plain-text streaming this keeps the view from
-  // jittering.
-  const contentVersion = scrollVersion(items);
-  useEffect(() => {
-    if (!stick.current) return;
-    // 节流：两次自动滚动至少间隔 100ms，给用户滚轮操作留出响应窗口
-    const now = Date.now();
-    if (now - lastAutoScrollRef.current < 100) return;
-    lastAutoScrollRef.current = now;
-
+  // ── 折叠/展开保持滚动 ──────────────────────────────────────────
+  const scheduleMeasure = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // 虚拟滚动模式下，虚拟列表总高度变化时也要滚动到底部
-    if (grouped.length > 0) {
-      virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
-    }
-    // rAF 兜底：等布局完成后再次确认滚动到底部，但仅在用户未手动滚离时
-    const id = requestAnimationFrame(() => {
-      if (stick.current) {
-        el.scrollTop = el.scrollHeight;
-      }
-    });
-    return () => cancelAnimationFrame(id);
-  }, [contentVersion, grouped.length, virtualizer]);
+    const savedTop = el.scrollTop;
+    const timer = setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = savedTop;
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Sub-agent calls carry a parentId; collect them under their parent `task`
-  // call so the parent card can render them nested, and skip them at top level.
+  // ── 子调用收集 ──────────────────────────────────────────────────
   const subcallsByParent = new Map<string, ToolItem[]>();
   for (const it of items) {
     if (it.kind === "tool" && it.parentId) {
@@ -193,8 +239,6 @@ export function Transcript({
     }
   }
 
-  // The rewind menu's open state is lifted here so at most one is open at a time;
-  // a mousedown outside any .rewind closes it.
   const [dismissedErrors, setDismissedErrors] = useState(new Set<string>());
   const [openTurn, setOpenTurn] = useState<number | null>(null);
   useEffect(() => {
@@ -207,33 +251,12 @@ export function Transcript({
     return () => document.removeEventListener("mousedown", onDown);
   }, [openTurn]);
 
-  // Each user message's turn = its ordinal among user messages, so a rewind
-  // targets the matching checkpoint.
   const userTurn = new Map<string, number>();
   let nt = 0;
   for (const it of items) {
     if (it.kind === "user") userTurn.set(it.id, nt++);
   }
 
-  // 折叠/展开时保持滚动位置稳定。
-  // ResizeObserver（measureElement ref）会自动追踪内容尺寸变化并更新虚拟列表，
-  // 手动调用 measure() 反而会在 CSS 过渡期间与 ResizeObserver 冲突导致布局混乱。
-  // 这里只负责在过渡完成后恢复滚动位置，防止视口上方卡片展开时界面跳转。
-  const scheduleMeasure = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const savedTop = el.scrollTop;
-    // 等待 CSS max-height 过渡完成 (200ms) + 余量，然后恢复滚动位置
-    const timer = setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = savedTop;
-      }
-    }, 250);
-    // 如果组件卸载（不太可能但防御性），清理定时器
-    return () => clearTimeout(timer);
-  }, []);
-
-  // 渲染单条条目（user / assistant / tool / phase / notice / compaction）
   const renderItem = (g: (typeof grouped)[number]) => {
     if (g.kind === "group") {
       return <ToolGroup key={g.id} tools={g.tools} onCollapse={scheduleMeasure} />;
@@ -244,39 +267,28 @@ export function Transcript({
         const tn = userTurn.get(it.id);
         return (
           <div key={it.id} data-turn={tn != null ? tn : undefined}>
-          <UserMessage
-            key={it.id}
-            text={it.text}
-            turn={tn}
-            open={tn != null && openTurn === tn}
-            onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
-            onRewind={(turn, scope) => {
-              onRewind?.(turn, scope);
-              setOpenTurn(null);
-            }}
-          />
+            <UserMessage
+              key={it.id} text={it.text} turn={tn}
+              open={tn != null && openTurn === tn}
+              onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
+              onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }}
+            />
           </div>
         );
       }
       case "assistant":
         return <AssistantMessage key={it.id} item={it} onCollapse={scheduleMeasure} />;
       case "tool":
-        if (it.parentId) return null; // rendered nested under its parent
-        if (it.name === "todo_write") return null; // shown live in the pinned TodoPanel
-        if (it.name === "exit_plan_mode") return null; // the plan was shown in the approval card
+        if (it.parentId) return null;
+        if (it.name === "todo_write" || it.name === "exit_plan_mode") return null;
         return <ToolCard key={it.id} item={it} subcalls={subcallsByParent.get(it.id)} />;
       case "phase":
-        return (
-          <div key={it.id} className="phase">
-            {it.text}
-          </div>
-        );
+        return <div key={it.id} className="phase">{it.text}</div>;
       case "notice":
         if (it.level === "warn") {
           if (dismissedErrors.has(it.id)) return null;
           return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
         }
-        // Diagnostics notices get special styling
         if (it.text.startsWith("diagnostics:")) {
           const clean = it.text.includes("— clean");
           return (
@@ -286,41 +298,34 @@ export function Transcript({
             </div>
           );
         }
-        return (
-          <div key={it.id} className="notice">
-            {it.text}
-          </div>
-        );
+        return <div key={it.id} className="notice">{it.text}</div>;
       case "compaction":
         return <CompactionCard key={it.id} item={it} />;
     }
   };
 
+  const scrollDown = useCallback(() => {
+    stick.current = true;
+    setShowScrollDown(false);
+    scrollToBottomAfterLayout();
+  }, [scrollToBottomAfterLayout]);
+
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
       <div className="max-w-[--maxw] mx-auto px-8">
-        {items.length === 0 && <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />}
+        {items.length === 0 && (
+          <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
+        )}
         <StreamingIndicator running={running} items={items} />
-
-        <div
-          style={{
-            height: `${virtualizer.getTotalSize()}px`,
-            width: "100%",
-            position: "relative",
-          }}
-        >
+        <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
           {virtualizer.getVirtualItems().map((virtualItem) => (
             <div
               key={virtualItem.key}
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
               style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                display: "flex",
-                flexDirection: "column",
+                position: "absolute", top: 0, left: 0, width: "100%",
+                display: "flex", flexDirection: "column",
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
@@ -329,35 +334,24 @@ export function Transcript({
           ))}
         </div>
       </div>
+      {/* 回到底部按钮 —— 柔和设计，不抢眼 */}
       {showScrollDown && (
         <button
-          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all animate-fadeIn px-3 py-1.5"
-          style={{boxShadow: "var(--ds-shadow-accent-btn)"}}
-          onClick={() => {
-            stick.current = true;
-            setShowScrollDown(false);
-            const el = scrollRef.current;
-            if (el) {
-              if (grouped.length > 0) virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
-              gsap.to(el, { scrollTop: el.scrollHeight, duration: 0.3, ease: "power2.out" });
-            }
-          }}
+          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all px-3 py-1.5 opacity-80 hover:opacity-100"
+          style={{ boxShadow: "var(--ds-shadow-accent-btn)" }}
+          onClick={scrollDown}
           aria-label="回到底部"
         >
-          <ArrowDown size={14} className="animate-bounce" />
-          <span className="text-[11px] font-medium">↓</span>
+          <ArrowDown size={14} />
+          <span className="text-[11px] font-medium">到底</span>
         </button>
       )}
     </div>
   );
 }
 
+// ── CompactionCard ──────────────────────────────────────────────────
 type CompactionItem = Extract<Item, { kind: "compaction" }>;
-
-// CompactionCard marks a context-compaction boundary in the transcript. While
-// the pass runs it shows a "compacting…" placeholder; once done it shows the
-// message count and trigger with the summary collapsed behind a toggle (the
-// summary is the new context base, so it's available but doesn't flood the view).
 function CompactionCard({ item }: { item: CompactionItem }) {
   const [open, setOpen] = useState(false);
   if (item.pending) {
@@ -372,9 +366,7 @@ function CompactionCard({ item }: { item: CompactionItem }) {
       <button className="flex items-center gap-2 w-full px-3 py-2 bg-transparent border-0 text-fg-dim text-[12.5px] cursor-pointer hover:bg-bg-elev" onClick={() => setOpen((v) => !v)}>
         <span className="text-accent text-xs shrink-0">◆</span>
         <span className="font-medium text-fg">Context compacted</span>
-        <span className="text-fg-faint text-[11px] ml-auto">
-          {item.messages} messages · {item.trigger}
-        </span>
+        <span className="text-fg-faint text-[11px] ml-auto">{item.messages} messages · {item.trigger}</span>
         <span className="text-fg-faint text-[10.5px] underline shrink-0">{open ? "hide summary" : "show summary"}</span>
       </button>
       {open && <pre className="m-0 p-3 bg-bg text-fg-dim text-[11.5px] leading-relaxed whitespace-pre-wrap border-t border-border-soft">{item.summary}</pre>}

@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -313,9 +314,34 @@ type AgentRunner struct {
 	preMu       sync.Mutex
 	preWG       sync.WaitGroup
 
+
 	// tc caches read-only tool results (file reads) to avoid redundant disk IO
 	// within a turn. Write operations auto-invalidate. Thread-safe.
 	tc *toolCache
+
+
+	// steerQueue holds mid-turn user messages queued while the agent is
+	// running. Each is consumed once per loop iteration, persisted to the
+	// session for history replay, and sent to the model as guidance (not a
+	// new task). (Design adopted from DeepSeek-Reasonix-V1.12)
+	steerMu       sync.Mutex
+	steerQueue    []string
+	steerConsumed bool
+
+
+	// responseLanguage is the runtime final-answer language preference
+	// ("auto"|"zh"|"en"), stored as an atomic.Value for lock-free reads
+	// from the hot stream path. Set via SetResponseLanguage.
+	// (Design adopted from DeepSeek-Reasonix-V1.12)
+
+
+	responseLanguage atomic.Value // string
+
+	// reasoningLanguage is the runtime visible-reasoning language preference
+	// ("auto"|"zh"|"en"), stored as an atomic.Value.
+	// Set via SetReasoningLanguage.
+	// (Design adopted from DeepSeek-Reasonix-V1.12)
+	reasoningLanguage atomic.Value // string
 }
 
 // SetActiveSchemas installs a tool subset for this session. Pass nil to revert
@@ -873,5 +899,84 @@ func streamRecoveryMessage(hasPartialText bool) string {
 // (Design adopted from DeepSeek-Reasonix-V1.12)
 func emptyFinalRetryMessage() string {
 	return "The previous assistant response finished without any visible answer text. Continue the same task now and provide a concise visible answer to the user. Do not send reasoning only."
+}
+
+
+// MidTurnSteerPrefix marks user messages that were injected mid-turn as
+// guidance (via Steer). The model sees them as instructions; frontends
+// display them as a notice, not a regular user bubble.
+// (Design adopted from DeepSeek-Reasonix-V1.12)
+const MidTurnSteerPrefix = "[Mid-turn steer queued by the user. Do not treat this as a new task; use it only as additional guidance for the current task after completing the current step.]"
+
+func midTurnSteerMessage(text string) string {
+	return MidTurnSteerPrefix + "\n" + text
+}
+
+// Steer queues a message for mid-turn injection.
+// (Design adopted from DeepSeek-Reasonix-V1.12)
+func (a *AgentRunner) Steer(text string) {
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
+	a.steerQueue = append(a.steerQueue, text)
+	a.steerConsumed = false
+}
+
+// SteerConsumed returns true when the steer queue became empty after the last consume.
+func (a *AgentRunner) SteerConsumed() bool {
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
+	return a.steerConsumed
+}
+
+func (a *AgentRunner) consumeSteer() (string, bool) {
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
+	if len(a.steerQueue) == 0 {
+		return "", false
+	}
+	t := a.steerQueue[0]
+	a.steerQueue = a.steerQueue[1:]
+	a.steerConsumed = len(a.steerQueue) == 0
+	return t, true
+}
+
+func (a *AgentRunner) clearSteerQueue() {
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
+	a.steerQueue = nil
+	a.steerConsumed = false
+}
+
+func (a *AgentRunner) steerQueueLen() int {
+	a.steerMu.Lock()
+	defer a.steerMu.Unlock()
+	return len(a.steerQueue)
+}
+
+// finalReadinessCheck verifies that the model's claim of completion is backed
+// by host-observable evidence. Returns reason string if blocked, empty if ok.
+// (Design adopted from DeepSeek-Reasonix-V1.12, simplified for tianxuan)
+func (a *AgentRunner) finalReadinessCheck() (blocked bool, reason string) {
+	if a.evidence == nil {
+		return false, ""
+	}
+	// Check for unverified completed todos: the model marked a todo as
+	// "completed" but never ran complete_step for it.
+	unverified, hasBaseline := a.evidence.UnverifiedCompletedTodos(nil)
+	if hasBaseline && len(unverified) > 0 {
+		names := make([]string, len(unverified))
+		for i, m := range unverified {
+			names[i] = m.ActiveForm
+		}
+		return true, fmt.Sprintf("complete_step missing for: %s", strings.Join(names, ", "))
+	}
+	return false, ""
+}
+
+// finalReadinessRetryMessage generates a retry prompt when the final-answer
+// readiness check blocks completion.
+// (Design adopted from DeepSeek-Reasonix-V1.12)
+func finalReadinessRetryMessage(reason string) string {
+	return "Host final-answer readiness check failed. Before giving a final answer, address the missing host-observable receipts: " + reason + ". Run the required tool calls, then answer when readiness is satisfied. If the blocked item needs user input, call the ask tool with concrete options and wait for its tool result; do not ask in prose."
 }
 

@@ -19,11 +19,15 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	// V3.3: generate trace ID for this turn
 	traceID := NewTraceID()
 	ctx = WithTraceID(ctx, traceID)
+	defer a.clearSteerQueue() // V10.0: drain any remaining steer on turn exit
 
 	if a.evidence != nil {
 		a.evidence.Reset()
 	}
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
+	// V10.0: wrap user input with transient language preference blocks
+	// (Design adopted from DeepSeek-Reasonix-V1.12)
+	input = a.withTurnPreferences(input)
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
 	// V8.0 P0-1: reset tool filter from previous turn (prefix must be immutable).
@@ -87,7 +91,15 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		const maxStreamRecoveries = 3
 		emptyFinalBlocks := 0
 		const maxEmptyFinalBlocks = 3
+		finalReadinessBlocks := 0
+		const maxFinalReadinessBlocks = 3
 		for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
+		// V10.0: consume a queued mid-turn steer as session guidance
+		// (Design adopted from DeepSeek-Reasonix-V1.12)
+		if text, ok := a.consumeSteer(); ok {
+			a.session.Add(provider.Message{Role: provider.RoleUser, Content: midTurnSteerMessage(text)})
+			a.sink.Emit(event.Event{Kind: event.Steer, Text: text})
+		}
 		text, reasoning, signature, calls, usage, interrupted, err := a.stream(ctx, step+1)
 		if err != nil {
 			// V10.0: stream recovery — save partial output and inject recovery prompt
@@ -213,6 +225,21 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			// Gate 3: verify gate �� orchestrate ģʽ��֤
 			if a.verifyGate() {
 				continue
+			}
+			// V10.0: final-answer readiness gate — verify evidence before accepting completion
+			if blocked, reason := a.finalReadinessCheck(); blocked {
+				finalReadinessBlocks++
+				if finalReadinessBlocks >= maxFinalReadinessBlocks {
+					return fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
+				}
+				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+					Text: "final-answer readiness blocked: " + reason})
+				a.session.Add(provider.Message{Role: provider.RoleUser, Content: finalReadinessRetryMessage(reason)})
+				a.maybeCompact(ctx, usage)
+				continue
+			}
+			if a.steerQueueLen() > 0 {
+				continue // V10.0: more steers pending — another pass
 			}
 			return nil // all gates passed
 		}

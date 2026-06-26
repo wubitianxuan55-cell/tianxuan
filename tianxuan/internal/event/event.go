@@ -64,6 +64,8 @@ const (
 	// so a sink can render a distinct, expandable card.
 	CompactionDone
 	// Retrying marks a stream-recovery retry attempt.
+	// Steer is a mid-turn user guidance message injected while the agent is running.
+	Steer
 	Retrying
 )
 

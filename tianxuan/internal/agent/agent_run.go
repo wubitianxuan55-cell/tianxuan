@@ -30,6 +30,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	input = a.withTurnPreferences(input)
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
+	// V10.0: rebuild canonical todo state from session history
+	// (Design adopted from DeepSeek-Reasonix-V1.12)
+	a.rebuildTodoState(a.session.Messages)
+
 	// V8.0 P0-1: reset tool filter from previous turn (prefix must be immutable).
 	a.activeSchemasMu.Lock()
 	a.activeSchemas = nil
@@ -283,6 +287,18 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 					ToolCallID: call.ID,
 					Name:       call.Name,
 				})
+			}
+		}
+
+		// V10.0: advance canonical todo state for successful complete_step calls
+
+		// V10.0: advance canonical todo state for successful complete_step calls
+		for i, call := range calls {
+			if call.Name == "complete_step" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
+				step := extractStepFromArgs(call.Arguments)
+				if step != "" {
+					a.advanceCanonicalTodo(step)
+				}
 			}
 		}
 

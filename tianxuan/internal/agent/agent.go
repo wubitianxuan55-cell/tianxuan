@@ -328,6 +328,19 @@ type AgentRunner struct {
 	steerQueue    []string
 	steerConsumed bool
 
+	// todoState is the host canonical task list: the latest successful
+	// todo_write with completions applied by complete_step. Unlike the per-turn
+	// ledger it survives turn boundaries and compaction, so the final-answer
+	// gate sees an unfinished plan a later turn would otherwise hide.
+	// (Design adopted from DeepSeek-Reasonix-V1.12)
+	todoMu    sync.Mutex
+	todoState []evidence.TodoItem
+
+	// hostAdvanceSeq guarantees unique tool IDs across turns: every
+	// emitTodoState call increments it so the frontend always sees a fresh
+	// dispatch.
+	hostAdvanceSeq atomic.Int64
+
 
 	// responseLanguage is the runtime final-answer language preference
 	// ("auto"|"zh"|"en"), stored as an atomic.Value for lock-free reads

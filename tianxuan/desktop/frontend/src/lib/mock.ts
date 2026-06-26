@@ -497,5 +497,8 @@ export function makeMockApp(): AppBindings {
         window.open("https://github.com/esengine/tianxuan/releases/latest", "_blank", "noopener");
       }
     },
+    async SaveWindowState(_state: {width:number;height:number;x:number;y:number;maximised:boolean}) {
+      // no-op in browser dev
+    },
   };
 }

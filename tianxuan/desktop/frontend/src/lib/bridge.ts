@@ -128,6 +128,8 @@ export interface AppBindings {
   CheckUpdate(): Promise<UpdateInfo | null>;
   ApplyUpdate(): Promise<void>;
   OpenDownloadPage(): Promise<void>;
+  // Window state persistence.
+  SaveWindowState(state: {width:number;height:number;x:number;y:number;maximised:boolean}): Promise<void>;
 }
 
 interface WailsRuntime {

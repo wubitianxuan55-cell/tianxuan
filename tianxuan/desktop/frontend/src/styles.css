@@ -125,7 +125,83 @@
   --ds-shadow-accent-btn: 0 8px 20px color-mix(in srgb, var(--accent) 20%, transparent);
 
   /* ── Surface gradients ──────────────────────────────────────────────── */
-  --ds-gradient-sidebar: linear-gradient(180deg, var(--bg-soft) 0%, var(--sidebar-bg) 45%, var(--bg) 100%);
+  
+  /* -- Z-index scale (14 levels) ----------------------------------------------------- */
+  --z-local-raised: 2;
+  --z-local-handle: 4;
+  --z-local-handle-active: 5;
+  --z-layout-resizer: 12;
+  --z-layout-resizer-active: 13;
+  --z-inline-sticky: 20;
+  --z-local-backdrop: 30;
+  --z-local-popover: 31;
+  --z-workspace-float: 40;
+  --z-app-chrome: 70;
+  --z-drawer-backdrop: 90;
+  --z-menu-backdrop: 95;
+  --z-menu: 96;
+  --z-dock: 100;
+  --z-floating-menu: 110;
+  --z-topicbar-menu: 210;
+  --z-startup-overlay: 300;
+  --z-modal: 1200;
+  --z-overlay-backdrop: 1300;
+  --z-popover: 1301;
+  --z-toast: 1302;
+  --z-tooltip: 1302;
+  --z-onboarding: 9999;
+  --z-crash-overlay: 99999;
+
+  /* -- Component recipes (buttons / pills / list rows) ------------------------------ */
+  --list-row-height: 38px;
+  --list-row-radius: 7px;
+  --list-row-gap: 10px;
+  --list-row-px: 10px;
+  --list-row-title: var(--fg-dim);
+  --list-row-meta: var(--fg-faint);
+  --list-row-hover-bg: var(--sidebar-hover);
+  --list-row-current-bg: color-mix(in srgb, var(--accent) 12%, var(--sidebar-hover));
+  --list-row-current-title: var(--fg);
+  --list-row-current-meta: var(--accent);
+  --tree-row-height: 30px;
+  --tree-row-radius: 7px;
+  --tree-row-hover-bg: var(--sidebar-hover);
+  --tree-row-current-bg: color-mix(in srgb, var(--sidebar-active) 42%, var(--bg-soft));
+  --tree-row-current-fg: var(--fg);
+  --tree-row-current-icon: var(--fg-dim);
+  --tree-row-marker: var(--accent);
+  --control-primary-bg: var(--accent);
+  --control-primary-fg: var(--accent-fg);
+  --control-disabled-bg: var(--bg-elev-2);
+  --control-disabled-fg: var(--fg-faint);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
+  --button-height: 34px;
+  --button-small-height: 30px;
+  --button-icon-size: 30px;
+  --button-radius: 8px;
+  --button-px: 12px;
+  --button-bg: color-mix(in srgb, var(--bg-elev-2) 62%, var(--bg-soft));
+  --button-bg-hover: color-mix(in srgb, var(--bg-elev-2) 82%, var(--bg-soft));
+  --button-border: var(--border);
+  --button-border-hover: color-mix(in srgb, var(--fg-faint) 48%, var(--border));
+  --button-fg: var(--fg);
+  --button-muted-fg: var(--fg-dim);
+  --button-danger-bg: color-mix(in srgb, var(--err) 10%, var(--bg-elev));
+  --button-danger-border: color-mix(in srgb, var(--err) 30%, var(--border));
+  --button-danger-fg: var(--err);
+  --pill-bg: color-mix(in srgb, var(--bg-elev-2) 62%, transparent);
+  --pill-border: var(--border);
+  --pill-fg: var(--fg-dim);
+  --pill-hover-bg: var(--bg-elev-2);
+  --pill-plan-bg: var(--accent-soft);
+  --pill-plan-border: color-mix(in srgb, var(--accent) 24%, var(--border));
+  --pill-yolo-bg: var(--danger);
+  --pill-yolo-bg-hover: color-mix(in srgb, var(--danger) 90%, var(--fg));
+  --pill-yolo-border: var(--danger);
+  --pill-yolo-border-hover: color-mix(in srgb, var(--danger) 90%, var(--fg));
+  --pill-yolo-fg: var(--danger-fg);
+
+--ds-gradient-sidebar: linear-gradient(180deg, var(--bg-soft) 0%, var(--sidebar-bg) 45%, var(--bg) 100%);
   --ds-gradient-topbar: linear-gradient(
     180deg,
     color-mix(in srgb, var(--bg-elev) 86%, transparent) 0%,
@@ -146,6 +222,83 @@
   /* typography */
   --ds-font-display: "SF Pro Display", "PingFang SC", "Noto Sans SC", var(--sans);
 }
+/* -- Platform-specific font stacks -------------------------------------------------- */
+:root[data-platform="windows"] {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
+    "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+  --font-content-family: var(--font-ui);
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Liberation Mono",
+    ui-monospace, monospace;
+  --font-smoothing: auto;
+  --text-rendering: auto;
+}
+
+:root[data-platform="darwin"] {
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif;
+  --font-content-family: var(--font-ui);
+  --font-mono: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco,
+    "Cascadia Code", Consolas, monospace;
+}
+
+:root[data-platform="linux"] {
+  --font-ui: system-ui, "Noto Sans", "Noto Sans CJK SC", "WenQuanYi Micro Hei",
+    "Microsoft YaHei", Arial, sans-serif;
+  --font-content-family: var(--font-ui);
+  --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono",
+    "Noto Sans Mono", "Liberation Mono", Consolas, monospace;
+}
+
+/* Font-family presets */
+:root[data-font-family="yahei"] {
+  --font-ui: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-content-family: var(--font-ui);
+}
+
+:root[data-font-family="pingfang"] {
+  --font-ui: "PingFang SC", "Noto Sans SC",
+    "Microsoft YaHei", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-content-family: var(--font-ui);
+}
+
+:root[data-font-family="noto"] {
+  --font-ui: "Noto Sans SC", "Noto Sans", "PingFang SC",
+    "Microsoft YaHei", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-content-family: var(--font-ui);
+}
+
+:root[data-font-family="custom"] {
+  --font-ui: var(--font-family-custom, "PingFang SC"),
+    "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-content-family: var(--font-ui);
+}
+
+:root[data-mono-font-family="cascadia"] {
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Liberation Mono",
+    ui-monospace, monospace;
+}
+
+:root[data-mono-font-family="jetbrains"] {
+  --font-mono: "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas,
+    ui-monospace, monospace;
+}
+
+:root[data-mono-font-family="sfmono"] {
+  --font-mono: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco,
+    "Cascadia Code", Consolas, monospace;
+}
+
+:root[data-mono-font-family="custom"] {
+  --font-mono: var(--font-family-mono-custom, "Cascadia Code"),
+    "Cascadia Code", "SF Mono", Consolas, ui-monospace, monospace;
+}
+
+
+
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {

@@ -63,6 +63,8 @@ const (
 	// Summary so the placeholder still resolves. Replaces the older plain Notice
 	// so a sink can render a distinct, expandable card.
 	CompactionDone
+	// Retrying marks a stream-recovery retry attempt.
+	Retrying
 )
 
 // Level classifies a Notice so sinks can style or filter it.
@@ -170,6 +172,9 @@ type Event struct {
 	Ask         Ask        // AskRequest
 	Err         error      // TurnDone: non-nil on failure
 	Compaction  Compaction // Compaction
+	// RetryAttempt / RetryMax track stream-recovery progress (Retrying events).
+	RetryAttempt int // Retrying: current attempt number (1-based)
+	RetryMax     int // Retrying: maximum allowed attempts
 }
 
 // Sink consumes a turn's events. The agent calls Emit serially from its run

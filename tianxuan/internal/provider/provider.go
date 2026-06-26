@@ -7,6 +7,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -356,4 +357,32 @@ func Kinds() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// StreamInterruptedError 标记一个可恢复的流传输中断——在调用者已经收到模型输出
+// 之后发生。Provider 不能自行重放这些请求，因为那样可能重复可见文本或工具调用；
+// Agent 可以注入尾部恢复提示语来替代。
+// (Design adopted from DeepSeek-Reasonix-V1.12)
+type StreamInterruptedError struct {
+	Err error
+}
+
+func (e *StreamInterruptedError) Error() string {
+	if e == nil || e.Err == nil {
+		return "stream interrupted"
+	}
+	return e.Err.Error()
+}
+
+func (e *StreamInterruptedError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+// IsStreamInterrupted 检查 error 是否为可恢复的流中断。
+func IsStreamInterrupted(err error) bool {
+	var interrupted *StreamInterruptedError
+	return errors.As(err, &interrupted)
 }

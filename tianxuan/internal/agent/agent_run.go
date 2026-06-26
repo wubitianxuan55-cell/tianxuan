@@ -82,12 +82,37 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			a.maybeRecallReminder()
 
 			graceRound := false
+		// V10.0: stream recovery + empty final detection counters
+		streamRecoveries := 0
+		const maxStreamRecoveries = 3
+		emptyFinalBlocks := 0
+		const maxEmptyFinalBlocks = 3
 		for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
-		text, reasoning, signature, calls, usage, err := a.stream(ctx, step+1)
+		text, reasoning, signature, calls, usage, interrupted, err := a.stream(ctx, step+1)
 		if err != nil {
+			// V10.0: stream recovery — save partial output and inject recovery prompt
+			if interrupted && streamRecoveries < maxStreamRecoveries {
+				streamRecoveries++
+				if strings.TrimSpace(text) != "" {
+					a.session.Add(provider.Message{
+						Role:               provider.RoleAssistant,
+						Content:            text,
+						ReasoningContent:   reasoning,
+						ReasoningSignature: signature,
+					})
+				}
+				a.session.Add(provider.Message{
+					Role:    provider.RoleUser,
+					Content: streamRecoveryMessage(strings.TrimSpace(text) != ""),
+				})
+				a.sink.Emit(event.Event{Kind: event.Retrying, RetryAttempt: streamRecoveries, RetryMax: maxStreamRecoveries})
+				step-- // recovery retries do not consume the tool-round budget
+				continue
+			}
 			a.preWG.Wait() // drain any in-flight pre-execution goroutines before returning
 			return err
 		}
+		streamRecoveries = 0
 
 		// V6.0 P1: ������Ƚضϡ���finish_reason="length" ���޹��ߵ���ʱע�� nudge
 		if a.maybeContinueOutputLength(usage, calls) {
@@ -162,7 +187,22 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				return nil
 			}
 
+			// V10.0: empty final detection — model returned no tool calls
+			// and no visible text. Inject retry prompt; fail after 3 blocks.
+			if strings.TrimSpace(text) == "" {
+				emptyFinalBlocks++
+				if emptyFinalBlocks >= maxEmptyFinalBlocks {
+					return fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
+				}
+				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+					Text: fmt.Sprintf("empty final answer blocked: retrying (%d/%d)", emptyFinalBlocks, maxEmptyFinalBlocks)})
+				a.session.Add(provider.Message{Role: provider.RoleUser, Content: emptyFinalRetryMessage()})
+				a.maybeCompact(ctx, usage)
+				continue
+			}
+
 			// Gate 1: task gate �� ���δ�������
+
 			if a.taskGate() {
 				continue
 			}
@@ -178,7 +218,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		}
 
 		// V4.2: wait for stream() pre-execution goroutines to finish before
-		// dispatching the full batch �� avoids races and double-execution.
+		// dispatching the full batch — avoids races and double-execution.
+		emptyFinalBlocks = 0 // V10.0: reset empty-final counter when model calls tools successfully
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
 		// V8.0 P0-2: deterministic pruning — skip duplicate tool results.

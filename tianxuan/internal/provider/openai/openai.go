@@ -457,7 +457,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	}
 
 	if err := scanner.Err(); err != nil {
-		out <- provider.Chunk{Type: provider.ChunkError, Err: fmt.Errorf("%s: read stream: %w", c.name, err)}
+		out <- provider.Chunk{Type: provider.ChunkError, Err: &provider.StreamInterruptedError{Err: fmt.Errorf("%s: read stream: %w", c.name, err)}}
 		return
 	}
 

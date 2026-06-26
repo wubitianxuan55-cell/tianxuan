@@ -9,7 +9,7 @@ import (
 	"tianxuan/internal/provider"
 )
 
-func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, string, []provider.ToolCall, *provider.Usage, error) {
+func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, string, []provider.ToolCall, *provider.Usage, bool, error) {
 	// Build tools and messages. L4 conversation messages always come from
 	// Session �� NOT from ctxMgr.AssemblePrompt() which reads FlowLayer.
 	// FlowLayer is only updated during compact, so reading it on every turn
@@ -32,7 +32,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 		Temperature: a.temperature,
 	})
 	if err != nil {
-		return "", "", "", nil, nil, err
+		return "", "", "", nil, nil, false, err
 	}
 
 	// A PostLLMCall hook rewrites the whole reasoning block, so when one is wired
@@ -101,7 +101,10 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				a.lastPrefixShape = postShape
 			}
 		case provider.ChunkError:
-			return "", "", "", nil, nil, chunk.Err
+			if provider.IsStreamInterrupted(chunk.Err) {
+				return text.String(), reasoning.String(), signature, calls, usage, true, chunk.Err
+			}
+			return "", "", "", nil, nil, false, chunk.Err
 		}
 	}
 	// With a PostLLMCall hook, the live stream was suppressed above; transform the
@@ -130,7 +133,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	if text.Len() > 0 || display != "" {
 		a.sink.Emit(event.Event{Kind: event.Message, Text: text.String(), Reasoning: display})
 	}
-	return text.String(), stored, signature, calls, usage, nil
+	return text.String(), stored, signature, calls, usage, false, nil
 }
 
 // repairArguments applies Tool-Call-Repair fixes (flatten wrappers, scavenge

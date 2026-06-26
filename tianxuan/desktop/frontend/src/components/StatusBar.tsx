@@ -130,8 +130,11 @@ export function StatusBar({
   // ── 缓存率 ──
   const totalCacheable = sessionHit + sessionMiss;
   const sessionRate = totalCacheable > 0 ? Math.round((sessionHit / totalCacheable) * 100) : 0;
+  const nowDenom = (usage?.cacheHitTokens ?? 0) + (usage?.cacheMissTokens ?? 0);
+  const nowRate = nowDenom > 0 ? Math.round(((usage?.cacheHitTokens ?? 0) / nowDenom) * 100) : null;
   const cacheColor = sessionRate >= 80 ? "text-ok" : sessionRate >= 50 ? "text-warning" : "text-err";
   const cacheBadge = sessionRate >= 80 ? "bg-ok/10 border-ok/20" : sessionRate >= 50 ? "bg-warning/10 border-warning/20" : "bg-err/10 border-err/20";
+  const nowColor = nowRate == null ? "" : nowRate >= 80 ? "text-ok" : nowRate >= 50 ? "text-warning" : "text-err";
 
   const barH = compact ? "h-6" : "h-8";
   const barPx = compact ? "px-2" : "px-3";
@@ -237,9 +240,10 @@ export function StatusBar({
         {sessionTotal > 0 && usage && (
           <>
             <span className="text-border/40 select-none">│</span>
-            <Tooltip label="缓存命中率">
+            <Tooltip label={nowRate != null ? `本轮 ${nowRate}% · 会话 ${sessionRate}%` : `会话命中率 ${sessionRate}%`}>
               <span className={`${fontSize} font-semibold px-1.5 py-px rounded border ${cacheColor} ${cacheBadge}`}>
                 {t("status.cache", { pct: sessionRate })}
+                {nowRate != null && <span className={`ml-0.5 ${nowColor}`}>·{nowRate}%</span>}
               </span>
             </Tooltip>
             <Tooltip label="本轮提示">

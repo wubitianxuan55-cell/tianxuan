@@ -4,6 +4,7 @@ import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
+import { displayReasoningText } from "../lib/reasoningDisplay";
 import type { Item } from "../lib/store";
 
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
@@ -55,17 +56,27 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
   const t = useT();
   const compact = useCompact();
   const thinkOnly = !!item.reasoning && !item.text;
-  const [reasoningOpen, setReasoningOpen] = useState(false);
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
-  useGSAPCollapse(reasoningBodyRef, reasoningOpen);
 
-  // Keep collapsed by default; user clicks to expand.
+  // 流式推理阶段自动展开，完成后折叠（用户手动操作后以用户为准）
+  const reasoningRunning = item.streaming && !item.text;
+  const [userToggled, setUserToggled] = useState(false);
+  const [reasoningOpenState, setReasoningOpenState] = useState(false);
+  const reasoningOpen = userToggled ? reasoningOpenState : reasoningRunning;
+  useGSAPCollapse(reasoningBodyRef, reasoningOpen);
   const toggleReasoning = useCallback(() => {
-    setReasoningOpen((v) => !v);
+    setUserToggled(true);
+    setReasoningOpenState((v) => !v);
   }, []);
 
   const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
-  const reasoningRunning = item.streaming && !item.text;
+
+  // 流式推理文本截断——防止超长思维链卡顿 UI
+  const reasoningDisplay = displayReasoningText(item.reasoning ?? "", {
+    streaming: item.streaming ?? false,
+    truncateStreaming: true,
+  });
+  const reasoningTruncated = item.reasoning && reasoningDisplay !== item.reasoning;
 
   return (
     <div className={`relative ${compact ? "py-0.5" : "py-1"} ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
@@ -84,12 +95,16 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
             />
             <span>{t("msg.thinking")}</span>
             <span className="text-fg-faint/50">
-              {reasoningRunning ? t("msg.thinkingRunning") ?? "…" : `${reasoningLines} 段`}
+              {reasoningRunning
+                ? reasoningTruncated
+                  ? `…${reasoningDisplay.length} 字符`
+                  : t("msg.thinkingRunning") ?? "…"
+                : `${reasoningLines} 段`}
             </span>
           </button>
           <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
             <div className={`pl-3 ml-1 border-l-2 border-accent/30 bg-accent/[0.03] rounded-sm text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[300px] py-1" : "max-h-[500px] py-1.5"}`}>
-              {item.reasoning}
+              {reasoningDisplay}
             </div>
           </div>
         </div>

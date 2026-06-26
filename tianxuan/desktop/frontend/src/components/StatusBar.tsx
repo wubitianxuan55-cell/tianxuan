@@ -57,19 +57,19 @@ function useTick(on: boolean): number {
 
 // ─── Jobs popover ─────────────────────────────────────────────────
 
-function JobsChip({ jobs }: { jobs: JobView[] }) {
+function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
   const { t } = useI18n();
-  const compact = useCompact();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative inline-flex">
       <button
-        className={`inline-flex items-center gap-1 ${compact ? "text-[10px]" : "text-[11px]"} px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors`}
+        className={`inline-flex items-center gap-1 ${compact ? "text-[11px]" : "text-[11px]"} px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors`}
         onClick={() => setOpen((v) => !v)}
         title={t("status.jobsTitle")}
       >
-        <Cpu size={compact ? 10 : 11} />
-        {jobs.length}
+        <Cpu size={compact ? 11 : 12} />
+        <span>任务</span>
+        <span className="font-mono tabular-nums">{jobs.length}</span>
       </button>
       {open && (
         <>
@@ -110,12 +110,11 @@ export function StatusBar({
   onOpenStats?: () => void;
 }) {
   const compact = useCompact();
-  const { t } = useI18n();
   const now = useTick(running);
 
   const elapsedMs = running && turnStartAt ? Math.max(0, now - turnStartAt) : 0;
   const elapsed = elapsedMs > 0 ? fmtElapsed(elapsedMs) : "";
-  const tokLabel = running && turnTokens > 0 ? `↓${fmtTokens(turnTokens)}` : "";
+  const tokLabel = running && turnTokens > 0 ? fmtTokens(turnTokens) : "";
 
   // ── 会话成本 ──
   const p = priceFor(model);
@@ -136,29 +135,26 @@ export function StatusBar({
   const cacheBadge = sessionRate >= 80 ? "bg-ok/10 border-ok/20" : sessionRate >= 50 ? "bg-warning/10 border-warning/20" : "bg-err/10 border-err/20";
   const nowColor = nowRate == null ? "" : nowRate >= 80 ? "text-ok" : nowRate >= 50 ? "text-warning" : "text-err";
 
-  const barH = compact ? "h-6" : "h-8";
+  const barH = compact ? "h-7" : "h-8";
   const barPx = compact ? "px-2" : "px-3";
-  const fontSize = compact ? "text-[10px]" : "text-[11px]";
+  const fontSize = compact ? "text-[11px]" : "text-[11.5px]";
   const contextPct = context.window > 0 ? Math.round((context.used / context.window) * 100) : 0;
   const contextColor = contextPct > 80 ? "bg-err" : contextPct > 60 ? "bg-warning" : "bg-accent";
 
+  const connLabel = !bridgeAlive ? "离线" : running ? "生成中" : "在线";
+  const connColor = !bridgeAlive ? "bg-err" : running ? "bg-warning ds-pulse" : "bg-ok";
+  const connTextColor = !bridgeAlive ? "text-err" : running ? "text-warning" : "text-ok";
+
   return (
     <div className={`flex items-center gap-2 ${barH} ${barPx} ${fontSize} bg-bg-soft border-t border-border-soft select-none shrink-0`} data-wails-no-drag>
-      {/* ── 左: 连接灯 + 模式 ── */}
+      {/* ── 左: 连接灯 + 状态文字 ── */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <Tooltip label={!bridgeAlive ? "离线" : running ? "生成中" : "在线"}>
-          <span
-            className={`w-2 h-2 rounded-full block ${
-              !bridgeAlive ? "bg-err" : running ? "bg-warning ds-pulse" : "bg-ok"
-            }`}
-          />
+        <Tooltip label={connLabel}>
+          <span className={`w-2 h-2 rounded-full block ${connColor}`} />
         </Tooltip>
-        {!bridgeAlive && (
-          <span className="text-err font-medium">离线</span>
-        )}
+        <span className={`${connTextColor} font-medium`}>{connLabel}</span>
       </div>
 
-      {/* ── 分隔 ── */}
       <span className="text-border/30 select-none">│</span>
 
       {/* ── 中: 运行指标 ── */}
@@ -172,7 +168,7 @@ export function StatusBar({
               <>
                 <span className="text-border/40 select-none">·</span>
                 <Tooltip label="本轮 Token">
-                  <span className="text-fg-dim tabular-nums font-mono">{tokLabel}</span>
+                  <span className="text-fg-dim tabular-nums font-mono">↓{tokLabel}</span>
                 </Tooltip>
               </>
             )}
@@ -189,22 +185,24 @@ export function StatusBar({
                 <span className="text-border/40 select-none">·</span>
                 <Tooltip label={`会话费用 ¥${sessionCost.toFixed(4)}`}>
                   <span className="text-fg-dim font-mono tabular-nums flex items-center gap-0.5">
-                    <Coins size={compact ? 10 : 11} className="text-fg-faint" />
+                    <Coins size={compact ? 11 : 12} className="text-fg-faint" />
+                    <span className="text-fg-faint">费</span>
                     {fmtCost(sessionCost)}
                   </span>
                 </Tooltip>
               </>
             )}
-            {/* 上下文用量 */}
+            {/* 上下文用量 — 加宽带标签 */}
             {context.window > 0 && (
               <>
                 <span className="text-border/40 select-none">·</span>
-                <Tooltip label={`上下文窗口: ${fmtTokens(context.used)} / ${fmtTokens(context.window)}`}>
+                <Tooltip label={`上下文: ${fmtTokens(context.used)} / ${fmtTokens(context.window)}`}>
                   <div className="flex items-center gap-1">
-                    <div className="w-[40px] h-[5px] bg-border rounded-full overflow-hidden">
+                    <span className="text-fg-faint">上下文</span>
+                    <div className="w-[60px] h-[5px] bg-border rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${contextColor}`}
-                        style={{ width: `${Math.min(contextPct, 100)}%` }}
+                        style={{ width: `${Math.min(contextPct, 100)}%` } as React.CSSProperties}
                       />
                     </div>
                     <span className="text-fg-faint font-mono tabular-nums text-[9px]">{contextPct}%</span>
@@ -236,37 +234,41 @@ export function StatusBar({
           </Tooltip>
         )}
 
-        {/* 缓存详情 — 直接平铺 */}
-        {sessionTotal > 0 && usage && (
+        {/* 缓存详情 — 始终显示，带文字标注 */}
+        {usage && sessionTotal > 0 && (
           <>
             <span className="text-border/40 select-none">│</span>
             <Tooltip label={nowRate != null ? `本轮 ${nowRate}% · 会话 ${sessionRate}%` : `会话命中率 ${sessionRate}%`}>
               <span className={`${fontSize} font-semibold px-1.5 py-px rounded border ${cacheColor} ${cacheBadge}`}>
-                {t("status.cache", { pct: sessionRate })}
+                缓存 {sessionRate}%
                 {nowRate != null && <span className={`ml-0.5 ${nowColor}`}>·{nowRate}%</span>}
               </span>
             </Tooltip>
-            <Tooltip label="本轮提示">
-              <span className="text-fg-dim font-mono tabular-nums">{fmtTokens(usage?.promptTokens ?? 0)}</span>
+            <Tooltip label="提示 Token">
+              <span className="text-fg-dim tabular-nums">提{fmtTokens(usage?.promptTokens ?? 0)}</span>
+            </Tooltip>
+            <Tooltip label="输出 Token">
+              <span className="text-fg-dim tabular-nums">出{fmtTokens(usage?.completionTokens ?? 0)}</span>
             </Tooltip>
             <Tooltip label="缓存命中">
-              <span className="text-ok font-mono tabular-nums">{fmtTokens(usage?.cacheHitTokens ?? 0)}</span>
+              <span className="text-ok tabular-nums">✓{fmtTokens(usage?.cacheHitTokens ?? 0)}</span>
             </Tooltip>
             <Tooltip label="缓存未命中">
-              <span className="text-err font-mono tabular-nums">{fmtTokens(usage?.cacheMissTokens ?? 0)}</span>
+              <span className="text-err tabular-nums">✗{fmtTokens(usage?.cacheMissTokens ?? 0)}</span>
             </Tooltip>
           </>
         )}
 
-        {/* 后台任务 */}
-        {jobs && jobs.length > 0 && <JobsChip jobs={jobs} />}
+        {/* 后台任务 — 文字标注 */}
+        {jobs && jobs.length > 0 && <JobsChip jobs={jobs} compact={compact} />}
 
-        {/* 余额 */}
+        {/* 余额 — 文字标注 */}
         {balance?.available && balance.display && (
           <Tooltip label="账户余额">
-            <span className="inline-flex items-center gap-1 text-fg-dim font-mono tabular-nums">
-              <Wallet size={compact ? 10 : 11} />
-              {balance.display}
+            <span className="inline-flex items-center gap-1 text-fg-dim tabular-nums">
+              <Wallet size={compact ? 11 : 12} />
+              <span className="text-fg-faint">余额</span>
+              <span className="font-mono">{balance.display}</span>
             </span>
           </Tooltip>
         )}

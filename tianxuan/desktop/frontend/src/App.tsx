@@ -34,6 +34,7 @@ import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSpla
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { SkillsPanel } from "./components/SkillsPanel";
 import { StatsPanel } from "./components/StatsPanel";
+import { MessageNavigator } from "./components/MessageNavigator";
 import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -97,11 +98,13 @@ export default function App() {
   const { agentMode, setAgentMode, yolo, toggleYolo, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, setBypass, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
-  const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
+  const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
+  const [statsReset, setStatsReset] = useState(0);
   const [capsOpen, setCapsOpen] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("files");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("files");
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
@@ -113,7 +116,7 @@ export default function App() {
 
   const {
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
-    sidebarWidthRef, sidebarExpandBlocked,
+    sidebarWidthRef,
     toggleSidebar, setExpandedSidebarWidth, startSidebarResize,
     resizeSidebarWithKeyboard, handleWorkspacePreviewModeChange,
   } = useSidebar();
@@ -274,7 +277,7 @@ export default function App() {
         return;
       }
       if (!mod) return;
-      if (ke.key === "n" && !state.running) { ke.preventDefault(); void startNewSession(); return; }
+      if (ke.key === "n" && !state.running) { ke.preventDefault(); void newSessionAndReset(); return; }
       if (ke.key === "k") { ke.preventDefault(); setPaletteOpen(true); return; }
       if (ke.key === ",") { ke.preventDefault(); setSettingsOpen(true); return; }
       if (ke.key === "M" && ke.shiftKey) { ke.preventDefault(); void openMemory(); return; }
@@ -286,11 +289,7 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [state.running, capsOpen, settingsOpen, memView, histView, showPlan, workspacePanelOpen]);
 
-  const sidebarToggleTitle = sidebarExpandBlocked
-    ? t("sidebar.expandBlocked")
-    : sidebarCollapsed
-      ? t("sidebar.expand")
-      : t("sidebar.collapse");
+  const sidebarToggleTitle = sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse");
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
@@ -306,7 +305,7 @@ export default function App() {
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
     const cmds: PaletteItem[] = [
-      { id: "cmd-new", group: t("palette.group.commands") ?? "命令", title: t("topbar.newSession") ?? "新建会话", icon: <SquarePen size={15} />, compact: true, keywords: ["new", "新建"], run: () => void startNewSession() },
+      { id: "cmd-new", group: t("palette.group.commands") ?? "命令", title: t("topbar.newSession") ?? "新建会话", icon: <SquarePen size={15} />, compact: true, keywords: ["new", "新建"], run: () => void newSessionAndReset() },
       { id: "cmd-settings", group: t("palette.group.commands") ?? "命令", title: t("topbar.settings") ?? "设置", icon: <SettingsIcon size={15} />, compact: true, keywords: ["settings", "设置"], run: () => setSettingsOpen(true) },
       { id: "cmd-memory", group: t("palette.group.commands") ?? "命令", title: t("topbar.memory") ?? "记忆", icon: <Brain size={15} />, compact: true, keywords: ["memory", "记忆"], run: () => void openMemory() },
       { id: "cmd-history", group: t("palette.group.commands") ?? "命令", title: t("topbar.history") ?? "历史", icon: <MessageSquare size={15} />, compact: true, keywords: ["history", "历史"], run: () => void openHistory() },
@@ -369,12 +368,12 @@ export default function App() {
               className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover no-drag ${
                 sidebarCollapsed ? "ml-0" : "ml-auto"
               } ${
-                sidebarExpandBlocked ? "!text-fg-faint !bg-transparent !cursor-not-allowed opacity-55" : ""
+                ""
               }`}
-              onClick={sidebarExpandBlocked ? undefined : toggleSidebar}
+              onClick={toggleSidebar}
               title={sidebarToggleTitle}
               aria-label={sidebarToggleTitle}
-              aria-disabled={sidebarExpandBlocked}
+              
             >
               {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
             </button>
@@ -386,13 +385,17 @@ export default function App() {
               sidebarCollapsed ? "justify-center w-9 h-9 !rounded-full !p-0 !gap-0" : ""
             }`}
             style={{boxShadow: "var(--ds-shadow-accent-btn)"}}
-            onClick={() => void startNewSession()}
+            onClick={() => void newSessionAndReset()}
             disabled={state.running}
             title={state.running ? t("common.busyHint") : t("topbar.newSession")}
           >
             <SquarePen size={15} />
             {!sidebarCollapsed && <span>{t("topbar.newSession")}</span>}
           </button>
+          {/* Collapsed session indicator */}
+          {sidebarCollapsed && (() => { const cur = sidebarSessions.find(s => s.current); return cur ? (
+            <button className="w-9 h-9 mb-3 rounded-full bg-sidebar-active text-accent text-[12px] font-bold flex items-center justify-center cursor-pointer hover:bg-sidebar-hover transition-colors no-drag" title={sessionTitle(cur, "")} type="button">{(cur.title || cur.preview || "?").charAt(0).toUpperCase()}</button>
+          ) : null; })()}
 
           {/* Sessions section (hidden when collapsed) */}
           {!sidebarCollapsed && (
@@ -408,7 +411,7 @@ export default function App() {
                   {t("sidebar.viewAll")}
                 </button>
               </div>
-              {sidebarSessions.length > 0 && <input className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag" placeholder={t("sidebar.search")} value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />}
+              <input className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag" placeholder={t("sidebar.search")} value={sidebarQuery} onChange={e => setSidebarQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
               <div className="min-h-0 overflow-y-auto pr-0.5">
                 {(() => {
                   const q = sidebarQuery.trim().toLowerCase();
@@ -433,6 +436,7 @@ export default function App() {
                     </div>
                   ));
                 })()}
+              {hasMore && !sidebarQuery && <button className="w-full mt-1 py-1.5 text-fg-faint text-[11.5px] border border-border-soft rounded-md bg-transparent cursor-pointer hover:text-fg hover:bg-sidebar-hover transition-colors" onClick={() => void loadMore()} type="button">Show more...</button>}
               </div>
             </section>
           )}
@@ -512,7 +516,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
               <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
-              <ToolbarButton onClick={() => void startNewSession()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
+              <ToolbarButton onClick={() => void newSessionAndReset()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
               <ThemeSwitcher theme={themeNow} onSet={applyTheme} onStore={setTheme} />
             </div>
           </header>
@@ -623,6 +627,13 @@ export default function App() {
               <BarChart3 size={13} />
               <span>统计</span>
             </button>
+            <button
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "messages" ? "text-accent border-accent" : ""}`}
+              onClick={() => setRightTab("messages")}
+            >
+              <MessageSquare size={13} />
+              <span>消息</span>
+            </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {rightTab === "files" ? (
@@ -644,8 +655,11 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
+            {rightTab === "messages" && (
+              <MessageNavigator items={state.items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />
+            )}
           </div>
         </div>
       )}

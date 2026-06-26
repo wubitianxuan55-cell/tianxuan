@@ -124,13 +124,13 @@ function HitPct({ hit, total }: { hit: number; total: number }) {
   );
 }
 
-export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, toolCounts, skillCounts }: {
+export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, resetKey, toolCounts, skillCounts }: {
   usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string;
-  sessionKey: string; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
+  sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
 }) {
   const turnRef = useRef(0);
   const stepRef = useRef(0);
-  const turnAccumRef = useRef({ prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 });
+  const turnAccumRef = useRef<{ prompt: number; completion: number; cacheHit: number; cacheMiss: number }>({ prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 });
   const perTurnRef = useRef<WireUsage | null>(null);
   const [data, setData] = useState<StoredData>(() => {
     const loaded = loadData(sessionKey);
@@ -144,6 +144,18 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
   const keyChanged = lastKeyRef.current !== sessionKey;
   if (keyChanged) lastKeyRef.current = sessionKey;
 
+
+  const lastResetRef = useRef(resetKey);
+  useEffect(() => {
+    if (resetKey === undefined || resetKey === lastResetRef.current) return;
+    lastResetRef.current = resetKey;
+    saveData(sessionKey, { turns: [], steps: [] });
+    turnRef.current = 0;
+    stepRef.current = 0;
+    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
+    perTurnRef.current = null;
+    setData({ turns: [], steps: [] });
+  }, [resetKey, sessionKey]);
   useEffect(() => {
     if (!keyChanged) return;
     const loaded = loadData(sessionKey);
@@ -225,7 +237,6 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
   // 会话总 Token — 从 history 累计
   const sessionPromptTk = useMemo(() => history.reduce((s, r) => s + r.prompt, 0), [history]);
   const sessionComplTk = useMemo(() => history.reduce((s, r) => s + r.completion, 0), [history]);
-
   // 有数据？
   const hasAnyData = history.length > 0 || stepHistory.length > 0;
 
@@ -278,7 +289,6 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
           </div>
           {sessionPrompt > 0 && <HitPct hit={sessionHit} total={sessionPrompt} />}
         </div>
-
         {/* ── 本轮 ── */}
         {lastTurn && (
           <div className="py-3 border-b border-border-soft">

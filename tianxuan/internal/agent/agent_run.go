@@ -226,10 +226,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			if a.goalGate() {
 				continue
 			}
-			// Gate 3: verify gate �� orchestrate ģʽ��֤
-			if a.verifyGate() {
-				continue
-			}
+			// V10.3: verify gate merged into taskGate — no separate call needed
 			// V10.0: final-answer readiness gate — verify evidence before accepting completion
 			if blocked, reason := a.finalReadinessCheck(); blocked {
 				finalReadinessBlocks++

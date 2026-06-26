@@ -147,7 +147,12 @@ type subagentSkillTool struct {
 }
 
 func (t *subagentSkillTool) Name() string        { return t.toolName }
-func (*subagentSkillTool) ReadOnly() bool        { return false }
+// ReadOnly is true: explore/research/review/security_review are all read-only by nature.
+// The sub-agent itself inherits plan mode from the parent, so any writer tool
+// calls within the sub-agent are blocked at the sub-agent's own executeOne gate.
+// Making these available in plan mode enables research-heavy workflows without
+// affecting the prefix cache (ReadOnly is a runtime property, not part of the API schema).
+func (*subagentSkillTool) ReadOnly() bool        { return true }
 func (t *subagentSkillTool) Description() string { return t.description }
 
 func (t *subagentSkillTool) Schema() json.RawMessage {

@@ -23,6 +23,7 @@ interface ControllerState {
   items: Item[]; running: boolean; turnActive: boolean; approval?: WireApproval; ask?: WireAsk;
   usage?: WireUsage; context: ContextInfo; meta?: Meta; balance?: BalanceInfo; jobs: JobView[];
   tcca?: TCCAReport;
+  subAgentActive: boolean;
   currentAssistant?: string; pendingUser?: string; discardTurn?: boolean;
   turnStartAt: number; turnTokens: number; seq: number;
   sessionTotal: number;
@@ -93,7 +94,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
       const id = t.id || `tool${s.seq}`;
       const idx = s.items.findIndex(it => it.kind === "tool" && it.id === id);
       if (idx >= 0) { const next = [...s.items]; const it = next[idx]; if (it.kind === "tool") next[idx] = { ...it, name: t.name, args: t.args ? t.args : it.args, readOnly: t.readOnly }; return { ...s, currentAssistant: undefined, items: next }; }
-      return { ...s, seq: s.seq + 1, currentAssistant: undefined, items: [...s.items, { kind: "tool", id, name: t.name, args: t.args ?? "", readOnly: t.readOnly, status: "running", parentId: t.parentId }] };
+      return { ...s, seq: s.seq + 1, currentAssistant: undefined, subAgentActive: s.subAgentActive || !!(t.parentId), items: [...s.items, { kind: "tool", id, name: t.name, args: t.args ?? "", readOnly: t.readOnly, status: "running", parentId: t.parentId }] };
     }
     case "tool_result": {
       const t = e.tool; if (!t) return s; const next = [...s.items];
@@ -117,8 +118,8 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
         sessionCacheMissTokens: u.sessionCacheMissTokens > 0 ? u.sessionCacheMissTokens : (s.perTurnUsage?.sessionCacheMissTokens ?? 0),
       } : u;
       // V5.31: record each API call as a step for per-step stats
-      const steps = u ? [...s.turnSteps, u] : s.turnSteps;
-      return { ...s, usage: u, perTurnUsage: acc, turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (u?.completionTokens ?? 0) };
+      // 子代理和主模型合并统计 —— 不再通过 source 字段区分
+      const tagged = u ? { ...u } : undefined; const steps = tagged ? [...s.turnSteps, tagged] : s.turnSteps; return { ...s, usage: tagged, perTurnUsage: acc, turnSteps: steps, subAgentActive: false, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };
     }
     case "notice": return { ...s, running: s.turnActive ? s.running : false, seq: s.seq + 1, items: [...s.items, { kind: "notice", id: `n${s.seq}`, level: e.level ?? "info", text: e.text ?? "" }] };
     case "phase": return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "phase", id: `p${s.seq}`, text: e.text ?? "" }] };
@@ -159,7 +160,7 @@ const initialState: ControllerState = {
   context: { used: 0, window: 0 }, meta: undefined, balance: undefined,
   tcca: undefined,
   jobs: [], currentAssistant: undefined, pendingUser: undefined, discardTurn: false,
-  turnStartAt: 0, turnTokens: 0, seq: 0, sessionTotal: 0, sessionNonce: 0, perTurnUsage: null, turnSteps: [],
+  turnStartAt: 0, turnTokens: 0, seq: 0, sessionTotal: 0, sessionNonce: 0, perTurnUsage: null, turnSteps: [], subAgentActive: false,
   _dispatch: () => {},
 };
 

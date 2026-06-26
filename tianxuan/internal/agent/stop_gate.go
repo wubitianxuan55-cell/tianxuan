@@ -19,7 +19,7 @@ const (
 	stopGateReentryCap  = taskGateCap // legacy alias; use taskGateCap
 )
 
-// --- Gate 1: Task gate ---
+// --- Gate 1: Task gate (V10.3: merged with verify gate) ---
 
 // taskGateNudge is the synthetic user message injected when the model tries
 // to stop but has unfinished tasks. Compile-time constant for cache stability.
@@ -33,16 +33,30 @@ const taskGateNudgeHeader = "[system] You still have unfinished tasks — " +
 // Returns true when a nudge was injected (caller should continue the loop).
 //
 // V7.0: separated from goalGate. Uses its own reentry counter (taskGateReentry).
-// Does NOT check goal — that's Gate 2.
+// V10.3: skips when planMode is active (tasks can't be completed without write tools).
+// V10.3: in orchestrate mode, verify nudge is merged into taskGate to save one API round-trip.
 func (a *AgentRunner) taskGate() bool {
-	// explore mode: no task enforcement — research and answer
+	// explore mode: no task enforcement
 	if a.agentMode == "explore" {
+		return false
+	}
+	// plan mode: can't complete tasks without write tools — don't block
+	if a.planMode.Load() {
 		return false
 	}
 
 	incomplete := countIncompleteTodos(a.session.Messages)
 	if incomplete == 0 {
 		a.taskGateReentry = 0 // reset on clean pass
+		// Orchestrate mode — tasks done, fire verify once (merged)
+		if a.agentMode == "orchestrate" && !a.verifyGateFired {
+			a.verifyGateFired = true
+			a.session.Add(provider.Message{
+				Role:    provider.RoleUser,
+				Content: stopGateOrchestrateVerifyNudge,
+			})
+			return true
+		}
 		return false
 	}
 
@@ -51,10 +65,15 @@ func (a *AgentRunner) taskGate() bool {
 		return false // cap exceeded: allow stop
 	}
 
-	// Build a nudge listing incomplete task count
+	// Orchestrate mode: combine task + verify into ONE nudge
+	msg := taskGateNudgeHeader
+	if a.agentMode == "orchestrate" && !a.verifyGateFired {
+		msg = taskGateNudgeHeader + " " + stopGateOrchestrateVerifyNudge
+		a.verifyGateFired = true
+	}
 	a.session.Add(provider.Message{
 		Role:    provider.RoleUser,
-		Content: taskGateNudgeHeader,
+		Content: msg,
 	})
 	return true
 }
@@ -121,7 +140,7 @@ func (a *AgentRunner) goalGate() bool {
 	return true
 }
 
-// --- Gate 3: Orchestrate verification ---
+// --- Gate 3: Orchestrate verification (V10.3: merged into taskGate, kept as alias) ---
 
 // stopGateOrchestrateVerifyNudge is injected in orchestrate mode when the
 // model tries to stop after completing all tasks. Compile-time constant.
@@ -135,12 +154,13 @@ const stopGateOrchestrateVerifyNudge = "[system] All tasks appear complete. " +
 // (orchestrate mode). Returns true when a nudge was injected.
 //
 // V7.0: this is now a standalone verify step, not mixed with the stop gates.
+// V10.3: functionality merged into taskGate. Kept for backward compatibility.
 func (a *AgentRunner) verifyGate() bool {
 	if a.agentMode != "orchestrate" {
 		return false
 	}
 	if a.verifyGateFired {
-		return false // only fire once
+		return false // already fired (either standalone or merged in taskGate)
 	}
 	a.verifyGateFired = true
 	a.session.Add(provider.Message{

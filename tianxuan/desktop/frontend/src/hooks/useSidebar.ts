@@ -14,7 +14,6 @@ export function useSidebar() {
   const effectiveSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const sidebarWidthRef = useRef(effectiveSidebarWidth);
   sidebarWidthRef.current = effectiveSidebarWidth;
-  const sidebarExpandBlocked = sidebarCollapsed && sidebarBeforeRef.current !== null;
 
   const toggleSidebar = useCallback(() => {
     sidebarBeforeRef.current = null;
@@ -76,10 +75,15 @@ export function useSidebar() {
     [setExpandedSidebarWidth, sidebarCollapsed, sidebarWidth],
   );
 
+  // Preview mode: auto-collapse sidebar to make room, but allow manual re-expand.
+  // On preview exit, restore to the remembered collapse state.
   const handleWorkspacePreviewModeChange = useCallback((active: boolean) => {
     if (active) {
       if (sidebarBeforeRef.current === null) sidebarBeforeRef.current = sidebarCollapsed;
-      if (!sidebarCollapsed) { setSidebarCollapsed(false); saveSidebarCollapsed(true); }
+      if (!sidebarCollapsed) {
+        setSidebarCollapsed(true);
+        saveSidebarCollapsed(true);
+      }
     } else {
       const restore = sidebarBeforeRef.current;
       sidebarBeforeRef.current = null;
@@ -92,7 +96,7 @@ export function useSidebar() {
 
   return {
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
-    sidebarWidthRef, sidebarExpandBlocked, sidebarBeforeRef,
+    sidebarWidthRef,
     toggleSidebar, setExpandedSidebarWidth, startSidebarResize,
     resizeSidebarWithKeyboard, handleWorkspacePreviewModeChange,
     setSidebarWidth, setSidebarCollapsed,

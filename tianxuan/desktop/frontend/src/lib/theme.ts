@@ -3,7 +3,7 @@
 // by setting data-theme on <html>, or "auto" to remove it and follow the OS.
 // The choice persists in localStorage and is applied on load.
 
-export type Theme = "auto" | "light" | "dark" | "warm" | "ice";
+export type Theme = "auto" | "light" | "dark" | "warm" | "ice" | "forest" | "midnight" | "neon" | "mono";
 
 const KEY = "tianxuan-theme";
 
@@ -17,16 +17,22 @@ function normalizeTheme(value: unknown): Theme | null {
       return "auto";
     case "light":
     case "focus":
-    case "forest":
       return "light";
     case "dark":
-    case "midnight":
     case "contrast":
       return "dark";
     case "warm":
       return "warm";
     case "ice":
       return "ice";
+    case "forest":
+      return "forest";
+    case "midnight":
+      return "midnight";
+    case "neon":
+      return "neon";
+    case "mono":
+      return "mono";
     default:
       return null;
   }

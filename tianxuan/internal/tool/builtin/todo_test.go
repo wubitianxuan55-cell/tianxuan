@@ -28,6 +28,7 @@ func TestTodoWriteRejectsBadLevel(t *testing.T) {
 
 func TestTodoWriteRejectsNewCompletedWithoutCompleteStepReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,
@@ -44,6 +45,7 @@ func TestTodoWriteRejectsNewCompletedWithoutCompleteStepReceipt(t *testing.T) {
 
 func TestTodoWriteAcceptsNewCompletedWithCompleteStepReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,
@@ -69,6 +71,7 @@ func TestTodoWriteAllowsInitialCompletedWithoutBaseline(t *testing.T) {
 
 func TestTodoWriteIgnoresFailedCompleteStepReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,

@@ -164,6 +164,15 @@ func verifyTodoCompletionTransitions(ctx context.Context, todos []todoItem) erro
 	if !ok {
 		return nil
 	}
+	// V10.8: 只在严格验证模式（Plan Mode）下强制 complete_step 验证
+	// 普通模式下允许自由标记 todo 状态，由 complete_step 自行验证
+	strictMode := false
+	if ledger, ok := evidence.FromContext(ctx); ok {
+		strictMode = ledger.StrictVerification()
+	}
+	if !strictMode {
+		return nil
+	}
 	missing, hasBaseline := ledger.UnverifiedCompletedTodos(toEvidenceTodos(todos))
 	if !hasBaseline || len(missing) == 0 {
 		return nil

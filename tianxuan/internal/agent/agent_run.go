@@ -251,7 +251,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
 		// V8.0 P0-2: deterministic pruning — skip duplicate tool results.
-		// Hash (toolName + args + result) to detect identical outcomes.
+		// V10.8: only dedup ReadOnly tools — bash/git_commit etc. may produce
+		// different results on repeated calls (state changed between calls).
 		for i, call := range calls {
 			// Skip suppressed calls (already have placeholder result).
 			if strings.HasPrefix(results[i], "suppressed:") {
@@ -263,28 +264,28 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				})
 				continue
 			}
-			// Compute dedup key: toolName | first 64 chars of args | first 64 chars of result
-			dk := call.Name + "|" + truncateStr(call.Arguments, 64) + "|" + truncateStr(results[i], 64)
-			if a.dedupHashes == nil {
-				a.dedupHashes = make(map[string]bool)
+			// Only dedup read-only tools — writers may legitimately change state
+			dedupOK := false
+			if t, ok := a.tools.Get(call.Name); ok {
+				dedupOK = t.ReadOnly()
 			}
-			if a.dedupHashes[dk] {
-				// Same tool + args + result already seen — skip full result.
-				a.session.Add(provider.Message{
-					Role:       provider.RoleTool,
-					Content:    "[cached — same as previous " + call.Name + " call]",
-					ToolCallID: call.ID,
-					Name:       call.Name,
-				})
-			} else {
-				a.dedupHashes[dk] = true
-				a.session.Add(provider.Message{
-					Role:       provider.RoleTool,
-					Content:    results[i],
-					ToolCallID: call.ID,
-					Name:       call.Name,
-				})
+			if dedupOK {
+				dk := call.Name + "|" + truncateStr(call.Arguments, 64) + "|" + truncateStr(results[i], 64)
+				if a.dedupHashes == nil {
+					a.dedupHashes = make(map[string]bool)
+				}
+				if a.dedupHashes[dk] {
+					results[i] = "[cached — same as previous " + call.Name + " call]"
+				} else {
+					a.dedupHashes[dk] = true
+				}
 			}
+			a.session.Add(provider.Message{
+				Role:       provider.RoleTool,
+				Content:    results[i],
+				ToolCallID: call.ID,
+				Name:       call.Name,
+			})
 		}
 
 		// V10.0: advance canonical todo state for successful complete_step calls

@@ -45,11 +45,33 @@ type Receipt struct {
 
 // Ledger stores the receipts available to complete_step for the current turn.
 type Ledger struct {
-	mu       sync.Mutex
-	receipts []Receipt
+	mu             sync.Mutex
+	receipts       []Receipt
+	strictVerify   bool // V10.8: only enforce complete_step evidence in Plan Mode
 }
 
 func NewLedger() *Ledger { return &Ledger{} }
+
+// SetStrictVerification enables/disables strict evidence verification.
+// Should be set to true only in Plan Mode where complete_step receipts are required.
+func (l *Ledger) SetStrictVerification(v bool) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.strictVerify = v
+}
+
+// StrictVerification reports whether strict evidence checking is enabled.
+func (l *Ledger) StrictVerification() bool {
+	if l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.strictVerify
+}
 
 // Reset clears receipts between user turns.
 func (l *Ledger) Reset() {

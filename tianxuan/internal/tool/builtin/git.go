@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -298,20 +299,31 @@ func (gitCommit) Execute(ctx context.Context, args json.RawMessage) (string, err
 }
 
 // autoCommitMessage generates a conventional-commit-style message from diff stat.
+// V10.7: enhanced to include representative file names for more descriptive messages.
 func autoCommitMessage(stat string) string {
 	lines := strings.Split(strings.TrimSpace(stat), "\n")
 	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
 		return "chore: update"
 	}
 
-	// Count file types
+	// Parse file paths and change counts from the diff stat
+	type fileStat struct {
+		path   string
+		change string // e.g. "2 +-"
+	}
+	var files []fileStat
 	var goFiles, tsFiles, mdFiles, cfgFiles, otherFiles int
 	for _, line := range lines {
 		if !strings.Contains(line, "|") {
 			continue
 		}
-		path := strings.TrimSpace(strings.SplitN(line, "|", 2)[0])
-		path = strings.TrimSpace(path)
+		parts := strings.SplitN(line, "|", 2)
+		path := strings.TrimSpace(parts[0])
+		change := ""
+		if len(parts) > 1 {
+			change = strings.TrimSpace(parts[1])
+		}
+		files = append(files, fileStat{path: path, change: change})
 		switch {
 		case strings.HasSuffix(path, ".go"):
 			goFiles++
@@ -328,12 +340,12 @@ func autoCommitMessage(stat string) string {
 		}
 	}
 
-	// Build type and scope
-	scope := ""
+	// Build type
 	msgType := "chore"
+	scope := ""
 	if goFiles > 0 {
 		msgType = "feat"
-		if goFiles > tsFiles+mdFiles+cfgFiles+otherFiles {
+		if goFiles >= tsFiles+mdFiles+cfgFiles+otherFiles {
 			scope = "(core)"
 		}
 	}
@@ -349,8 +361,34 @@ func autoCommitMessage(stat string) string {
 		scope = "(config)"
 	}
 
+	// Build a short summary from representative file names
+	filePaths := make([]string, 0, len(files))
+	for _, f := range files {
+		filePaths = append(filePaths, f.path)
+	}
+	fileSummary := summarizeFiles(filePaths)
 	changes := statSummary(lines)
-	return fmt.Sprintf("%s%s: %s", msgType, scope, changes)
+
+	return fmt.Sprintf("%s%s: %s — %s", msgType, scope, fileSummary, changes)
+}
+
+// summarizeFiles extracts a representative short summary from file paths.
+// Returns something like "edit_file tool + compact.go" or "3 files".
+func summarizeFiles(filePaths []string) string {
+	if len(filePaths) == 0 {
+		return "update"
+	}
+	if len(filePaths) == 1 {
+		return filepath.Base(filePaths[0])
+	}
+	if len(filePaths) <= 3 {
+		names := make([]string, 0, len(filePaths))
+		for _, p := range filePaths {
+			names = append(names, filepath.Base(p))
+		}
+		return strings.Join(names, " + ")
+	}
+	return fmt.Sprintf("%d files", len(filePaths))
 }
 
 func statSummary(lines []string) string {

@@ -142,7 +142,12 @@ func (a *AgentRunner) maybeCompact(ctx context.Context, u *provider.Usage) {
 	}
 
 	// ── Tier 3: LLM summary compaction ──
-	if err := a.compact(ctx, "auto", "", force); err != nil {
+	instructions := ""
+	// V10.7: 注入当前计划进度，compaction 后 agent 可恢复 todo 状态
+	if progress := readProgressFile(); progress != "" {
+		instructions = "Include this task progress in the summary under ## Pending & next step:\n" + progress
+	}
+	if err := a.compact(ctx, "auto", instructions, force); err != nil {
 		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
 			Text: fmt.Sprintf("compaction skipped: %v", err)})
 		return
@@ -691,6 +696,26 @@ func (a *AgentRunner) forceRatio() float64 {
 
 // ─── V5.0 legacy: preserved for checkpoint use ───
 
-
 // ─── Todos extraction for backward compatibility ───
 
+// readProgressFile reads .tianxuan/progress.md from the project root (found by
+// walking up from cwd). Returns "" if the file doesn't exist or can't be read.
+// Used by maybeCompact to inject current todo state into compaction instructions.
+func readProgressFile() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	// Walk up looking for .tianxuan/
+	for {
+		candidate := filepath.Join(dir, ".tianxuan", "progress.md")
+		if data, err := os.ReadFile(candidate); err == nil {
+			return string(data)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}

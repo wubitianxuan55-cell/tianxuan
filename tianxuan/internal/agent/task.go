@@ -265,16 +265,31 @@ func RunSubAgent(ctx context.Context, prov provider.Provider, reg *tool.Registry
 	sess := NewSession(sysPrompt)
 	sub := New(prov, reg, sess, opts, sink)
 	// V5.30: 继承父代理工具集，使 tools JSON 段缓存命中
-	if err := sub.Run(ctx, prompt); err != nil {
-		return "", fmt.Errorf("sub-agent: %w", err)
-	}
-	for i := len(sess.Messages) - 1; i >= 0; i-- {
-		m := sess.Messages[i]
-		if m.Role == provider.RoleAssistant && strings.TrimSpace(m.Content) != "" {
-			return m.Content, nil
+	runErr := sub.Run(ctx, prompt)
+	// V10.5: 即使 Run 出错（如超时），也尝试提取最后一条助手消息作为部分结果
+	lastMsg := extractLastAssistantMessage(sess.Messages)
+	if runErr != nil {
+		if lastMsg != "" {
+			return lastMsg, fmt.Errorf("sub-agent terminated with error (partial result returned): %w", runErr)
 		}
+		return "", fmt.Errorf("sub-agent: %w", runErr)
+	}
+	if lastMsg != "" {
+		return lastMsg, nil
 	}
 	return "", fmt.Errorf("sub-agent finished without producing a final answer")
+}
+
+// extractLastAssistantMessage finds the last non-empty assistant message
+// in the session, traversing from the end. Returns "" if none found.
+func extractLastAssistantMessage(msgs []provider.Message) string {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		m := msgs[i]
+		if m.Role == provider.RoleAssistant && strings.TrimSpace(m.Content) != "" {
+			return m.Content
+		}
+	}
+	return ""
 }
 
 func NestedSink(ctx context.Context, fallback event.Sink) event.Sink {

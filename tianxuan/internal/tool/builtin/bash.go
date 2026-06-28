@@ -43,7 +43,7 @@ func (b bash) Description() string {
 			"so write PowerShell syntax (e.g. $null not /dev/null; ';' or separate calls, not '&&'; " +
 			"Get-ChildItem/Select-String, not ls/grep). Use for builds, tests, git, etc."
 	}
-	return "Execute a shell command and return combined stdout+stderr. 5-minute timeout. For long-running commands, use run_in_background=true. Set output_format=json to get structured result (exit_code, duration_ms) like the former verify tool. 🔴 Always verify command output before calling complete_step."
+	return "Execute a shell command. 5-minute timeout. For long-running commands, use run_in_background=true. Set output_format=json to get structured result with separated stdout/stderr fields."
 }
 
 // resolved returns the bound shell, resolving lazily for the zero-value instance
@@ -56,7 +56,7 @@ func (b bash) resolved() sandbox.Shell {
 }
 
 func (bash) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw output. json returns structured {ok, exit_code, duration_ms, stdout_stderr, command}."}},"required":["command"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw merged output. json returns structured {ok, exit_code, duration_ms, stdout, stderr, command} with separated stdout/stderr fields."}},"required":["command"]}`)
 }
 
 // ReadOnly is false: bash's effect cannot be inferred from args (rm, curl,
@@ -143,9 +143,16 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	hideBashWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	cmd.Dir = b.workDir // "" lets exec use the process working directory
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+
+	// V10.5: json 模式下分离 stdout/stderr；plain 模式保持合并
+	var stdoutBuf, stderrBuf bytes.Buffer
+	if p.OutputFormat == "json" {
+		cmd.Stdout = &stdoutBuf
+		cmd.Stderr = &stderrBuf
+	} else {
+		cmd.Stdout = &stdoutBuf
+		cmd.Stderr = &stdoutBuf // merged in plain mode
+	}
 
 	err := cmd.Start()
 	if err == nil {
@@ -169,9 +176,8 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			killProcessTree(cmd)
 		}
 	}
-	out := buf.String()
 
-	// JSON output mode: return structured result like former verify tool
+	// JSON output mode: return structured result with separated stdout/stderr
 	if p.OutputFormat == "json" {
 		ok := err == nil && ctx.Err() == nil
 		exitCode := 0
@@ -186,13 +192,18 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		enc := json.NewEncoder(&buf2)
 		enc.SetEscapeHTML(false)
 		_ = enc.Encode(map[string]any{
-			"ok": ok, "exit_code": exitCode,
+			"ok":          ok,
+			"exit_code":   exitCode,
 			"duration_ms": time.Since(start).Milliseconds(),
-			"stdout_stderr": strings.TrimSpace(out),
-			"command": p.Command,
+			"stdout":      strings.TrimSpace(stdoutBuf.String()),
+			"stderr":      strings.TrimSpace(stderrBuf.String()),
+			"command":     p.Command,
 		})
 		return strings.TrimSpace(buf2.String()), nil
 	}
+
+	// Plain mode: merged output
+	out := stdoutBuf.String()
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return out, fmt.Errorf("command timed out (> %s)", bashTimeout)

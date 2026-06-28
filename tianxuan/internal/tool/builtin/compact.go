@@ -21,7 +21,7 @@ var compactDesc = map[string]string{
 	"bash_output":    "读取后台任务增量输出",
 	"kill_shell":     "终止后台任务",
 	"wait":           "阻塞等待后台任务结束",
-	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全)",
+	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全,支持重试)",
 	"web_search":     "搜索公开网页(通过DuckDuckGo)，返回标题/URL/摘要",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
 	"complete_step":  "完成计划步骤(附验证证据,空证据拒绝)",
@@ -64,7 +64,7 @@ var compactSchema = map[string]json.RawMessage{
 	"wait": json.RawMessage(
 		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"}},"timeout_seconds":{"type":"integer"}}}`),
 	"web_fetch": json.RawMessage(
-		`{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}`),
+		`{"type":"object","properties":{"url":{"type":"string"},"retries":{"type":"integer"}},"required":["url"]}`),
 	"web_search": json.RawMessage(
 		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer"}},"required":["query"]}`),
 	"todo_write": json.RawMessage(

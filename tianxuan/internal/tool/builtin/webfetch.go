@@ -20,21 +20,23 @@ func init() { tool.RegisterBuiltin(webFetch{}) }
 type webFetch struct{}
 
 const (
-	webFetchTimeout = 15 * time.Second
-	webFetchMaxRead = 1 << 20 // 1 MiB cap before extraction
+	webFetchTimeout       = 15 * time.Second
+	webFetchMaxRead       = 1 << 20 // 1 MiB cap before extraction
+	webFetchDefaultRetries = 2       // V10.5: 默认重试次数
 )
 
 func (webFetch) Name() string { return "web_fetch" }
 
 func (webFetch) Description() string {
-	return "Fetch a URL over HTTPS/HTTP and return its text content. HTML pages are reduced to readable text (scripts, styles, tags stripped, whitespace collapsed); JSON / plain text / markdown bodies come back verbatim. Use to read documentation pages, API responses, or source files hosted somewhere the local filesystem can't reach."
+	return "Fetch a URL over HTTPS/HTTP and return its text content. HTML pages are reduced to readable text (scripts, styles, tags stripped, whitespace collapsed); JSON / plain text / markdown bodies come back verbatim. Use retries=N for transient network errors (default 2, exponential backoff 1s→2s→4s)."
 }
 
 func (webFetch) Schema() json.RawMessage {
 	return json.RawMessage(`{
 "type":"object",
 "properties":{
-  "url":{"type":"string","description":"Absolute URL beginning with http:// or https://"}
+  "url":{"type":"string","description":"Absolute URL beginning with http:// or https://"},
+  "retries":{"type":"integer","description":"Max retries on transient network errors (default 2). Exponential backoff: 1s, 2s, 4s...","minimum":0,"maximum":5}
 },
 "required":["url"]
 }`)
@@ -100,35 +102,60 @@ func blockedFetchIP(ip net.IP) bool {
 		cgnatRange.Contains(ip) // 100.64.0.0/10 (incl. Alibaba Cloud metadata)
 }
 
-func (webFetch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
-	var p struct {
-		URL string `json:"url"`
+// isTransientError reports whether err represents a transient network issue
+// that is worth retrying (DNS failures, connection refused/timeout/reset, TLS
+// handshake failures), as opposed to permanent errors (invalid URL, SSRF block)
+// or HTTP-level errors (4xx/5xx) which should be returned as-is.
+func isTransientError(err error) bool {
+	if err == nil {
+		return false
 	}
-	if err := json.Unmarshal(args, &p); err != nil {
-		return "", fmt.Errorf("invalid args: %w", err)
+	msg := err.Error()
+	// Permanent errors we should NOT retry
+	if strings.Contains(msg, "refusing to fetch internal") {
+		return false
 	}
-	if p.URL == "" {
-		return "", fmt.Errorf("url is required")
+	if strings.Contains(msg, "unsupported protocol") {
+		return false
 	}
-	u, err := url.Parse(p.URL)
+	// Transient errors worth retrying
+	if strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "connection timed out") ||
+		strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "EOF") ||
+		strings.Contains(msg, "TLS handshake timeout") ||
+		strings.Contains(msg, "broken pipe") {
+		return true
+	}
+	// net.Error with Timeout() or Temporary() is transient
+	if ne, ok := err.(net.Error); ok {
+		return ne.Timeout() || ne.Temporary()
+	}
+	return false
+}
+
+// doFetch performs a single HTTP fetch and returns the cleaned result.
+// Extracted so the retry loop can call it without duplicating logic.
+func doFetch(ctx context.Context, rawURL string) (string, error) {
+	u, err := url.Parse(rawURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return "", fmt.Errorf("url must be an absolute http(s) address")
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, webFetchTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, p.URL, nil)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
 	}
-	// A plain UA + Accept tip the server toward returning text/HTML rather
-	// than minified asset bundles or binary content.
 	req.Header.Set("User-Agent", "tianxuan-web-fetch/1.0")
 	req.Header.Set("Accept", "text/html,text/plain,text/markdown,application/json,*/*;q=0.5")
 
 	resp, err := ssrfGuardedClient().Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetch %s: %w", p.URL, err)
+		return "", fmt.Errorf("fetch %s: %w", rawURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -148,6 +175,47 @@ func (webFetch) Execute(ctx context.Context, args json.RawMessage) (string, erro
 	}
 	header := fmt.Sprintf("status %s · %s · %d bytes\n\n", resp.Status, contentTypeShort(ct), len(body))
 	return header + out, nil
+}
+
+func (webFetch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+	var p struct {
+		URL     string `json:"url"`
+		Retries *int   `json:"retries,omitempty"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if p.URL == "" {
+		return "", fmt.Errorf("url is required")
+	}
+
+	maxRetries := webFetchDefaultRetries
+	if p.Retries != nil {
+		maxRetries = *p.Retries
+	}
+
+	// V10.5: 自动重试 — 指数退避处理瞬时网络错误
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<(attempt-1)) * time.Second // 1s, 2s, 4s, 8s
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+		result, err := doFetch(ctx, p.URL)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if !isTransientError(err) {
+			// Non-transient error — don't retry
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("fetch %s failed after %d retries: %w", p.URL, maxRetries, lastErr)
 }
 
 // looksLikeHTML lets servers that misreport Content-Type still hit the HTML
@@ -178,8 +246,6 @@ func htmlToText(s string) string {
 	s = htmlComment.ReplaceAllString(s, "")
 	s = anyTag.ReplaceAllString(s, "")
 
-	// Unescape the entities the model is most likely to encounter. Avoids
-	// pulling in html.UnescapeString just to handle five characters.
 	repl := strings.NewReplacer(
 		"&amp;", "&",
 		"&lt;", "<",

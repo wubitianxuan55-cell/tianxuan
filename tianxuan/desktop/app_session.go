@@ -37,9 +37,7 @@ type HistoryMessage struct {
 
 // NewSession snapshots the current conversation and rotates to a fresh one.
 func (a *App) NewSession() error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -48,9 +46,7 @@ func (a *App) NewSession() error {
 
 // Checkpoints lists the session's rewind points, oldest first, for the rewind UI.
 func (a *App) Checkpoints() []CheckpointMeta {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return []CheckpointMeta{}
 	}
@@ -66,9 +62,7 @@ func (a *App) Checkpoints() []CheckpointMeta {
 // "conversation", or "both" (anything else is treated as "both"). The frontend
 // re-reads History after this resolves.
 func (a *App) Rewind(turn int, scope string) error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -86,9 +80,7 @@ func (a *App) Rewind(turn int, scope string) error {
 // (preserving the current one), keeping code intact, and switches to the branch.
 // The frontend re-reads History after this resolves.
 func (a *App) Fork(turn int) error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -100,9 +92,7 @@ func (a *App) Fork(turn int) error {
 // of turn into one summary (Claude Code's "summarize from/up to here"), keeping
 // code intact. The frontend re-reads History after this resolves.
 func (a *App) SummarizeFrom(turn int) error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -110,9 +100,7 @@ func (a *App) SummarizeFrom(turn int) error {
 }
 
 func (a *App) SummarizeUpTo(turn int) error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -129,9 +117,7 @@ func (a *App) ListSessions() []SessionMeta {
 		return []SessionMeta{}
 	}
 	titles := loadSessionTitles(dir)
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	cur := ""
 	if ctrl != nil {
 		cur = ctrl.SessionPath()
@@ -171,9 +157,7 @@ func (a *App) ListSessions() []SessionMeta {
 // session — that's the conversation on screen, and auto-save would recreate the
 // file on the next turn; start a new session first to retire it.
 func (a *App) DeleteSession(path string) error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl != nil && ctrl.SessionPath() == path {
 		return errActiveSession
 	}
@@ -191,9 +175,7 @@ func (a *App) RenameSession(path, title string) error {
 // working folder are unchanged (same controller); only the transcript is swapped.
 // Returns the resumed messages for the frontend to render.
 func (a *App) ResumeSession(path string) ([]HistoryMessage, error) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return []HistoryMessage{}, nil
 	}
@@ -208,9 +190,7 @@ func (a *App) ResumeSession(path string) ([]HistoryMessage, error) {
 
 // History returns the session's message log.
 func (a *App) History() []HistoryMessage {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}

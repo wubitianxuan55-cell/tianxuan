@@ -12,10 +12,7 @@ import (
 // Submit runs raw user input as a turn; slash commands and @-references are
 // resolved by the controller. Output arrives asynchronously on eventChannel.
 func (a *App) Submit(input string) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.Submit(input)
 	}
 }
@@ -23,9 +20,7 @@ func (a *App) Submit(input string) {
 // SubmitDisplay runs input as a turn while recording a shorter UI-only display
 // string for the saved desktop transcript. The model still receives input.
 func (a *App) SubmitDisplay(display, input string) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return
 	}
@@ -35,10 +30,7 @@ func (a *App) SubmitDisplay(display, input string) {
 
 // Cancel aborts the in-flight turn.
 func (a *App) Cancel() {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.Cancel()
 	}
 }
@@ -46,20 +38,14 @@ func (a *App) Cancel() {
 // Approve answers a pending approval_request by ID: allow runs the call, session
 // also remembers the grant for the rest of the session.
 func (a *App) Approve(id string, allow, session bool) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.Approve(id, allow, session)
 	}
 }
 
 // SetPlanMode toggles read-only plan mode.
 func (a *App) SetPlanMode(on bool) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.SetPlanMode(on)
 	}
 }
@@ -73,9 +59,7 @@ type QuestionAnswer struct {
 // AnswerQuestion resolves a pending ask_request (the `ask` tool) by ID with the
 // user's selections per question.
 func (a *App) AnswerQuestion(id string, answers []QuestionAnswer) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return
 	}
@@ -90,9 +74,7 @@ func (a *App) AnswerQuestion(id string, answers []QuestionAnswer) {
 // Compact runs a plain compaction pass (the "compact now" button). Focus-guided
 // compaction goes through Submit("/compact <focus>") instead.
 func (a *App) Compact() error {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}
@@ -102,20 +84,14 @@ func (a *App) Compact() error {
 // SetAgentMode switches the agent runtime mode: "explore" (read-only research),
 // "develop" (full tools, default), or "orchestrate" (plan→execute→verify).
 func (a *App) SetAgentMode(mode string) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.SetAgentMode(mode)
 	}
 }
 
 // AgentMode returns the current agent runtime mode, for the status-bar indicator.
 func (a *App) AgentMode() string {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		return ctrl.AgentMode()
 	}
 	return ""
@@ -125,10 +101,7 @@ func (a *App) AgentMode() string {
 // (writers and bash run without asking). Deny rules still apply. Runtime-only —
 // not written to config, so it resets on relaunch.
 func (a *App) SetBypass(on bool) {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
-	if ctrl != nil {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
 		ctrl.SetBypass(on)
 	}
 }

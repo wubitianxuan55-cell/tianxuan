@@ -1,6 +1,6 @@
-import { Plus, Search, X } from "lucide-react";
+import { Plus, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MemoryView } from "../lib/types";
+import type { MemorySuggestion, MemorySuggestionsView, MemoryView, SkillSuggestion } from "../lib/types";
 import { DocEditor } from "./DocEditor";
 import { useT } from "../lib/i18n";
 import { FactCard } from "./FactCard";
@@ -11,8 +11,11 @@ export function MemoryPanel(p: {
   onRemember: (scope: string, note: string) => Promise<void> | void;
   onForget: (name: string) => Promise<void> | void;
   onSaveDoc: (path: string, body: string) => Promise<void> | void;
+  onAcceptMemorySuggestion: (candidate: MemorySuggestion) => Promise<void> | void;
+  onAcceptSkillSuggestion: (candidate: SkillSuggestion) => Promise<void> | void;
+  onRefreshSuggestions: () => Promise<MemorySuggestionsView | null>;
 }) {
-  const { view, onClose, onRemember, onForget, onSaveDoc } = p;
+  const { view, onClose, onRemember, onForget, onSaveDoc, onAcceptMemorySuggestion, onAcceptSkillSuggestion, onRefreshSuggestions } = p;
   const t = useT();
   const [note, setNote] = useState("");
   const [scope, setScope] = useState("");
@@ -29,7 +32,9 @@ export function MemoryPanel(p: {
   const facts = view?.facts ?? [];
   const docs = view?.docs ?? [];
   const archives = view?.archives ?? [];
-  const suggestions = view?.suggestions;
+  const [suggestions, setSuggestions] = useState<MemorySuggestionsView | null>(null);
+  const [suggestionsBusy, setSuggestionsBusy] = useState(false);
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<string>>(new Set());
   const scopes = view?.scopes ?? [];
   const factNames = useMemo(() => new Set(facts.map((f) => f.name)), [facts]);
   const factTypes = useMemo(
@@ -166,6 +171,11 @@ export function MemoryPanel(p: {
               {t("common.add")}
             </button>
           </div>
+          {scopes.find((s) => s.scope === activeScope)?.path && (
+            <div className="text-fg-faint/50 text-[10px] truncate" title={scopes.find((s) => s.scope === activeScope)?.path}>
+              保存至: {scopes.find((s) => s.scope === activeScope)?.path}
+            </div>
+          )}
 
           {/* 搜索 + 类型过滤（仅事实标签页显示） */}
           {tab === "facts" && (
@@ -201,7 +211,7 @@ export function MemoryPanel(p: {
           <TabButton
             active={tab === "suggestions"}
             onClick={() => setTab("suggestions")}
-            badge={suggestions ? suggestions.memory.length + suggestions.skills.length : 0}
+            badge={suggestions ? suggestions.memories.length + suggestions.skills.length : 0}
           >
             {t("memory.suggestions")}
           </TabButton>
@@ -257,32 +267,103 @@ export function MemoryPanel(p: {
             </>
           )}
 
-          {tab === "suggestions" && suggestions && (
+          {tab === "suggestions" && (
             <div className="flex flex-col gap-3">
-              {suggestions.memory.length === 0 && suggestions.skills.length === 0 ? (
-                <EmptyState message={t("memory.noSuggestions")} />
+              {/* 刷新按钮 */}
+              <button
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-border-soft rounded-lg bg-bg-soft text-fg text-[12.5px] cursor-pointer hover:bg-bg hover:border-accent transition-colors disabled:opacity-40"
+                onClick={async () => {
+                  setSuggestionsBusy(true);
+                  const result = await onRefreshSuggestions();
+                  setSuggestions(result);
+                  setSuggestionsBusy(false);
+                }}
+                disabled={suggestionsBusy}
+                type="button"
+              >
+                <RefreshCw size={14} className={suggestionsBusy ? "animate-spin" : ""} />
+                {suggestions ? "刷新建议" : "扫描建议"}
+              </button>
+
+              {!suggestions ? (
+                <EmptyState message="点击扫描来分析最近的对话" />
+              ) : suggestions.memories.length === 0 && suggestions.skills.length === 0 ? (
+                <EmptyState message="未发现候选项" />
               ) : (
                 <>
-                  {suggestions.memory.map((s) => (
-                    <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionNew")}</span>
-                        <span className="badge badge--muted">{s.type}</span>
+                  {suggestions.memories.length > 0 && (
+                    <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider">记忆候选项</div>
+                  )}
+                  {suggestions.memories.map((s) => (
+                    <div key={s.id || s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">新建</span>
+                            <span className="badge badge--muted">{s.type}</span>
+                            {acceptedSuggestions.has(s.id || s.name) && (
+                              <span className="text-emerald-400 text-[11px] ml-1">✓ 已保存</span>
+                            )}
+                          </div>
+                          <div className="text-fg text-[12.5px] font-medium">{s.title || s.name}</div>
+                          <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
+                          <div className="text-fg-faint/70 text-[10px] mt-1">{s.reason}</div>
+                          {s.evidence && s.evidence.length > 0 && (
+                            <div className="mt-1.5 text-fg-faint/50 text-[10px]">{s.evidence[0]}</div>
+                          )}
+                        </div>
+                        {!acceptedSuggestions.has(s.id || s.name) && (
+                          <button
+                            className="shrink-0 px-2.5 py-1 text-[11px] font-medium border border-accent rounded text-accent bg-transparent cursor-pointer hover:bg-accent hover:text-accent-fg transition-colors"
+                            onClick={async () => {
+                              await onAcceptMemorySuggestion(s);
+                              setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
+                            }}
+                            type="button"
+                          >
+                            采纳
+                          </button>
+                        )}
                       </div>
-                      <div className="text-fg text-[12.5px] font-medium">{s.title || s.name}</div>
-                      <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
-                      <div className="text-fg-faint/70 text-[10px] mt-1">{s.reason}</div>
                     </div>
                   ))}
+                  {suggestions.skills.length > 0 && (
+                    <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider mt-2">技能候选项</div>
+                  )}
                   {suggestions.skills.map((s) => (
-                    <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-info text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionSkill")}</span>
+                    <div key={s.id || s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-info text-[11px] font-semibold uppercase tracking-wide">新技能</span>
+                            {acceptedSuggestions.has(s.id || s.name) && (
+                              <span className="text-emerald-400 text-[11px] ml-1">✓ 已创建</span>
+                            )}
+                          </div>
+                          <div className="text-fg text-[12.5px] font-medium">{s.name}</div>
+                          <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
+                          <div className="text-fg-faint/70 text-[10px] mt-1">{s.reason}</div>
+                        </div>
+                        {!acceptedSuggestions.has(s.id || s.name) && (
+                          <button
+                            className="shrink-0 px-2.5 py-1 text-[11px] font-medium border border-accent rounded text-accent bg-transparent cursor-pointer hover:bg-accent hover:text-accent-fg transition-colors"
+                            onClick={async () => {
+                              await onAcceptSkillSuggestion(s);
+                              setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
+                            }}
+                            type="button"
+                          >
+                            创建
+                          </button>
+                        )}
                       </div>
-                      <div className="text-fg text-[12.5px] font-medium">{s.name}</div>
-                      <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
                     </div>
                   ))}
+                  {suggestions.generatedAt && (
+                    <div className="text-fg-faint/50 text-[10px] text-right">
+                      生成于 {new Date(suggestions.generatedAt).toLocaleString()}
+                    </div>
+                  )}
                 </>
               )}
             </div>

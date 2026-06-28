@@ -354,9 +354,7 @@ func (a *App) AttachmentDataURL(path string) (string, error) {
 
 // WorkspaceChanges returns the files modified during the current session.
 func (a *App) WorkspaceChanges() []WorkspaceChangeView {
-	a.mu.RLock()
-	ctrl := a.ctrl
-	a.mu.RUnlock()
+	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return nil
 	}

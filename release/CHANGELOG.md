@@ -1,5 +1,31 @@
 # Tianxuan 版本变更日志
 
+## V10.9.0 (2026-06-28) — 🧠 记忆建议引擎 + 多标签页骨架 + UI 增强
+
+### 记忆建议引擎（借鉴 DeepSeek-Reasonix V1.13）
+- **自动检测记忆候选**: 16 个中英文关键词（记住/always/偏好/约定 等）从用户消息中自动提取，纯本地运算不消耗 token
+- **工作流技能自动生成**: 3 个模板（code-review/refactor/bug-fix）从历史检测重复模式→自动生成 SKILL.md
+- **一键采纳**: AcceptMemorySuggestion / AcceptSkillSuggestion，记忆→Store.Save，技能→skill.CreateWithContent
+- **归档记忆列表**: ListArchived() + ArchivedMemory 类型，store.go +80 行
+- **[[wiki-link]] 内联渲染**: 记忆正文中 [[name]] 渲染为可点击跳转链接，死链接灰色删除线提示
+
+### 多标签页系统（骨架）
+- **WorkspaceTab 类型**: 独立 ID/Scope/WorkspaceRoot/SessionPath/Ctrl，为多标签准备
+- **App.tabs map**: 所有绑定方法统一改用 ctrlByTabID("") 路由（20+ 方法重构），完全向后兼容
+- **tabEventSink + toWireTab**: 事件注入 tabId 供前端路由，全局 eventSink 自动注入活跃 tabID
+- **TabBar 前端组件 + 持久化**: desktop-tabs.json 保存恢复，SelectTab/TabMeta API
+
+### UI 增强
+- **PromptShelf 组件**: 共享架子（头部+进度条+折叠体+按钮），TodoPanel 重构使用
+- **快速添加路径提示**: MemoryPanel 显示"保存至: ~/.tianxuan/..."路径
+- **FactCard 增强**: wiki-link 内联渲染、编辑/删除/确认删除交互
+
+### 借鉴来源
+- DeepSeek-Reasonix V1.13.0 桌面端代码深度分析
+- 记忆建议引擎 (memory_suggestions.go, 440行) ← Reasonix
+- 多标签页骨架 (tabs.go + 路由重构) ← Reasonix
+- PromptShelf ← Reasonix
+
 ## V10.8.0 (2026-06-28) — 🔵 智能化
 
 - **compact 保留 todo**: 压缩前读取 .tianxuan/progress.md 注入指令，防止进度丢失

@@ -368,20 +368,40 @@ export interface MemoryArchive {
 }
 
 export interface MemorySuggestion {
+  id: string;
   name: string;
   title?: string;
   description: string;
   type: string;
   body: string;
   reason: string;
+  evidence: string[];
 }
 
 export interface SkillSuggestion {
+  id: string;
   name: string;
   description: string;
+  scope: string;
+  body: string;
+  reason: string;
+  evidence: string[];
 }
 
 export interface MemorySuggestionsView {
-  memory: MemorySuggestion[];
+  memories: MemorySuggestion[];
   skills: SkillSuggestion[];
+  generatedAt: string;
+  available: boolean;
+  source: string;
+}
+
+export interface TabMeta {
+  id: string;
+  scope: string;
+  workspaceRoot: string;
+  title: string;
+  ready: boolean;
+  label?: string;
+  activityStatus?: string;
 }

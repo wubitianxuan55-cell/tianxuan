@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useT } from "../lib/i18n";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { MemoryFact } from "../lib/types";
 
 function uniqueLinks(body: string, names: Set<string>) {
@@ -15,6 +15,45 @@ function uniqueLinks(body: string, names: Set<string>) {
     links.push({ name: n, exists: names.has(n) });
   }
   return links;
+}
+
+/** renderWithLinks turns [[name]] tokens into clickable in-body jumps. */
+function renderWithLinks(
+  text: string,
+  factNames: Set<string>,
+  onJump: (name: string) => void,
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\[\[([^\]]+)\]\]/g;
+  let last = 0;
+  let k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const target = m[1].trim();
+    if (factNames.has(target)) {
+      out.push(
+        <button
+          key={k++}
+          type="button"
+          className="inline border-0 bg-accent-soft text-accent rounded px-1 py-px cursor-pointer font-mono text-[11px] hover:bg-accent/20 transition-colors"
+          onClick={() => onJump(target)}
+          title={`跳转到 ${target}`}
+        >
+          {target}
+        </button>,
+      );
+    } else {
+      out.push(
+        <span key={k++} className="inline text-fg-faint line-through font-mono text-[11px]" title={`未找到 "${target}"`}>
+          {target}
+        </span>,
+      );
+    }
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
 }
 
 export function FactCard(p: {
@@ -63,7 +102,7 @@ export function FactCard(p: {
           )}
           {!expanded && fact.body && (
             <pre className="m-0 mt-1.5 text-fg-dim/70 text-[11px] leading-relaxed whitespace-pre-wrap line-clamp-3 font-mono border-0 bg-transparent p-0">
-              {fact.body}
+              {renderWithLinks(fact.body, factNames, onJump)}
             </pre>
           )}
         </div>
@@ -119,7 +158,7 @@ export function FactCard(p: {
             </div>
           ) : (
             <pre className="m-0 mt-2 bg-bg-soft border border-border-soft rounded-md p-3 text-fg-dim text-xs leading-relaxed whitespace-pre-wrap max-h-[360px] overflow-y-auto font-mono">
-              {fact.body}
+              {renderWithLinks(fact.body, factNames, onJump)}
             </pre>
           )}
           {links.length > 0 && (

@@ -12,11 +12,13 @@
 
 import type {
   MCPServerInput,
+  MemorySuggestion,
   Meta,
   ProviderView,
   ServerView,
   SessionMeta,
   SettingsView,
+  SkillSuggestion,
   SkillView,
   UpdateProgress,
   WireEvent,
@@ -423,6 +425,19 @@ export function makeMockApp(): AppBindings {
     async SaveDoc(path: string, _body: string) {
       emit({ kind: "notice", level: "info", text: `saved → ${path}` });
       return path;
+    },
+    async MemorySuggestions() {
+      return { memories: [], skills: [], generatedAt: new Date().toISOString(), available: false, source: "mock" };
+    },
+    async AcceptMemorySuggestion(_candidate: MemorySuggestion) {
+      return "mock-memory-path";
+    },
+    async AcceptSkillSuggestion(_candidate: SkillSuggestion) {
+      return "mock-skill-path";
+    },
+    async SelectTab(_tabID: string) {},
+    async TabMeta() {
+      return [{ id: "mock-tab", scope: "project", workspaceRoot: "", title: "Mock", ready: true }] as any;
     },
     async Settings() {
       return JSON.parse(JSON.stringify(settings)) as SettingsView;

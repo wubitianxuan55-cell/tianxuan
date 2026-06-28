@@ -19,7 +19,8 @@ import (
 // saved, and reads individual facts on demand with read_file. The whole thing is
 // plain files the user can edit by hand.
 type Store struct {
-	Dir string // ...tianxuan/projects/<slug>/memory
+	Dir       string // ...tianxuan/projects/<slug>/memory (project-scoped)
+	GlobalDir string // global memory directory (optional, for cross-project facts)
 }
 
 // Type classifies a memory, mirroring the auto-memory taxonomy.
@@ -53,6 +54,15 @@ type Memory struct {
 	Description string // one-line summary used for the index and recall
 	Type        Type
 	Body        string // the fact itself (Markdown)
+}
+
+// ArchivedMemory is a saved fact that has been removed from active memory but
+// kept on disk for traceability. The ArchivedAt timestamp records when it was
+// archived; Path is the absolute path to the archived .md file.
+type ArchivedMemory struct {
+	Memory
+	Path       string    `json:"path"`
+	ArchivedAt time.Time `json:"archivedAt"`
 }
 
 // StoreFor resolves the auto-memory directory for a project working dir under
@@ -244,6 +254,80 @@ func (s Store) List() []Memory {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// dirs returns the non-empty store directories to scan. Project-scoped Dir
+// takes priority; GlobalDir (when set) is also included for cross-project facts.
+func (s Store) dirs() []string {
+	var out []string
+	if s.Dir != "" {
+		out = append(out, s.Dir)
+	}
+	if s.GlobalDir != "" && s.GlobalDir != s.Dir {
+		out = append(out, s.GlobalDir)
+	}
+	return out
+}
+
+// ListArchived returns archived memories parsed from .archive/, newest first.
+// Archived files stay out of List() and the prompt index, so stale facts remain
+// inspectable without being reused as active truth.
+func (s Store) ListArchived() []ArchivedMemory {
+	if s.Dir == "" && s.GlobalDir == "" {
+		return nil
+	}
+	var out []ArchivedMemory
+	for _, base := range s.dirs() {
+		if base == "" {
+			continue
+		}
+		dir := filepath.Join(base, ".archive")
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			m, ok := loadMemory(path)
+			if !ok {
+				continue
+			}
+			when := archiveTimeFromName(e.Name())
+			if when.IsZero() {
+				if info, err := e.Info(); err == nil {
+					when = info.ModTime()
+				}
+			}
+			out = append(out, ArchivedMemory{Memory: m, Path: path, ArchivedAt: when})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].ArchivedAt.Equal(out[j].ArchivedAt) {
+			return out[i].ArchivedAt.After(out[j].ArchivedAt)
+		}
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+// archiveTimeFromName extracts the timestamp from an archived filename, which is
+// prefixed with "20060102-150405.000-" by Archive.
+func archiveTimeFromName(name string) time.Time {
+	const stampLen = len("20060102-150405.000")
+	if len(name) <= stampLen || name[stampLen] != '-' {
+		return time.Time{}
+	}
+	t, err := time.Parse("20060102-150405.000", name[:stampLen])
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // loadMemory parses one fact file back into a Memory. It tolerates the minimal

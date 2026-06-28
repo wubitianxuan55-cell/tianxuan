@@ -13,6 +13,7 @@ import logo from "./assets/logo.png";
 import { useT } from "./lib/i18n";
 import { applyTheme } from "./lib/theme";
 import { useController } from "./lib/store";
+import { app } from "./lib/bridge";
 import { Transcript } from "./components/Transcript";
 import { JumpBar } from "./components/JumpBar";
 import { ToastProvider, useToast } from "./components/Toast";
@@ -39,7 +40,7 @@ import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { downloadMarkdown, exportAsMarkdown } from "./lib/export";
-import type { MemoryView, SessionMeta } from "./lib/types";
+import type { MemorySuggestion, MemorySuggestionsView, MemoryView, SessionMeta, SkillSuggestion } from "./lib/types";
 import { usePlanExtractor } from "./hooks/usePlanExtractor";
 import { useTodoExtractor } from "./hooks/useTodoExtractor";
 import { useModeManager } from "./hooks/useModeManager";
@@ -258,6 +259,29 @@ export default function App() {
     },
     [saveDoc, fetchMemory],
   );
+
+  const onAcceptMemorySuggestion = useCallback(
+    async (candidate: MemorySuggestion) => {
+      await app.AcceptMemorySuggestion(candidate);
+      setMemView(await fetchMemory());
+    },
+    [fetchMemory],
+  );
+
+  const onAcceptSkillSuggestion = useCallback(
+    async (candidate: SkillSuggestion) => {
+      await app.AcceptSkillSuggestion(candidate);
+    },
+    [],
+  );
+
+  const onRefreshSuggestions = useCallback(async (): Promise<MemorySuggestionsView | null> => {
+    try {
+      return await app.MemorySuggestions();
+    } catch {
+      return null;
+    }
+  }, []);
 
   useEffect(() => { void refreshSessions(); }, [cwd, refreshSessions]);
 
@@ -697,6 +721,9 @@ export default function App() {
             onRemember={onRemember}
             onForget={onForget}
             onSaveDoc={onSaveDoc}
+            onAcceptMemorySuggestion={onAcceptMemorySuggestion}
+            onAcceptSkillSuggestion={onAcceptSkillSuggestion}
+            onRefreshSuggestions={onRefreshSuggestions}
           />
         )}
       </Suspense>

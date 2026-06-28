@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Circle, Loader, X } from "lucide-react";
+import { Check, Circle, Loader } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import type { Todo } from "../lib/tools";
+import { PromptBadge, PromptHeaderAction, PromptShelf } from "./PromptShelf";
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -21,11 +22,14 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
   const compact = useCompact();
   const [open, setOpen] = useState(true);
   const listRef = useRef<HTMLUListElement>(null);
+  const currentRef = useRef<HTMLLIElement | null>(null);
   useGSAPCollapse(listRef, open);
   if (todos.length === 0) return null;
 
-  const done = todos.filter((t) => t.status === "completed").length;
-  const current = todos.find((t) => t.status === "in_progress");
+  const done = todos.filter((td) => td.status === "completed").length;
+  const current = todos.find((td) => td.status === "in_progress");
+  const allDone = todos.length > 0 && done === todos.length;
+  const summary = current?.activeForm || current?.content || todos[todos.length - 1]?.content || "";
   const pct = todos.length > 0 ? Math.round((done / todos.length) * 100) : 0;
 
   const itemPy = compact ? "py-[5px]" : "py-[7px]";
@@ -33,7 +37,25 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
   const itemTextSize = compact ? "text-[11.5px]" : "text-[12.5px]";
 
   return (
-    <div className="max-w-[--maxw] mx-auto mb-2 border border-border rounded-[9px] bg-bg-soft overflow-hidden" style={{boxShadow: "var(--ds-shadow-card)"}}>
+    <PromptShelf
+      titleId="todo-shelf-title"
+      title={t("todo.title")}
+      badges={<PromptBadge>{done}/{todos.length}</PromptBadge>}
+      meta={!open ? summary : undefined}
+      role="region"
+      headerActions={
+        <>
+          <PromptHeaderAction onClick={() => setOpen((v) => !v)}>
+            {open ? t("common.collapse") : t("common.expand")}
+          </PromptHeaderAction>
+          {allDone && (
+            <PromptHeaderAction onClick={onDismiss}>
+              {t("common.close")}
+            </PromptHeaderAction>
+          )}
+        </>
+      }
+    >
       {/* Thin progress bar */}
       <div className="h-[3px] bg-border-soft">
         <div
@@ -42,74 +64,49 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
         />
       </div>
 
-      {/* Header */}
-      <div className={`flex items-center ${itemPx}`}>
-        <button
-          className={`flex items-center gap-[7px] flex-1 min-w-0 ${itemPy} bg-transparent border-0 text-fg-dim ${itemTextSize} cursor-pointer no-drag`}
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          <span className="shrink-0 font-medium text-fg">{t("todo.title")}</span>
-          <span className="shrink-0 text-fg-faint font-mono text-[11px] tabular-nums">
-            {done}/{todos.length}
-          </span>
-          {!open && current && (
-            <span className={`text-fg-faint truncate ${compact ? "text-[10px]" : "text-[11px]"}`}>
-              {current.activeForm || current.content}
-            </span>
-          )}
-        </button>
-        <button
-          className="ml-auto border-0 bg-transparent text-fg-faint cursor-pointer p-1.5 rounded hover:text-err hover:bg-bg-soft no-drag"
-          onClick={onDismiss}
-          title={t("todo.dismiss")}
-        >
-          <X size={13} />
-        </button>
-      </div>
-
       {/* List */}
-      <ul ref={listRef} className="m-0 p-0 list-none border-t border-border-soft" style={{ overflow: "hidden" }}>
-        {todos.map((t, i) => {
-          const isPhase = t.level === 0;
-          const isSub = t.level != null && t.level > 0;
+      <ul ref={listRef} className="m-0 p-0 list-none" style={{ overflow: "hidden" }}>
+        {todos.map((td, i) => {
+          const isPhase = td.level === 0;
+          const isSub = td.level != null && td.level > 0;
           return (
             <li
               key={i}
+              ref={td.status === "in_progress" ? currentRef : undefined}
               className={`relative flex items-center gap-2.5 ${itemPx} ${itemPy} border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
-                t.status === "in_progress"
+                td.status === "in_progress"
                   ? "bg-accent-soft"
                   : "bg-transparent hover:bg-bg-elev"
               } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
             >
-              {/* Left accent strip for in-progress items */}
-              {t.status === "in_progress" && !isSub && (
+              {/* Left accent strip */}
+              {td.status === "in_progress" && !isSub && (
                 <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm" />
               )}
-              {/* Sub-item border trail */}
+              {/* Sub-item trail */}
               {isSub && (
                 <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
               )}
 
-              {statusIcon(t.status)}
+              {statusIcon(td.status)}
 
               <span
                 className={`min-w-0 leading-relaxed ${
                   isPhase ? "font-medium text-fg" : "text-fg-dim"
                 } ${
-                  t.status === "completed"
+                  td.status === "completed"
                     ? "line-through text-fg-faint"
-                    : t.status === "in_progress"
+                    : td.status === "in_progress"
                       ? "text-fg font-medium"
                       : ""
                 } ${itemTextSize}`}
               >
-                {t.status === "in_progress" && t.activeForm ? t.activeForm : t.content}
+                {td.status === "in_progress" && td.activeForm ? td.activeForm : td.content}
               </span>
             </li>
           );
         })}
       </ul>
-    </div>
+    </PromptShelf>
   );
 }

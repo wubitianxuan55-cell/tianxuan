@@ -32,11 +32,22 @@ const eventChannel = "agent:event"
 type App struct {
 	ctx  context.Context
 	sink *eventSink
+
+	// --- multi-tab support ---
+	// tabs holds all open conversation tabs. The map and tabOrder are protected
+	// by mu. activeTabID points to the currently selected tab.
+	tabs        map[string]*WorkspaceTab
+	tabOrder    []string
+	activeTabID string
+
+	// ctrl is a convenience pointer to the active tab's controller (nil until
+	// the first tab is built). Legacy code reads this directly; new code should
+	// prefer activeCtrlLocked() for thread safety.
 	ctrl *control.Controller
 
-	// mu protects ctrl, label, model, startupErr, and ready during the async
-	// boot sequence. startup() spawns a goroutine for boot.Build(); all methods
-	// that touch the controller acquire the lock.
+	// mu protects ctrl, label, model, startupErr, ready, tabs, tabOrder,
+	// activeTabID, and per-tab fields. startup() spawns a goroutine for
+	// boot.Build(); all methods that touch the controller acquire the lock.
 	mu          sync.RWMutex
 	startupErr  string
 	label       string
@@ -48,7 +59,15 @@ type App struct {
 
 // NewApp constructs the bound object. The controller is built later, in startup,
 // once the Wails context exists.
-func NewApp() *App { return &App{sink: &eventSink{}, disabledMCP: map[string]ServerView{}} }
+func NewApp() *App {
+	a := &App{
+		sink:        &eventSink{},
+		tabs:        map[string]*WorkspaceTab{},
+		disabledMCP: map[string]ServerView{},
+	}
+	a.sink.app = a
+	return a
+}
 
 // startup runs once the webview process is up, before the frontend can issue any
 // bound call. It captures the Wails context (needed for EventsEmit), points the
@@ -126,6 +145,15 @@ func (a *App) buildController() {
 	a.model = model
 	a.mu.Unlock()
 
+	// Create the default tab. Every desktop session has at least one tab;
+	// this keeps backward compatibility with all existing bound methods.
+	tab := newWorkspaceTab("project", "", "新会话")
+	a.mu.Lock()
+	a.tabs[tab.ID] = tab
+	a.tabOrder = []string{tab.ID}
+	a.activeTabID = tab.ID
+	a.mu.Unlock()
+
 	ctrl, err := boot.Build(ctx, boot.Options{
 		Model: model, RequireKey: false, Sink: a.sink,
 		SessionDir: config.WorkspaceSessionDir(""),
@@ -133,7 +161,9 @@ func (a *App) buildController() {
 	if err != nil {
 		a.mu.Lock()
 		a.startupErr = err.Error()
+		tab.StartupErr = err.Error()
 		a.ready = true
+		tab.Ready = true
 		a.mu.Unlock()
 		runtime.EventsEmit(ctx, "agent:ready")
 		return
@@ -141,8 +171,11 @@ func (a *App) buildController() {
 
 	a.mu.Lock()
 	a.ctrl = ctrl
+	tab.Ctrl = ctrl
 	a.label = ctrl.Label()
+	tab.Label = ctrl.Label()
 	a.ready = true
+	tab.Ready = true
 	a.mu.Unlock()
 
 	// Desktop is interactive: route "ask" gate decisions to the frontend as
@@ -183,18 +216,26 @@ func (a *App) buildController() {
 	// Notify the frontend that the controller is ready — it re-fetches Meta,
 	// ContextUsage, and History.
 	runtime.EventsEmit(ctx, "agent:ready")
+
+	// Persist the default tab so a relaunch can restore it.
+	a.saveTabs()
 }
 
-// shutdown snapshots the conversation and stops plugin subprocesses on close.
+// shutdown snapshots every tab's conversation and stops plugin subprocesses.
 func (a *App) shutdown(context.Context) {
 	// Save window geometry before the webview tears down.
 	a.saveWindowStateSync()
 	a.mu.RLock()
-	ctrl := a.ctrl
+	tabs := make([]*WorkspaceTab, 0, len(a.tabs))
+	for _, t := range a.tabs {
+		tabs = append(tabs, t)
+	}
 	a.mu.RUnlock()
-	if ctrl != nil {
-		_ = ctrl.Snapshot()
-		ctrl.Close()
+	for _, tab := range tabs {
+		if tab.Ctrl != nil {
+			_ = tab.Ctrl.Snapshot()
+			tab.Ctrl.Close()
+		}
 	}
 }
 
@@ -204,11 +245,102 @@ func (a *App) shutdown(context.Context) {
 // — Emit must not be exposed to JS. Emit runs on the agent goroutine;
 // runtime.EventsEmit is goroutine-safe, and the ctx guard covers the brief window
 // before startup assigns it.
-type eventSink struct{ ctx context.Context }
+type eventSink struct {
+	ctx context.Context
+	app *App // optional back-reference for tab ID injection
+}
 
 func (s *eventSink) Emit(e event.Event) {
 	if s.ctx == nil {
 		return
 	}
-	runtime.EventsEmit(s.ctx, eventChannel, toWire(e))
+	// Inject the active tab ID so the frontend can route events. When no tabs
+	// exist yet (during initial boot), omit the field.
+	tabID := ""
+	if s.app != nil {
+		s.app.mu.RLock()
+		tabID = s.app.activeTabID
+		s.app.mu.RUnlock()
+	}
+	if tabID != "" {
+		runtime.EventsEmit(s.ctx, eventChannel, toWireTab(e, tabID))
+	} else {
+		runtime.EventsEmit(s.ctx, eventChannel, toWire(e))
+	}
+}
+
+// --- tab helper methods ---
+
+// activeCtrlLocked returns the active tab's controller. Must be called with
+// mu held (read or write). Falls back to a.ctrl for backward compatibility.
+func (a *App) activeCtrlLocked() *control.Controller {
+	if a.activeTabID != "" {
+		if tab := a.tabs[a.activeTabID]; tab != nil && tab.Ctrl != nil {
+			return tab.Ctrl
+		}
+	}
+	return a.ctrl
+}
+
+// activeTabLocked returns the active tab. Must be called with mu held.
+func (a *App) activeTabLocked() *WorkspaceTab {
+	if a.activeTabID != "" {
+		return a.tabs[a.activeTabID]
+	}
+	return nil
+}
+
+// TabMeta returns metadata for every open tab, for the frontend tab bar.
+func (a *App) TabMeta() []TabMeta {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make([]TabMeta, 0, len(a.tabOrder))
+	for _, id := range a.tabOrder {
+		if tab := a.tabs[id]; tab != nil && !tab.closing {
+			out = append(out, tab.tabMeta())
+		}
+	}
+	return out
+}
+
+// SelectTab switches the active tab. The empty string selects the first tab.
+func (a *App) SelectTab(tabID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if tabID == "" || a.tabs[tabID] == nil {
+		if len(a.tabOrder) > 0 {
+			tabID = a.tabOrder[0]
+		} else {
+			return
+		}
+	}
+	a.activeTabID = tabID
+	if tab := a.tabs[tabID]; tab != nil && tab.Ctrl != nil {
+		a.ctrl = tab.Ctrl
+		a.label = tab.Label
+		a.model = tab.model
+	}
+}
+
+// ctrlByTabID returns the controller for the given tab. An empty tabID resolves
+// to the active tab's controller. Returns nil when no controller is available.
+func (a *App) ctrlByTabID(tabID string) *control.Controller {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if tabID == "" {
+		return a.activeCtrlLocked()
+	}
+	if tab := a.tabs[tabID]; tab != nil {
+		return tab.Ctrl
+	}
+	return nil
+}
+
+// tabByIDLocked returns the tab for the given ID. Must be called with mu held.
+// An empty tabID resolves to the active tab.
+func (a *App) tabByIDLocked(tabID string) *WorkspaceTab {
+	if tabID == "" {
+		return a.activeTabLocked()
+	}
+	return a.tabs[tabID]
 }

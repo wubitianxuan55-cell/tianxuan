@@ -18,6 +18,10 @@ import type {
   JobView,
   MCPServerInput,
   MemoryView,
+  MemorySuggestion,
+  MemorySuggestionsView,
+  SkillSuggestion,
+  TabMeta,
   Meta,
   ModelInfo,
   ProviderView,
@@ -106,6 +110,11 @@ export interface AppBindings {
   Remember(scope: string, note: string): Promise<string>;
   Forget(name: string): Promise<void>;
   SaveDoc(path: string, body: string): Promise<string>;
+  MemorySuggestions(): Promise<MemorySuggestionsView>;
+  AcceptMemorySuggestion(candidate: MemorySuggestion): Promise<string>;
+  AcceptSkillSuggestion(candidate: SkillSuggestion): Promise<string>;
+  SelectTab(tabID: string): Promise<void>;
+  TabMeta(): Promise<TabMeta[]>;
   // Settings panel: read the resolved config and apply edits (each writes config
   // and rebuilds the controller live). Secrets go through SetProviderKey (→ .env).
   Settings(): Promise<SettingsView>;

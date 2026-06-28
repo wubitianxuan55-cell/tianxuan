@@ -28,6 +28,7 @@ const TOOL_DESC: Record<string, string> = {
   git_diff: "显示行级别变更(--staged可选,path可限文件)",
   git_log: "显示提交历史(支持count/path/author过滤)",
   git_commit: "提交暂存变更(可stage_all/amend/自动生成消息)",
+  git_worktree: "管理git工作树(添加/删除/列出)",
   // 网络
   web_fetch: "抓取URL纯文本(去标签,SSRF安全)",
   web_search: "搜索公开网页(通过DuckDuckGo)",
@@ -67,7 +68,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: "版本",
-    items: ["git_status", "git_diff", "git_log", "git_commit"],
+    items: ["git_status", "git_diff", "git_log", "git_commit", "git_worktree"],
   },
   {
     title: "网络",

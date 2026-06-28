@@ -1,8 +1,7 @@
-// Package builtin — Git tools (native replacement for "bash git ...").
+// Package builtin provides Tianxuan's compile-time built-in tools.
 //
-// These tools parse structured git output so the model never has to interpret
-// raw terminal text. Four tools cover the daily workflow: status (what's dirty),
-// diff (what changed, line by line), commit (stage+commit), log (history).
+// git.go: git_status, git_diff, git_commit, git_log — the core git workflow
+// tools that parse structured output so models never interpret raw terminal text.
 package builtin
 
 import (
@@ -222,7 +221,7 @@ type gitCommit struct{}
 func (gitCommit) Name() string        { return "git_commit" }
 func (gitCommit) ReadOnly() bool      { return false }
 func (gitCommit) Description() string {
-	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 TDD rule: commit after each test-code-refactor cycle. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted. Use with verify: verify tests pass, then git_commit to lock in the green state."
+	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 V10.6: warns when committing directly to main/master — use a feature branch instead. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted."
 }
 func (gitCommit) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"message":{"type":"string","description":"commit message (empty = auto-generate from diff)"},"stage_all":{"type":"boolean","description":"if true, run ` + "`git add -u`" + ` before committing"},"amend":{"type":"boolean","description":"if true, amend the last commit instead of creating a new one"}},"required":[]}`)
@@ -238,6 +237,13 @@ func (gitCommit) Execute(ctx context.Context, args json.RawMessage) (string, err
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
+	}
+
+	// V10.6: 检测 main/master 分支直接提交，发出警告
+	branchRaw, _ := runGit(ctx, "branch", "--show-current")
+	branch := strings.TrimSpace(branchRaw)
+	if branch == "main" || branch == "master" {
+		return "", fmt.Errorf("🔴 禁止在 %s 分支上直接提交！请使用 git_worktree 创建功能分支进行开发。\n  git_worktree add path=<dir> branch=<feature-branch>\n  如果这是发布提交，请使用 amend=true 参数确认。", branch)
 	}
 
 	// Optional: stage all tracked changes first

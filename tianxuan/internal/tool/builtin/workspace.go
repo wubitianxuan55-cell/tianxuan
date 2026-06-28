@@ -48,6 +48,7 @@ func (w Workspace) Tools(enabled ...string) []tool.Tool {
 		globTool{workDir: w.Dir},
 		grepTool{workDir: w.Dir},
 		webFetch{},
+		gitWorktree{},
 	}
 	if len(enabled) == 0 {
 		return all

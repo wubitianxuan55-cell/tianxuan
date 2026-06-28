@@ -387,6 +387,7 @@ func Default() *Config {
 			"web_fetch", "web_search",
 			"todo_write", "complete_step",
 			"memory_search",
+			"git_status", "git_diff", "git_commit", "git_log", "git_worktree",
 		}},
 		Providers: []ProviderEntry{
 			{Name: "deepseek-flash", Kind: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-v4-flash", APIKeyEnv: "DEEPSEEK_API_KEY", BalanceURL: "https://api.deepseek.com/user/balance", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.02, Input: 1, Output: 2, Currency: "¥"}},

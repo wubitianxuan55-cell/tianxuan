@@ -30,6 +30,7 @@ var compactDesc = map[string]string{
 	"git_diff":       "显示行级别变更(--staged可选,path可限文件)",
 	"git_commit":     "提交暂存变更(可stage_all/amend/自动生成消息)",
 	"git_log":        "显示提交历史(支持count/path/author过滤)",
+	"git_worktree":   "管理git工作树(添加/删除/列出)",
 }
 
 // compactSchema maps tool names to stripped JSON Schema (properties without
@@ -81,4 +82,6 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"message":{"type":"string"},"stage_all":{"type":"boolean"},"amend":{"type":"boolean"}}}`),
 	"git_log": json.RawMessage(
 		`{"type":"object","properties":{"count":{"type":"integer"},"path":{"type":"string"},"author":{"type":"string"}}}`),
+	"git_worktree": json.RawMessage(
+		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
 }

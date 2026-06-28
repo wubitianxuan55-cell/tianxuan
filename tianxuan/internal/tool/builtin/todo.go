@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"tianxuan/internal/evidence"
 	"tianxuan/internal/tool"
@@ -28,7 +32,7 @@ type todoItem struct {
 func (todoWrite) Name() string { return "todo_write" }
 
 func (todoWrite) Description() string {
-	return "Record and update a structured task list for the current work. Send the COMPLETE list every call — it replaces the previous one. Use it to plan multi-step work and show progress: keep exactly one item in_progress at a time, and flip an item to completed the moment it's done (don't batch completions). Skip it for trivial single-step tasks. The list is two-level: a `level` 0 item is a PHASE (a milestone) and the `level` 1 items after it are its concrete sub-steps; omit `level` (0) for a flat list. Each item has `content` (imperative, e.g. \"Add the parser\"), `status` (pending|in_progress|completed), `activeForm` (present-continuous shown while in progress, e.g. \"Adding the parser\"), and optional `level` (0 phase | 1 sub-step)."
+	return "Record and update a structured task list for the current work. Send the COMPLETE list every call — it replaces the previous one. Use it to plan multi-step work and show progress: keep exactly one item in_progress at a time, and flip an item to completed the moment it's done (don't batch completions). Skip it for trivial single-step tasks. The list is two-level: a `level` 0 item is a PHASE (a milestone) and the `level` 1 items after it are its concrete sub-steps; omit `level` (0) for a flat list."
 }
 
 func (todoWrite) Schema() json.RawMessage {
@@ -91,8 +95,68 @@ func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, err
 	if err := verifyTodoCompletionTransitions(ctx, p.Todos); err != nil {
 		return "", err
 	}
+
+	// V10.6: 计划进度持久化 — 每次 todo_write 同步写入 .tianxuan/progress.md
+	// compaction 后丢失 todo 状态时，系统提示会引导 agent 读取此文件恢复进度
+	saveProgressMarkdown(p.Todos)
+
 	return fmt.Sprintf("Todos updated: %d total — %d completed, %d in progress, %d pending.",
 		len(p.Todos), done, active, pending), nil
+}
+
+// saveProgressMarkdown writes the current todo list to .tianxuan/progress.md
+// in the project root (discovered by walking up from cwd). This survives
+// compaction and lets the agent recover its plan after context resets.
+func saveProgressMarkdown(todos []todoItem) {
+	// Find project root by looking for .tianxuan/ directory
+	dir, err := os.Getwd()
+	if err != nil {
+		return // can't save without knowing where we are
+	}
+	root := findTianxuanDir(dir)
+	if root == "" {
+		return // no .tianxuan/ found
+	}
+
+	path := filepath.Join(root, "progress.md")
+	var b strings.Builder
+	b.WriteString("# 任务进度\n\n")
+	b.WriteString(fmt.Sprintf("> 最后更新: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	b.WriteString("| 状态 | 任务 |\n")
+	b.WriteString("|------|------|\n")
+
+	for _, t := range todos {
+		icon := "⬜"
+		switch t.Status {
+		case "in_progress":
+			icon = "🔄"
+		case "completed":
+			icon = "✅"
+		}
+		prefix := ""
+		if t.Level == 1 {
+			prefix = "  └─ "
+		}
+		b.WriteString(fmt.Sprintf("| %s | %s%s |\n", icon, prefix, t.Content))
+	}
+
+	_ = os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// findTianxuanDir walks up from dir looking for a .tianxuan/ directory.
+// Returns the path to the .tianxuan directory, or "" if not found.
+func findTianxuanDir(dir string) string {
+	for {
+		candidate := filepath.Join(dir, ".tianxuan")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "" // reached root
+		}
+		dir = parent
+	}
 }
 
 func verifyTodoCompletionTransitions(ctx context.Context, todos []todoItem) error {

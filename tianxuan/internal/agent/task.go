@@ -128,7 +128,7 @@ func NewTaskTool(prov provider.Provider, pricing *provider.Pricing, parentReg *t
 func (t *TaskTool) Name() string { return "task" }
 
 func (t *TaskTool) Description() string {
-	return "Spawn a sub-agent for a focused sub-task. The sub-agent runs in its own session with the same provider and a filtered tool list (defaults to every parent tool except subagent/skill meta-tools, so delegation stays one layer deep). Only its final answer is returned. Use this to (a) keep long exploration sequences out of the parent's context budget, or (b) delegate self-contained work like 'find every place that calls X and summarise the patterns'."
+	return "Spawn a sub-agent for a focused sub-task. The sub-agent runs in its own session with the same provider and a filtered tool list (defaults to every parent tool except subagent/skill meta-tools, so delegation stays one layer deep). Only its final answer is returned. Set output_schema to get structured JSON back (e.g. {files_modified: [...], key_decisions: [...]}). Use this to (a) keep long exploration sequences out of the parent's context budget, or (b) delegate self-contained work like 'find every place that calls X and summarise the patterns'."
 }
 
 func (t *TaskTool) Schema() json.RawMessage {
@@ -150,6 +150,14 @@ func (t *TaskTool) Schema() json.RawMessage {
 // writers. Conservative classification keeps the parallel-dispatch path from
 // running two sub-agents at once and letting their writes race.
 func (t *TaskTool) ReadOnly() bool { return false }
+
+// CompactDescriptor — V10.11: compact task description for prompt efficiency.
+func (t *TaskTool) CompactDescription() string {
+	return "派发隔离子代理执行子任务(可设置output_schema获取结构化JSON)"
+}
+func (t *TaskTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"description":{"type":"string"},"tools":{"type":"array","items":{"type":"string"}},"max_steps":{"type":"integer"},"run_in_background":{"type":"boolean"},"output_schema":{"type":"object"}},"required":["prompt"]}`)
+}
 
 func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {

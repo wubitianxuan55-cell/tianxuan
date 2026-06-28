@@ -240,11 +240,17 @@ func tryMarkItDown(path string) (string, bool) {
 	var out []byte
 	var runErr error
 	if p, err := exec.LookPath("markitdown"); err == nil {
-		out, runErr = exec.CommandContext(ctx, p, path).Output()
+		cmd := exec.CommandContext(ctx, p, path)
+		hideBashWindow(cmd)
+		out, runErr = cmd.Output()
 	} else if p, err := exec.LookPath("python3"); err == nil {
-		out, runErr = exec.CommandContext(ctx, p, "-m", "markitdown", path).Output()
+		cmd := exec.CommandContext(ctx, p, "-m", "markitdown", path)
+		hideBashWindow(cmd)
+		out, runErr = cmd.Output()
 	} else if p, err := exec.LookPath("python"); err == nil {
-		out, runErr = exec.CommandContext(ctx, p, "-m", "markitdown", path).Output()
+		cmd := exec.CommandContext(ctx, p, "-m", "markitdown", path)
+		hideBashWindow(cmd)
+		out, runErr = cmd.Output()
 	} else {
 		return "", false
 	}

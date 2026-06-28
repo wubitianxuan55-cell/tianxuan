@@ -15,22 +15,24 @@ var compactDesc = map[string]string{
 	"delete_range":   "删除文件连续行(起止锚点定位)",
 	"delete_symbol":  "删除Go符号(函数/类型/接口等,AST解析)",
 	"glob":           "通配符匹配文件名(支持**递归)",
-	"grep":           "正则搜索文件内容(返回path:行:文本,限200条)",
+	"grep":           "正则搜索文件内容(返回path:行:文本,支持sort_by=relevance)",
 	"ls":             "列目录条目(子目录带/)",
-	"bash":           "执行shell命令(5分超时,支持json输出)",
+	"bash":           "执行shell命令(5分超时,output_format=json得结构化输出)",
 	"bash_output":    "读取后台任务增量输出",
 	"kill_shell":     "终止后台任务",
 	"wait":           "阻塞等待后台任务结束",
 	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全,支持重试)",
 	"web_search":     "搜索公开网页(通过DuckDuckGo)，返回标题/URL/摘要",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
-	"complete_step":  "完成计划步骤(附验证证据,空证据拒绝)",
+	"complete_step":  "完成计划步骤(须可验证证据,禁止纯manual)",
 	"notebook_edit":  "编辑Jupyter Notebook单元格(.ipynb)",
 	"git_status":     "显示工作区状态(分支/暂存/未暂存/未跟踪/冲突)",
 	"git_diff":       "显示行级别变更(--staged可选,path可限文件)",
 	"git_commit":     "提交暂存变更(可stage_all/amend/自动生成消息)",
 	"git_log":        "显示提交历史(支持count/path/author过滤)",
 	"git_worktree":   "管理git工作树(添加/删除/列出)",
+	"memory_search":  "搜索已保存的记忆(关键词,返回相关条目)",
+	"read_skill":     "读取指定技能(skill)的完整内容",
 }
 
 // compactSchema maps tool names to stripped JSON Schema (properties without
@@ -84,4 +86,8 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"count":{"type":"integer"},"path":{"type":"string"},"author":{"type":"string"}}}`),
 	"git_worktree": json.RawMessage(
 		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
+	"memory_search": json.RawMessage(
+		`{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`),
+	"read_skill": json.RawMessage(
+		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
 }

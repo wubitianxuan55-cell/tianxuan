@@ -110,7 +110,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
         </div>
       )}
       {item.text && (
-        <div className={item.streaming ? "ds-shiny-text" : ""}>
+        <div className={`msg-text-fade ${item.streaming ? "ds-shiny-text" : ""}`}>
         <MemoMarkdown text={item.text} streaming={item.streaming} />
         </div>
       )}

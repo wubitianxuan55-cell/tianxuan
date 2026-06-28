@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"tianxuan/internal/provider"
 )
@@ -151,20 +152,8 @@ func (cp *CheckpointData) formatForLLM() string {
 		parts = append(parts, "- Goal: "+cp.Goal)
 	}
 	if len(cp.EditFiles) > 0 {
-		parts = append(parts, "- Files modified: "+joinStr(cp.EditFiles, ", "))
+		parts = append(parts, "- Files modified: "+strings.Join(cp.EditFiles, ", "))
 	}
 	parts = append(parts, "]")
-	return joinStr(parts, "\n")
-}
-
-// joinStr joins strings with a separator (stdlib strings.Join without import).
-func joinStr(ss []string, sep string) string {
-	if len(ss) == 0 {
-		return ""
-	}
-	result := ss[0]
-	for _, s := range ss[1:] {
-		result += sep + s
-	}
-	return result
+	return strings.Join(parts, "\n")
 }

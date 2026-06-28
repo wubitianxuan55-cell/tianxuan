@@ -31,6 +31,7 @@ func init() {
 // on non-zero exit.
 func runGit(ctx context.Context, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
+	hideBashWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -43,6 +44,8 @@ func runGit(ctx context.Context, args ...string) (string, error) {
 	}
 	return stdout.String(), nil
 }
+
+// --- git_status --------------------------------------------------------------
 
 // --- git_status --------------------------------------------------------------
 

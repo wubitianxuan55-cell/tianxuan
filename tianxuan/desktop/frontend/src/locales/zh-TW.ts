@@ -424,4 +424,20 @@ export const zhTW: Record<DictKey, string> = {
   "memory.scopeUser": "使用者",
   "memory.scopeProject": "專案",
   "memory.scopeLocal": "本地",
+
+  // 建議面板
+  "memory.saveTo": "儲存至",
+  "memory.scanSuggestions": "掃描建議",
+  "memory.refreshSuggestions": "重整建議",
+  "memory.suggestionsHint": "點擊掃描來分析最近的對話",
+  "memory.noCandidates": "未發現候選項目",
+  "memory.memoryCandidates": "記憶候選項目",
+  "memory.skillCandidates": "技能候選項目",
+  "memory.newBadge": "新建",
+  "memory.newSkillBadge": "新技能",
+  "memory.accept": "採納",
+  "memory.create": "建立",
+  "memory.savedBadge": "✓ 已儲存",
+  "memory.createdBadge": "✓ 已建立",
+  "memory.generatedAt": "生成於",
 };

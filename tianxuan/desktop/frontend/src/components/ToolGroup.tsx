@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronRight, FolderOpen } from "lucide-react";
 import { ToolCard } from "./ToolCard";
 import { useCompact } from "../hooks/useCompact";
+import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { subjectOf } from "../lib/tools";
 import type { Item } from "../lib/store";
 
@@ -10,6 +11,8 @@ type ToolItem = Extract<Item, { kind: "tool" }>;
 // ToolGroup collapses consecutive same-name tool calls into a single row.
 export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse?: () => void }) {
   const [open, setOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useGSAPCollapse(contentRef, open);
   const compact = useCompact();
   if (tools.length === 0) return null;
   const t = tools[0];
@@ -33,7 +36,7 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
         onClick={() => { setOpen((v) => !v); onCollapse?.(); }}
       >
         <ChevronRight
-          className={`shrink-0 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+          className={`shrink-0 transition-transform duration-180 ${open ? "rotate-90" : ""}`}
           size={iconSize}
         />
         <FolderOpen className="shrink-0 text-fg-faint" size={iconSize} />
@@ -46,15 +49,12 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
           </span>
         )}
       </div>
-      <div className={`grid transition-all duration-200 ${
-        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-      }`}>
-        <div className="overflow-hidden min-h-0">
-          <div className="border-t border-border-soft pt-0.5">
-            {tools.map((t) => (
-              <ToolCard key={t.id} item={t} />
-            ))}
-          </div>
+      {/* GSAP 驱动的高度动画 — 替代有 Chrome bug 的 CSS grid-rows 方案 */}
+      <div ref={contentRef} className="overflow-hidden">
+        <div className="border-t border-border-soft pt-0.5">
+          {tools.map((t) => (
+            <ToolCard key={t.id} item={t} />
+          ))}
         </div>
       </div>
     </div>

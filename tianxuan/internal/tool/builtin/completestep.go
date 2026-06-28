@@ -41,7 +41,7 @@ var validEvidenceKinds = map[string]bool{
 func (completeStep) Name() string { return "complete_step" }
 
 func (completeStep) Description() string {
-	return `Sign off ONE plan step with PROOF it is done. Requires evidence: verification (run a command via bash and cite its output), diff (show what changed), files (list paths touched), or manual (for steps that can only be visually confirmed). Fields: step (title/number matching todo_write), result (what changed), evidence (≥1 item with kind=verification|diff|files|manual and a summary), optional notes.`
+	return `Sign off ONE plan step with PROOF it is done. At least one evidence item must be verification (run a command via bash and cite its output), diff (show what changed), or files (list paths touched). Manual evidence alone is NOT accepted — combine it with at least one verifiable kind. Fields: step (title/number matching todo_write), result (what changed), evidence (≥1 item, at least one non-manual), optional notes.`
 }
 
 func (completeStep) Schema() json.RawMessage {
@@ -115,6 +115,10 @@ func (completeStep) Execute(ctx context.Context, args json.RawMessage) (string, 
 	todoMatch, hasTodo, err := verifyTodoStep(ctx, p.Step)
 	if err != nil {
 		return "", err
+	}
+	// 编码铁律: manual 证据不能单独作为签退依据——至少需要一条可验证证据
+	if hostVerified == 0 && manualUnverified > 0 {
+		return "", fmt.Errorf("all evidence is manual (%d item(s)) — at least one verification, diff, or files evidence is required; run a check with bash and cite its output, or cite a concrete code change", manualUnverified)
 	}
 	hostStatus := ""
 	if _, ok := evidence.FromContext(ctx); ok {

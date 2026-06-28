@@ -66,11 +66,15 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
     case "text": case "reasoning": {
       const { items, id, seq } = ensureAssistant(s);
       const delta = e.text ?? e.reasoning ?? "";
-      const nextItems = items.map(it => {
-        if (it.id !== id || it.kind !== "assistant") return it;
-        return e.kind === "text" ? { ...it, text: it.text + delta } : { ...it, reasoning: it.reasoning + delta };
-      });
-      return { ...s, items: nextItems as Item[], currentAssistant: id, seq };
+      // 直接索引更新：ensureAssistant 保证最后一项就是目标 assistant
+      // 原 items.map() 每次 O(n) 遍历全数组 → 现 O(1) 直接定位
+      const idx = items.length - 1;
+      const it = items[idx] as Extract<Item, { kind: "assistant" }>;
+      const next = [...items];
+      next[idx] = e.kind === "text"
+        ? { ...it, text: it.text + delta }
+        : { ...it, reasoning: it.reasoning + delta };
+      return { ...s, items: next, currentAssistant: id, seq };
     }
     case "message": {
       // 始终更新最后一个 assistant，不创建新的。

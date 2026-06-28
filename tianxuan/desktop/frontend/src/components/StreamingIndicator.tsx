@@ -13,6 +13,7 @@ const stageConfig: Record<Stage, { label: string; barClass: string; dotClass: st
 /**
  * StreamingIndicator renders a compact "preparing → streaming → stalled"
  * status bar inside the transcript while the model is generating a response.
+ * Always occupies layout space (via visibility) to prevent virtual-list jitter.
  */
 export function StreamingIndicator({
   running,
@@ -46,12 +47,12 @@ export function StreamingIndicator({
     };
   }, [running, last?.id, last?.kind === "assistant" && last.streaming]);
 
-  if (!running || stage === "idle") return null;
-
-  const cfg = stageConfig[stage];
+  // 始终渲染占位容器 — 防止 running 切换时虚拟列表布局跳动
+  const hidden = !running || stage === "idle";
+  const cfg = stageConfig[hidden ? "idle" : stage];
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50">
+    <div className={`sticky top-0 z-10 flex items-center gap-2.5 px-3 py-2 border-b border-border-soft bg-bg-soft/50 ${hidden ? "invisible" : ""}`}>
       {/* 滚动色条 — 高 3px，顶对齐 */}
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-border-soft overflow-hidden">
         <div className={`h-full rounded-r-sm animate-pulse ${

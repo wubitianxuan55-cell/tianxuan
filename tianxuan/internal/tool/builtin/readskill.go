@@ -47,14 +47,8 @@ func (r readSkill) Execute(_ context.Context, args json.RawMessage) (string, err
 	return content, nil
 }
 
-// Compact tool descriptions for prompt efficiency (V6.0).
-func (readSkill) CompactDescription() string {
-	return "读取指定技能(skill)的完整内容"
-}
-
-func (readSkill) CompactSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`)
-}
+func (readSkill) CompactDescription() string { return compactDesc["read_skill"] }
+func (readSkill) CompactSchema() json.RawMessage   { return compactSchema["read_skill"] }
 
 func init() {
 	tool.RegisterBuiltin(readSkill{})

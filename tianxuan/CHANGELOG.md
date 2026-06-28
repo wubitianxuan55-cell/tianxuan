@@ -1,3 +1,73 @@
+## [10.11.0] — 2026-06-29
+
+### 🎨 体验优化迭代
+
+> 基于 V10.10.0 · 流式输出流畅度 + 终端降噪 + 记忆面板重设计 + CMD 窗口修复
+
+#### 流式输出流畅度
+- stream_batcher: maxBytes 64→8, maxDelay 16ms→4ms（消除文字爆发感）
+- Transcript: 流式时 scrollTop 直接跟随（替代 GSAP tween 重启抖动）
+- shiny-text: background-clip:text 渐变→border-left 脉冲（降低 GPU 开销）
+
+#### 终端输出降噪
+- textsink: 推理 500ms 节流 + `\r` 进度指示器（替代 2000+ 字刷屏）
+- textsink: ≥3 工具合并 `▸ N tools running...` 一行摘要
+- textsink: ≥2 错误合并 `⊘ N tools failed: ...` 聚合显示
+
+#### 记忆面板重设计
+- MemoryPanel: 卡片式布局 + 全中文 i18n（14 新翻译键）
+- SuggestionCard: 提取独立组件, badge 胶囊样式, evidence 引用线
+- 搜索框仅在有事实时显示, 空结果 + 清空筛选按钮
+
+#### CMD 窗口闪现修复
+- hideBashWindow: +CREATE_NO_WINDOW 标志（比 HideWindow 更彻底）
+- git.go/readfile.go/hook.go/notify.go/plugin: 补全 HideWindow 调用
+- hide_window_windows.go: 统一 proc.HideWindow 导出
+
+#### 其他
+- ToolGroup: CSS Grid→GSAP 动画（修复 Chrome 闪烁）
+- StreamingIndicator: return null→invisible 固定占位（防布局跳动）
+- ThemeSwitcher: 5→9 主题 + forest/midnight/neon/mono
+- 回到底部按钮: absolute→fixed + backdrop-blur 毛玻璃
+- 推理→正文: msg-fade-in 0.25s 过渡动画
+
+### 🚀 DSpark 吸收 + 流式输出全栈重构（V10.11.0 上轮）
+
+> 基于 V10.10.0 · 25文件 +550/-140 · 核心: 推测解码思想吸收 + 输出管线性能优化
+
+#### DSpark 吸收（借鉴 DeepSeek DeepSpec 推测解码架构）
+| 新增 | 功能 | 映射 |
+|------|------|------|
+| tool_precheck.go | 确定性预检查 | Confidence Head |
+| tool_coherence.go | 批次一致性后验证 | Block Verify |
+| session_route_features.go | 会话特征路由 | extract_context_feature |
+
+#### 流式输出全栈优化
+| 层 | 优化 | 效果 |
+|----|------|------|
+| SSE | 字符串扫描快速路径 | 90% 跳过 json.Unmarshal |
+| Go 流 | streamBatcher 批量合并 | 800→40 事件/响应 |
+| Go 渲染 | writeDim 零分配 + Write | 消除 ANSI 字符串分配 |
+| TS 状态 | items.map()→直接索引 | O(n)→O(1) |
+| TS 渲染 | 动态窗口 + Markdown 粗糙缓存 | 平滑过渡 |
+| CSS | GPU 合成层隔离 | 避免布局重算 |
+
+#### 工具增强
+- compact.go: memory_search/read_skill 统一映射，grep/bash/complete_step 描述优化
+- completestep.go: 拒绝纯 manual 证据
+- task.go: 新增 CompactDescriptor，突出 output_schema
+
+#### 代码清理
+- checkpoint.go: joinStr→strings.Join
+- flow.go: toLower→strings.ToLower
+- provider_adapter.go: 自实现→标准库
+
+#### 构建产物
+- release/v10.11.0/tianxuan.exe (16MB CLI)
+- release/v10.11.0/tianxuan-desktop.exe (16MB Wails)
+
+---
+
 ## [8.23.0] — 2026-06-22
 
 ### 🔙 V9.1/V9.2 精确摘除

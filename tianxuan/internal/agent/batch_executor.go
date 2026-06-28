@@ -115,6 +115,9 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: o.truncMsg})
 		}
 	}
+	// Phase 2 DSpark: 批次一致性检查 — 检测同一批次中读失败→写失败
+	// 的因果链，提前阻止注定失败的操作或注入一致性警告。
+	a.postBatchCoherenceCheck(calls, results)
 	a.applyStormBreaker(calls, outcomes, results)
 	return results
 }

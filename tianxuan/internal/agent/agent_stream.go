@@ -45,6 +45,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	var signature string // provider-issued proof for the reasoning (Anthropic thinking)
 	var calls []provider.ToolCall
 	var usage *provider.Usage
+	batcher := newStreamBatcher(a.sink)
 	for chunk := range ch {
 		switch chunk.Type {
 		case provider.ChunkReasoning:
@@ -53,12 +54,13 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				signature = chunk.Signature
 			}
 			if chunk.Text != "" && !transformReasoning {
-				a.sink.Emit(event.Event{Kind: event.Reasoning, Text: chunk.Text})
+				batcher.addReasoning(chunk.Text)
 			}
 		case provider.ChunkText:
 			text.WriteString(chunk.Text)
-			a.sink.Emit(event.Event{Kind: event.Text, Text: chunk.Text})
+			batcher.addText(chunk.Text)
 		case provider.ChunkToolCallStart:
+			batcher.flushNow()
 			// Surface the tool card as soon as the call begins �� before its
 			// (possibly large) arguments finish streaming �� so the user sees it
 			// working instead of a stall. executeBatch emits the full dispatch
@@ -90,6 +92,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 			a.lastUsage.Store(chunk.Usage)
 			a.sessCacheHit.Add(int64(chunk.Usage.CacheHitTokens)); chunk.Usage.SessionCacheHitTokens = int(a.sessCacheHit.Load())
 			a.sessCacheMiss.Add(int64(chunk.Usage.CacheMissTokens)); chunk.Usage.SessionCacheMissTokens = int(a.sessCacheMiss.Load())
+			batcher.flushNow()
 			// Phase 3: CompareShape diagnostics — explain cache behaviour
 			if chunk.Usage != nil {
 				postShape := a.CaptureShape()
@@ -101,12 +104,14 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				a.lastPrefixShape = postShape
 			}
 		case provider.ChunkError:
+			batcher.flushNow()
 			if provider.IsStreamInterrupted(chunk.Err) {
 				return text.String(), reasoning.String(), signature, calls, usage, true, chunk.Err
 			}
 			return "", "", "", nil, nil, false, chunk.Err
 		}
 	}
+	batcher.flushAll()
 	// With a PostLLMCall hook, the live stream was suppressed above; transform the
 	// full reasoning now and emit it once so the sink never sees the untranslated
 	// text. Without a hook this is skipped �� the chunk-by-chunk events already fired.

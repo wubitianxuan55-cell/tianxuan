@@ -108,22 +108,35 @@ export function Transcript({
   }, []);
 
   // ── 智能滚动：GSAP 驱动，无节流 ──────────────────────────────────
+  // 流式期间（最后一项是正在流出的 assistant）用 scrollTop 直接跟随，
+  // 避免每 token 重启 GSAP tween 导致的抖动。非流式用 GSAP 动画收尾。
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     if (!stick.current) return;
+
+    // 检测流式状态：最后一项是否是正在 streaming 的 assistant
+    const last = items[items.length - 1];
+    const isStreaming = last?.kind === "assistant" && last.streaming;
+
     if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
     resizeFrame.current = requestAnimationFrame(() => {
       resizeFrame.current = null;
       if (!stick.current) return;
-      gsap.to(el, {
-        scrollTo: { y: "max" },
-        duration: SCROLL_DURATION,
-        ease: "none",
-        overwrite: "auto",
-      });
+      if (isStreaming) {
+        // 流式：直接设置 scrollTop，零延迟零抖动
+        el.scrollTop = el.scrollHeight;
+      } else {
+        // 非流式：GSAP 动画平滑过渡
+        gsap.to(el, {
+          scrollTo: { y: "max" },
+          duration: SCROLL_DURATION,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      }
     });
-  }, []);
+  }, [items]);
 
   // 新问题提交时强制到底
   const onNewQuestion = useCallback(() => {
@@ -339,11 +352,10 @@ export function Transcript({
           ))}
         </div>
       </div>
-      {/* 回到底部按钮 —— 柔和设计，不抢眼 */}
+      {/* 回到底部按钮 —— 固定右下角，背景虚化透明 */}
       {showScrollDown && (
         <button
-          className="absolute bottom-5 right-8 z-10 flex items-center gap-1.5 rounded-full bg-accent text-accent-fg border-0 cursor-pointer hover:brightness-110 active:scale-95 transition-all px-3 py-1.5 opacity-80 hover:opacity-100"
-          style={{ boxShadow: "var(--ds-shadow-accent-btn)" }}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-1.5 rounded-full border border-border-soft backdrop-blur-md bg-bg-elev/70 text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-elev/90 hover:border-fg-faint/30 active:scale-95 transition-all px-3 py-1.5 shadow-lg"
           onClick={scrollDown}
           aria-label="回到底部"
         >

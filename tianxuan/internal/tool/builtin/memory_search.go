@@ -40,10 +40,8 @@ func (memorySearch) Schema() json.RawMessage {
 
 func (memorySearch) ReadOnly() bool { return true }
 
-func (memorySearch) CompactDescription() string { return "search saved memories by keyword" }
-func (memorySearch) CompactSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`)
-}
+func (memorySearch) CompactDescription() string { return compactDesc["memory_search"] }
+func (memorySearch) CompactSchema() json.RawMessage   { return compactSchema["memory_search"] }
 
 func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, error) {
 	idx := memorySearchIndex

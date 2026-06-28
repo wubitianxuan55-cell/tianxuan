@@ -86,6 +86,17 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			}
 		}
 	}
+	// Phase 1 DSpark: 确定性预检查 — 在文件编辑工具实际执行前，
+	// 验证 old_string / anchor 是否存在于目标文件中。
+	// 预检查命中时返回诊断消息，阻止必然失败的操作，节省一整轮 API 调用。
+	// 缓存安全: 纯运行时判断，返回内容作为本轮新 tool_result 追加在末尾。
+	if msg := a.precheckTool(call.Name, json.RawMessage(call.Arguments)); msg != "" {
+		return toolOutcome{
+			output:  msg,
+			blocked: true,
+			errMsg:  msg,
+		}
+	}
 	// Checkpoint the file this writer is about to change, so the turn can be
 	// rewound. Fires after all gating (the edit is cleared to run) and only for
 	// tools that can describe their change; a Preview error means the edit will

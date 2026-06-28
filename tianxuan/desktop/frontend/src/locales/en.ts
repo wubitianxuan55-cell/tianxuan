@@ -425,6 +425,21 @@ export const en = {
   "memory.scopeUser": "User",
   "memory.scopeProject": "Project",
   "memory.scopeLocal": "Local",
-};
 
+  // suggestions panel
+  "memory.saveTo": "Save to",
+  "memory.scanSuggestions": "Scan for suggestions",
+  "memory.refreshSuggestions": "Refresh suggestions",
+  "memory.suggestionsHint": "Click scan to analyze recent conversations",
+  "memory.noCandidates": "No candidates found",
+  "memory.memoryCandidates": "Memory candidates",
+  "memory.skillCandidates": "Skill candidates",
+  "memory.newBadge": "New",
+  "memory.newSkillBadge": "New skill",
+  "memory.accept": "Accept",
+  "memory.create": "Create",
+  "memory.savedBadge": "✓ Saved",
+  "memory.createdBadge": "✓ Created",
+  "memory.generatedAt": "Generated at",
+};
 export type DictKey = keyof typeof en;

@@ -1,6 +1,35 @@
 # tianxuan project memory
 
-> V8.23.0 — 精确回退V9.1/V9.2破坏性变更，保留agentMode模式统一 · 2026-06-22
+> V10.11.0 — DSpark吸收 + 流式输出全栈重构 · 2026-06-28
+
+## V10.11.0 (2026-06-28)
+
+### DSpark 吸收
+🧠 tool_precheck.go: 确定性预检查（edit_file old_string验证、delete_range anchor验证）
+🧠 tool_coherence.go: 批次一致性后验证（读失败→写失败因果链检测）
+🧠 session_route_features.go: 会话状态特征路由（TurnCount/RecentErrors/PendingTodos→强制pro）
+
+### 流式输出全栈重构
+📡 SSE快速路径: 90%行字符串扫描替代json.Unmarshal
+📡 Go流批量化: streamBatcher 16ms/64B合并，800→40事件/响应
+📡 Go渲染零分配: writeDim三步Write替代dimText字符串拼接
+📡 TS状态O(1): items.map()→直接索引，~1000x迭代减少
+📡 TS渲染平滑: 动态窗口+Markdown粗糙缓存，消除纯文本→格式化跳变
+📡 CSS GPU合成: translateZ(0)隔离流式文本布局重算
+📡 StatusBar memo: 流式更新时跳过状态栏重渲染
+
+### 工具增强
+🔧 compact.go: memory_search/read_skill中心映射，grep/bash/complete_step描述优化
+🔧 completestep.go: 拒绝纯manual证据（编码铁律）
+🔧 task.go: 新增CompactDescriptor，Description突出output_schema
+
+### 代码清理
+🧹 checkpoint.go: joinStr→strings.Join
+🧹 flow.go: toLower→strings.ToLower
+🧹 provider_adapter.go: 自实现→标准库
+
+### 验证
+✅ go build ✅ go vet ✅ go test ✅ npx tsc --noEmit ✅ wails build 11.7s
 
 ## V8.23.0 (2026-06-22)
 

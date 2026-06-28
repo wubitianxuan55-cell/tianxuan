@@ -44,8 +44,9 @@ export function MemoryPanel(p: {
   );
 
   const activeScope = scope || scopes[0]?.scope || "";
+  const scopePath = scopes.find((s) => s.scope === activeScope)?.path;
 
-  // 初始化 scope（从 props 派生，不使用 render 中副作用）
+  // 初始化 scope
   useEffect(() => {
     if (!scope && scopes.length > 0) setScope(scopes[0].scope);
   }, [scope, scopes]);
@@ -118,7 +119,7 @@ export function MemoryPanel(p: {
   // 键盘快捷键
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement === document.body) {
+      if (e.key === "/" && document.activeElement === document.body && tab === "facts") {
         e.preventDefault();
         searchRef.current?.focus();
         return;
@@ -130,12 +131,12 @@ export function MemoryPanel(p: {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [tab]);
 
   return (
     <div className="drawer-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="drawer drawer--wide" onClick={(e) => e.stopPropagation()}>
-        {/* 头部 */}
+        {/* ═══ 标题栏 ═══ */}
         <div className="drawer__head">
           <div>
             <div className="drawer__title">{t("memory.title")}</div>
@@ -145,18 +146,22 @@ export function MemoryPanel(p: {
               </div>
             )}
           </div>
-          <button className="drawer__close" onClick={onClose} aria-label="Close">
+          <button className="drawer__close" onClick={onClose} aria-label="关闭">
             <X size={18} />
           </button>
         </div>
 
-        {/* 固定顶栏：快速添加 */}
-        <div className="shrink-0 px-4 py-3 border-b border-border-soft space-y-2">
+        {/* ═══ 快速添加区 ═══ */}
+        <div className="shrink-0 mx-4 mt-3 p-3 border border-border-soft rounded-xl bg-bg-elev/40">
+          <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider mb-2">
+            {t("memory.quickAdd")}
+          </div>
           <div className="flex items-center gap-2">
             <select
-              className="bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] px-2 py-1.5 outline-none focus:border-accent cursor-pointer"
+              className="bg-bg-soft border border-border-soft rounded-lg text-fg text-[12px] px-2.5 py-1.5 outline-none focus:border-accent cursor-pointer"
               value={activeScope}
               onChange={(e) => setScope(e.target.value)}
+              aria-label={t("memory.whereToSave")}
             >
               {scopes.map((s) => (
                 <option key={s.scope} value={s.scope}>
@@ -166,16 +171,17 @@ export function MemoryPanel(p: {
             </select>
             <input
               ref={noteRef}
-              className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
+              className="flex-1 bg-bg-soft border border-border-soft rounded-lg text-fg text-[12px] px-3 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
               placeholder={t("memory.notePlaceholder")}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submitNote();
               }}
+              aria-label={t("memory.notePlaceholder")}
             />
             <button
-              className="px-3 py-1.5 border-0 rounded-md bg-accent text-accent-fg text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40"
+              className="shrink-0 px-3 py-1.5 border-0 rounded-lg bg-accent text-accent-fg text-[12px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40"
               onClick={submitNote}
               disabled={busy || !note.trim()}
               type="button"
@@ -184,37 +190,18 @@ export function MemoryPanel(p: {
               {t("common.add")}
             </button>
           </div>
-          {scopes.find((s) => s.scope === activeScope)?.path && (
-            <div className="text-fg-faint/50 text-[10px] truncate" title={scopes.find((s) => s.scope === activeScope)?.path}>
-              保存至: {scopes.find((s) => s.scope === activeScope)?.path}
-            </div>
-          )}
-
-          {/* 搜索 + 类型过滤（仅事实标签页显示） */}
-          {tab === "facts" && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 px-2.5 h-8 border border-border rounded-md bg-bg text-fg-faint focus-within:border-accent transition-colors">
-                <Search size={14} />
-                <input
-                  ref={searchRef}
-                  className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint"
-                  placeholder={t("memory.searchPlaceholder")}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <FilterChip active={typeFilter === "all"} label={t("memory.filterAll")} onClick={() => setTypeFilter("all")} />
-                {factTypes.map((ft) => (
-                  <FilterChip key={ft} active={typeFilter === ft} label={ft} onClick={() => setTypeFilter(ft)} />
-                ))}
-              </div>
+          {scopePath && (
+            <div className="mt-1.5 flex items-center gap-1">
+              <span className="text-fg-faint/40 text-[10px]">{t("memory.saveTo")}:</span>
+              <span className="text-fg-faint/60 text-[10px] font-mono truncate" title={scopePath}>
+                {scopePath}
+              </span>
             </div>
           )}
         </div>
 
-        {/* 标签栏 */}
-        <div className="shrink-0 flex border-b border-border-soft">
+        {/* ═══ 标签栏 ═══ */}
+        <div className="shrink-0 mx-4 mt-3 flex border-b border-border-soft">
           <TabButton active={tab === "facts"} onClick={() => setTab("facts")} badge={facts.length}>
             {t("memory.facts")}
           </TabButton>
@@ -230,14 +217,57 @@ export function MemoryPanel(p: {
           </TabButton>
         </div>
 
-        {/* 内容区 */}
+        {/* ═══ 搜索与筛选（仅事实标签） ═══ */}
+        {tab === "facts" && facts.length > 0 && (
+          <div className="shrink-0 mx-4 mt-2 space-y-2">
+            <div className="flex items-center gap-1.5 px-3 h-8 border border-border rounded-lg bg-bg text-fg-faint focus-within:border-accent transition-colors">
+              <Search size={14} />
+              <input
+                ref={searchRef}
+                className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint"
+                placeholder={t("memory.searchPlaceholder")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label={t("memory.searchPlaceholder")}
+              />
+              {query && (
+                <button
+                  className="bg-transparent border-0 text-fg-faint cursor-pointer hover:text-fg p-0"
+                  onClick={() => setQuery("")}
+                  aria-label={t("memory.clearFilters")}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <FilterChip active={typeFilter === "all"} label={t("memory.filterAll")} onClick={() => setTypeFilter("all")} />
+              {factTypes.map((ft) => (
+                <FilterChip key={ft} active={typeFilter === ft} label={ft} onClick={() => setTypeFilter(ft)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ 内容区 ═══ */}
         <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
+          {/* ── 事实标签 ── */}
           {tab === "facts" && (
             <>
-              {filteredFacts.length === 0 && facts.length === 0 ? (
+              {facts.length === 0 ? (
                 <EmptyState message={t("memory.noFacts")} />
               ) : filteredFacts.length === 0 ? (
-                <div className="py-10 text-center text-fg-faint text-[13px]">{t("memory.noResults")}</div>
+                <div className="py-10 text-center text-fg-faint text-[13px]">
+                  {t("memory.noResults")}
+                  {(query || typeFilter !== "all") && (
+                    <button
+                      className="block mx-auto mt-2 text-accent text-[12px] bg-transparent border-0 cursor-pointer hover:underline"
+                      onClick={() => { setQuery(""); setTypeFilter("all"); }}
+                    >
+                      {t("memory.clearFilters")}
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   {filteredFacts.map((fact) => (
@@ -262,15 +292,16 @@ export function MemoryPanel(p: {
                 </div>
               )}
 
-              {/* 归档 */}
+              {/* ── 归档区 ── */}
               {archives.length > 0 && (
-                <div className="mt-4">
+                <div className="mt-4 pt-3 border-t border-border-soft/50">
                   <ArchivesSection archives={archives} />
                 </div>
               )}
             </>
           )}
 
+          {/* ── 文档标签 ── */}
           {tab === "docs" && (
             <>
               {docs.length === 0 ? (
@@ -281,9 +312,10 @@ export function MemoryPanel(p: {
             </>
           )}
 
+          {/* ── 建议标签 ── */}
           {tab === "suggestions" && (
             <div className="flex flex-col gap-3">
-              {/* 刷新按钮 */}
+              {/* 扫描按钮 */}
               <button
                 className="flex items-center justify-center gap-2 px-4 py-2.5 border border-border-soft rounded-lg bg-bg-soft text-fg text-[12.5px] cursor-pointer hover:bg-bg hover:border-accent transition-colors disabled:opacity-40"
                 onClick={async () => {
@@ -296,86 +328,65 @@ export function MemoryPanel(p: {
                 type="button"
               >
                 <RefreshCw size={14} className={suggestionsBusy ? "animate-spin" : ""} />
-                {suggestions ? "刷新建议" : "扫描建议"}
+                {suggestions ? t("memory.refreshSuggestions") : t("memory.scanSuggestions")}
               </button>
 
               {!suggestions ? (
-                <EmptyState message="点击扫描来分析最近的对话" />
+                <EmptyState message={t("memory.suggestionsHint")} />
               ) : suggestions.memories.length === 0 && suggestions.skills.length === 0 ? (
-                <EmptyState message="未发现候选项" />
+                <EmptyState message={t("memory.noCandidates")} />
               ) : (
                 <>
+                  {/* 记忆候选项 */}
                   {suggestions.memories.length > 0 && (
-                    <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider">记忆候选项</div>
-                  )}
-                  {suggestions.memories.map((s) => (
-                    <div key={s.id || s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">新建</span>
-                            <span className="badge badge--muted">{s.type}</span>
-                            {acceptedSuggestions.has(s.id || s.name) && (
-                              <span className="text-emerald-400 text-[11px] ml-1">✓ 已保存</span>
-                            )}
-                          </div>
-                          <div className="text-fg text-[12.5px] font-medium">{s.title || s.name}</div>
-                          <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
-                          <div className="text-fg-faint/70 text-[10px] mt-1">{s.reason}</div>
-                          {s.evidence && s.evidence.length > 0 && (
-                            <div className="mt-1.5 text-fg-faint/50 text-[10px]">{s.evidence[0]}</div>
-                          )}
-                        </div>
-                        {!acceptedSuggestions.has(s.id || s.name) && (
-                          <button
-                            className="shrink-0 px-2.5 py-1 text-[11px] font-medium border border-accent rounded text-accent bg-transparent cursor-pointer hover:bg-accent hover:text-accent-fg transition-colors"
-                            onClick={async () => {
-                              await onAcceptMemorySuggestion(s);
-                              setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
-                            }}
-                            type="button"
-                          >
-                            采纳
-                          </button>
-                        )}
+                    <>
+                      <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider">
+                        {t("memory.memoryCandidates")}
                       </div>
-                    </div>
-                  ))}
+                      {suggestions.memories.map((s) => (
+                        <SuggestionCard
+                          key={s.id || s.name}
+                          item={s}
+                          accepted={acceptedSuggestions.has(s.id || s.name)}
+                          badge={t("memory.newBadge")}
+                          acceptedBadge={t("memory.savedBadge")}
+                          actionLabel={t("memory.accept")}
+                          onAccept={async () => {
+                            await onAcceptMemorySuggestion(s);
+                            setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {/* 技能候选项 */}
                   {suggestions.skills.length > 0 && (
-                    <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider mt-2">技能候选项</div>
-                  )}
-                  {suggestions.skills.map((s) => (
-                    <div key={s.id || s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-info text-[11px] font-semibold uppercase tracking-wide">新技能</span>
-                            {acceptedSuggestions.has(s.id || s.name) && (
-                              <span className="text-emerald-400 text-[11px] ml-1">✓ 已创建</span>
-                            )}
-                          </div>
-                          <div className="text-fg text-[12.5px] font-medium">{s.name}</div>
-                          <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
-                          <div className="text-fg-faint/70 text-[10px] mt-1">{s.reason}</div>
-                        </div>
-                        {!acceptedSuggestions.has(s.id || s.name) && (
-                          <button
-                            className="shrink-0 px-2.5 py-1 text-[11px] font-medium border border-accent rounded text-accent bg-transparent cursor-pointer hover:bg-accent hover:text-accent-fg transition-colors"
-                            onClick={async () => {
-                              await onAcceptSkillSuggestion(s);
-                              setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
-                            }}
-                            type="button"
-                          >
-                            创建
-                          </button>
-                        )}
+                    <>
+                      <div className="text-fg-faint text-[10px] font-semibold uppercase tracking-wider mt-2">
+                        {t("memory.skillCandidates")}
                       </div>
-                    </div>
-                  ))}
+                      {suggestions.skills.map((s) => (
+                        <SuggestionCard
+                          key={s.id || s.name}
+                          item={s}
+                          accepted={acceptedSuggestions.has(s.id || s.name)}
+                          badge={t("memory.newSkillBadge")}
+                          acceptedBadge={t("memory.createdBadge")}
+                          actionLabel={t("memory.create")}
+                          onAccept={async () => {
+                            await onAcceptSkillSuggestion(s);
+                            setAcceptedSuggestions((prev) => new Set(prev).add(s.id || s.name));
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {/* 生成时间 */}
                   {suggestions.generatedAt && (
-                    <div className="text-fg-faint/50 text-[10px] text-right">
-                      生成于 {new Date(suggestions.generatedAt).toLocaleString()}
+                    <div className="text-fg-faint/40 text-[10px] text-right">
+                      {t("memory.generatedAt")} {new Date(suggestions.generatedAt).toLocaleString()}
                     </div>
                   )}
                 </>
@@ -387,6 +398,10 @@ export function MemoryPanel(p: {
     </div>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   子组件
+   ══════════════════════════════════════════════════════════════════ */
 
 function FilterChip(p: { active: boolean; label: string; onClick: () => void }) {
   return (
@@ -427,6 +442,55 @@ function EmptyState(p: { message: string }) {
   );
 }
 
+function SuggestionCard(p: {
+  item: MemorySuggestion | SkillSuggestion;
+  accepted: boolean;
+  badge: string;
+  acceptedBadge: string;
+  actionLabel: string;
+  onAccept: () => Promise<void>;
+}) {
+  const { item, accepted, badge, acceptedBadge, actionLabel, onAccept } = p;
+  const name = "name" in item ? item.name : "";
+  const title = "title" in item ? (item.title || item.name) : name;
+  const type = "type" in item ? item.type : undefined;
+
+  return (
+    <div className="border border-border-soft rounded-xl p-3.5 bg-bg-soft/60 hover:bg-bg-soft transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-accent text-[10px] font-semibold uppercase tracking-wider bg-accent/10 px-1.5 py-0.5 rounded">
+              {badge}
+            </span>
+            {type && <span className="badge badge--muted">{type}</span>}
+            {accepted && (
+              <span className="text-emerald-400 text-[10px] font-medium ml-1">{acceptedBadge}</span>
+            )}
+          </div>
+          <div className="text-fg text-[12.5px] font-medium">{title}</div>
+          <div className="text-fg-faint text-[11px] mt-0.5">{item.description}</div>
+          <div className="text-fg-faint/60 text-[10px] mt-1 italic">{item.reason}</div>
+          {item.evidence && item.evidence.length > 0 && (
+            <div className="mt-1.5 text-fg-faint/40 text-[10px] leading-relaxed border-l-2 border-fg-faint/15 pl-2">
+              {item.evidence[0]}
+            </div>
+          )}
+        </div>
+        {!accepted && (
+          <button
+            className="shrink-0 px-3 py-1 text-[11px] font-medium border border-accent/50 rounded-lg text-accent bg-transparent cursor-pointer hover:bg-accent hover:text-accent-fg transition-colors"
+            onClick={onAccept}
+            type="button"
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ArchivesSection(p: { archives: Array<{ name: string; title?: string; description: string; type: string; path?: string; archivedAt?: string }> }) {
   const st = useT();
   const [open, setOpen] = useState(false);
@@ -436,6 +500,7 @@ function ArchivesSection(p: { archives: Array<{ name: string; title?: string; de
         className="flex items-center gap-1.5 text-fg-faint text-[11px] font-semibold uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-fg transition-colors"
         onClick={() => setOpen((v) => !v)}
         type="button"
+        aria-expanded={open}
       >
         {open ? "▾" : "▸"} {st("memory.archived")}
         <span className="text-fg-faint/60 font-normal">({p.archives.length})</span>
@@ -445,7 +510,7 @@ function ArchivesSection(p: { archives: Array<{ name: string; title?: string; de
           {p.archives.map((a) => (
             <div
               key={a.name}
-              className="border border-border-soft rounded-md px-3 py-2 bg-bg-soft/50 opacity-70 hover:opacity-100 transition-opacity"
+              className="border border-border-soft rounded-lg px-3 py-2 bg-bg-soft/50 opacity-70 hover:opacity-100 transition-opacity"
             >
               <div className="flex items-center gap-2">
                 <span className="text-fg-dim text-[12px] font-medium">{a.title || a.name}</span>

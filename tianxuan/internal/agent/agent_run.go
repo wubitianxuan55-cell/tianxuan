@@ -44,8 +44,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ����
 	if a.flashProv != nil {
 		if !a.autoRouteLocked {
-						// V7.4: history-aware routing (heuristic + learned)
-			heuristic := AutoRouteProvider(input, a.prov, a.flashProv)
+					// V7.4: history-aware routing (heuristic + learned)
+			// V10.12 DSpark: session-state-aware routing — complex sessions
+			// always use pro regardless of short follow-up inputs.
+			sessionFeatures := a.collectSessionRouteFeatures()
+			heuristic := AutoRouteProviderWithSession(input, sessionFeatures, a.prov, a.flashProv)
 			useFlash := heuristic == a.flashProv
 			if a.routeHistory != nil {
 				useFlash = a.routeHistory.ShouldRouteToFlash(input, useFlash)

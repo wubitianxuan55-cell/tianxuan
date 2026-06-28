@@ -8,12 +8,16 @@ import (
 	"unsafe"
 )
 
-// hideBashWindow 防止 bash 子进程在 Windows 上弹出 cmd 黑框
+const createNoWindow = 0x08000000 // CREATE_NO_WINDOW
+
+// hideBashWindow 防止子进程在 Windows 上弹出 cmd 黑框。
+// HideWindow 隐藏窗口，CREATE_NO_WINDOW 阻止进程创建任何控制台。
 func hideBashWindow(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.HideWindow = true
+	cmd.SysProcAttr.CreationFlags |= createNoWindow
 }
 
 // Windows Job Object 常量

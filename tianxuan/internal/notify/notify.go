@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+
+	"tianxuan/internal/proc"
 )
 
 // Send dispatches a desktop notification. It returns nil when the notification
@@ -57,6 +59,7 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($template);
 		escape(title), escape(body),
 	)
 	cmd := exec.Command("powershell", "-NoProfile", "-Command", script)
+	proc.HideWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	// Ignore errors: may fail on older Windows / non-UWP environments.
 	_ = cmd.Run()
 	return nil

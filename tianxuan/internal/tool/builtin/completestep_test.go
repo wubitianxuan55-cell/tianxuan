@@ -149,22 +149,28 @@ func TestCompleteStepRejectsUnverifiedHostEvidence(t *testing.T) {
 	}
 }
 
-func TestCompleteStepAllowsManualAsUnverified(t *testing.T) {
+func TestCompleteStepRejectsManualOnly(t *testing.T) {
 	ctx := evidence.WithLedger(context.Background(), evidence.NewLedger())
-	out, err := completeStep{}.Execute(ctx, json.RawMessage(`{
+	_, err := completeStep{}.Execute(ctx, json.RawMessage(`{
 		"step":"Manual check",
 		"result":"operator confirmed behavior",
 		"evidence":[{"kind":"manual","summary":"checked the visible output"}]}`))
-	if err != nil {
-		t.Fatalf("manual evidence should remain allowed: %v", err)
+	if err == nil {
+		t.Fatal("manual-only evidence should be rejected")
 	}
-	if !strings.Contains(out, "manual/unverified 1") {
-		t.Fatalf("manual evidence should be marked unverified, got %q", out)
+	if !strings.Contains(err.Error(), "all evidence is manual") {
+		t.Fatalf("error should mention manual, got %v", err)
 	}
 }
 
+
 func TestCompleteStepMatchesTodoReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.Record(evidence.Receipt{
+		ToolName: "bash",
+		Success:  true,
+		Command:  "go test ./...",
+	})
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,
@@ -180,7 +186,7 @@ func TestCompleteStepMatchesTodoReceipt(t *testing.T) {
 			out, err := completeStep{}.Execute(ctx, json.RawMessage(`{
 				"step":"`+step+`",
 				"result":"step is complete",
-				"evidence":[{"kind":"manual","summary":"checked manually"}]}`))
+				"evidence":[{"kind":"verification","summary":"tests pass","command":"go test ./..."}]}`))
 			if err != nil {
 				t.Fatalf("todo-backed step rejected: %v", err)
 			}
@@ -231,6 +237,11 @@ func TestCompleteStepRejectsTodoMismatchAndPending(t *testing.T) {
 func TestCompleteStepIgnoresFailedTodoReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
 	ledger.Record(evidence.Receipt{
+		ToolName: "bash",
+		Success:  true,
+		Command:  "go test ./...",
+	})
+	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  false,
 		Todos:    []evidence.TodoItem{{Content: "Add parser", Status: "in_progress"}},
@@ -240,7 +251,7 @@ func TestCompleteStepIgnoresFailedTodoReceipt(t *testing.T) {
 	if _, err := (completeStep{}).Execute(ctx, json.RawMessage(`{
 		"step":"Anything",
 		"result":"step is complete",
-		"evidence":[{"kind":"manual","summary":"checked manually"}]}`)); err != nil {
+		"evidence":[{"kind":"verification","summary":"tests pass","command":"go test ./..."}]}`)); err != nil {
 		t.Fatalf("failed todo_write receipt should not constrain step: %v", err)
 	}
 }

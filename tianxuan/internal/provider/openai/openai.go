@@ -398,6 +398,24 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 			break
 		}
 
+		// Fast path: ~90% of SSE lines carry only content/reasoning_content.
+		// Scan with string ops instead of full json.Unmarshal.
+		if content, reasoning, fast := sseFastPath(data); !fast {
+			if reasoning != "" {
+				out <- provider.Chunk{Type: provider.ChunkReasoning, Text: reasoning}
+			}
+			if content != "" {
+				r, txt := think.push(content)
+				if r != "" {
+					out <- provider.Chunk{Type: provider.ChunkReasoning, Text: r}
+				}
+				if txt != "" {
+					out <- provider.Chunk{Type: provider.ChunkText, Text: txt}
+				}
+			}
+			continue
+		}
+
 		var sr streamResponse
 		if err := json.Unmarshal([]byte(data), &sr); err != nil {
 			out <- provider.Chunk{Type: provider.ChunkError, Err: fmt.Errorf("%s: decode stream: %w", c.name, err)}

@@ -4,50 +4,50 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 )
 
-// TextSink renders a turn's event stream to ANSI text on an io.Writer. It is
-// the reference terminal frontend: a headless `tianxuan run` writes to stdout,
-// and during the cache-first migration the chat TUI is fed through it too. The
-// output is byte-for-byte what the agent used to print directly, now driven by
-// typed events instead of inline Fprint calls.
-//
-// renderer, when non-nil, replaces the streamed raw answer text with styled
-// markdown once the text stream completes (a Message event). termWidth is the
-// column count used to count how many rows the raw stream occupied before the
-// redraw moves the cursor back. A nil renderer keeps the raw stream — correct
-// for piped output and for the chat TUI, which renders markdown itself.
+// Pre-computed ANSI dim SGR sequences — avoid per-chunk string allocation
+// in the hot reasoning-rendering path.
+var (
+	dimPrefix = []byte("\x1b[2m")
+	dimSuffix = []byte("\x1b[0m")
+	newline   = []byte("\n")
+)
+
+// TextSink renders a turn's event stream to ANSI text on an io.Writer.
 type TextSink struct {
 	out       io.Writer
 	renderer  Renderer
 	termWidth int
 
-	// Per-stream state, reset on Message / TurnStarted.
 	wroteReasoningHeader bool
 	wroteReasoningBody   bool
 	textWritten          bool
 	showReasoning        bool
-	// Per-turn state, reset on TurnStarted. Tracks whether anything has been
-	// written this turn so a coordinator Phase marker leads with a blank line
-	// only when it follows earlier output.
-	wroteAnything bool
+	wroteAnything        bool
+
+	// R3.1: reasoning throttle — show progress indicator instead of full text
+	reasoningChars     int
+	reasoningLastFlush time.Time
+	reasoningActive    bool // true while \r-overwritable progress line is live
+
+	// R3.2: tool batch — merge rapid tool dispatches into a summary line
+	pendingTools []string
+
+	// R3.3: error aggregation — merge consecutive errors into one line
+	pendingErrors []string
 }
 
-// NewTextSink builds a TextSink writing to out. renderer/termWidth drive the
-// post-stream markdown redraw; pass a nil renderer to keep the raw stream.
 func NewTextSink(out io.Writer, renderer Renderer, termWidth int) *TextSink {
 	return &TextSink{out: out, renderer: renderer, termWidth: termWidth}
 }
 
-// SetShowReasoning toggles Claude Code-style verbose display for thinking-mode
-// reasoning. Reasoning is still kept in session state by the agent; this only
-// controls terminal rendering.
 func (s *TextSink) SetShowReasoning(show bool) { s.showReasoning = show }
 
-// Emit renders one event. Called serially by the run loop.
 func (s *TextSink) Emit(e event.Event) {
 	switch e.Kind {
 	case event.TurnStarted:
@@ -55,56 +55,82 @@ func (s *TextSink) Emit(e event.Event) {
 		s.wroteReasoningBody = false
 		s.textWritten = false
 		s.wroteAnything = false
+		s.reasoningChars = 0
+		s.reasoningActive = false
+		s.pendingTools = nil
+		s.pendingErrors = nil
 
 	case event.Reasoning:
 		if !s.wroteReasoningHeader {
-			fmt.Fprintln(s.out, dimText("  ▎ thinking"))
+			writeDim(s.out, "  ▎ thinking")
 			s.wroteReasoningHeader = true
+			s.reasoningActive = true
+			s.reasoningLastFlush = time.Now()
 		}
 		if s.showReasoning && e.Text != "" {
-			fmt.Fprint(s.out, dimText(e.Text))
+			s.reasoningChars += len(e.Text)
 			s.wroteReasoningBody = true
+			// Throttle: update progress every 500ms (overwrite current line with \r)
+			if now := time.Now(); now.Sub(s.reasoningLastFlush) >= 500*time.Millisecond {
+				s.flushReasoningProgress()
+				s.reasoningLastFlush = now
+			}
 		}
 		s.wroteAnything = true
 
 	case event.Text:
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		if s.wroteReasoningHeader && s.wroteReasoningBody && !s.textWritten {
-			fmt.Fprintln(s.out) // separate the reasoning block from the answer
+			s.out.Write(newline)
 		}
-		fmt.Fprint(s.out, e.Text)
+		s.out.Write([]byte(e.Text))
 		s.textWritten = true
 		s.wroteAnything = true
 
 	case event.Message:
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		s.closeTextStream(e.Text, e.Reasoning)
 
 	case event.ToolDispatch:
-		// The early (Partial) dispatch carries no args — the full one prints the
-		// line. Without this the headless stream shows every call twice.
+		s.finalizeReasoning()
+		s.flushAggregatedErrors()
 		if e.Tool.Partial {
 			break
 		}
-		fmt.Fprintf(s.out, "  -> %s %s\n", e.Tool.Name, CompactArgs(e.Tool.Args))
+		s.pendingTools = append(s.pendingTools,
+			fmt.Sprintf("%s %s", e.Tool.Name, CompactArgs(e.Tool.Args)))
+		// Flush immediately if 3+ tools accumulated (batch already big enough to summarise)
+		if len(s.pendingTools) >= 3 {
+			s.flushBatchedTools()
+		}
 		s.wroteAnything = true
 
 	case event.ToolResult:
-		// A successful result is silent (it only feeds the model); a blocked
-		// call surfaces the same "⊘ name <reason>" line the agent used to print.
+		s.flushBatchedTools()
 		if e.Tool.Err != "" {
-			fmt.Fprintf(s.out, "  ⊘ %s %s\n", e.Tool.Name, e.Tool.Err)
-			s.wroteAnything = true
+			s.pendingErrors = append(s.pendingErrors,
+				fmt.Sprintf("%s(%s)", e.Tool.Name, e.Tool.Err))
 		}
+		s.wroteAnything = true
 
 	case event.Usage:
-		// Close a still-open raw text block (the planner path streams text with
-		// no Message redraw) before the usage line, matching the old Fprintln.
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		if s.textWritten {
-			fmt.Fprintln(s.out)
+			s.out.Write(newline)
 			s.textWritten = false
 		}
 		s.usageLine(e.Usage, e.Pricing)
 
 	case event.Notice:
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		glyph := "·"
 		if e.Level == event.LevelWarn {
 			glyph = "!"
@@ -113,34 +139,93 @@ func (s *TextSink) Emit(e event.Event) {
 		s.wroteAnything = true
 
 	case event.Phase:
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		if s.wroteAnything {
-			fmt.Fprintln(s.out)
+			s.out.Write(newline)
 		}
 		fmt.Fprintf(s.out, "[%s]\n", e.Text)
 		s.wroteAnything = true
 
 	case event.CompactionStarted:
-		fmt.Fprintln(s.out, dimText("  ⋯ compacting conversation…"))
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
+		writeDim(s.out, "  ⋯ compacting conversation…")
+		s.out.Write(newline)
 		s.wroteAnything = true
 
 	case event.CompactionDone:
+		s.flushBatchedTools()
+		s.flushAggregatedErrors()
+		s.finalizeReasoning()
 		c := e.Compaction
 		if c.Summary == "" {
-			break // aborted pass — the caller's Notice already explained why
+			break
 		}
-		fmt.Fprintln(s.out, dimText(fmt.Sprintf("  ⋯ compacted %d messages (%s)", c.Messages, c.Trigger)))
+		s2 := fmt.Sprintf("  ⋯ compacted %d messages (%s)", c.Messages, c.Trigger)
+		writeDim(s.out, s2)
+		s.out.Write(newline)
 		for _, ln := range strings.Split(strings.TrimRight(c.Summary, "\n"), "\n") {
-			fmt.Fprintln(s.out, dimText("    "+ln))
+			writeDim(s.out, "    "+ln)
+			s.out.Write(newline)
 		}
 		s.wroteAnything = true
 	}
 }
 
-// closeTextStream ends the streamed answer. With a renderer wired in and the
-// stream short enough to scroll back over, it moves the cursor to where text
-// began, clears to end of screen, and re-emits the styled markdown; otherwise
-// it just terminates the block with a newline. Reasoning above the text is left
-// untouched. Mirrors the old Agent.stream tail exactly.
+// finalizeReasoning ends the \r-overwritable reasoning progress line with a
+// newline and the final character count.
+func (s *TextSink) finalizeReasoning() {
+	if !s.reasoningActive {
+		return
+	}
+	// Overwrite the current \r progress line with the final count + newline
+	fmt.Fprintf(s.out, "\r  ▎ thinking ··· %d chars\n", s.reasoningChars)
+	s.reasoningActive = false
+}
+
+// flushReasoningProgress writes (or overwrites) the reasoning progress line.
+func (s *TextSink) flushReasoningProgress() {
+	if !s.reasoningActive {
+		return
+	}
+	fmt.Fprintf(s.out, "\r  ▎ thinking ··· %d chars", s.reasoningChars)
+}
+
+// flushBatchedTools emits pending tool dispatches. When 3+, shows a summary
+// line; otherwise shows one line per tool (the standard industry pattern).
+func (s *TextSink) flushBatchedTools() {
+	n := len(s.pendingTools)
+	if n == 0 {
+		return
+	}
+	if n >= 3 {
+		fmt.Fprintf(s.out, "  ▸ %d tools running...\n", n)
+	} else {
+		for _, t := range s.pendingTools {
+			fmt.Fprintf(s.out, "  -> %s\n", t)
+		}
+	}
+	s.pendingTools = nil
+}
+
+// flushAggregatedErrors emits pending tool errors. When 2+, aggregates into
+// a single summary line; otherwise shows the individual error.
+func (s *TextSink) flushAggregatedErrors() {
+	n := len(s.pendingErrors)
+	if n == 0 {
+		return
+	}
+	if n >= 2 {
+		fmt.Fprintf(s.out, "  ⊘ %d tools failed: %s\n", n, strings.Join(s.pendingErrors, "; "))
+	} else {
+		fmt.Fprintf(s.out, "  ⊘ %s\n", s.pendingErrors[0])
+	}
+	s.pendingErrors = nil
+}
+
 func (s *TextSink) closeTextStream(text, reasoning string) {
 	defer func() {
 		s.wroteReasoningHeader = false
@@ -162,11 +247,10 @@ func (s *TextSink) closeTextStream(text, reasoning string) {
 		}
 	}
 	if len(text) > 0 || (len(reasoning) > 0 && s.wroteReasoningBody) {
-		fmt.Fprintln(s.out)
+		s.out.Write(newline)
 	}
 }
 
-// usageLine writes the one-line token/cache summary; no-op when usage is unset.
 func (s *TextSink) usageLine(u *provider.Usage, p *provider.Pricing) {
 	if line := FormatUsageLine(u, p); line != "" {
 		fmt.Fprintln(s.out, line)
@@ -174,14 +258,6 @@ func (s *TextSink) usageLine(u *provider.Usage, p *provider.Pricing) {
 	}
 }
 
-// FormatUsageLine renders the per-turn token/cache summary — the key signal for
-// the cache-first design — as a single line (no trailing newline), or "" when
-// usage is unset or empty. Cache is reported as absolute "(N cached / M new)"
-// so a turn that adds a lot of fresh content doesn't read as "cache broke" the
-// way a falling percentage would; the cached prefix is still hitting, the
-// denominator just grew. Reasoning tokens (a subset of completion) show the
-// chain-of-thought cost. Shared by TextSink and the chat TUI so both frontends
-// render the line identically.
 func FormatUsageLine(u *provider.Usage, p *provider.Pricing) string {
 	if u == nil || u.TotalTokens == 0 {
 		return ""
@@ -209,12 +285,17 @@ func FormatUsageLine(u *provider.Usage, p *provider.Pricing) string {
 		u.TotalTokens, u.PromptTokens, cacheCol, u.CompletionTokens, reasoning, cost)
 }
 
-// dimText wraps s in the ANSI dim SGR sequence so reasoning streams visually
-// recede from the final answer.
+// dimText wraps s in the ANSI dim SGR sequence. Kept for FormatUsageLine etc.
 func dimText(s string) string { return "\x1b[2m" + s + "\x1b[0m" }
 
-// CompactArgs trims and caps a tool's raw JSON arguments for the dispatch line.
-// Exported so the CLI can reuse the same rendering without duplicating the logic.
+// writeDim writes s with ANSI dim SGR to w in three Write calls — prefix,
+// content, suffix — without allocating an intermediate string.
+func writeDim(w io.Writer, s string) {
+	w.Write(dimPrefix)
+	w.Write([]byte(s))
+	w.Write(dimSuffix)
+}
+
 func CompactArgs(s string) string {
 	s = strings.TrimSpace(s)
 	r := []rune(s)

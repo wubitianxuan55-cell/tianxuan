@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/proc"
 	"tianxuan/internal/sandbox"
 )
 
@@ -389,6 +390,7 @@ func DefaultSpawner(ctx context.Context, in SpawnInput) SpawnResult {
 		name, args := shellInvocation(in.Command)
 		cmd = exec.CommandContext(cctx, name, args...)
 	}
+	proc.HideWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	cmd.Dir = in.Cwd
 	cmd.Stdin = strings.NewReader(in.Stdin)
 	var outBuf, errBuf cappedBuffer

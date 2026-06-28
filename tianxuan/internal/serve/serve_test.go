@@ -23,6 +23,7 @@ func TestServeSubmitRunsAndBroadcastsTurnDone(t *testing.T) {
 	bc := NewBroadcaster()
 	got := make(chan string, 1)
 	ctrl := control.New(control.Options{Runner: fakeRunner{got: got}, Sink: bc})
+	ctrl.SetAgentMode("develop") // prevent auto-classify of short inputs as explore
 	srv := httptest.NewServer(New(ctrl, bc).Handler())
 	defer srv.Close()
 

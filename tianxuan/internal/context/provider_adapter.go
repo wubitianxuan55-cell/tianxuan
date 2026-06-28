@@ -1,5 +1,7 @@
 package context
 
+import "strings"
+
 // ProviderHint describes cache behaviour for different LLM providers.
 // V4.0b: enables automatic strategy selection based on the active provider.
 type ProviderHint struct {
@@ -49,9 +51,9 @@ func DefaultProviderHint() ProviderHint {
 
 // LookupProvider returns the hint for a provider name (case-insensitive prefix match).
 func LookupProvider(name string) ProviderHint {
-	lower := toLower(name)
+	lower := strings.ToLower(name)
 	for key, hint := range ProviderDefaults {
-		if stringsContains(lower, key) {
+		if strings.Contains(lower, key) {
 			return hint
 		}
 	}
@@ -66,17 +68,4 @@ func (h ProviderHint) ApplyToPolicy(p *CompactPolicy) {
 	if p.TailTokens <= 0 {
 		p.TailTokens = h.TailTokens
 	}
-}
-
-func stringsContains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || findSubstring(s, substr) >= 0)
-}
-
-func findSubstring(s, sub string) int {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }

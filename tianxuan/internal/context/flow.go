@@ -7,8 +7,9 @@
 package context
 
 import (
-"sync"
-"time"
+	"strings"
+	"sync"
+	"time"
 
 	"tianxuan/internal/provider"
 )
@@ -35,7 +36,7 @@ func DefaultCompactPolicy() CompactPolicy {
 // compaction detail rings. It decouples flow management from AgentRunner.
 type FlowLayer struct {
 	mu      sync.Mutex
-	store   MessageStore           // V4.0: abstracted message storage
+	store   MessageStore // V4.0: abstracted message storage
 	rings   *DetailRingBuffer
 	compact CompactPolicy
 }
@@ -207,7 +208,6 @@ func (l *FlowLayer) DetailDir() string { return l.rings.dir }
 // CompactPolicy returns the compaction policy.
 func (l *FlowLayer) CompactPolicy() CompactPolicy { return l.compact }
 
-
 // SetCompactPolicy updates the compaction policy at runtime.
 func (l *FlowLayer) SetCompactPolicy(p CompactPolicy) { l.compact = p }
 
@@ -224,24 +224,5 @@ func containsIgnoreCase(s, sub string) bool {
 	if len(sub) == 0 {
 		return false
 	}
-	lower := toLower(s)
-	sublower := toLower(sub)
-	for i := 0; i <= len(lower)-len(sublower); i++ {
-		if lower[i:i+len(sublower)] == sublower {
-			return true
-		}
-	}
-	return false
-}
-
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 32
-		}
-		b[i] = c
-	}
-	return string(b)
+	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }

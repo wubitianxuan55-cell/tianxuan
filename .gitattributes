@@ -1,0 +1,24 @@
+# Auto-detect text files and normalize to LF in the repo, but let Windows
+# checkouts use CRLF (core.autocrlf=true handles this at checkout time).
+*       text=auto
+
+# Source code — always LF in the repository
+*.go    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.mod   text eol=lf
+*.sum   text eol=lf
+
+# Binary files — never normalize
+*.exe   binary
+*.png   binary
+*.woff2 binary
+*.ico   binary

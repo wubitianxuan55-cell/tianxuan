@@ -46,8 +46,15 @@ export function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
     if (scrollToTurn) {
       scrollToTurn(turn);
     } else if (threadEl) {
+      // Fallback: DOM querySelector. With virtual scrolling, only visible
+      // + overscan items exist in the DOM. For elements outside the viewport,
+      // estimate scroll position by turn number (120px ~ average item height).
       const el = threadEl.querySelector(`[data-turn="${turn}"]`);
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        threadEl.scrollTo({ top: turn * 120, behavior: "smooth" });
+      }
     }
   }, [threadEl, scrollToTurn]);
 

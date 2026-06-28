@@ -124,7 +124,21 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		cctx = memory.WithQueue(cctx, a.memQueue)
 	}
 	start := time.Now()
-	result, err := t.Execute(cctx, json.RawMessage(call.Arguments))
+	// V10.12: if the tool implements ContextualTool, pass rich session context
+	// alongside the standard context — borrowed from opencode's ToolContext pattern.
+	var result string
+	var err error
+	if ct, ok := t.(tool.ContextualTool); ok {
+		tc := tool.ToolContext{
+			SessionID:  a.sessionID,
+			AgentName:  string(a.agentMode),
+			ToolCallID: call.ID,
+			Messages:   a.session.Messages,
+		}
+		result, err = ct.ExecuteWithContext(cctx, tc, json.RawMessage(call.Arguments))
+	} else {
+		result, err = t.Execute(cctx, json.RawMessage(call.Arguments))
+	}
 	duration := time.Since(start).Milliseconds()
 
 	// V4.2: cache successful file reads; invalidate writes

@@ -94,6 +94,7 @@ export default function App() {
     remember,
     forget,
     saveDoc,
+    updateFact,
   } = useController();
   const t = useT();
   const { agentMode, setAgentMode, yolo, toggleYolo, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, setBypass, setModel);
@@ -258,6 +259,14 @@ export default function App() {
       setMemView(await fetchMemory());
     },
     [saveDoc, fetchMemory],
+  );
+
+  const onSaveFact = useCallback(
+    async (name: string, body: string) => {
+      await updateFact(name, body);
+      setMemView(await fetchMemory());
+    },
+    [updateFact, fetchMemory],
   );
 
   const onAcceptMemorySuggestion = useCallback(
@@ -721,6 +730,7 @@ export default function App() {
             onRemember={onRemember}
             onForget={onForget}
             onSaveDoc={onSaveDoc}
+            onSaveFact={onSaveFact}
             onAcceptMemorySuggestion={onAcceptMemorySuggestion}
             onAcceptSkillSuggestion={onAcceptSkillSuggestion}
             onRefreshSuggestions={onRefreshSuggestions}

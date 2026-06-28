@@ -20,6 +20,19 @@ Use the provided tools to investigate or act. Return a single final answer that 
 and self-contained — the parent will see only that answer, not your tool calls or reasoning.
 If you need to ask for clarification, fail with a precise question instead of guessing.`
 
+// taskResultTag wraps sub-agent output in structured XML so the parent agent can
+// distinguish the result from other tool output. Borrowed from opencode.
+const (
+	taskResultTagOpen  = "<task-result>"
+	taskResultTagClose = "</task-result>"
+)
+
+// wrapTaskResult wraps a sub-agent's final answer in structured XML tags so the
+// parent model can reliably identify and parse it.
+func wrapTaskResult(text string) string {
+	return taskResultTagOpen + "\n" + strings.TrimSpace(text) + "\n" + taskResultTagClose
+}
+
 var subagentMetaTools = []string{
 	"task",
 	"run_skill",
@@ -257,6 +270,9 @@ var subUsage provider.Usage
 	if err == nil {
 		u := subUsage
 		t.accumulatedUsage = &u
+		// V10.12: wrap successful sub-agent results in structured XML tags
+		// so the parent can reliably identify the result. Borrowed from opencode.
+		return wrapTaskResult(result), nil
 	}
 	return result, err
 }

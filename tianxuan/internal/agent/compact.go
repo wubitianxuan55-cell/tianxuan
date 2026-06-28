@@ -297,6 +297,24 @@ func (a *AgentRunner) planCompaction(msgs []provider.Message, min int) (head, st
 		if maxByWin := int(float64(a.compaction.Window) * defaultCompactTarget); maxByWin < budget {
 			budget = maxByWin
 		}
+		// V10.11: guarantee at least 25% of the window for recent turns,
+		// clamped to [2000, 8000] tokens. Borrowed from opencode's
+		// preserveRecentBudget. Ensures protected tool outputs and
+		// recent context survive compaction.
+		const (
+			minRecentTokens = 2000
+			maxRecentTokens = 8000
+			recentRatio     = 0.25
+		)
+		recentBudget := int(float64(a.compaction.Window) * recentRatio)
+		if recentBudget < minRecentTokens {
+			recentBudget = minRecentTokens
+		} else if recentBudget > maxRecentTokens {
+			recentBudget = maxRecentTokens
+		}
+		if budget < recentBudget {
+			budget = recentBudget
+		}
 		start = tailStart(msgs, head, budget, a.tokPerChar(), a.tailFloor())
 	} else {
 		// V10.0: no window configured — fall back to message-count tail
@@ -396,6 +414,19 @@ func (a *AgentRunner) partitionFold(region []provider.Message) (kept, fold []pro
 
 // ─── KeepPolicy helpers ───
 
+// protectedTools is the set of tools whose outputs are foundational context that
+// should never be pruned or summarized away during compaction. Pattern borrowed
+// from opencode (PRUNE_PROTECTED_TOOLS).
+var protectedTools = map[string]bool{
+	"read_skill":   true, // skill definitions must persist
+	"memory_search": true, // memory search results are foundational context
+	"remember":     true, // memory facts should survive compaction
+}
+
+func isProtectedToolResult(m provider.Message) bool {
+	return m.Role == provider.RoleTool && protectedTools[m.Name]
+}
+
 // keepIndexes returns a bool slice indicating which messages in region should be
 // kept verbatim due to KeepPolicy. Retention only applies since the latest digest;
 // older kept messages are allowed to fold on the next pass.
@@ -452,6 +483,9 @@ func shouldKeepMessage(m provider.Message, policy KeepPolicy) bool {
 		return true
 	}
 	if policy&KeepUserMarked != 0 && isUserMarked(m) {
+		return true
+	}
+	if policy&KeepProtected != 0 && isProtectedToolResult(m) {
 		return true
 	}
 	return false

@@ -11,11 +11,12 @@ export function MemoryPanel(p: {
   onRemember: (scope: string, note: string) => Promise<void> | void;
   onForget: (name: string) => Promise<void> | void;
   onSaveDoc: (path: string, body: string) => Promise<void> | void;
+  onSaveFact: (name: string, body: string) => Promise<void> | void;
   onAcceptMemorySuggestion: (candidate: MemorySuggestion) => Promise<void> | void;
   onAcceptSkillSuggestion: (candidate: SkillSuggestion) => Promise<void> | void;
   onRefreshSuggestions: () => Promise<MemorySuggestionsView | null>;
 }) {
-  const { view, onClose, onRemember, onForget, onSaveDoc, onAcceptMemorySuggestion, onAcceptSkillSuggestion, onRefreshSuggestions } = p;
+  const { view, onClose, onRemember, onForget, onSaveDoc, onSaveFact, onAcceptMemorySuggestion, onAcceptSkillSuggestion, onRefreshSuggestions } = p;
   const t = useT();
   const [note, setNote] = useState("");
   const [scope, setScope] = useState("");
@@ -43,7 +44,11 @@ export function MemoryPanel(p: {
   );
 
   const activeScope = scope || scopes[0]?.scope || "";
-  if (!scope && scopes.length > 0) setScope(scopes[0].scope);
+
+  // 初始化 scope（从 props 派生，不使用 render 中副作用）
+  useEffect(() => {
+    if (!scope && scopes.length > 0) setScope(scopes[0].scope);
+  }, [scope, scopes]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredFacts = useMemo(
@@ -100,6 +105,14 @@ export function MemoryPanel(p: {
       Promise.resolve(onForget(name)).finally(() => setBusy(false));
     },
     [onForget],
+  );
+
+  const saveFact = useCallback(
+    (name: string, body: string) => {
+      setBusy(true);
+      Promise.resolve(onSaveFact(name, body)).finally(() => setBusy(false));
+    },
+    [onSaveFact],
   );
 
   // 键盘快捷键
@@ -241,6 +254,7 @@ export function MemoryPanel(p: {
                         highlight={highlight === fact.name}
                         onToggle={() => toggleFact(fact.name)}
                         onJump={jumpTo}
+                        onSave={saveFact}
                         onForget={() => forgetFact(fact.name)}
                       />
                     </div>

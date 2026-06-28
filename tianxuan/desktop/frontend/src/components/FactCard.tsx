@@ -63,9 +63,10 @@ export function FactCard(p: {
   highlight: boolean;
   onToggle: () => void;
   onJump: (name: string) => void;
+  onSave: (name: string, body: string) => void;
   onForget: () => void;
 }) {
-  const { fact, factNames, expanded, highlight, onToggle, onJump, onForget } = p;
+  const { fact, factNames, expanded, highlight, onToggle, onJump, onSave, onForget } = p;
   const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(fact.body);
@@ -149,7 +150,10 @@ export function FactCard(p: {
                 </button>
                 <button
                   className="px-2.5 py-1 text-[11px] border-0 rounded bg-accent text-accent-fg font-semibold cursor-pointer hover:brightness-110 active:scale-[0.97] transition-all"
-                  onClick={() => setEditing(false)}
+                  onClick={() => {
+                    onSave(fact.name, draft);
+                    setEditing(false);
+                  }}
                   type="button"
                 >
                   {t("common.save")}

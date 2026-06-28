@@ -5,9 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -37,12 +40,7 @@ type WorkspaceTab struct {
 	// ActivityStatus is the transient project-tree status for the in-flight turn.
 	ActivityStatus string
 
-	// Per-turn autosave per tab.
-	saveMu    sync.Mutex
-	saving    bool
-	saveAgain bool
 	closing   bool
-	saveCond  *sync.Cond
 
 	model string // active model ref (for meta)
 }
@@ -56,14 +54,16 @@ func newWorkspaceTab(scope, workspaceRoot, topicTitle string) *WorkspaceTab {
 		WorkspaceRoot: workspaceRoot,
 		TopicTitle:    topicTitle,
 		DisabledMCP:   map[string]ServerView{},
-		saveCond:      sync.NewCond(&sync.Mutex{}),
 	}
 }
 
 func randomTabID() string {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
+		// crypto/rand failure is nearly impossible, but panicking kills the
+		// entire desktop process. Fall back to a time-based ID so the app
+		// stays alive — the tab ID just needs to be unique per process.
+		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))[:16]
 	}
 	return hex.EncodeToString(b)
 }
@@ -202,13 +202,17 @@ func (a *App) saveTabs() {
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		log.Printf("saveTabs: MkdirAll %s: %v", filepath.Dir(path), err)
 		return
 	}
 	b, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
+		log.Printf("saveTabs: MarshalIndent: %v", err)
 		return
 	}
-	_ = os.WriteFile(path, b, 0o644)
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		log.Printf("saveTabs: WriteFile %s: %v", path, err)
+	}
 }
 
 // loadTabs reads desktop-tabs.json and returns the persisted entries.
@@ -219,10 +223,12 @@ func loadTabs() []tabPersistEntry {
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
+		log.Printf("loadTabs: ReadFile %s: %v", path, err)
 		return nil
 	}
 	var entries []tabPersistEntry
 	if err := json.Unmarshal(b, &entries); err != nil {
+		log.Printf("loadTabs: Unmarshal %s: %v", path, err)
 		return nil
 	}
 	return entries

@@ -247,6 +247,9 @@ func suggestSkills(workspaceRoot string, existing []skill.Skill, sessions []sugg
 }
 
 func existingMemoryText(set *memory.Set) []string {
+	// The *Set returned by ctrl.Memory() is an immutable snapshot — Docs and
+	// Store.List() are never mutated in place; refreshMemoryLocked creates a
+	// new *Set. So reading without the controller lock is safe.
 	var out []string
 	for _, d := range set.Docs {
 		out = append(out, normalizeSuggestionKey(d.Body))

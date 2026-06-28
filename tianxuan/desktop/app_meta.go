@@ -417,6 +417,18 @@ func (a *App) Forget(name string) error {
 	return ctrl.ForgetMemory(name)
 }
 
+// UpdateFact overwrites a saved fact's body by name — the panel's in-place
+// editor for fact cards. Returns the file written.
+func (a *App) UpdateFact(name, body string) (string, error) {
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl == nil {
+		return "", nil
+	}
+	return ctrl.UpdateFact(name, body)
+}
+
 // SaveDoc overwrites a memory doc with the panel editor's contents. The controller
 // validates path against the recognized memory files. Returns the file written.
 func (a *App) SaveDoc(path, body string) (string, error) {

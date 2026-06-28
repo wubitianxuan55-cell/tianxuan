@@ -31,6 +31,28 @@ type Tool interface {
 	ReadOnly() bool
 }
 
+// ToolContext carries session-scoped information that a tool may need beyond
+// its arguments: the conversation history, the calling agent, and identifiers
+// for the session, message, and tool call. Borrowed from opencode.
+type ToolContext struct {
+	SessionID  string
+	MessageID  string
+	AgentName  string
+	ToolCallID string
+	// Messages is the full conversation history up to (but not including)
+	// the current tool call. Read-only — tools must not mutate it.
+	Messages []provider.Message
+}
+
+// ContextualTool is an optional interface a Tool may implement to receive
+// richer session context alongside the standard context.Context. Tools that
+// don't implement this continue to work with Execute(ctx, args) alone.
+// Borrowed from opencode's ToolContext pattern.
+type ContextualTool interface {
+	Tool
+	ExecuteWithContext(ctx context.Context, tc ToolContext, args json.RawMessage) (string, error)
+}
+
 // CompactDescriptor is an optional capability a Tool may implement. When present,
 // CompactDescription replaces Description and CompactSchema replaces Schema in
 // the provider-facing tool list, significantly reducing per-turn prompt tokens.

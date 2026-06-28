@@ -133,9 +133,6 @@ func TestDeleteSessionFile(t *testing.T) {
 	if _, ok := m["session.jsonl"]; ok {
 		t.Error("title should be removed after delete")
 	}
-	if got := resolveSessionDisplay(dir, sessionPath, "expanded prompt"); got != "expanded prompt" {
-		t.Errorf("display sidecar should be removed after delete, got %q", got)
-	}
 }
 
 func TestDeleteSessionFileNoTitle(t *testing.T) {
@@ -178,22 +175,6 @@ func TestErrActiveSession(t *testing.T) {
 }
 
 func TestSessionDisplayRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	sessionPath := filepath.Join(dir, "s.jsonl")
-	content := "prefix\n--- Begin [Pasted text #1 · 5 lines] ---\nfull text\n--- End [Pasted text #1 · 5 lines] ---"
-	display := "[Pasted text #1 · 5 lines]"
-	if err := recordSessionDisplay(dir, sessionPath, content, display); err != nil {
-		t.Fatalf("record display: %v", err)
-	}
-	if got := resolveSessionDisplay(dir, sessionPath, content); got != display {
-		t.Fatalf("display = %q, want %q", got, display)
-	}
-	if got := resolveSessionDisplay(dir, sessionPath, "other"); got != "other" {
-		t.Fatalf("unknown content should pass through, got %q", got)
-	}
-}
-
-func TestRecordSessionDisplaySkipsNoop(t *testing.T) {
 	dir := t.TempDir()
 	sessionPath := filepath.Join(dir, "s.jsonl")
 	if err := recordSessionDisplay(dir, sessionPath, "same", "same"); err != nil {

@@ -214,7 +214,8 @@ export function Transcript({
   const scrollToTurnRef = useRef((turn: number) => {
     const idx = turnToIndexRef.current.get(turn);
     if (idx != null) {
-      stick.current = true;
+      // 跳转时不设置 stick.current = true —— 否则 ResizeObserver 检测到
+      // 容器高度变化后立即 scrollToBottom()，把视图拉回底部，用户看不到跳转效果。
       virtualizerRef.current.scrollToIndex(idx, { align: "start" });
     }
   });

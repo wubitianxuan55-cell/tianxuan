@@ -127,6 +127,10 @@ const (
 	// <keep>, or <!-- keep --> markers, letting the user pin facts that must
 	// survive compaction.
 	KeepUserMarked
+	// KeepProtected preserves tool results from protected-tool list (e.g.
+	// read_skill, memory_search) whose outputs are foundational context that
+	// must survive compaction. Pattern borrowed from opencode.
+	KeepProtected
 )
 
 type AgentRunner struct {
@@ -624,6 +628,11 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		if comp.RecentKeep <= 0 {
 			comp.RecentKeep = minRecentKeep
 		}
+	}
+	// V10.11: KeepProtected is enabled by default so foundational context from
+	// read_skill, memory_search, and remember tools survives compaction.
+	if comp.KeepPolicy == 0 {
+		comp.KeepPolicy = KeepProtected
 	}
 	if comp.ArchiveDir == "" {
 		comp.ArchiveDir = opts.ArchiveDir

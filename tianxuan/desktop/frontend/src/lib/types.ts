@@ -254,7 +254,6 @@ export interface MemoryView {
   storeDir: string;
   available: boolean;
   archives?: MemoryArchive[];
-  suggestions?: MemorySuggestionsView;
 }
 
 // Settings panel payloads (desktop/settings_app.go).

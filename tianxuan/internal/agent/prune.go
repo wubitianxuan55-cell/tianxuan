@@ -43,6 +43,11 @@ func (a *AgentRunner) PruneStaleToolResults() (PruneStats, error) {
 		if a.keepPolicy&KeepErrors != 0 && isErrorMessage(m) {
 			continue
 		}
+		// V10.11: KeepProtected preserves foundational context — tool outputs
+		// from read_skill, memory_search, remember survive pruning.
+		if a.keepPolicy&KeepProtected != 0 && isProtectedToolResult(m) {
+			continue
+		}
 		idx = append(idx, i)
 	}
 	if len(idx) == 0 {

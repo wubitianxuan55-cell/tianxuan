@@ -426,6 +426,10 @@ export function makeMockApp(): AppBindings {
       emit({ kind: "notice", level: "info", text: `saved → ${path}` });
       return path;
     },
+    async UpdateFact(name: string, _body: string) {
+      emit({ kind: "notice", level: "info", text: `updated → ${name}` });
+      return name;
+    },
     async MemorySuggestions() {
       return { memories: [], skills: [], generatedAt: new Date().toISOString(), available: false, source: "mock" };
     },

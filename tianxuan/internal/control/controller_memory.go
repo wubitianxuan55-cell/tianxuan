@@ -58,6 +58,37 @@ func (c *Controller) SaveDoc(path, body string) (string, error) {
 	return written, nil
 }
 
+// UpdateFact overwrites a saved fact's body by name, preserving all other
+// fields. It re-uses Store.Save (which overwrites by stem), so the edit is
+// atomic on disk and the index stays consistent. Returns the file written.
+func (c *Controller) UpdateFact(name, body string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil {
+		return "", nil
+	}
+	var target *memory.Memory
+	for _, f := range c.mem.Store.List() {
+		if f.Name == name {
+			m := f // copy
+			target = &m
+			break
+		}
+	}
+	if target == nil {
+		return "", fmt.Errorf("fact %q not found", name)
+	}
+	target.Body = body
+	path, err := c.mem.Store.Save(*target)
+	if err != nil {
+		return "", err
+	}
+	c.pendingMemory = append(c.pendingMemory,
+		"Memory fact \""+name+"\" was edited. Its current body:\n"+strings.TrimSpace(body))
+	c.refreshMemoryLocked()
+	return path, nil
+}
+
 // ForgetMemory deletes a saved auto-memory by name — the panel/TUI delete action,
 // the manual counterpart to the model's `forget` tool. It queues a turn-tail note
 // so the deletion applies this session (the cached prefix still lists the fact

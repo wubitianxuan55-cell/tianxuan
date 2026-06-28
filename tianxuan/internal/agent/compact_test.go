@@ -107,3 +107,35 @@ func TestCompactNow(t *testing.T) {
 		t.Logf("CompactNow: %d -> %d messages", len(s.Messages), len(a.session.Messages))
 	}
 }
+
+func TestKeepProtectedToolResult(t *testing.T) {
+	// read_skill tool results should be kept verbatim when KeepProtected is set.
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: "hello"},
+		{Role: provider.RoleAssistant, Content: "ok", ToolCalls: []provider.ToolCall{{ID: "c1", Name: "read_skill", Arguments: `{"name":"test"}`}}},
+		{Role: provider.RoleTool, ToolCallID: "c1", Name: "read_skill", Content: "important skill content"},
+		{Role: provider.RoleAssistant, Content: "done"},
+		{Role: provider.RoleUser, Content: "thanks"},
+	}
+
+	// Without KeepProtected, nothing is kept (only structural rules apply)
+	keep := keepIndexes(msgs, 0)
+	for i, m := range msgs {
+		if keep[i] {
+			t.Errorf("keep[%d] (%s/%s) should not be kept without KeepProtected", i, m.Role, m.Name)
+		}
+	}
+
+	// With KeepProtected, the read_skill tool result should be kept.
+	keep = keepIndexes(msgs, KeepProtected)
+	if !keep[2] {
+		t.Error("read_skill tool result should be kept with KeepProtected")
+	}
+	if !keep[1] {
+		t.Error("assistant message calling read_skill should be kept (tool-call group)")
+	}
+	// Other messages should not be affected.
+	if keep[0] || keep[3] || keep[4] {
+		t.Error("non-protected messages should not be kept")
+	}
+}

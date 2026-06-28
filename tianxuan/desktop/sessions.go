@@ -37,16 +37,17 @@ func loadSessionTitles(dir string) map[string]string {
 	return m
 }
 
-// saveSessionTitles writes the map atomically (temp file + rename).
-func saveSessionTitles(dir string, m map[string]string) error {
-	b, err := json.MarshalIndent(m, "", "  ")
+// saveAtomically serialises v as indented JSON and writes it atomically (temp
+// file + rename) to path. The temp file uses pattern for the prefix in dir.
+func saveAtomically(dir, pattern, path string, v any) error {
+	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(dir, ".titles.*.tmp")
+	tmp, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,12 @@ func saveSessionTitles(dir string, m map[string]string) error {
 		os.Remove(tmpPath)
 		return err
 	}
-	return os.Rename(tmpPath, sessionTitlesPath(dir))
+	return os.Rename(tmpPath, path)
+}
+
+// saveSessionTitles writes the map atomically (temp file + rename).
+func saveSessionTitles(dir string, m map[string]string) error {
+	return saveAtomically(dir, ".titles.*.tmp", sessionTitlesPath(dir), m)
 }
 
 // setSessionTitle sets (or, with an empty title, clears) a session's custom name.
@@ -114,28 +120,7 @@ func loadSessionDisplays(dir string) sessionDisplayMap {
 }
 
 func saveSessionDisplays(dir string, m sessionDisplayMap) error {
-	b, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, ".display.*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(b); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return os.Rename(tmpPath, sessionDisplayPath(dir))
+	return saveAtomically(dir, ".display.*.tmp", sessionDisplayPath(dir), m)
 }
 
 func recordSessionDisplay(dir, sessionPath, content, display string) error {
@@ -163,8 +148,4 @@ func sessionDisplayResolver(dir, sessionPath string) func(content string) string
 		}
 		return content
 	}
-}
-
-func resolveSessionDisplay(dir, sessionPath, content string) string {
-	return sessionDisplayResolver(dir, sessionPath)(content)
 }

@@ -382,7 +382,7 @@ func Default() *Config {
 		LSP: LSPConfig{Enabled: true},
 		Notify: NotifyConfig{Enabled: true, MinDuration: 5},
 		Tools: ToolsConfig{Enabled: []string{
-			"read_file", "write_file", "edit_file",
+			"read_file", "write_file", "edit_file", "edit_lines",
 			"ls", "grep", "bash",
 			"web_fetch", "web_search",
 			"todo_write", "complete_step",

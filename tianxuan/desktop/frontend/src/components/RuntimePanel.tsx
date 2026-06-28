@@ -11,6 +11,7 @@ const TOOL_DESC: Record<string, string> = {
   write_file: "写入/覆盖文件(自动建父目录)",
   edit_file: "精确替换文件字符串(须全局唯一)",
   multi_edit: "原子化批量编辑(单文件N步依次执行)",
+  edit_lines: "按行号替换文件连续行(起止行号定位)",
   delete_range: "删除文件连续行(起止锚点定位)",
   delete_symbol: "删除Go符号(函数/类型/接口等,AST解析)",
   glob: "通配符匹配文件名(支持**递归)",
@@ -58,7 +59,7 @@ interface Section {
 const SECTIONS: Section[] = [
   {
     title: "文件",
-    items: ["read_file", "write_file", "edit_file", "multi_edit", "delete_range", "delete_symbol", "glob", "grep", "ls", "notebook_edit"],
+    items: ["read_file", "write_file", "edit_file", "edit_lines", "multi_edit", "delete_range", "delete_symbol", "glob", "grep", "ls", "notebook_edit"],
   },
   {
     title: "命令",

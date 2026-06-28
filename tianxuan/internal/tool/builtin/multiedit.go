@@ -33,7 +33,7 @@ type editStep struct {
 func (multiEdit) Name() string { return "multi_edit" }
 
 func (multiEdit) Description() string {
-	return "Apply a list of edits to a single file atomically: each edit runs against the result of the previous one, all in memory; the file is rewritten only if every edit succeeds. Cheaper and safer than chaining edit_file calls — a failure in step 3 leaves the file untouched instead of half-edited."
+	return "Apply a list of edits to a single file atomically: each edit runs against the result of the previous one, all in memory; the file is rewritten only if every edit succeeds. Line endings are auto-adapted (see edit_file). Cheaper and safer than chaining edit_file calls — a failure in step 3 leaves the file untouched instead of half-edited."
 }
 
 func (multiEdit) Schema() json.RawMessage {
@@ -48,8 +48,8 @@ func (multiEdit) Schema() json.RawMessage {
     "items":{
       "type":"object",
       "properties":{
-        "old_string":{"type":"string","description":"Exact text to find. Without replace_all, must match exactly once."},
-        "new_string":{"type":"string","description":"Replacement text (empty deletes)."},
+        "old_string":{"type":"string","description":"Exact text to find. Without replace_all, must match exactly once. Line endings auto-adapted."},
+        "new_string":{"type":"string","description":"Replacement text (empty deletes). Line endings auto-adapted."},
         "replace_all":{"type":"boolean","description":"Replace every occurrence instead of requiring uniqueness."}
       },
       "required":["old_string","new_string"]
@@ -90,6 +90,9 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 	}
 	content := string(b)
 
+	// V10.5: 自动行尾适配 — multip_edit 复用 edit_file 的适配逻辑
+	fileLE := detectLineEnding(content)
+
 	// Apply edits in order against the running in-memory buffer. Any failure
 	// returns before the write, leaving the file untouched — that's the
 	// safety guarantee that makes multi_edit preferable to chained
@@ -99,20 +102,27 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 		if step.OldString == "" {
 			return "", fmt.Errorf("edit %d: old_string is required", i+1)
 		}
+		oldStr := adaptLineEndings(step.OldString, fileLE)
+		newStr := adaptLineEndings(step.NewString, fileLE)
+		// Fall back to original if adaptation broke the match
+		if oldStr != step.OldString && strings.Count(content, oldStr) == 0 && strings.Count(content, step.OldString) > 0 {
+			oldStr = step.OldString
+			newStr = step.NewString
+		}
 		if step.ReplaceAll {
-			count := strings.Count(content, step.OldString)
+			count := strings.Count(content, oldStr)
 			if count == 0 {
 				return "", fmt.Errorf("edit %d: old_string not found -- check whitespace/indentation/line endings", i+1)
 			}
-			content = strings.ReplaceAll(content, step.OldString, step.NewString)
+			content = strings.ReplaceAll(content, oldStr, newStr)
 			applied += count
 			continue
 		}
-		switch strings.Count(content, step.OldString) {
+		switch strings.Count(content, oldStr) {
 		case 0:
 			return "", fmt.Errorf("edit %d: old_string not found -- check whitespace/indentation/line endings", i+1)
 		case 1:
-			content = strings.Replace(content, step.OldString, step.NewString, 1)
+			content = strings.Replace(content, oldStr, newStr, 1)
 			applied++
 		default:
 			return "", fmt.Errorf("edit %d: old_string is not unique; add more surrounding context or set replace_all", i+1)

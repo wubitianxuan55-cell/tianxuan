@@ -11,6 +11,7 @@ var compactDesc = map[string]string{
 	"edit_file":      "精确替换文件字符串(须全局唯一)",
 	"write_file":     "写入/覆盖文件(自动建父目录)",
 	"multi_edit":     "原子化批量编辑(单文件N步依次执行)",
+	"edit_lines":     "按行号替换文件连续行(起止行号定位)",
 	"delete_range":   "删除文件连续行(起止锚点定位)",
 	"delete_symbol":  "删除Go符号(函数/类型/接口等,AST解析)",
 	"glob":           "通配符匹配文件名(支持**递归)",
@@ -35,13 +36,15 @@ var compactDesc = map[string]string{
 // descriptions/constraints), used by CompactDescriptor.
 var compactSchema = map[string]json.RawMessage{
 	"read_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer"},"limit":{"type":"integer"}},"required":["path"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer"},"limit":{"type":"integer"},"line_numbers":{"type":"boolean"}},"required":["path"]}`),
 	"edit_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"}},"required":["path","old_string","new_string"]}`),
 	"write_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`),
 	"multi_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"edits":{"type":"array","items":{"type":"object","properties":{"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["old_string","new_string"]}}},"required":["path","edits"]}`),
+	"edit_lines": json.RawMessage(
+		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer"},"end_line":{"type":"integer"},"new_content":{"type":"string"}},"required":["path","start_line","end_line","new_content"]}`),
 	"delete_range": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"inclusive":{"type":"boolean"}},"required":["path","start_anchor","end_anchor"]}`),
 	"delete_symbol": json.RawMessage(

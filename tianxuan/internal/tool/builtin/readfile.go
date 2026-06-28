@@ -35,7 +35,7 @@ const (
 func (readFile) Name() string { return "read_file" }
 
 func (readFile) Description() string {
-	return "Read a text file with optional line offset/limit. Output prefixes each line with its 1-based number (e.g. `   42→...`) so subsequent edit_file calls can target exact lines. Use `offset` and `limit` to page through large files; the tool reports total length and pagination hints in a trailer."
+	return "Read a text file with optional line offset/limit. By default each line is prefixed with its 1-based number (e.g. `   42→...`). Set line_numbers=false to get raw text — useful when copying content for edit_file. Use `offset` and `limit` to page through large files."
 }
 
 func (readFile) Schema() json.RawMessage {
@@ -44,7 +44,8 @@ func (readFile) Schema() json.RawMessage {
 "properties":{
   "path":{"type":"string","description":"File path"},
   "offset":{"type":"integer","description":"0-based line offset to start reading from (default 0)","minimum":0},
-  "limit":{"type":"integer","description":"Maximum lines to return (default 2000)","minimum":1}
+  "limit":{"type":"integer","description":"Maximum lines to return (default 2000)","minimum":1},
+  "line_numbers":{"type":"boolean","description":"Prefix each line with its 1-based line number (default true). Set false for raw text."}
 },
 "required":["path"]
 }`)
@@ -57,9 +58,10 @@ func (readFile) CompactSchema() json.RawMessage   { return compactSchema["read_f
 
 func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		Path   string `json:"path"`
-		Offset int    `json:"offset,omitempty"`
-		Limit  int    `json:"limit,omitempty"`
+		Path        string `json:"path"`
+		Offset      int    `json:"offset,omitempty"`
+		Limit       int    `json:"limit,omitempty"`
+		LineNumbers *bool  `json:"line_numbers,omitempty"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -73,6 +75,11 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	}
 	if p.Limit <= 0 {
 		p.Limit = readFileDefaultLimit
+	}
+	// V10.5: line_numbers defaults to true (backward-compatible)
+	showLineNumbers := true
+	if p.LineNumbers != nil {
+		showLineNumbers = *p.LineNumbers
 	}
 
 	// A directory can be os.Open'd but not read as text — catch it up front with
@@ -157,19 +164,33 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return fmt.Sprintf("(offset %d is past EOF — file has %d lines)", p.Offset, totalSeen), nil
 	}
 
-	// Right-align line numbers to the largest one we'll print, so the arrow
-	// "→" column lines up. Add 1 for the 1-based display.
-	maxShown := p.Offset + len(collected)
-	w := len(fmt.Sprint(maxShown))
-
 	var b strings.Builder
-	for i, line := range collected {
-		fmt.Fprintf(&b, "%*d→%s\n", w, p.Offset+i+1, line)
+
+	if showLineNumbers {
+		// Right-align line numbers to the largest one we'll print, so the arrow
+		// "→" column lines up. Add 1 for the 1-based display.
+		maxShown := p.Offset + len(collected)
+		w := len(fmt.Sprint(maxShown))
+		for i, line := range collected {
+			fmt.Fprintf(&b, "%*d→%s\n", w, p.Offset+i+1, line)
+		}
+	} else {
+		// V10.5: raw text mode — no line numbers, useful for copying to edit_file
+		for _, line := range collected {
+			b.WriteString(line)
+			b.WriteByte('\n')
+		}
 	}
+
 	more := totalSeen - (p.Offset + len(collected))
 	if more > 0 {
-		fmt.Fprintf(&b, "\n[%d more line(s); pass offset=%d to continue]\n",
-			more, p.Offset+len(collected))
+		if showLineNumbers {
+			fmt.Fprintf(&b, "\n[%d more line(s); pass offset=%d to continue]\n",
+				more, p.Offset+len(collected))
+		} else {
+			fmt.Fprintf(&b, "\n[%d more line(s); pass offset=%d to continue]\n",
+				more, p.Offset+len(collected))
+		}
 	}
 	return b.String(), nil
 }

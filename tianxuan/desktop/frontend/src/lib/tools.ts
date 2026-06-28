@@ -70,6 +70,12 @@ export function diffsFor(name: string, args: string): ToolDiff[] {
   if (name === "write_file" && typeof a.content === "string") {
     return [{ original: "", modified: a.content, lang }];
   }
+  if (name === "edit_lines") {
+    if (typeof a.new_content === "string") {
+      const oldLines = `[lines ${a.start_line}-${a.end_line}]`;
+      return [{ original: oldLines, modified: a.new_content, lang }];
+    }
+  }
   if (name === "multi_edit" && Array.isArray(a.edits)) {
     const out: ToolDiff[] = [];
     (a.edits as unknown[]).forEach((e, i) => {
@@ -150,6 +156,13 @@ export function summarize(name: string, args: string, output?: string, error?: s
   switch (name) {
     case "write_file":
       return countOf(lineCount(str(a, "content")), "tool.lineOne", "tool.lineOther");
+    case "edit_lines": {
+      const start = typeof a.start_line === "number" ? a.start_line : 0;
+      const end = typeof a.end_line === "number" ? a.end_line : 0;
+      
+      const newLineCount = typeof a.new_content === "string" ? lineCount(a.new_content) : 0;
+      return `L${start}-${end} → ${countOf(newLineCount, "tool.lineOne", "tool.lineOther")}`;
+    }
     case "edit_file": {
       if (typeof a.old_string === "string" && typeof a.new_string === "string") {
         const { add, del } = plusMinus(a.old_string, a.new_string);

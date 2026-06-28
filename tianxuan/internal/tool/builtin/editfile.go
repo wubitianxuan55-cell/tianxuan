@@ -23,17 +23,49 @@ type editFile struct {
 func (editFile) Name() string { return "edit_file" }
 
 func (editFile) Description() string {
-	return "Replace an exact string in a file with another. old_string must occur exactly once; add surrounding context to disambiguate. Use for targeted edits instead of rewriting the whole file."
+	return "Replace an exact string in a file with another. old_string must occur exactly once; add surrounding context to disambiguate. Line endings are auto-adapted: if the file uses CRLF, your LF old_string/new_string are automatically converted. Use for targeted edits instead of rewriting the whole file."
 }
 
 func (editFile) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace (must be unique in the file)"},"new_string":{"type":"string","description":"Replacement text (may be empty to delete)"}},"required":["path","old_string","new_string"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace (must be unique in the file). Line endings auto-adapted."},"new_string":{"type":"string","description":"Replacement text (may be empty to delete). Line endings auto-adapted."}},"required":["path","old_string","new_string"]}`)
 }
 
 func (editFile) ReadOnly() bool { return false }
 
 func (editFile) CompactDescription() string { return compactDesc["edit_file"] }
 func (editFile) CompactSchema() json.RawMessage   { return compactSchema["edit_file"] }
+
+// detectLineEnding reports the dominant line-ending style in content.
+// Returns "\r\n" for CRLF, "\n" for LF, "" for no-newlines.
+func detectLineEnding(content string) string {
+	if strings.Contains(content, "\r\n") {
+		return "\r\n"
+	}
+	if strings.Contains(content, "\n") {
+		return "\n"
+	}
+	return ""
+}
+
+// adaptLineEndings replaces standalone \n (not preceded by \r) with the target
+// line ending. This prevents the most common edit_file failure: the LLM sends
+// old_string with LF, but the file uses CRLF (or vice versa).
+func adaptLineEndings(s string, target string) string {
+	if target == "\n" || target == "" {
+		return s // nothing to adapt — LF is the canonical form
+	}
+	// Replace \n that is NOT preceded by \r with \r\n
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' && (i == 0 || s[i-1] != '\r') {
+			b.WriteString(target)
+		} else {
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
+}
 
 func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -61,26 +93,49 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	}
 	content := string(b)
 
-	switch strings.Count(content, p.OldString) {
+	// V10.5: 自动行尾适配 — 将 old_string/new_string 的 \n 适配为文件的行尾格式，
+	// 消除 CRLF/LF 混用导致的最高频编辑失败。
+	fileLE := detectLineEnding(content)
+	oldAdapted := adaptLineEndings(p.OldString, fileLE)
+	newAdapted := adaptLineEndings(p.NewString, fileLE)
+
+	// Try with adapted line endings first; fall back to original if adaptation
+	// changed nothing or made it worse (e.g. the file has no newlines).
+	oldStr := oldAdapted
+	newStr := newAdapted
+	if oldAdapted == p.OldString {
+		// No adaptation needed — file already uses LF or has no newlines.
+	} else if strings.Count(content, oldAdapted) == 0 && strings.Count(content, p.OldString) > 0 {
+		// Adaptation broke the match — the LLM may have intentionally used LF
+		// in a CRLF file (e.g. for a specific single-line replacement).
+		oldStr = p.OldString
+		newStr = p.NewString
+	}
+
+	switch strings.Count(content, oldStr) {
 	case 0:
-		lineType := "LF"
-		if strings.Contains(content, "\r\n") {
-			lineType = "CRLF"
-		} else if !strings.Contains(content, "\n") {
-			lineType = "no-newlines"
+		leLabel := "LF"
+		if fileLE == "\r\n" {
+			leLabel = "CRLF"
+		} else if fileLE == "" {
+			leLabel = "no-newlines"
 		}
 		oldPreview := p.OldString
-		if len(oldPreview) > 80 { oldPreview = oldPreview[:80] + "..." }
+		if len(oldPreview) > 80 {
+			oldPreview = oldPreview[:80] + "..."
+		}
 		filePreview := content
-		if len(filePreview) > 120 { filePreview = filePreview[:120] + "..." }
-		return "", fmt.Errorf("old_string not found in %s (line endings: %s).\n  old_string: %q\n  file head: %q\n  Check whitespace, indentation, line endings (CRLF vs LF).", p.Path, lineType, oldPreview, filePreview)
+		if len(filePreview) > 120 {
+			filePreview = filePreview[:120] + "..."
+		}
+		return "", fmt.Errorf("old_string not found in %s (line endings: %s).\n  old_string: %q\n  file head: %q\n  Check whitespace, indentation, line endings (CRLF vs LF).", p.Path, leLabel, oldPreview, filePreview)
 	case 1:
 		// ok
 	default:
 		return "", fmt.Errorf("old_string is not unique in %s; add more surrounding context", p.Path)
 	}
 
-	updated := strings.Replace(content, p.OldString, p.NewString, 1)
+	updated := strings.Replace(content, oldStr, newStr, 1)
 	if err := os.WriteFile(p.Path, []byte(updated), 0o644); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}

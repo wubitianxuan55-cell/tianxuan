@@ -379,6 +379,8 @@ export const zhTW: Record<DictKey, string> = {
   "tool.editOther": "{n} 次編輯",
   "tool.emptyFile": "空檔案",
   "tool.noOutput": "無輸出",
+  "tool.resultOne": "{n} 筆結果",
+  "tool.resultOther": "{n} 筆結果",
 
   // software update
   "updater.title": "軟體更新",
@@ -415,4 +417,11 @@ export const zhTW: Record<DictKey, string> = {
   "memory.suggestionNew": "建議新增",
   "memory.suggestionSkill": "建議技能",
   "memory.archived": "已歸檔",
+  "memory.facts": "事實",
+  "memory.docs": "文件",
+  "memory.noSuggestions": "尚無建議。AI 將在分析你的工作流程後提供記憶建議。",
+  "memory.jumpTo": "跳轉到",
+  "memory.scopeUser": "使用者",
+  "memory.scopeProject": "專案",
+  "memory.scopeLocal": "本地",
 };

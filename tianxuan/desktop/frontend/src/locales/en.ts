@@ -380,6 +380,8 @@ export const en = {
   "tool.editOther": "{n} edits",
   "tool.emptyFile": "empty file",
   "tool.noOutput": "no output",
+  "tool.resultOne": "{n} result",
+  "tool.resultOther": "{n} results",
 
   // software update
   "updater.title": "Software update",
@@ -416,6 +418,13 @@ export const en = {
   "memory.suggestionNew": "Suggested",
   "memory.suggestionSkill": "Suggested Skill",
   "memory.archived": "Archived",
+  "memory.facts": "Facts",
+  "memory.docs": "Docs",
+  "memory.noSuggestions": "No suggestions yet. The AI will suggest memories after analyzing your workflow.",
+  "memory.jumpTo": "Jump to",
+  "memory.scopeUser": "User",
+  "memory.scopeProject": "Project",
+  "memory.scopeLocal": "Local",
 };
 
 export type DictKey = keyof typeof en;

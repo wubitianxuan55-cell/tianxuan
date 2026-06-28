@@ -381,6 +381,8 @@ export const zh: Record<DictKey, string> = {
   "tool.editOther": "{n} 处编辑",
   "tool.emptyFile": "空文件",
   "tool.noOutput": "无输出",
+  "tool.resultOne": "{n} 条结果",
+  "tool.resultOther": "{n} 条结果",
 
   // 软件更新
   "updater.title": "软件更新",
@@ -417,4 +419,11 @@ export const zh: Record<DictKey, string> = {
   "memory.suggestionNew": "建议新增",
   "memory.suggestionSkill": "建议技能",
   "memory.archived": "已归档",
+  "memory.facts": "事实",
+  "memory.docs": "文档",
+  "memory.noSuggestions": "暂无建议。AI 将在分析你的工作流后给出记忆建议。",
+  "memory.jumpTo": "跳转到",
+  "memory.scopeUser": "用户",
+  "memory.scopeProject": "项目",
+  "memory.scopeLocal": "本地",
 };

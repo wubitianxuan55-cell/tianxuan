@@ -17,7 +17,7 @@ func TestResolveIn(t *testing.T) {
 		workDir, p, want string
 	}{
 		{"", "foo.go", "foo.go"}, // empty workDir: unchanged
-		{"", "", ""},             // empty workDir: unchanged
+		{"", "", ""},             // empty workDir + empty p: unchanged (not cleaned to ".")
 		{workDir, "foo.go", filepath.Join(workDir, "foo.go")},                  // relative joins
 		{workDir, "a/b.go", filepath.Join(workDir, "a", "b.go")},               // nested relative
 		{workDir, ".", workDir},                                                // "." targets the root

@@ -1,8 +1,8 @@
 // tool_icons.ts — 工具名→图标映射表，ToolCard.tsx 专用。
 // 从 ToolCard.tsx 提取，减少主文件行数。
 import {
-  Activity, ArrowRightLeft, Ban, BookOpen, Brain, Bug, CheckCircle,
-  Clock, FilePen, FileText, FolderOpen, GitBranch, Globe, Hourglass,
+  ArrowRightLeft, Ban, BookOpen, Brain, Bug, CheckCircle,
+  FilePen, FileText, FolderOpen, GitBranch, Globe, Hourglass,
   Layers, Lightbulb, List, ListTree, Pencil, Plug, PlusCircle, Search, Sparkles,
   SquareTerminal, Trash2, Wrench, Zap, type LucideIcon,
 } from "lucide-react";
@@ -18,7 +18,7 @@ export const ICONS: Record<string, LucideIcon> = {
   lsp_diagnostics: Bug, lsp_definition: ArrowRightLeft, lsp_references: List,
   lsp_hover: Lightbulb, lsp_completion: Sparkles, lsp_rename: Pencil,
   memory_search: Brain, remember: Brain, read_skill: BookOpen,
-  doctor: Activity, time: Clock, wait: Hourglass,
+  wait: Hourglass,
   complete_step: CheckCircle, ask: List,
 };
 

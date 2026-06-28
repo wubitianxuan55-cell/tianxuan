@@ -41,6 +41,8 @@ export function subjectOf(name: string, args: string): string {
       return str(a, "pattern") || str(a, "path");
     case "web_fetch":
       return str(a, "url");
+    case "web_search":
+      return str(a, "query");
     case "task":
       return str(a, "description") || str(a, "prompt");
     case "remember":
@@ -128,6 +130,17 @@ function countOf(n: number, one: DictKey, other: DictKey): string {
   return t(n === 1 ? one : other, { n });
 }
 
+// extractOutputFromEnvelope tries to unwrap the ToolEnvelope JSON that the backend
+// wraps around web_fetch/web_search results, returning the real output text.
+function extractOutputFromEnvelope(output: string): string {
+  try {
+    const env = JSON.parse(output) as { ok?: boolean; data?: { result?: string }; message?: string };
+    if (env.ok && env.data?.result) return env.data.result;
+    if (env.ok && env.message) return env.message;
+  } catch {}
+  return output;
+}
+
 // summarize derives the one-line outcome shown under a finished card (the "⎿"
 // secondary line) — counts from the args for writers, from the output for
 // readers. "" means there's nothing worth a summary line.
@@ -172,8 +185,17 @@ export function summarize(name: string, args: string, output?: string, error?: s
       return countOf(nonEmptyLines(output), "tool.fileOne", "tool.fileOther");
     case "ls":
       return countOf(nonEmptyLines(output), "tool.entryOne", "tool.entryOther");
-    case "web_fetch":
-      return output.split("\n", 1)[0].slice(0, 80);
+    case "web_fetch": {
+      const text = extractOutputFromEnvelope(output);
+      const lines = text.split("\n").filter(l => !l.startsWith("status "));
+      const first = lines[0] || "";
+      return first.slice(0, 80);
+    }
+    case "web_search": {
+      const text = extractOutputFromEnvelope(output);
+      const count = (text.match(/^\d+\. /gm) || []).length;
+      return count > 0 ? countOf(count, "tool.resultOne", "tool.resultOther") : "";
+    }
     case "bash":
       return output.trim() === "" ? t("tool.noOutput") : countOf(lineCount(output), "tool.lineOne", "tool.lineOther");
     default:

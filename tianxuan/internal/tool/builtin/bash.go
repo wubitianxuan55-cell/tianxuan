@@ -18,7 +18,7 @@ import (
 	"tianxuan/internal/tool"
 )
 
-const bashTimeout = 120 * time.Second
+const bashTimeout = 300 * time.Second
 
 func init() { tool.RegisterBuiltin(bash{}) }
 
@@ -43,7 +43,7 @@ func (b bash) Description() string {
 			"so write PowerShell syntax (e.g. $null not /dev/null; ';' or separate calls, not '&&'; " +
 			"Get-ChildItem/Select-String, not ls/grep). Use for builds, tests, git, etc."
 	}
-	return "Execute a command in the shell and return combined stdout/stderr. Use for builds, tests, git, etc."
+	return "Execute a shell command and return combined stdout+stderr. 5-minute timeout. For long-running commands, use run_in_background=true. Set output_format=json to get structured result (exit_code, duration_ms) like the former verify tool. 🔴 Always verify command output before calling complete_step."
 }
 
 // resolved returns the bound shell, resolving lazily for the zero-value instance
@@ -56,7 +56,7 @@ func (b bash) resolved() sandbox.Shell {
 }
 
 func (bash) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns (no timeout). Read new output with bash_output, wait for it with wait, stop it with kill_shell. Use for long-running commands like servers, watchers, or builds you don't need to block on."}},"required":["command"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw output. json returns structured {ok, exit_code, duration_ms, stdout_stderr, command}."}},"required":["command"]}`)
 }
 
 // ReadOnly is false: bash's effect cannot be inferred from args (rm, curl,
@@ -71,6 +71,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	var p struct {
 		Command         string `json:"command"`
 		RunInBackground bool   `json:"run_in_background"`
+		OutputFormat    string `json:"output_format"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -135,6 +136,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		return fmt.Sprintf("Started background job %q. It keeps running across turns; read new output with bash_output(job_id=%q), wait for it with wait, or stop it with kill_shell(job_id=%q).", job.ID, job.ID, job.ID), nil
 	}
 
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, bashTimeout)
 	defer cancel()
 
@@ -168,6 +170,29 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		}
 	}
 	out := buf.String()
+
+	// JSON output mode: return structured result like former verify tool
+	if p.OutputFormat == "json" {
+		ok := err == nil && ctx.Err() == nil
+		exitCode := 0
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			} else {
+				exitCode = -1
+			}
+		}
+		var buf2 bytes.Buffer
+		enc := json.NewEncoder(&buf2)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(map[string]any{
+			"ok": ok, "exit_code": exitCode,
+			"duration_ms": time.Since(start).Milliseconds(),
+			"stdout_stderr": strings.TrimSpace(out),
+			"command": p.Command,
+		})
+		return strings.TrimSpace(buf2.String()), nil
+	}
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return out, fmt.Errorf("command timed out (> %s)", bashTimeout)

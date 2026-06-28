@@ -131,35 +131,31 @@ func TestReferencesInlined(t *testing.T) {
 	}
 }
 
-func TestBuiltinInitIsInlineSkill(t *testing.T) {
-	// /init must resolve to a built-in inline skill (the model-driven AGENTS.md
-	// bootstrap), present even with no project/user skills on disk.
+func TestBuiltinExploreIsSubagentSkill(t *testing.T) {
 	st := New(Options{HomeDir: t.TempDir()})
-	sk, ok := st.Read("init")
+	sk, ok := st.Read("explore")
 	if !ok {
-		t.Fatal("built-in init skill not found")
+		t.Fatal("built-in explore skill not found")
 	}
-	if sk.Scope != ScopeBuiltin || sk.RunAs != RunInline {
-		t.Errorf("init should be a builtin inline skill, got scope=%s runAs=%s", sk.Scope, sk.RunAs)
+	if sk.Scope != ScopeBuiltin || sk.RunAs != RunSubagent {
+		t.Errorf("explore should be a builtin subagent skill, got scope=%s runAs=%s", sk.Scope, sk.RunAs)
 	}
-	if _, listed := find(st.List(), "init"); !listed {
-		t.Error("init should appear in List() so it reaches the slash menu")
+	if _, listed := find(st.List(), "explore"); !listed {
+		t.Error("explore should appear in List() so it reaches the slash menu")
 	}
 }
 
-func TestBuiltinDebugIsInlineSkill(t *testing.T) {
-	// /debug must resolve to a built-in inline skill (4-phase systematic debug),
-	// present even with no project/user skills on disk.
+func TestBuiltinReviewIsSubagentSkill(t *testing.T) {
 	st := New(Options{HomeDir: t.TempDir()})
-	sk, ok := st.Read("debug")
+	sk, ok := st.Read("review")
 	if !ok {
-		t.Fatal("built-in debug skill not found")
+		t.Fatal("built-in review skill not found")
 	}
-	if sk.Scope != ScopeBuiltin || sk.RunAs != RunInline {
-		t.Errorf("debug should be a builtin inline skill, got scope=%s runAs=%s", sk.Scope, sk.RunAs)
+	if sk.Scope != ScopeBuiltin || sk.RunAs != RunSubagent {
+		t.Errorf("review should be a builtin subagent skill, got scope=%s runAs=%s", sk.Scope, sk.RunAs)
 	}
-	if _, listed := find(st.List(), "debug"); !listed {
-		t.Error("debug should appear in List() so it reaches the slash menu")
+	if _, listed := find(st.List(), "review"); !listed {
+		t.Error("review should appear in List() so it reaches the slash menu")
 	}
 }
 

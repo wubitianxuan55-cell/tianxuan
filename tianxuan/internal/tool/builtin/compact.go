@@ -7,7 +7,7 @@ import "encoding/json"
 // compactDesc maps tool names to single-line Chinese descriptions (~15-25 chars),
 // used by CompactDescriptor to slash per-turn prompt tokens by ~75%.
 var compactDesc = map[string]string{
-	"read_file":      "读取文件内容(可选行范围/分页)",
+	"read_file":      "读取文件(可选行范围/分页)",
 	"edit_file":      "精确替换文件字符串(须全局唯一)",
 	"write_file":     "写入/覆盖文件(自动建父目录)",
 	"multi_edit":     "原子化批量编辑(单文件N步依次执行)",
@@ -16,17 +16,15 @@ var compactDesc = map[string]string{
 	"glob":           "通配符匹配文件名(支持**递归)",
 	"grep":           "正则搜索文件内容(返回path:行:文本,限200条)",
 	"ls":             "列目录条目(子目录带/)",
-	"bash":           "执行shell命令(合并stdout+stderr,限2分钟)",
-	"bash_output":    "读取后台任务的增量输出(不阻塞)",
-	"kill_shell":     "终止后台任务(SIGTERM→SIGKILL)",
-	"wait":           "阻塞等待后台任务结束(可设超时)",
+	"bash":           "执行shell命令(5分超时,支持json输出)",
+	"bash_output":    "读取后台任务增量输出",
+	"kill_shell":     "终止后台任务",
+	"wait":           "阻塞等待后台任务结束",
 	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全)",
 	"web_search":     "搜索公开网页(通过DuckDuckGo)，返回标题/URL/摘要",
-	"doctor":         "运行系统诊断(Go环境/项目结构/OS)，返回结构化报告",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
 	"complete_step":  "完成计划步骤(附验证证据,空证据拒绝)",
 	"notebook_edit":  "编辑Jupyter Notebook单元格(.ipynb)",
-	"time":           "获取当前日期时间(可指定时区)",
 	"git_status":     "显示工作区状态(分支/暂存/未暂存/未跟踪/冲突)",
 	"git_diff":       "显示行级别变更(--staged可选,path可限文件)",
 	"git_commit":     "提交暂存变更(可stage_all/amend/自动生成消息)",
@@ -66,16 +64,12 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}`),
 	"web_search": json.RawMessage(
 		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer"}},"required":["query"]}`),
-	"doctor": json.RawMessage(
-		`{"type":"object","properties":{},"required":[]}`),
 	"todo_write": json.RawMessage(
 		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string"},"activeForm":{"type":"string"},"level":{"type":"integer"}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(
 		`{"type":"object","properties":{"step":{"type":"string"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
 	"notebook_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string"},"edit_mode":{"type":"string"}},"required":["path"]}`),
-	"time": json.RawMessage(
-		`{"type":"object","properties":{"timezone":{"type":"string"}}}`),
 	"git_status": json.RawMessage(
 		`{"type":"object","properties":{},"required":[]}`),
 	"git_diff": json.RawMessage(

@@ -41,7 +41,7 @@ var validEvidenceKinds = map[string]bool{
 func (completeStep) Name() string { return "complete_step" }
 
 func (completeStep) Description() string {
-	return "Record the evidence-backed completion of ONE step of an approved plan. Call it as you finish each step instead of silently moving on: it signs the step off with PROOF it is done — the verification you ran (command + result), the diff/files you changed, or a manual check. A completion with no evidence is REJECTED, so don't claim a step is done until you can show why. Keep the task list moving with todo_write (set the next step in_progress); use complete_step for the formal, evidenced sign-off of the finished one. Fields: `step` (which step — its title or number, matching the task list), `result` (what is now true/changed), `evidence` (≥1 item, each with `kind` = verification|diff|files|manual and a `summary`, plus optional `command`/`paths`), and optional `notes`."
+	return `Sign off ONE plan step with PROOF it is done. Requires evidence: verification (run a command via bash and cite its output), diff (show what changed), files (list paths touched), or manual (for steps that can only be visually confirmed). Fields: step (title/number matching todo_write), result (what changed), evidence (≥1 item with kind=verification|diff|files|manual and a summary), optional notes.`
 }
 
 func (completeStep) Schema() json.RawMessage {

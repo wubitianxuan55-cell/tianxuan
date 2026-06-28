@@ -54,7 +54,7 @@ type gitStatus struct{}
 func (gitStatus) Name() string        { return "git_status" }
 func (gitStatus) ReadOnly() bool      { return true }
 func (gitStatus) Description() string {
-	return "Show working tree status — branch, staged/unstaged/untracked files, merge conflicts. Structured output, each file with path and status."
+	return "Show working tree status: current branch, staged/unstaged/untracked files, merge conflicts. 🔴 Check this before committing: ensure only intended files are staged. Returns structured output with file paths and status codes (M=modified, A=added, D=deleted, ??=untracked)."
 }
 func (gitStatus) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{},"required":[]}`)
@@ -222,7 +222,7 @@ type gitCommit struct{}
 func (gitCommit) Name() string        { return "git_commit" }
 func (gitCommit) ReadOnly() bool      { return false }
 func (gitCommit) Description() string {
-	return "Commit staged changes. If --staged-all is set, stage all tracked files first. With --amend, amend the last commit. With an empty message, auto-generates one from the diff summary."
+	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 TDD rule: commit after each test-code-refactor cycle. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted. Use with verify: verify tests pass, then git_commit to lock in the green state."
 }
 func (gitCommit) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"message":{"type":"string","description":"commit message (empty = auto-generate from diff)"},"stage_all":{"type":"boolean","description":"if true, run ` + "`git add -u`" + ` before committing"},"amend":{"type":"boolean","description":"if true, amend the last commit instead of creating a new one"}},"required":[]}`)

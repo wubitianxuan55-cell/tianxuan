@@ -176,7 +176,17 @@ Your final answer:
 
 The 'task' names what to review. Stay on it; don't redesign the feature.`
 
-const builtinTDDBody = `This skill is INLINED — you run in the parent loop. The user invoked /tdd or the system triggered test-driven development. Follow the RED → GREEN → REFACTOR cycle.
+const builtinTDDBody = `This skill is INLINED — you run in the parent loop. The user invoked /tdd or the system triggered test-driven development.
+
+## 🔴 IRON LAW
+
+**NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST.**
+Write code before the test? Delete it. Start over. No exceptions.
+Do not keep it as "reference." Do not "adapt" it while writing tests. Do not look at it.
+Delete means delete. Implement fresh from tests. Period.
+Violating the letter of these rules is violating the spirit of TDD.
+
+## The RED → GREEN → REFACTOR Cycle
 
 ## RED: Write a Failing Test
 
@@ -206,7 +216,26 @@ Rule: If no test exists for the target behaviour, you must create one before cha
 
 Don't: skip/delete/disable failing tests; edit the test runner config; install dependencies without asking.
 
-Lead each turn with a one-line status (e.g. "▸ RED: writing failing test for ...", "▸ GREEN: test passes — running full suite...") so the user always knows where you are.`
+Lead each turn with a one-line status (e.g. "▸ RED: writing failing test for ...", "▸ GREEN: test passes — running full suite...") so the user always knows where you are.
+
+## When Stuck (Design Feedback)
+
+| Symptom | Likely Cause |
+|---------|-------------|
+| Test is too hard to write | Design is too complex. Simplify the interface. |
+| Must mock everything | Code is too tightly coupled. Decouple first. |
+| Cannot reproduce the bug | Missing logging/observability. Add instrumentation. |
+| Test passes immediately | You are testing existing behavior. Fix the test. |
+| Test errors (does not compile) | Fix the error, re-run until it FAILS correctly. Not the same as a test failure. |
+
+## Common TDD Anti-Patterns
+
+- Testing mocks instead of real behavior
+- Adding test-only methods to production classes
+- Skipping the "watch it fail" step (you do not know if the test is correct)
+- Writing more code than needed to pass (YAGNI violation)
+- Keeping "reference implementation" written before the test
+- Multiple failing tests at once (fix one at a time, smallest first)`
 
 const builtinLSPBody = `This skill is INLINED — you run in the parent loop. The user invoked /lsp or wants structured code diagnostics. Use tianxuan's LSP tools to find, understand, and fix code issues.
 
@@ -268,47 +297,131 @@ The response contains code examples and API docs directly from the library's sou
 - For library setup/configuration questions, combine Context7 docs with the user's actual project context.
 - Don't use Context7 for the language's own stdlib — only for third-party packages/libraries.`
 
-const builtinDebugBody = `This skill is INLINED — you run in the parent loop. The user invoked /debug or wants systematic debugging. Follow the 4-phase method below — don't jump to fixes before finding the root cause.
+const builtinDebugBody = `This skill is INLINED — you run in the parent loop. The user invoked /debug or wants systematic debugging.
 
-## Phase 1: Reproduce
+## 🔴 IRON LAW
 
-1. Read the error report / stack trace / test failure carefully — extract the exact error message, file, and line.
-2. If a test reproduces it: run just that test (bash the project's test command with -run flag).
-3. If no test reproduces it: write a minimal reproducer first — confirm you can trigger the bug reliably.
-4. If you can't reproduce it: say so and stop. Don't guess.
+**NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.**
 
-## Phase 2: Isolate
+Random fixes waste time and create new bugs. Quick patches mask underlying issues.
+If you haven't completed Phase 1 (reproduce + isolate root cause), you CANNOT propose fixes.
+Symptom fixes are FAILURE. Violating the letter of this process is violating the spirit of debugging.
 
-1. lsp_diagnostics on the failure file — are there compile-time clues?
-2. git_diff (staged + unstaged) — what changed recently? Use git_log to see recent commits.
-3. If available, ` + "`" + cgTrace + "`" + ` from the likely entry point to the crash site — does the control flow match your assumptions?
-4. Add targeted logging / print statements at the decision point — NOT everywhere. One strategic print is worth ten shotgun prints.
+## When to Use
+Use for ANY technical issue: test failures, bugs, unexpected behavior, performance problems, build failures.
+Use ESPECIALLY under time pressure — emergencies make guessing tempting.
+Don't skip when issue seems simple or you're in a hurry — systematic is faster than thrashing.
 
-Key question at this phase: "What ONE condition, if true, would explain ALL the symptoms?"
+## The 4-Phase Method
 
-## Phase 3: Fix
+Lead each turn with: "▸ Phase 1: Reproducing..." / "▸ Phase 2: Isolating..." / "▸ Phase 3: Fixing..." / "▸ Phase 4: Preventing..."
 
-1. Once the root cause is confirmed: write the minimal fix.
-2. If the fix spans more than one file: ` + "`" + cgImpact + "`" + ` with direction=upstream on the changed symbol FIRST — catch callers that depend on the old behaviour.
-3. Apply the fix with edit_file / multi_edit.
+### Phase 1: Reproduce & Gather Evidence
+
+1. Read error messages CAREFULLY — don't skip past errors or warnings. They often contain the exact solution.
+2. Read stack traces completely. Note line numbers, file paths, error codes.
+3. Reproduce consistently: exact steps? happens every time? If not reproducible → gather more data, don't guess.
+4. Check recent changes: git_diff (staged + unstaged), git_log for recent commits. What changed?
+5. **Multi-component systems**: BEFORE proposing fixes, add diagnostic instrumentation at each component boundary:
+   - Log what data enters/exits each component
+   - Verify environment/config propagation
+   - Run once to gather evidence showing WHERE it breaks, THEN analyze
+6. Key question: "What ONE condition, if true, would explain ALL the symptoms?"
+
+### Phase 2: Isolate Root Cause
+
+1. lsp_diagnostics on the failure file — compile-time clues?
+2. If available, ` + "`" + cgTrace + "`" + ` from entry point to crash site — does control flow match assumptions?
+3. **Find working examples**: locate similar working code in the same codebase. What's different?
+4. **If 3+ fixes have already failed**: STOP. This is NOT a failed hypothesis — this is a WRONG ARCHITECTURE. Question fundamentals, not just symptoms. Don't propose another fix — re-examine assumptions.
+5. Add ONE strategic print/log at the decision point — not everywhere.
+6. Trace data flow: where does the bad value originate? What called this with bad value? Keep tracing up until you find the source. Fix at source, not at symptom.
+
+### Phase 3: Fix
+
+1. Once root cause confirmed: write the MINIMAL fix. No "while I'm here" improvements.
+2. If fix spans multiple files: ` + "`" + cgImpact + "`" + ` direction=upstream FIRST — catch callers depending on old behavior.
+3. Apply fix with edit_file / multi_edit.
 4. Run lsp_diagnostics on changed files — zero new errors.
 5. Re-run the reproducer — it must pass.
+6. If fix makes things worse (new failures): revert and re-diagnose. Don't pile fixes on fixes.
 
-## Phase 4: Prevent
+### Phase 4: Prevent
 
-1. If the bug was a logic error: add a unit test that catches this class of error.
-2. If the bug was a missing validation: add the check at the boundary.
-3. If the bug was a type mistake (nil, wrong type): consider whether a type-system guard (nullable annotation, stricter type) would prevent recurrence.
-4. Run the full test suite — no regressions.
-5. Report: what the bug was, what the fix was, what test prevents it.
+1. Logic error → add unit test catching this class of error.
+2. Missing validation → add check at the boundary (defense-in-depth).
+3. Type mistake → consider type-system guard (nullable annotation, stricter type).
+4. Run full test suite — no regressions.
+5. Report: root cause → fix → prevention.
 
-Stop conditions:
-- Root cause not found after 3 isolation attempts → escalate with your best hypothesis.
-- Fix makes things worse (new test failures) → revert and re-diagnose.
-- Same test still failing after 2 fix attempts → stop and explain.
+## Stop Conditions
 
-Lead each turn with a phase indicator: "▸ Phase 1: Reproducing..." / "▸ Phase 2: Isolating..." / "▸ Phase 3: Fixing..." / "▸ Phase 4: Preventing..."
-Never skip Phase 1 — a fix without reproduction is a guess.`
+- Root cause not found after 3 isolation attempts → escalate with best hypothesis.
+- Fix makes things worse → revert and re-diagnose.
+- 3+ fix attempts failed → question architecture, don't propose another fix.
+- "No root cause" found after thorough investigation → document findings, add monitoring/logging. But: 95% of "no root cause" cases are incomplete investigation.
+
+## Common Rationalizations (DON'T FALL FOR THESE)
+
+| Excuse | Reality |
+|--------|---------|
+| "Issue is simple, don't need process" | Simple issues have root causes too |
+| "Emergency, no time for process" | Systematic debugging is FASTER than guess-and-check |
+| "Just try this first, then investigate" | First fix sets the pattern. Do it right from start |
+| "I'll write test after confirming fix works" | Untested fixes don't stick. Test first proves it |
+| "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs |
+| "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause |
+| "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem |
+
+Never skip Phase 1 — a fix without reproduction is a guess.
+`
+
+const builtinReceivingReviewBody = `This skill is INLINED — you run in the parent loop. You received code review feedback. Handle it with technical rigor, not social comfort.
+
+## The 6-Step Response Method
+
+1. **READ** — Read every comment completely. Do not skim. Understand what the reviewer is actually asking.
+2. **UNDERSTAND** — Restate the feedback in your own words. If you cannot, you have not understood it.
+3. **VERIFY** — Check the codebase to confirm or refute the claim. grep for evidence. Read the relevant code. Do not rely on memory.
+4. **EVALUATE** — Is the feedback technically correct? Does it align with project constraints? Does it introduce new problems?
+5. **RESPOND** — For valid feedback: acknowledge and implement. For invalid feedback: explain why with code evidence. For unclear feedback: ask a specific clarifying question.
+6. **IMPLEMENT** — Apply changes one at a time, with tests. Never batch unrelated changes.
+
+## Forbidden Responses (DO NOT USE)
+
+These phrases signal performative agreement, not technical engagement:
+- "You are absolutely right!"
+- "Great point!"
+- "Excellent feedback!"
+- "Good catch!"
+- Any response that agrees without citing specific code evidence
+
+Instead: show your work. Cite the file:line that confirms or refutes the claim. Demonstrate that you verified, not that you are polite.
+
+## When to Push Back
+
+Reject feedback when:
+- It is factually incorrect (cite the code that disproves it)
+- It conflicts with project constraints (cite AGENTS.md, spec, or design doc)
+- It introduces more problems than it solves (explain the trade-off)
+- It is a style preference, not a technical issue (acknowledge and move on)
+
+When pushing back: be specific, cite evidence, and offer an alternative if one exists. Technical correctness over social comfort.
+
+## When Feedback Asks for Something Unnecessary (YAGNI)
+
+If a reviewer asks you to add functionality that has no current callers or use cases:
+1. grep the codebase for potential callers
+2. If none exist: respond with "This has no current callers. YAGNI. We can add it when needed."
+3. Do not blindly implement features "in case we need them later"
+
+## Implementation Rules
+
+- Fix one piece of feedback at a time. Commit between each fix.
+- Write a test for each change before making it (follow /tdd).
+- Run the full test suite after each fix — not just the new test.
+- If feedback is unclear: ask ONE specific question. Do not guess.
+- Never mark feedback as "done" without running verification.`
 
 // builtinSkills returns the shipped skills. A fresh slice each call so callers
 // can't mutate the shared set.
@@ -326,16 +439,8 @@ func builtinSkills() []Skill {
 	}
 	return []Skill{
 		{
-			Name:        "init",
-			Description: "Bootstrap or refresh this project's AGENTS.md — analyze the codebase (structure, build/test commands, architecture, conventions) and write a concise memory file loaded into every future session. Inlined.",
-			Body:        builtinInitBody,
-			Scope:       ScopeBuiltin,
-			Path:        "(builtin)",
-			RunAs:       RunInline,
-		},
-		{
 			Name:         "explore",
-			Description:  "Explore the codebase in an isolated subagent — wide-net read-only investigation that returns one distilled answer. Best for: 'find all places that...', 'how does X work across the project', 'survey the code for Y'.",
+			Description:  "Explore the codebase in an isolated subagent. Wide-net read-only investigation returning one distilled answer with file:line citations. Best for: survey questions, finding all places that X, understanding architecture.",
 			Body:         builtinExploreBody,
 			Scope:        ScopeBuiltin,
 			Path:         "(builtin)",
@@ -344,7 +449,7 @@ func builtinSkills() []Skill {
 		},
 		{
 			Name:         "research",
-			Description:  "Research a question by combining web_search + web_fetch + code reading in an isolated subagent. Best for: 'is X supported by lib Y', 'compare our impl against the spec'.",
+			Description:  "Research a question by combining web_search + web_fetch + code reading in an isolated subagent. Returns synthesis with code and web citations.",
 			Body:         builtinResearchBody,
 			Scope:        ScopeBuiltin,
 			Path:         "(builtin)",
@@ -353,7 +458,7 @@ func builtinSkills() []Skill {
 		},
 		{
 			Name:         "review",
-			Description:  "Review the pending changes (current branch diff by default) in an isolated subagent — flags correctness, security, missing tests, hidden behavior changes; reports a verdict + per-issue file:line. Read-only.",
+			Description:  "Review current branch diff in an isolated subagent. Flags correctness, security, missing tests, hidden behavior per file:line. Reports verdict + per-issue severity.",
 			Body:         builtinReviewBody,
 			Scope:        ScopeBuiltin,
 			Path:         "(builtin)",
@@ -362,44 +467,12 @@ func builtinSkills() []Skill {
 		},
 		{
 			Name:         "security-review",
-			Description:  "Security-focused review of the current branch diff in an isolated subagent — injection / authz / secrets / deserialization / path-traversal / crypto, severity-tagged. Read-only.",
+			Description:  "Security-focused review of current branch diff in an isolated subagent. Injection, authz, secrets, deserialization, path-traversal, crypto. Severity-tagged.",
 			Body:         builtinSecurityReviewBody,
 			Scope:        ScopeBuiltin,
 			Path:         "(builtin)",
 			RunAs:        RunSubagent,
 			AllowedTools: append([]string(nil), reviewTools...),
-		},
-		{
-			Name:        "tdd",
-			Description: "Test-Driven Development with isolation: RED (lsp_diagnostics + git_diff + codegraph trace to isolate, then write failing test) → GREEN (minimal fix) → REFACTOR (clean up + regression test). Inlined. Detects go/npm/pnpm/yarn/pytest/cargo.",
-			Body:        builtinTDDBody,
-			Scope:       ScopeBuiltin,
-			Path:        "(builtin)",
-			RunAs:       RunInline,
-		},
-		{
-			Name:        "lsp",
-			Description: "Use Tianxuan's LSP tools to diagnose, understand, and fix code — run lsp_diagnostics after every edit, use lsp_definition/lsp_references/lsp_hover for code understanding, use lsp_rename for safe refactors. Inlined.",
-			Body:        builtinLSPBody,
-			Scope:       ScopeBuiltin,
-			Path:        "(builtin)",
-			RunAs:       RunInline,
-		},
-		{
-			Name:        "context7",
-			Description: "Fetch up-to-date third-party library documentation via Context7 — use mcp__context7__resolve-library-id + mcp__context7__query-docs for API docs, code examples, and setup guides. Inlined.",
-			Body:        builtinContext7Body,
-			Scope:       ScopeBuiltin,
-			Path:        "(builtin)",
-			RunAs:       RunInline,
-		},
-		{
-			Name:        "debug",
-			Description: "Systematic 4-phase debugging: Reproduce → Isolate (lsp_diagnostics + git_diff + codegraph trace) → Fix (with impact analysis) → Prevent (unit test + regression suite). Inlined.",
-			Body:        builtinDebugBody,
-			Scope:       ScopeBuiltin,
-			Path:        "(builtin)",
-			RunAs:       RunInline,
 		},
 	}
 }

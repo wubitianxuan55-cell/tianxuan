@@ -2,6 +2,7 @@ import { Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MemoryView } from "../lib/types";
 import { DocEditor } from "./DocEditor";
+import { useT } from "../lib/i18n";
 import { FactCard } from "./FactCard";
 
 export function MemoryPanel(p: {
@@ -12,6 +13,7 @@ export function MemoryPanel(p: {
   onSaveDoc: (path: string, body: string) => Promise<void> | void;
 }) {
   const { view, onClose, onRemember, onForget, onSaveDoc } = p;
+  const t = useT();
   const [note, setNote] = useState("");
   const [scope, setScope] = useState("");
   const [busy, setBusy] = useState(false);
@@ -118,10 +120,10 @@ export function MemoryPanel(p: {
         {/* 头部 */}
         <div className="drawer__head">
           <div>
-            <div className="drawer__title">Memory</div>
+            <div className="drawer__title">{t("memory.title")}</div>
             {view && (
               <div className="drawer__summary">
-                {facts.length} facts &middot; {docs.length} docs
+                {t("memory.summary", { facts: facts.length, docs: docs.length })}
               </div>
             )}
           </div>
@@ -140,14 +142,14 @@ export function MemoryPanel(p: {
             >
               {scopes.map((s) => (
                 <option key={s.scope} value={s.scope}>
-                  {s.scope}
+                  {s.scope === "user" ? t("memory.scopeUser") : s.scope === "project" ? t("memory.scopeProject") : s.scope === "local" ? t("memory.scopeLocal") : s.scope}
                 </option>
               ))}
             </select>
             <input
               ref={noteRef}
               className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
-              placeholder="Quick-add a note..."
+              placeholder={t("memory.notePlaceholder")}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => {
@@ -161,7 +163,7 @@ export function MemoryPanel(p: {
               type="button"
             >
               <Plus size={13} className="inline mr-1" />
-              Add
+              {t("common.add")}
             </button>
           </div>
 
@@ -173,13 +175,13 @@ export function MemoryPanel(p: {
                 <input
                   ref={searchRef}
                   className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[12.5px] placeholder:text-fg-faint"
-                  placeholder="Search facts..."
+                  placeholder={t("memory.searchPlaceholder")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <FilterChip active={typeFilter === "all"} label="All" onClick={() => setTypeFilter("all")} />
+                <FilterChip active={typeFilter === "all"} label={t("memory.filterAll")} onClick={() => setTypeFilter("all")} />
                 {factTypes.map((ft) => (
                   <FilterChip key={ft} active={typeFilter === ft} label={ft} onClick={() => setTypeFilter(ft)} />
                 ))}
@@ -191,17 +193,17 @@ export function MemoryPanel(p: {
         {/* 标签栏 */}
         <div className="shrink-0 flex border-b border-border-soft">
           <TabButton active={tab === "facts"} onClick={() => setTab("facts")} badge={facts.length}>
-            Facts
+            {t("memory.facts")}
           </TabButton>
           <TabButton active={tab === "docs"} onClick={() => setTab("docs")} badge={docs.length}>
-            Docs
+            {t("memory.docs")}
           </TabButton>
           <TabButton
             active={tab === "suggestions"}
             onClick={() => setTab("suggestions")}
             badge={suggestions ? suggestions.memory.length + suggestions.skills.length : 0}
           >
-            Suggestions
+            {t("memory.suggestions")}
           </TabButton>
         </div>
 
@@ -210,9 +212,9 @@ export function MemoryPanel(p: {
           {tab === "facts" && (
             <>
               {filteredFacts.length === 0 && facts.length === 0 ? (
-                <EmptyState message="No facts yet. Use quick-add or let the AI save memories." />
+                <EmptyState message={t("memory.noFacts")} />
               ) : filteredFacts.length === 0 ? (
-                <div className="py-10 text-center text-fg-faint text-[13px]">No matches</div>
+                <div className="py-10 text-center text-fg-faint text-[13px]">{t("memory.noResults")}</div>
               ) : (
                 <div className="flex flex-col gap-2">
                   {filteredFacts.map((fact) => (
@@ -248,7 +250,7 @@ export function MemoryPanel(p: {
           {tab === "docs" && (
             <>
               {docs.length === 0 ? (
-                <EmptyState message="No instruction files found." />
+                <EmptyState message={t("memory.noDocs")} />
               ) : (
                 <DocEditor docs={docs} onSaveDoc={onSaveDoc} busy={busy} />
               )}
@@ -258,13 +260,13 @@ export function MemoryPanel(p: {
           {tab === "suggestions" && suggestions && (
             <div className="flex flex-col gap-3">
               {suggestions.memory.length === 0 && suggestions.skills.length === 0 ? (
-                <EmptyState message="No suggestions yet. The AI will suggest memories after analyzing your workflow." />
+                <EmptyState message={t("memory.noSuggestions")} />
               ) : (
                 <>
                   {suggestions.memory.map((s) => (
                     <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">New Memory</span>
+                        <span className="text-accent text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionNew")}</span>
                         <span className="badge badge--muted">{s.type}</span>
                       </div>
                       <div className="text-fg text-[12.5px] font-medium">{s.title || s.name}</div>
@@ -275,7 +277,7 @@ export function MemoryPanel(p: {
                   {suggestions.skills.map((s) => (
                     <div key={s.name} className="border border-border-soft rounded-lg p-3 bg-bg-soft">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-info text-[11px] font-semibold uppercase tracking-wide">Skill</span>
+                        <span className="text-info text-[11px] font-semibold uppercase tracking-wide">{t("memory.suggestionSkill")}</span>
                       </div>
                       <div className="text-fg text-[12.5px] font-medium">{s.name}</div>
                       <div className="text-fg-faint text-[11px] mt-0.5">{s.description}</div>
@@ -331,6 +333,7 @@ function EmptyState(p: { message: string }) {
 }
 
 function ArchivesSection(p: { archives: Array<{ name: string; title?: string; description: string; type: string; path?: string; archivedAt?: string }> }) {
+  const st = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -339,7 +342,7 @@ function ArchivesSection(p: { archives: Array<{ name: string; title?: string; de
         onClick={() => setOpen((v) => !v)}
         type="button"
       >
-        {open ? "▾" : "▸"} Archived
+        {open ? "▾" : "▸"} {st("memory.archived")}
         <span className="text-fg-faint/60 font-normal">({p.archives.length})</span>
       </button>
       {open && (

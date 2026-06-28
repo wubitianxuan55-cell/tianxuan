@@ -286,7 +286,8 @@ func TestResolveInRelative(t *testing.T) {
 
 func TestResolveInEmptyWorkDir(t *testing.T) {
 	got := resolveIn("", "relative/path")
-	if got != "relative/path" {
+	// filepath.Clean normalizes to OS-native separators
+	if got != filepath.Clean("relative/path") {
 		t.Errorf("resolveIn empty workdir = %q", got)
 	}
 }

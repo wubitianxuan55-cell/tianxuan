@@ -14,7 +14,7 @@ import (
 	"tianxuan/internal/tool"
 )
 
-const grepMaxMatches = 200
+const grepMaxMatches = 500
 
 func init() { tool.RegisterBuiltin(grepTool{}) }
 
@@ -25,11 +25,11 @@ type grepTool struct{ workDir string }
 func (grepTool) Name() string { return "grep" }
 
 func (grepTool) Description() string {
-	return "Search for a regular expression in a file, or recursively under a directory. Returns matching lines as path:line:text, capped at 200 matches."
+	return "Search for a regular expression in a file, or recursively under a directory. Returns matching lines as path:line:text, default limit 500 matches. Set max_matches to increase (max 2000)."
 }
 
 func (grepTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Regular expression (RE2 syntax)"},"path":{"type":"string","description":"File or directory to search (default \".\")"}},"required":["pattern"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Regular expression (RE2 syntax)"},"path":{"type":"string","description":"File or directory to search (default \".\")"},"max_matches":{"type":"integer","description":"Maximum matches to return (default 500, max 2000)"}},"required":["pattern"]}`)
 }
 
 func (grepTool) ReadOnly() bool { return true }

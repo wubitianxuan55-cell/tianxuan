@@ -72,7 +72,17 @@ func (e editFile) Preview(args json.RawMessage) (diff.Change, error) {
 
 	switch strings.Count(content, p.OldString) {
 	case 0:
-		return diff.Change{}, fmt.Errorf("old_string not found in %s", p.Path)
+		lineType := "LF"
+		if strings.Contains(content, "\r\n") {
+			lineType = "CRLF"
+		} else if !strings.Contains(content, "\n") {
+			lineType = "no-newlines"
+		}
+		oldPreview := p.OldString
+		if len(oldPreview) > 80 { oldPreview = oldPreview[:80] + "..." }
+		filePreview := content
+		if len(filePreview) > 120 { filePreview = filePreview[:120] + "..." }
+		return diff.Change{}, fmt.Errorf("old_string not found in %s (line endings: %s).\n  old_string: %q\n  file head: %q\n  Check whitespace, indentation, line endings (CRLF vs LF).", p.Path, lineType, oldPreview, filePreview)
 	case 1:
 		// ok
 	default:
@@ -116,14 +126,14 @@ func (m multiEdit) Preview(args json.RawMessage) (diff.Change, error) {
 		}
 		if step.ReplaceAll {
 			if strings.Count(content, step.OldString) == 0 {
-				return diff.Change{}, fmt.Errorf("edit %d: old_string not found", i+1)
+				return diff.Change{}, fmt.Errorf("edit %d: old_string not found in %s -- check whitespace/indentation/line endings", i+1, p.Path)
 			}
 			content = strings.ReplaceAll(content, step.OldString, step.NewString)
 			continue
 		}
 		switch strings.Count(content, step.OldString) {
 		case 0:
-			return diff.Change{}, fmt.Errorf("edit %d: old_string not found", i+1)
+			return diff.Change{}, fmt.Errorf("edit %d: old_string not found in %s -- check whitespace/indentation/line endings", i+1, p.Path)
 		case 1:
 			content = strings.Replace(content, step.OldString, step.NewString, 1)
 		default:

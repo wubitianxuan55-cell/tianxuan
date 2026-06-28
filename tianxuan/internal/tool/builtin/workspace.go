@@ -74,15 +74,16 @@ func (w Workspace) Tools(enabled ...string) []tool.Tool {
 // defaulted "." (ls/grep) targets the workspace root.
 func resolveIn(workDir, p string) string {
 	if workDir == "" {
-		return p
+		if p == "" { return p }
+		return filepath.Clean(p)
 	}
 	if p == "" || p == "." {
 		return workDir
 	}
 	if filepath.IsAbs(p) {
-		return p
+		return filepath.Clean(p)
 	}
-	return filepath.Join(workDir, p)
+	return filepath.Clean(filepath.Join(workDir, p))
 }
 
 // vendorDirs are directory names grep and glob skip during a recursive walk:

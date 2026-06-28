@@ -171,7 +171,7 @@ func TestGrepTruncation(t *testing.T) {
 	dir := t.TempDir()
 	// Create a file with many matching lines.
 	var b strings.Builder
-	for i := 0; i < 300; i++ {
+	for i := 0; i < 600; i++ {
 		fmt.Fprintf(&b, "match %d\n", i)
 	}
 	os.WriteFile(filepath.Join(dir, "many.txt"), []byte(b.String()), 0o644)

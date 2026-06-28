@@ -400,6 +400,8 @@ var toolCompressLimits = map[string]toolCompressLimit{
 	"search_files":    {160, 24 * 1024},
 	"ls":              {120, 24 * 1024},  // 目录列表
 	"list_directory":  {120, 24 * 1024},
+	"web_fetch":       {320, 32 * 1024},  // 网页内容
+	"web_search":      {160, 24 * 1024},  // 搜索结果
 	"grep":            {0, 0},            // 走 compressGrep
 	"search_content":  {0, 0},            // 走 compressGrep
 	"directory_tree":  {0, 0},            // 走 compressTree

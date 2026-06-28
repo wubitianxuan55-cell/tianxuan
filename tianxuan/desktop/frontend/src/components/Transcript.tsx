@@ -158,9 +158,13 @@ export function Transcript({
   // ── 内容变化时自动跟随 ──────────────────────────────────────────
   const contentVersion = scrollVersion(items);
   const prevItemsLen = useRef(items.length);
+  // 仅在新用户消息提交时强制到底（工具结果/流式输出不强制）
   useEffect(() => {
     if (items.length > prevItemsLen.current) {
-      onNewQuestion();
+      const last = items[items.length - 1];
+      if (last && last.kind === "user") {
+        onNewQuestion();
+      }
     }
     prevItemsLen.current = items.length;
   }, [items.length, onNewQuestion]);

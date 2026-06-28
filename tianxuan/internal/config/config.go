@@ -385,7 +385,6 @@ func Default() *Config {
 			"read_file", "write_file", "edit_file",
 			"ls", "grep", "bash",
 			"web_fetch", "web_search",
-			"doctor",
 			"todo_write", "complete_step",
 			"memory_search",
 		}},

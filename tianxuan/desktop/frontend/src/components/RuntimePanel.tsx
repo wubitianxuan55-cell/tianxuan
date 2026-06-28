@@ -34,9 +34,6 @@ const TOOL_DESC: Record<string, string> = {
   todo_write: "更新任务清单(全量替换,最多一个进行中)",
   complete_step: "完成计划步骤(附验证证据,空证据拒绝)",
   ask: "向用户提供多选项问题",
-  // 系统
-  doctor: "运行系统诊断(Go环境/项目结构/OS)",
-  time: "获取当前日期时间(可指定时区)",
   // 子代理
   task: "派发子代理执行聚焦子任务",
   explore: "隔离子代理——只读代码库调查",
@@ -90,10 +87,6 @@ const SECTIONS: Section[] = [
   {
     title: "记忆",
     items: ["remember", "forget", "memory_search"],
-  },
-  {
-    title: "系统",
-    items: ["doctor", "time"],
   },
 ];
 

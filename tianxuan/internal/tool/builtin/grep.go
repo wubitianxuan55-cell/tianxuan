@@ -26,11 +26,11 @@ type grepTool struct{ workDir string }
 func (grepTool) Name() string { return "grep" }
 
 func (grepTool) Description() string {
-	return "Search for a regular expression in a file, or recursively under a directory. Returns matching lines as path:line:text. Set sort_by=relevance to rank results by match density (most relevant first) instead of the default path-based order. Set max_matches to increase limit (default 500, max 2000)."
+	return "搜索正则表达式匹配的文件或目录。返回匹配行 path:line:text。支持 context_lines 显示匹配行上下文（前后各N行），highlight 高亮匹配部分（>>>match<<<），sort_by=relevance 按匹配密度排序。max_matches 最大 2000。"
 }
 
 func (grepTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Regular expression (RE2 syntax)"},"path":{"type":"string","description":"File or directory to search (default \".\")"},"max_matches":{"type":"integer","description":"Maximum matches to return (default 500, max 2000)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"Sort order: path (default, by file path then line number) or relevance (by match density, most relevant first)"}},"required":["pattern"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"正则表达式 (RE2 语法)"},"path":{"type":"string","description":"文件或目录 (默认 \".\")"},"max_matches":{"type":"integer","description":"最大匹配数 (默认 500, 最大 2000)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"排序方式: path (默认) 或 relevance (按匹配密度)"},"context_lines":{"type":"integer","description":"匹配行四周的上下文行数 (默认 0, 最大 5)"},"highlight":{"type":"boolean","description":"用 >>><<< 包裹匹配文本 (默认 true)"}},"required":["pattern"]}`)
 }
 
 func (grepTool) ReadOnly() bool { return true }
@@ -42,15 +42,22 @@ type grepMatch struct {
 	file string
 	line int
 	text string
+	// isContext is true when this match is a surrounding context line, not a
+	// direct regex match. Context lines are rendered with a "-" suffix on the
+	// line number to distinguish them.
+	isContext bool
 }
 
 func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
-	var p struct {
-		Pattern    string `json:"pattern"`
-		Path       string `json:"path"`
-		MaxMatches *int   `json:"max_matches,omitempty"`
-		SortBy     string `json:"sort_by"`
+	type pT struct {
+		Pattern      string `json:"pattern"`
+		Path         string `json:"path"`
+		MaxMatches   *int   `json:"max_matches,omitempty"`
+		SortBy       string `json:"sort_by"`
+		ContextLines *int   `json:"context_lines,omitempty"`
+		Highlight    *bool  `json:"highlight,omitempty"`
 	}
+	var p pT
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
@@ -67,6 +74,19 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		if maxMatches > 2000 {
 			maxMatches = 2000
 		}
+	}
+
+	ctxLines := 0
+	if p.ContextLines != nil && *p.ContextLines > 0 {
+		ctxLines = *p.ContextLines
+		if ctxLines > 5 {
+			ctxLines = 5
+		}
+	}
+
+	highlight := true
+	if p.Highlight != nil {
+		highlight = *p.Highlight
 	}
 
 	p.Path = resolveIn(g.workDir, p.Path)
@@ -89,17 +109,98 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		sc := bufio.NewScanner(f)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		ln := 0
+
+		// When context_lines > 0, maintain a ring buffer of recent lines.
+		var ringBuf []string
+		ringPos := 0
+		var pendingAfter int // context lines to emit after the last match
+
 		for sc.Scan() {
 			ln++
 			line := sc.Text()
 			if strings.IndexByte(line, 0) >= 0 {
 				return nil // looks binary, skip the file
 			}
-			if re.MatchString(line) {
-				out = append(out, grepMatch{file: file, line: ln, text: line})
-				if len(out) >= maxMatches {
-					truncated = true
-					return io.EOF
+
+			matched := re.MatchString(line)
+
+			if ctxLines > 0 {
+				// Ring buffer for context lines before a match.
+				if cap(ringBuf) < ctxLines {
+					ringBuf = make([]string, ctxLines)
+				}
+				ringBuf[ringPos%ctxLines] = line
+				ringPos++
+
+				if matched {
+					// Emit preceding context lines from the ring buffer.
+					start := ringPos - 1 - ctxLines
+					if start < 0 {
+						start = 0
+					}
+					// ringBuf may contain lines not yet flushed that are
+					// part of the context. Walk from start to ringPos-1 and
+					// emit non-duplicate lines.
+					//
+					// Simpler approach: compute the exact preceding line
+					// numbers we need (ln-ctxLines .. ln-1) and emit them
+					// as context, skipping any that were already emitted.
+					ctxStart := ln - ctxLines
+					if ctxStart < 1 {
+						ctxStart = 1
+					}
+					already := map[int]bool{}
+					for _, m := range out {
+						if m.file == file {
+							already[m.line] = true
+						}
+					}
+					for ctxLine := ctxStart; ctxLine < ln; ctxLine++ {
+						if already[ctxLine] {
+							continue
+						}
+						// Re-read the context line text from the ring buffer.
+						offset := ctxLine - ctxStart
+						idx := (ringPos - 1 - ctxLines + offset) % ctxLines
+						if idx < 0 {
+							idx += ctxLines
+						}
+						ctxTxt := ringBuf[idx]
+						if ctxTxt == "" {
+							continue
+						}
+						out = append(out, grepMatch{file: file, line: ctxLine, text: ctxTxt, isContext: true})
+						already[ctxLine] = true
+						if len(out) >= maxMatches {
+							truncated = true
+							return io.EOF
+						}
+					}
+
+					// Emit the actual match.
+					out = append(out, grepMatch{file: file, line: ln, text: line, isContext: false})
+					if len(out) >= maxMatches {
+						truncated = true
+						return io.EOF
+					}
+					pendingAfter = ctxLines
+				} else if pendingAfter > 0 {
+					// Emit trailing context line.
+					out = append(out, grepMatch{file: file, line: ln, text: line, isContext: true})
+					pendingAfter--
+					if len(out) >= maxMatches {
+						truncated = true
+						return io.EOF
+					}
+				}
+			} else {
+				// No context_lines: simple match.
+				if matched {
+					out = append(out, grepMatch{file: file, line: ln, text: line})
+					if len(out) >= maxMatches {
+						truncated = true
+						return io.EOF
+					}
 				}
 			}
 		}
@@ -148,26 +249,48 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	var b strings.Builder
 	for _, m := range out {
-		fmt.Fprintf(&b, "%s:%d:%s\n", m.file, m.line, m.text)
+		txt := m.text
+		if highlight && !m.isContext {
+			txt = highlightMatch(re, txt)
+		}
+		lineMark := ""
+		if m.isContext {
+			lineMark = "-" // context line: path:line-:text
+		}
+		fmt.Fprintf(&b, "%s:%d%s:%s\n", m.file, m.line, lineMark, txt)
 	}
 	res := strings.TrimSuffix(b.String(), "\n")
 	if truncated {
-		res += fmt.Sprintf("\n... (truncated at %d matches)", maxMatches)
+		res += fmt.Sprintf("\n... (truncated at %d results)", maxMatches)
 	}
 	return res, nil
 }
 
+// highlightMatch wraps the leftmost regex match in >>> and <<< markers.
+// If the regex doesn't match or the match would empty the string, the
+// original text is returned unchanged.
+func highlightMatch(re *regexp.Regexp, text string) string {
+	loc := re.FindStringIndex(text)
+	if loc == nil {
+		return text
+	}
+	return text[:loc[0]] + ">>>" + text[loc[0]:loc[1]] + "<<<" + text[loc[1]:]
+}
+
 // sortByRelevance sorts matches by match density per file (descending), then
-// within each file by line number. Files with more matches relative to their
-// size appear first — this surfaces the most relevant files at the top.
+// within each file by line number. Context lines are sorted adjacent to their
+// originating match.
 func sortByRelevance(matches []grepMatch) {
-	// Count matches per file
+	// When context_lines is active, we need to preserve the order of context
+	// lines relative to their matches. Use a simple approach: count only
+	// non-context matches per file.
 	perFile := make(map[string]int)
 	for _, m := range matches {
-		perFile[m.file]++
+		if !m.isContext {
+			perFile[m.file]++
+		}
 	}
 
-	// Sort: by match count per file (desc), then file path, then line number
 	sort.SliceStable(matches, func(i, j int) bool {
 		ci := perFile[matches[i].file]
 		cj := perFile[matches[j].file]

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown } from "lucide-react";
-import gsap from "gsap";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Item } from "../lib/store";
 import { useItems } from "../lib/store";
@@ -12,11 +10,9 @@ import { ToolGroup, scanGroups } from "./ToolGroup";
 import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
 
-gsap.registerPlugin(ScrollToPlugin);
 
 // ── 滚动参数 ──────────────────────────────────────────────────────────
 const BOTTOM_THRESHOLD_PX = 80; // 距底部 80px 以内视为"在底部"
-const SCROLL_DURATION = 0.12;   // GSAP 滚动动画时长(s)
 
 function isNearBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
@@ -82,7 +78,6 @@ export function Transcript({
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const resizeFrame = useRef<number | null>(null);
-  const layoutScrollFrames = useRef<number[]>([]);
 
   useEffect(() => {
     onThreadEl?.(scrollRef.current);
@@ -93,8 +88,6 @@ export function Transcript({
   useEffect(() => {
     return () => {
       if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
-      for (const frame of layoutScrollFrames.current) cancelAnimationFrame(frame);
-      layoutScrollFrames.current = [];
     };
   }, []);
 
@@ -105,7 +98,7 @@ export function Transcript({
     if (!el) return;
     const atBottom = isNearBottom(el);
     stick.current = atBottom;
-    setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight + 200);
+    setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight);
   }, []);
 
   // ── 智能滚动：GSAP 驱动，无节流 ──────────────────────────────────
@@ -128,13 +121,12 @@ export function Transcript({
         // 流式：直接设置 scrollTop，零延迟零抖动
         el.scrollTop = el.scrollHeight;
       } else {
-        // 非流式：GSAP 动画平滑过渡
-        gsap.to(el, {
-          scrollTo: { y: "max" },
-          duration: SCROLL_DURATION,
-          ease: "power2.out",
-          overwrite: "auto",
-        });
+        // 非流式：用 virtualizer.scrollToIndex 精确滚到底部
+        const v = virtualizerRef.current;
+        if (v) {
+          const lastIdx = v.options.count - 1;
+          if (lastIdx >= 0) v.scrollToIndex(lastIdx, { align: "end" });
+        }
       }
     });
   }, [items]);
@@ -145,29 +137,6 @@ export function Transcript({
     setShowScrollDown(false);
     scrollToBottom();
   }, [scrollToBottom]);
-
-  // 布局后多帧确认滚动（工具结果展开等场景）
-  const scrollToBottomAfterLayout = useCallback((frames = 4) => {
-    for (const frame of layoutScrollFrames.current) cancelAnimationFrame(frame);
-    layoutScrollFrames.current = [];
-    const el = scrollRef.current;
-    if (!el) return;
-    // 先立即设置
-    stick.current = true;
-    el.scrollTop = el.scrollHeight;
-    let remaining = frames;
-    const tick = () => {
-      if (remaining <= 0) return;
-      const frame = requestAnimationFrame(() => {
-        layoutScrollFrames.current = layoutScrollFrames.current.filter((id) => id !== frame);
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        remaining -= 1;
-        tick();
-      });
-      layoutScrollFrames.current.push(frame);
-    };
-    tick();
-  }, []);
 
   // ── 内容变化时自动跟随 ──────────────────────────────────────────
   const contentVersion = scrollVersion(items);
@@ -326,8 +295,13 @@ export function Transcript({
   const scrollDown = useCallback(() => {
     stick.current = true;
     setShowScrollDown(false);
-    scrollToBottomAfterLayout();
-  }, [scrollToBottomAfterLayout]);
+    // 用 virtualizer.scrollToIndex 替代 scrollTop=scrollHeight，
+    // 避免虚拟列表末测量项的估算高度不准导致滚不到真正的底部。
+    const v = virtualizerRef.current;
+    if (v && grouped.length > 0) {
+      v.scrollToIndex(grouped.length - 1, { align: "end" });
+    }
+  }, [grouped.length]);
 
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>

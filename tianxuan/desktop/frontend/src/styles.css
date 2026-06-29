@@ -1936,3 +1936,14 @@ body::after {
 .context-menu__label {
   flex: 1;
 }
+
+/* ── FactCard 容器：展开/折叠过渡动画 ───────────────────────────────── */
+.fact-card-wrapper {
+  /* 平滑过渡容器高度变化 */
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.fact-card-wrapper:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+

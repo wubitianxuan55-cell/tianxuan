@@ -36,11 +36,11 @@ type bashOutput struct{}
 func (bashOutput) Name() string { return "bash_output" }
 
 func (bashOutput) Description() string {
-	return "Read new output from a background job started with bash(run_in_background=true) or task(run_in_background=true). Returns the output produced since the last bash_output call for that job, plus its status (running/done/failed/killed). Does not block."
+	return "Read new output from a background job. Set tail_lines to limit the output to the last N lines (max 500). Does not block."
 }
 
 func (bashOutput) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"The background job id (e.g. \"bash-1\") returned when it was started."},"filter":{"type":"string","description":"Optional regular expression; only matching lines of the new output are returned."}},"required":["job_id"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"The background job id (e.g. \"bash-1\") returned when it was started."},"filter":{"type":"string","description":"Optional regular expression; only matching lines of the new output are returned."},"tail_lines":{"type":"integer","description":"Return only the last N lines of new output (default 0 = all lines, max 500)."}},"required":["job_id"]}`)
 }
 
 func (bashOutput) ReadOnly() bool { return true }
@@ -50,8 +50,9 @@ func (bashOutput) CompactSchema() json.RawMessage   { return compactSchema["bash
 
 func (bashOutput) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		JobID  string `json:"job_id"`
-		Filter string `json:"filter"`
+		JobID     string `json:"job_id"`
+		Filter    string `json:"filter"`
+		TailLines int    `json:"tail_lines"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -73,6 +74,18 @@ func (bashOutput) Execute(ctx context.Context, args json.RawMessage) (string, er
 			return "", err
 		}
 		text = filtered
+	}
+	// V10.12: tail_lines limits output to last N lines (clamped 1..500).
+	if p.TailLines > 0 && text != "" {
+		if p.TailLines > 500 {
+			p.TailLines = 500
+		}
+		lines := strings.Split(text, "\n")
+		if len(lines) > p.TailLines {
+			text = fmt.Sprintf("... (showing last %d of %d lines) ...\n%s",
+				p.TailLines, len(lines),
+				strings.Join(lines[len(lines)-p.TailLines:], "\n"))
+		}
 	}
 	header := fmt.Sprintf("[%s] %s", p.JobID, status)
 	if strings.TrimSpace(text) == "" {

@@ -177,7 +177,9 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		}
 	}
 
-	// JSON output mode: return structured result with separated stdout/stderr
+	// JSON output mode: return structured result with separated stdout/stderr.
+	// Apply truncation to prevent large outputs from blowing up context window
+	// (V10.12: previously JSON mode had NO truncation, risking massive blobs).
 	if p.OutputFormat == "json" {
 		ok := err == nil && ctx.Err() == nil
 		exitCode := 0
@@ -188,17 +190,33 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 				exitCode = -1
 			}
 		}
+		stdoutStr := strings.TrimSpace(stdoutBuf.String())
+		stderrStr := strings.TrimSpace(stderrBuf.String())
+
+		// Truncate each stream independently to ~24KB each (half of plain-mode 48KB).
+		// Keeping both streams available is more useful than one large merged output.
+		const jsonStreamMaxBytes = 24 * 1024
+		stdoutStr, stdoutTrunc := truncateStream(stdoutStr, jsonStreamMaxBytes)
+		stderrStr, stderrTrunc := truncateStream(stderrStr, jsonStreamMaxBytes)
+
 		var buf2 bytes.Buffer
 		enc := json.NewEncoder(&buf2)
 		enc.SetEscapeHTML(false)
-		_ = enc.Encode(map[string]any{
+		result := map[string]any{
 			"ok":          ok,
 			"exit_code":   exitCode,
 			"duration_ms": time.Since(start).Milliseconds(),
-			"stdout":      strings.TrimSpace(stdoutBuf.String()),
-			"stderr":      strings.TrimSpace(stderrBuf.String()),
+			"stdout":      stdoutStr,
+			"stderr":      stderrStr,
 			"command":     p.Command,
-		})
+		}
+		if stdoutTrunc {
+			result["stdout_truncated"] = true
+		}
+		if stderrTrunc {
+			result["stderr_truncated"] = true
+		}
+		_ = enc.Encode(result)
 		return strings.TrimSpace(buf2.String()), nil
 	}
 
@@ -266,4 +284,22 @@ func killProcessTree(cmd *exec.Cmd) {
 	killCmd.Stdout = io.Discard
 	killCmd.Stderr = io.Discard
 	_ = killCmd.Run() // 忽略错误（进程可能已正常退出）
+}
+
+// truncateStream applies head+tail truncation to a command output stream.
+// Keeps the first N bytes and last N bytes, eliding the middle. Returns the
+// truncated string and a boolean indicating whether truncation occurred.
+// Uses simple byte-length truncation (not line-aware) for predictable sizing.
+func truncateStream(s string, maxBytes int) (string, bool) {
+	if len(s) <= maxBytes {
+		return s, false
+	}
+	half := maxBytes / 2
+	head := s[:half]
+	tailStart := len(s) - half
+	if tailStart < half {
+		tailStart = half
+	}
+	tail := s[tailStart:]
+	return head + fmt.Sprintf("\n... (%d bytes elided) ...\n", len(s)-maxBytes) + tail, true
 }

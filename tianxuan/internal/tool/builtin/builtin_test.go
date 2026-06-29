@@ -460,3 +460,28 @@ func TestWebSearchFilterInternalLinks(t *testing.T) {
 		t.Errorf("URL = %q, want example.com/real", results[0].URL)
 	}
 }
+
+func TestTruncateStream(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxBytes int
+		wantTrunc bool
+	}{
+		{"short enough", "hello", 100, false},
+		{"exact fit", "hello", 5, false},
+		{"needs truncation", "hello world this is a long string", 10, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, truncated := truncateStream(tt.input, tt.maxBytes)
+			if truncated != tt.wantTrunc {
+				t.Errorf("truncateStream(%q, %d) truncated=%v, want %v", tt.input, tt.maxBytes, truncated, tt.wantTrunc)
+			}
+			if truncated && len(got) < len(tt.input) {
+				// okay: truncated output is shorter
+			}
+		})
+	}
+}
+

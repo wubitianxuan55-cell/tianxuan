@@ -1,31 +1,38 @@
 # Tianxuan 版本变更日志
 
-## V10.12.0 (2026-06-29) — 🔧 Bug修复 + 体验优化 + 路由增强 + Bash截断
+## V10.12.0 (2026-06-29) — 综合优化迭代
 
 ### Bug修复
-- session_route_features: FilesModified 永久为 0 → Pro 模型自动升级失效（从 ToolCall.Arguments 提取路径）
+- session_route_features: FilesModified 永久为0 → Pro模型自动升级失效
+- 回到底部按钮不可见 + 滚动不到位（虚拟列表 scrollHeight 阈值修复）
 
 ### 流式输出流畅度
-- text/reasoning 事件 setTimeout(0) 绕过 React 18 批处理
+- text/reasoning setTimeout(0) 绕过 React 18 批处理
 - stream_batcher 换行感知 flush
-- useItems() 分离订阅，Transcript 直连，App 不全局重渲染
-- 流式禁用 msg-fade-in 动画，contain:layout 防抖动
+- useItems() 分离订阅
 
 ### auto_router 增强
-- HasWrittenFiles / HasUsedSubAgent 信号检测
-- TurnCount 阈值 10→5
-- 关键词外部化 Options.RouterKeywords
+- HasWrittenFiles / HasUsedSubAgent + TurnCount 10→5 + 关键词外部化
 
 ### grep 增强
-- context_lines 上下文行 + highlight(>>>匹配<<<) 高亮
+- context_lines + highlight(>>>匹配<<<)
 
-### Bash 输出智能截断
-- JSON 模式 stdout/stderr 独立截断(~24KB) + truncated 标志
-- bash_output tail_lines 参数(1..500)
+### Bash 智能截断
+- JSON 模式独立截断 + bash_output tail_lines
+
+### 配色系统重设计
+- :root 暗色重设计 + 4主题(light/warm/ice/forest)
+- 删除无效主题 midnight/neon/mono
+
+### UI 紧凑化
+- 思考卡 + ToolCard 缩小间距/字号/边距
+
+### MemoryPanel 重构
+- 5子组件提取 + React.memo + useCallback
 
 ### 测试
-- 新增 58 用例：session_route_features 20 + tool_coherence 10 + tool_precheck 12 + grep 8 + bash truncate
-- agent 包总计 242 测试用例
+- 新增 58 用例，agent 包 242 测试
+- SHA256: 832585cb1fb5c7a0981abacf34412d7c97a1515c177ba88d9471e6f43ec8aa48
 
 ## V10.10.0 (2026-06-28) — 综合性优化迭代
 (详见 release/v10.10.0/RELEASE.md)

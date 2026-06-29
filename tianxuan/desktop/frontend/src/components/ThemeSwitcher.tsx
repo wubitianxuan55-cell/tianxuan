@@ -2,25 +2,19 @@ import { useState } from "react";
 import type { Theme } from "../lib/theme";
 
 const THEME_DOTS: Record<string, string> = {
-  dark: "#090a0c",
-  light: "#f7f4ef",
-  warm: "#fdf6e3",
-  ice: "#0d1b2a",
-  forest: "#0f1a0f",
-  midnight: "#000000",
-  neon: "#0a0e14",
-  mono: "#111111",
+  dark: "#0b0f15",
+  light: "#f8f6f2",
+  warm: "#1e1814",
+  ice: "#0a111a",
+  forest: "#0d1510",
 };
 
 const THEME_NAMES: Record<string, string> = {
   dark: "深色",
   light: "浅色",
-  warm: "暖护眼",
+  warm: "暖色",
   ice: "冰蓝",
   forest: "森林",
-  midnight: "午夜",
-  neon: "霓虹",
-  mono: "极简",
   auto: "自动",
 };
 
@@ -34,7 +28,7 @@ export function ThemeSwitcher({
   onStore: (theme: Theme) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const themes: Theme[] = ["dark", "light", "warm", "ice", "forest", "midnight", "neon", "mono", "auto"];
+  const themes: Theme[] = ["dark", "light", "warm", "ice", "forest", "auto"];
   const current = theme === "auto" ? "auto" : theme;
 
   const handlePick = (th: Theme) => {

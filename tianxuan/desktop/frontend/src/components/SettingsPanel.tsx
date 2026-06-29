@@ -661,18 +661,15 @@ function AgentSection({ s, busy, apply }: SectionProps) {
 
 function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
   const { t, pref, setPref } = useI18n();
-  const themeOptions: Theme[] = ["dark", "light", "warm", "ice", "forest", "midnight", "neon", "mono"];
+  const themeOptions: Theme[] = ["dark", "light", "warm", "ice", "forest"];
 
-  const themeColors: Record<Theme, { bg: string; accent: string; fg: string; label: string }> = {
-    auto:   { bg: "#090a0c", accent: "#d97757", fg: "#f4f5f7", label: t("settings.themeAuto") },
-    dark:   { bg: "#090a0c", accent: "#d97757", fg: "#f4f5f7", label: t("settings.themeDark") },
-    light:  { bg: "#f7f4ef", accent: "#c2613f", fg: "#1f1d1a", label: t("settings.themeLight") },
-    warm:   { bg: "#fdf6e3", accent: "#b85c38", fg: "#3d2b1f", label: "暖护眼" },
-    ice:    { bg: "#0d1b2a", accent: "#4fc3f7", fg: "#e0e8f0", label: "冰蓝" },
-    forest: { bg: "#0f1a0f", accent: "#7cb342", fg: "#e0ecd8", label: "森林" },
-    midnight: { bg: "#000000", accent: "#bb86fc", fg: "#e8e0f0", label: "午夜" },
-    neon:   { bg: "#0a0e14", accent: "#00e5ff", fg: "#d0f0ff", label: "霓虹" },
-    mono:   { bg: "#111111", accent: "#fafafa", fg: "#fafafa", label: "极简" },
+    const themeColors: Record<Theme, { bg: string; accent: string; fg: string; label: string }> = {
+    auto:   { bg: "#0b0f15", accent: "#e8815b", fg: "#e6ebf2", label: t("settings.themeAuto") },
+    dark:   { bg: "#0b0f15", accent: "#e8815b", fg: "#e6ebf2", label: t("settings.themeDark") },
+    light:  { bg: "#f8f6f2", accent: "#d4724a", fg: "#1a1c20", label: t("settings.themeLight") },
+    warm:   { bg: "#1e1814", accent: "#e8946b", fg: "#f0e8dd", label: "暖色" },
+    ice:    { bg: "#0a111a", accent: "#6ea8fe", fg: "#e0e8f2", label: "冰蓝" },
+    forest: { bg: "#0d1510", accent: "#7ebd85", fg: "#e0ece2", label: "森林" },
   };
 
   const tc = themeColors[theme] ?? themeColors.dark;

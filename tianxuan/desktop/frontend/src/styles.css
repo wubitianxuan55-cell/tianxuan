@@ -12,57 +12,60 @@
  */
 
 :root {
-  /* surfaces */
-  --bg: #090a0c;
-  --bg-soft: #111319;
-  --bg-elev: #191b22;
-  --bg-elev-2: #222631;
-  --sidebar-bg: #0c0e12;
-  --sidebar-hover: #181c24;
-  --sidebar-active: rgba(217, 119, 87, 0.13);
-  --border: #343945;
-  --border-soft: #252a34;
+  /* surfaces — deeper blue-grey with clear 4-level hierarchy */
+  --bg: #0b0f15;
+  --bg-soft: #121824;
+  --bg-elev: #1a2130;
+  --bg-elev-2: #232d3d;
+  --sidebar-bg: #090d12;
+  --sidebar-hover: #181f2c;
+  --sidebar-active: rgba(232, 129, 91, 0.15);
+  --border: #2a3548;
+  --border-soft: #1f2939;
 
-  /* text */
-  --fg: #f4f5f7;
-  --fg-dim: #c0c4cc;
-  --fg-faint: #858b96;
+  /* text — warm-tinted whites with clear contrast steps */
+  --fg: #e6ebf2;
+  --fg-dim: #b0b9c7;
+  --fg-faint: #6c7794;
 
-  /* brand + semantic — warm clay accent */
-  --accent: #d97757;
-  --accent-fg: #1a0f0a;
-  --accent-soft: rgba(217, 119, 87, 0.14);
-  --ok: #74b87a;
-  --warn: #d9a441;
-  --err: #e0696a;
-  --info: #7aa2f7;
-  --warning: #e0af68;
-  --error: #e0696a;
-  --danger: #d66;
+  /* brand accent — refined clay-orange */
+  --accent: #e8815b;
+  --accent-fg: #1a0b05;
+  --accent-soft: rgba(232, 129, 91, 0.14);
+
+  /* semantic — softer than pure red/green */
+  --ok: #7ebd85;
+  --warn: #dfaf55;
+  --err: #e06c75;
+  --info: #6ea8fe;
+  --warning: #dfaf55;
+  --error: #e06c75;
+  --danger: #e06c75;
 
   /* diff */
-  --add-bg: rgba(116, 184, 122, 0.12);
-  --add-fg: #82c98a;
-  --del-bg: rgba(224, 105, 106, 0.12);
-  --del-fg: #e58587;
+  --add-bg: rgba(126, 189, 133, 0.12);
+  --add-fg: #7ebd85;
+  --del-bg: rgba(224, 108, 117, 0.12);
+  --del-fg: #e58790;
 
-  /* syntax (One Dark-tuned) */
+  /* syntax (One Dark inspired) */
   --hl-keyword: #c678dd;
   --hl-string: #98c379;
   --hl-number: #d19a66;
-  --hl-comment: #6a6a72;
+  --hl-comment: #5c6370;
   --hl-func: #61afef;
   --hl-type: #e5c07b;
   --hl-builtin: #56b6c2;
   --hl-meta: #7f848e;
 
+  /* layout */
   --radius: 9px;
   --maxw: 960px;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans",
     "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* motion — shared timing + easing tokens */
+  /* motion */
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 340ms;
@@ -72,155 +75,6 @@
   --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
   --motion-pop-scale: 0.98;
   --motion-rise: 4px;
-
-  /* ── Kun-inspired --ds-* design token aliases ─────────────────────────── */
-  /* surfaces (glass hierarchy) */
-  --ds-bg-app: var(--bg);
-  --ds-bg-soft: var(--bg-soft);
-  --ds-bg-sidebar: var(--sidebar-bg);
-  --ds-sidebar-hover: var(--sidebar-hover);
-  --ds-sidebar-active: var(--sidebar-active);
-  --ds-surface-card: var(--bg-elev);
-  --ds-surface-elevated: var(--bg-elev-2);
-  --ds-surface-subtle: color-mix(in srgb, var(--bg-soft) 60%, var(--bg));
-
-  /* borders */
-  --ds-border: var(--border);
-  --ds-border-muted: var(--border-soft);
-  --ds-border-strong: color-mix(in srgb, var(--border) 80%, var(--fg));
-
-  /* text */
-  --ds-text: var(--fg);
-  --ds-text-muted: var(--fg-dim);
-  --ds-text-faint: var(--fg-faint);
-  --ds-text-placeholder: color-mix(in srgb, var(--fg-faint) 70%, transparent);
-
-  /* brand / accent */
-  --ds-accent: var(--accent);
-  --ds-accent-fg: var(--accent-fg);
-  --ds-accent-soft: var(--accent-soft);
-
-  /* semantic */
-  --ds-success: var(--ok);
-  --ds-success-soft: color-mix(in srgb, var(--ok) 14%, transparent);
-  --ds-warning: var(--warn);
-  --ds-warning-soft: color-mix(in srgb, var(--warn) 14%, transparent);
-  --ds-danger: var(--err);
-  --ds-danger-soft: color-mix(in srgb, var(--err) 12%, transparent);
-  --ds-info: var(--info);
-
-  /* diff */
-  --ds-diff-added: var(--add-fg);
-  --ds-diff-added-soft: var(--add-bg);
-  --ds-diff-removed: var(--del-fg);
-  --ds-diff-removed-soft: var(--del-bg);
-
-  /* ── Elevation (shadows) ──────────────────────────────────────────────── */
-  --ds-shadow-card: 0 10px 28px rgba(0, 0, 0, 0.22);
-  --ds-shadow-card-hover: 0 14px 36px rgba(0, 0, 0, 0.28);
-  --ds-shadow-panel: 0 16px 44px rgba(0, 0, 0, 0.30);
-  --ds-shadow-dropdown: 0 18px 52px rgba(0, 0, 0, 0.35);
-  --ds-shadow-composer: 0 18px 46px rgba(0, 0, 0, 0.30), 0 5px 16px rgba(0, 0, 0, 0.15);
-  --ds-shadow-topbar: 0 12px 30px rgba(0, 0, 0, 0.14);
-  --ds-shadow-accent-btn: 0 8px 20px color-mix(in srgb, var(--accent) 20%, transparent);
-
-  /* ── Surface gradients ──────────────────────────────────────────────── */
-  
-  /* -- Z-index scale (14 levels) ----------------------------------------------------- */
-  --z-local-raised: 2;
-  --z-local-handle: 4;
-  --z-local-handle-active: 5;
-  --z-layout-resizer: 12;
-  --z-layout-resizer-active: 13;
-  --z-inline-sticky: 20;
-  --z-local-backdrop: 30;
-  --z-local-popover: 31;
-  --z-workspace-float: 40;
-  --z-app-chrome: 70;
-  --z-drawer-backdrop: 90;
-  --z-menu-backdrop: 95;
-  --z-menu: 96;
-  --z-dock: 100;
-  --z-floating-menu: 110;
-  --z-topicbar-menu: 210;
-  --z-startup-overlay: 300;
-  --z-modal: 1200;
-  --z-overlay-backdrop: 1300;
-  --z-popover: 1301;
-  --z-toast: 1302;
-  --z-tooltip: 1302;
-  --z-onboarding: 9999;
-  --z-crash-overlay: 99999;
-
-  /* -- Component recipes (buttons / pills / list rows) ------------------------------ */
-  --list-row-height: 38px;
-  --list-row-radius: 7px;
-  --list-row-gap: 10px;
-  --list-row-px: 10px;
-  --list-row-title: var(--fg-dim);
-  --list-row-meta: var(--fg-faint);
-  --list-row-hover-bg: var(--sidebar-hover);
-  --list-row-current-bg: color-mix(in srgb, var(--accent) 12%, var(--sidebar-hover));
-  --list-row-current-title: var(--fg);
-  --list-row-current-meta: var(--accent);
-  --tree-row-height: 30px;
-  --tree-row-radius: 7px;
-  --tree-row-hover-bg: var(--sidebar-hover);
-  --tree-row-current-bg: color-mix(in srgb, var(--sidebar-active) 42%, var(--bg-soft));
-  --tree-row-current-fg: var(--fg);
-  --tree-row-current-icon: var(--fg-dim);
-  --tree-row-marker: var(--accent);
-  --control-primary-bg: var(--accent);
-  --control-primary-fg: var(--accent-fg);
-  --control-disabled-bg: var(--bg-elev-2);
-  --control-disabled-fg: var(--fg-faint);
-  --focus-ring: 0 0 0 3px var(--accent-soft);
-  --button-height: 34px;
-  --button-small-height: 30px;
-  --button-icon-size: 30px;
-  --button-radius: 8px;
-  --button-px: 12px;
-  --button-bg: color-mix(in srgb, var(--bg-elev-2) 62%, var(--bg-soft));
-  --button-bg-hover: color-mix(in srgb, var(--bg-elev-2) 82%, var(--bg-soft));
-  --button-border: var(--border);
-  --button-border-hover: color-mix(in srgb, var(--fg-faint) 48%, var(--border));
-  --button-fg: var(--fg);
-  --button-muted-fg: var(--fg-dim);
-  --button-danger-bg: color-mix(in srgb, var(--err) 10%, var(--bg-elev));
-  --button-danger-border: color-mix(in srgb, var(--err) 30%, var(--border));
-  --button-danger-fg: var(--err);
-  --pill-bg: color-mix(in srgb, var(--bg-elev-2) 62%, transparent);
-  --pill-border: var(--border);
-  --pill-fg: var(--fg-dim);
-  --pill-hover-bg: var(--bg-elev-2);
-  --pill-plan-bg: var(--accent-soft);
-  --pill-plan-border: color-mix(in srgb, var(--accent) 24%, var(--border));
-  --pill-yolo-bg: var(--danger);
-  --pill-yolo-bg-hover: color-mix(in srgb, var(--danger) 90%, var(--fg));
-  --pill-yolo-border: var(--danger);
-  --pill-yolo-border-hover: color-mix(in srgb, var(--danger) 90%, var(--fg));
-  --pill-yolo-fg: var(--danger-fg);
-
---ds-gradient-sidebar: linear-gradient(180deg, var(--bg-soft) 0%, var(--sidebar-bg) 45%, var(--bg) 100%);
-  --ds-gradient-topbar: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--bg-elev) 86%, transparent) 0%,
-    color-mix(in srgb, var(--bg-elev) 70%, transparent) 58%,
-    color-mix(in srgb, var(--bg) 42%, transparent) 100%
-  );
-
-  /* ── Border radius ladder ─────────────────────────────────────────────── */
-  --ds-radius-sm: 6px;
-  --ds-radius-md: 8px;
-  --ds-radius-lg: 12px;
-  --ds-radius-xl: 14px;
-  --ds-radius-2xl: 16px;
-  --ds-radius-3xl: 22px;
-  --ds-radius-composer: 16px;
-  --ds-radius-pill: 9999px;
-
-  /* typography */
-  --ds-font-display: "SF Pro Display", "PingFang SC", "Noto Sans SC", var(--sans);
 }
 /* -- Platform-specific font stacks -------------------------------------------------- */
 :root[data-platform="windows"] {
@@ -1919,3 +1773,129 @@ body::after {
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Theme variants — override surface/text/accent tokens per data-theme
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Light: warm white ────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f8f6f2;
+  --bg-soft: #f0ece6;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f5f2ec;
+  --sidebar-bg: #f0ece6;
+  --sidebar-hover: #e8e3da;
+  --sidebar-active: rgba(212, 114, 74, 0.12);
+  --border: #d8d3cb;
+  --border-soft: #e5e0d8;
+  --fg: #1a1c20;
+  --fg-dim: #4e5460;
+  --fg-faint: #8a909c;
+  --accent: #d4724a;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(212, 114, 74, 0.12);
+  --ok: #4a8c52;
+  --warn: #b8861f;
+  --err: #c94a4f;
+  --info: #4a7fd4;
+  --warning: #b8861f;
+  --error: #c94a4f;
+  --danger: #c94a4f;
+  --add-bg: rgba(74, 140, 82, 0.10);
+  --add-fg: #3d7344;
+  --del-bg: rgba(201, 74, 79, 0.10);
+  --del-fg: #b03d42;
+  --hl-comment: #8b949e;
+}
+
+/* ── Warm: sepia-toned dark ───────────────────────────────────────────── */
+[data-theme="warm"] {
+  --bg: #1e1814;
+  --bg-soft: #28211a;
+  --bg-elev: #302720;
+  --bg-elev-2: #3a2f27;
+  --sidebar-bg: #1a1410;
+  --sidebar-hover: #2a221b;
+  --sidebar-active: rgba(232, 148, 107, 0.15);
+  --border: #42372f;
+  --border-soft: #332b24;
+  --fg: #f0e8dd;
+  --fg-dim: #c4b8a8;
+  --fg-faint: #8c7f6f;
+  --accent: #e8946b;
+  --accent-fg: #1a0c06;
+  --accent-soft: rgba(232, 148, 107, 0.14);
+  --ok: #8cba7a;
+  --warn: #d9a853;
+  --err: #d9737a;
+  --info: #7a9fd4;
+  --warning: #d9a853;
+  --error: #d9737a;
+  --danger: #d9737a;
+  --add-bg: rgba(140, 186, 122, 0.12);
+  --add-fg: #8cba7a;
+  --del-bg: rgba(217, 115, 122, 0.12);
+  --del-fg: #d98a90;
+}
+
+/* ── Ice: cool blue dark ──────────────────────────────────────────────── */
+[data-theme="ice"] {
+  --bg: #0a111a;
+  --bg-soft: #0f1926;
+  --bg-elev: #152233;
+  --bg-elev-2: #1c2c42;
+  --sidebar-bg: #080e15;
+  --sidebar-hover: #141f2e;
+  --sidebar-active: rgba(110, 168, 254, 0.14);
+  --border: #253650;
+  --border-soft: #1a2a3d;
+  --fg: #e0e8f2;
+  --fg-dim: #a8b8cc;
+  --fg-faint: #60789a;
+  --accent: #6ea8fe;
+  --accent-fg: #0a111a;
+  --accent-soft: rgba(110, 168, 254, 0.14);
+  --ok: #6ebf85;
+  --warn: #d9b055;
+  --err: #d96c7a;
+  --info: #6ea8fe;
+  --warning: #d9b055;
+  --error: #d96c7a;
+  --danger: #d96c7a;
+  --add-bg: rgba(110, 191, 133, 0.12);
+  --add-fg: #6ebf85;
+  --del-bg: rgba(217, 108, 122, 0.12);
+  --del-fg: #d98590;
+}
+
+/* ── Forest: dark green ───────────────────────────────────────────────── */
+[data-theme="forest"] {
+  --bg: #0d1510;
+  --bg-soft: #121e16;
+  --bg-elev: #18281d;
+  --bg-elev-2: #1f3226;
+  --sidebar-bg: #0a100c;
+  --sidebar-hover: #151f18;
+  --sidebar-active: rgba(126, 189, 133, 0.14);
+  --border: #2a4032;
+  --border-soft: #1e3025;
+  --fg: #e0ece2;
+  --fg-dim: #a8c4ae;
+  --fg-faint: #5e8a6a;
+  --accent: #7ebd85;
+  --accent-fg: #0a150d;
+  --accent-soft: rgba(126, 189, 133, 0.14);
+  --ok: #7ebd85;
+  --warn: #c9a855;
+  --err: #d97a7a;
+  --info: #6ea8d4;
+  --warning: #c9a855;
+  --error: #d97a7a;
+  --danger: #d97a7a;
+  --add-bg: rgba(126, 189, 133, 0.14);
+  --add-fg: #7ebd85;
+  --del-bg: rgba(217, 122, 122, 0.12);
+  --del-fg: #d99090;
+}

@@ -151,9 +151,6 @@
     "Cascadia Code", "SF Mono", Consolas, ui-monospace, monospace;
 }
 
-
-
-
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     --bg: #f7f4ef;
@@ -312,46 +309,6 @@
   --hl-keyword: #c792ea; --hl-string: #a5d6a7; --hl-number: #f78c6c; --hl-comment: #546e4a;
   --hl-func: #82b1ff; --hl-type: #ffe082; --hl-builtin: #80cbc4; --hl-meta: #7f848e;
 }
-/* midnight — OLED 纯黑紫调 */
-:root[data-theme="midnight"] {
-  --bg: #000000; --bg-soft: #0a0a10; --bg-elev: #111122; --bg-elev-2: #1a1a30;
-  --sidebar-bg: #020208; --sidebar-hover: #141428; --sidebar-active: rgba(187, 134, 252, 0.13);
-  --border: #222240; --border-soft: #181830;
-  --fg: #e8e0f0; --fg-dim: #b0a0c8; --fg-faint: #706898;
-  --accent: #bb86fc; --accent-fg: #0a0020; --accent-soft: rgba(187, 134, 252, 0.14);
-  --ok: #81c784; --warn: #ffb74d; --err: #cf6679;
-  --add-bg: rgba(129, 199, 132, 0.12); --add-fg: #81c784;
-  --del-bg: rgba(207, 102, 121, 0.12); --del-fg: #cf6679;
-  --hl-keyword: #c792ea; --hl-string: #a5d6a7; --hl-number: #f78c6c; --hl-comment: #5a5a70;
-  --hl-func: #82aaff; --hl-type: #ffcb6b; --hl-builtin: #89ddff; --hl-meta: #7f848e;
-}
-/* neon — 青色黑客风 */
-:root[data-theme="neon"] {
-  --bg: #0a0e14; --bg-soft: #0d1220; --bg-elev: #121830; --bg-elev-2: #182040;
-  --sidebar-bg: #060a12; --sidebar-hover: #141e30; --sidebar-active: rgba(0, 229, 255, 0.13);
-  --border: #1a2840; --border-soft: #152030;
-  --fg: #d0f0ff; --fg-dim: #88c8e8; --fg-faint: #5080a0;
-  --accent: #00e5ff; --accent-fg: #001018; --accent-soft: rgba(0, 229, 255, 0.14);
-  --ok: #69f0ae; --warn: #ffd740; --err: #ff5252;
-  --add-bg: rgba(105, 240, 174, 0.12); --add-fg: #69f0ae;
-  --del-bg: rgba(255, 82, 82, 0.12); --del-fg: #ff5252;
-  --hl-keyword: #ea80fc; --hl-string: #b9f6ca; --hl-number: #ffab40; --hl-comment: #546e7a;
-  --hl-func: #40c4ff; --hl-type: #ffd740; --hl-builtin: #84ffff; --hl-meta: #7f848e;
-}
-/* mono — 极简黑白 */
-:root[data-theme="mono"] {
-  --bg: #111111; --bg-soft: #1a1a1a; --bg-elev: #242424; --bg-elev-2: #2e2e2e;
-  --sidebar-bg: #0a0a0a; --sidebar-hover: #1e1e1e; --sidebar-active: rgba(250, 250, 250, 0.10);
-  --border: #333333; --border-soft: #282828;
-  --fg: #fafafa; --fg-dim: #b0b0b0; --fg-faint: #707070;
-  --accent: #fafafa; --accent-fg: #111111; --accent-soft: rgba(250, 250, 250, 0.10);
-  --ok: #90a090; --warn: #c0a060; --err: #c06060;
-  --add-bg: rgba(144, 160, 144, 0.12); --add-fg: #a0b0a0;
-  --del-bg: rgba(192, 96, 96, 0.12); --del-fg: #cc8888;
-  --hl-keyword: #cccccc; --hl-string: #a0a0a0; --hl-number: #c0c0c0; --hl-comment: #606060;
-  --hl-func: #d0d0d0; --hl-type: #b0b0b0; --hl-builtin: #909090; --hl-meta: #808080;
-}
-
 
 /* box-sizing handled by tailwind.css base layer */
 html,
@@ -497,7 +454,6 @@ body {
   flex-direction: column;
   position: relative;
 }
-
 
 /* ── markdown prose ──────────────────────────────────────────────────────── */
 .md > :first-child {
@@ -1570,7 +1526,6 @@ body::after {
   opacity: 1;
 }
 
-
 /* -- InlineDiff -------------------------------------------------------------- */
 .inline-diff {
   margin: 4px 0;
@@ -1698,7 +1653,6 @@ body::after {
   background: var(--bg-elev);
 }
 
-
 /* -- ContextMenu ------------------------------------------------------------- */
 .context-menu {
   padding: 4px 0;
@@ -1772,8 +1726,6 @@ body::after {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
-
-
 
 /* ═══════════════════════════════════════════════════════════════════════
    Theme variants — override surface/text/accent tokens per data-theme

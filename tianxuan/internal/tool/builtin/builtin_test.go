@@ -463,14 +463,47 @@ func TestWebSearchFilterInternalLinks(t *testing.T) {
 
 func TestTruncateStream(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		maxBytes int
+		name      string
+		input     string
+		maxBytes  int
 		wantTrunc bool
+		check     func(t *testing.T, got string) // optional content check
 	}{
-		{"short enough", "hello", 100, false},
-		{"exact fit", "hello", 5, false},
-		{"needs truncation", "hello world this is a long string", 10, true},
+		{"short enough", "hello", 100, false, nil},
+		{"exact fit", "hello", 5, false, nil},
+		{"needs truncation", strings.Repeat("hello world ", 20), 10, true, nil},
+		{
+			"barely over — truncation would be longer",
+			strings.Repeat("x", 24577), // 1 byte over 24576 jsonStreamMaxBytes
+			24576,
+			false, // should NOT truncate when result >= input
+			nil,
+		},
+		{
+			"content preservation",
+			strings.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 10),
+			10,
+			true,
+			func(t *testing.T, got string) {
+				if !strings.HasPrefix(got, "ABCDE") {
+					t.Errorf("head mismatch, want prefix ABCDE, got %q", got[:5])
+				}
+				if !strings.HasSuffix(got, "VWXYZ") {
+					t.Errorf("tail mismatch, want suffix VWXYZ, got ...%q", got[len(got)-5:])
+				}
+			},
+		},
+		{
+			"half preserves odd maxBytes byte",
+			strings.Repeat("0123456789", 5), // 50 bytes
+			15,                               // half=8 each side (ceil of 15/2)
+			true,
+			func(t *testing.T, got string) {
+				if !strings.HasPrefix(got, "01234567") {
+					t.Errorf("head mismatch with odd maxBytes, want 01234567, got %q", got[:8])
+				}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -478,8 +511,11 @@ func TestTruncateStream(t *testing.T) {
 			if truncated != tt.wantTrunc {
 				t.Errorf("truncateStream(%q, %d) truncated=%v, want %v", tt.input, tt.maxBytes, truncated, tt.wantTrunc)
 			}
-			if truncated && len(got) < len(tt.input) {
-				// okay: truncated output is shorter
+			if truncated && len(got) >= len(tt.input) {
+				t.Errorf("truncated result is not shorter: len(result)=%d >= len(input)=%d", len(got), len(tt.input))
+			}
+			if tt.check != nil {
+				tt.check(t, got)
 			}
 		})
 	}

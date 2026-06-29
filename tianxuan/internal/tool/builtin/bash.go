@@ -294,12 +294,19 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 	if len(s) <= maxBytes {
 		return s, false
 	}
-	half := maxBytes / 2
+	// ceil division: (maxBytes+1)/2 so an odd maxBytes doesn't lose a byte
+	half := (maxBytes + 1) / 2
 	head := s[:half]
 	tailStart := len(s) - half
 	if tailStart < half {
 		tailStart = half
 	}
 	tail := s[tailStart:]
-	return head + fmt.Sprintf("\n... (%d bytes elided) ...\n", len(s)-maxBytes) + tail, true
+	result := head + fmt.Sprintf("\n... (%d bytes elided) ...\n", len(s)-maxBytes) + tail
+	// If truncation hint makes the result longer than the original (input just
+	// barely over maxBytes), return the original — truncation would be harmful.
+	if len(result) >= len(s) {
+		return s, false
+	}
+	return result, true
 }

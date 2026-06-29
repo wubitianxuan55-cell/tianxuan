@@ -1,9 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
-gsap.registerPlugin(useGSAP, ScrollToPlugin);
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FileText, FolderGit2, FolderTree,
   Settings as SettingsIcon, MessageSquare,
@@ -598,6 +594,7 @@ export default function App() {
               running={state.running}
               agentMode={agentMode}
               yolo={yolo}
+              approval={state.approval}
               bridgeAlive={bridgeAlive}
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}

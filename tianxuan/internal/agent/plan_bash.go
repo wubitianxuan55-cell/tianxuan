@@ -50,7 +50,7 @@ func planBashCheck(args json.RawMessage) string {
 	// Shell metacharacters block chaining/substitution.
 	for _, m := range shellMetachars {
 		if strings.Contains(cmd, m) {
-			return fmt.Sprintf("bash with %q is unsafe in plan mode — use native tools instead", m)
+			return fmt.Sprintf("bash with %q is unsafe in read-only mode — use native tools instead", m)
 		}
 	}
 
@@ -73,7 +73,7 @@ func planBashCheck(args json.RawMessage) string {
 		}
 	}
 
-	return fmt.Sprintf("bash %q is not in the plan-mode safe list — use native tools or approve the plan first", cmd)
+	return fmt.Sprintf("bash %q is not in the read-only safe list — use native tools or approve the plan first", cmd)
 }
 
 // hasShellRedirect checks for unquoted write redirects. Returns "" if safe,
@@ -104,7 +104,7 @@ func hasShellRedirect(cmd string) string {
 				continue // second > of 2>>, safe
 			}
 			inSafeRedirect = false
-			return "bash with file redirect (>) is unsafe in plan mode — use write_file after plan approval"
+			return "bash with file redirect (>) is unsafe in read-only mode — use write_file after plan approval"
 		}
 		inSafeRedirect = false
 		prev = r
@@ -119,13 +119,13 @@ func checkDangerousArgs(safePrefix, rest string) string {
 	case strings.HasPrefix(safePrefix, "find"):
 		for arg := range planModeFindWriteArgs {
 			if strings.Contains(rest, " "+arg) || strings.HasPrefix(rest, arg+" ") {
-				return fmt.Sprintf("find %s is unsafe in plan mode — use native tools instead", arg)
+				return fmt.Sprintf("find %s is unsafe in read-only mode — use native tools instead", arg)
 			}
 		}
 	case strings.HasPrefix(safePrefix, "go "):
 		for arg := range planModeGoDangerousArgs {
 			if strings.Contains(rest, " "+arg) || strings.HasPrefix(rest, arg+" ") {
-				return fmt.Sprintf("go %s is unsafe in plan mode — use native tools instead", arg)
+				return fmt.Sprintf("go %s is unsafe in read-only mode — use native tools instead", arg)
 			}
 		}
 	}

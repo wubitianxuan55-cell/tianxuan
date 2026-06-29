@@ -79,11 +79,10 @@ func (d *ToolDispatcher) Check(ctx context.Context, name string, args json.RawMe
 			}
 		}
 		return CheckResult{
-			Allowed: false,
 			Blocked: true,
-			Reason:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", name),
-		}
+			Reason:  fmt.Sprintf("blocked: %q is a writer tool — currently read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", name),
 	}
+}
 planBashAllowed:
 
 	// 2. Permission gate

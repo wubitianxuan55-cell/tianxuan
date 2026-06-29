@@ -1,3 +1,4 @@
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,9 +40,9 @@ const components: Components = {
   ),
 };
 
-// LLMs emit \( \) \[ \] delimiters (remark-math only parses $/$$); convert them,
-// but protect LaTeX line-break spacing \\[ (e.g. \\[4pt]) from the rewrite, and
-// swap | for \vert inside math so remark-gfm can't read the bar as a table column.
+// LLMs emit \\( \\) \\[ \\] delimiters (remark-math only parses $/$$); convert them,
+// but protect LaTeX line-break spacing \\\\[ (e.g. \\\\[4pt]) from the rewrite, and
+// swap | for \\vert inside math so remark-gfm can't read the bar as a table column.
 function normalizeMath(s: string): string {
   const lb = "\x00LB\x00";
   let r = s.replace(/\\\\\[/g, lb);
@@ -57,7 +58,7 @@ function normalizeMath(s: string): string {
   return r;
 }
 
-export function Markdown({ text }: { text: string }) {
+export const Markdown = memo(function Markdown({ text }: { text: string }) {
   return (
     <div className="md">
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={components}>
@@ -65,4 +66,4 @@ export function Markdown({ text }: { text: string }) {
       </ReactMarkdown>
     </div>
   );
-}
+});

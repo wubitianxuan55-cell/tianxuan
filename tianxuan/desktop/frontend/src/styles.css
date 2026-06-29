@@ -25,8 +25,8 @@
 
   /* text — warm-tinted whites with clear contrast steps */
   --fg: #e6ebf2;
-  --fg-dim: #b0b9c7;
-  --fg-faint: #6c7794;
+  --fg-dim: #bac3d0;
+  --fg-faint: #808ea0;
 
   /* brand accent — refined clay-orange */
   --accent: #e8815b;
@@ -463,13 +463,13 @@ body {
   margin-bottom: 0;
 }
 .md p {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
 }
 .md h1,
 .md h2,
 .md h3,
 .md h4 {
-  margin: 20px 0 10px;
+  margin: 14px 0 6px;
   line-height: 1.3;
   font-weight: 600;
 }
@@ -488,7 +488,7 @@ body {
 }
 .md ul,
 .md ol {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   padding-left: 22px;
 }
 .md li {
@@ -505,9 +505,11 @@ body {
   text-decoration: underline;
 }
 .md blockquote {
-  margin: 0 0 12px;
-  padding: 2px 14px;
-  border-left: 3px solid var(--border);
+  margin: 0 0 8px;
+  padding: 4px 14px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 0 4px 4px 0;
   color: var(--fg-dim);
 }
 .md hr {
@@ -525,10 +527,12 @@ body {
 }
 .md table {
   border-collapse: collapse;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-size: 13px;
   display: block;
   overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
 }
 .md th,
 .md td {
@@ -540,10 +544,13 @@ body {
   background: var(--bg-soft);
   font-weight: 600;
 }
+.md tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg-soft) 50%, var(--bg));
+}
 
 /* ── notices / phase ─────────────────────────────────────────────────────── */
 .notice {
-  margin: 8px 0;
+  margin: 3px 0;
   font-size: 12.5px;
   color: var(--fg-dim);
   padding: 5px 11px;
@@ -555,7 +562,7 @@ body {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
 .phase {
-  margin: 14px auto;
+  margin: 4px auto;
   text-align: center;
   font-size: 11px;
   letter-spacing: 0.5px;
@@ -872,37 +879,142 @@ body {
   }
 }
 
-/* ── streaming indicator (lightweight border pulse) ─────────────────────── */
-@keyframes ds-shiny-text {
-  0%, 100% { border-left-color: var(--accent); }
-  50% { border-left-color: var(--accent-soft); }
-}
-.ds-shiny-text {
-  border-left: 2px solid var(--accent);
-  animation: ds-shiny-text 2s ease-in-out infinite;
-  /* GPU compositor layer: avoids full layout on streaming text growth */
-  transform: translateZ(0);
-  will-change: transform;
-  /* 防止流式文本增长时触发父级重排 */
-  contain: layout style;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ds-shiny-text { animation: none; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   BEM semantic message layer
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.msg {
+  user-select: text;
+  -webkit-user-select: text;
+  margin: 6px auto;
 }
 
-/* ── message text fade-in (推理→正文过渡) ──────────────────────────────── */
-@keyframes msg-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ── user message bubble ───────────────────────────────────────────────── */
+.msg--user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
-.msg-text-fade {
-  animation: msg-fade-in 0.25s ease-out;
+.msg--user .msg__body {
+  max-width: 82%;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 6px 12px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .msg-text-fade { animation: none; }
+.msg--user .msg__text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+  font-size: 14px;
 }
 
-/* ── component recipes ───────────────────────────────────────────────────── */
+/* ── assistant message card ────────────────────────────────────────────── */
+.msg--assistant {
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.msg--assistant .msg__body {
+  line-height: 1.68;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── reasoning panel ───────────────────────────────────────────────────── */
+.reasoning {
+  margin-bottom: 2px;
+}
+.reasoning__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--fg-faint);
+  border-radius: 5px;
+  -webkit-app-region: no-drag;
+  transition: color 120ms ease, background 120ms ease;
+}
+.reasoning__head:hover {
+  color: var(--fg);
+  background: var(--bg-elev);
+}
+.reasoning__head .reasoning__icon {
+  flex-shrink: 0;
+  flex-shrink: 0;
+  color: var(--fg-faint);
+  opacity: 0.72;
+}
+.reasoning__head[data-running] .reasoning__icon {
+  color: var(--accent);
+  opacity: 1;
+}
+.reasoning__head .reasoning__label {
+  font-weight: 520;
+}
+.reasoning__head .reasoning__meta {
+  font-size: 11px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.reasoning__chevron {
+  flex: 0 0 auto;
+  transition: transform 0.2s;
+  opacity: 0.55;
+}
+.reasoning__chevron--open {
+  transform: rotate(90deg);
+}
+.reasoning__body {
+  overflow: hidden;
+  border-left: 2px solid var(--border);
+  margin-left: 5px;
+  padding-left: 12px;
+  color: var(--fg-dim);
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  font-style: italic;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ── reasoning shimmer (active state) ─────────────────────────────────── */
+.reasoning__head[data-running] {
+  background: linear-gradient(
+    105deg,
+    var(--fg-faint) 0%,
+    var(--fg-faint) 38%,
+    var(--fg) 46%,
+    var(--fg) 54%,
+    var(--fg-faint) 62%,
+    var(--fg-faint) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer-sweep 5s linear infinite;
+}
+.reasoning__head[data-running]:hover {
+  animation-play-state: paused;
+  background: none;
+  color: var(--accent);
+}
+.reasoning__head[data-running] .reasoning__icon,
+.reasoning__head[data-running] .reasoning__meta {
+  color: var(--fg-faint);
+}
+.reasoning__head[data-running]:hover .reasoning__icon,
+.reasoning__head[data-running]:hover .reasoning__meta {
+  color: var(--accent);
+}
+
 .ds-card {
   border: 1px solid var(--border);
   background: var(--bg-elev);

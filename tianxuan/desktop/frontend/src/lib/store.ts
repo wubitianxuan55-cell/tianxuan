@@ -186,10 +186,10 @@ export function useController() {
 
   useEffect(() => {
     const off = onEvent((e) => {
-      // 流式 text/reasoning 事件绕过 React 18 自动批处理，确保每个 chunk 即时渲染。
-      // 原理：用 setTimeout(0) 将 dispatch 推迟到下一宏任务，每个事件独立渲染帧，
-      // 避免 React 将多个连续 chunk 合并到一个渲染周期导致"一段一段蹦出来"。
-      if (e.kind === "text" || e.kind === "reasoning") {
+      // 流式 text 事件绕过 React 18 自动批处理，确保每个 chunk 即时渲染。
+      // reasoning 不走 setTimeout —— 异步会导致与 tool_dispatch 等同步事件
+      // 交错执行，错误地创建多个思考卡。
+      if (e.kind === "text") {
         setTimeout(() => dispatch({ type: "event", e }), 0);
       } else {
         dispatch({ type: "event", e });
@@ -261,6 +261,14 @@ export function useController() {
 // useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
 // 使用 useShallow 做浅比较：仅当 items 长度或元素引用变化时才触发重渲染，
 // 非 items 字段（meta/context/balance 等）的变化不会影响此 hook。
+// useItems 订阅 items 数组，与 useController 分离。
+// 流式输出时 items 高频变化（每次 text/reasoning 事件），通过独立 hook 避免
+// useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
 export function useItems(): Item[] {
   return useStore(s => s.items);
+}
+
+// useTurnStartAt 返回当前回合开始时间戳(ms)，用于计算思考耗时。
+export function useTurnStartAt(): number {
+  return useStore(s => s.turnStartAt);
 }

@@ -179,7 +179,7 @@ func (c *Controller) maybeClarifyVagueInput(input string) bool {
 	}
 	c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
 		Text: "[Clarify] Your request is brief. What exactly do you want to achieve? " +
-			"You can use read_file/ls/grep to explore — plan mode is read-only."})
+			"You can use read_file/ls/grep to explore — currently in read-only mode."})
 	return true
 }
 

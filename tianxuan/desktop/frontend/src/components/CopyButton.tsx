@@ -56,12 +56,14 @@ export function CopyButton({
   className,
   label,
   showInlineLabel = true,
+  ghost,
 }: {
   text?: string;
   getText?: () => string | Promise<string>;
   className?: string;
   label?: string;
   showInlineLabel?: boolean;
+  ghost?: boolean;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -91,7 +93,11 @@ export function CopyButton({
   };
   return (
     <button
-      className={`inline-flex items-center gap-1 bg-bg-elev-2 border border-border text-fg-faint rounded-md py-0.5 px-1.5 text-[11px] cursor-pointer transition-[color,border-color] duration-[var(--dur-fast)] hover:text-fg hover:border-fg-faint ${className ?? ""}`}
+      className={`inline-flex items-center gap-1 rounded-md py-0.5 px-1.5 text-[11px] cursor-pointer transition-[color,border-color] duration-[var(--dur-fast)] ${
+        ghost
+          ? "bg-transparent border-0 text-fg-faint/50 hover:text-fg-faint"
+          : "bg-bg-elev-2 border border-border text-fg-faint hover:text-fg hover:border-fg-faint"
+      } ${className ?? ""}`}
       onClick={copy}
       title={actionLabel}
       aria-label={stateLabel}

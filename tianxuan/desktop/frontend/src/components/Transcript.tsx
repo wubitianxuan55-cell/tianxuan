@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown } from "lucide-react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Item } from "../lib/store";
 import { useItems } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -9,10 +8,11 @@ import { ToolCard } from "./ToolCard";
 import { ToolGroup, scanGroups } from "./ToolGroup";
 import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
+import { useEntranceAnimation } from "../lib/useEntranceAnimation";
 
 
 // ── 滚动参数 ──────────────────────────────────────────────────────────
-const BOTTOM_THRESHOLD_PX = 80; // 距底部 80px 以内视为"在底部"
+const BOTTOM_THRESHOLD_PX = 80;
 
 function isNearBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
@@ -20,7 +20,7 @@ function isNearBottom(el: HTMLElement): boolean {
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
-// scrollVersion: 轻量级内容变化信号，只用最后一项的标识 + 流式状态。
+// scrollVersion: 轻量级内容变化信号
 function scrollVersion(items: Item[]): string {
   const n = items.length;
   if (n === 0) return "0";
@@ -35,7 +35,7 @@ function scrollVersion(items: Item[]): string {
   }
 }
 
-// mergeConsecutiveReasoning: 合并连续纯推理消息，减少渲染碎片。
+// mergeConsecutiveReasoning: 合并连续纯推理消息
 function mergeConsecutiveReasoning(items: Item[]): Item[] {
   const out: Item[] = [];
   for (const it of items) {
@@ -77,18 +77,15 @@ export function Transcript({
   const items = useItems();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
-  const resizeFrame = useRef<number | null>(null);
+  const rAF = useRef<number | null>(null);
 
   useEffect(() => {
     onThreadEl?.(scrollRef.current);
     return () => onThreadEl?.(null);
   }, [onThreadEl]);
 
-  // 清理动画和 rAF
   useEffect(() => {
-    return () => {
-      if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
-    };
+    return () => { if (rAF.current !== null) cancelAnimationFrame(rAF.current); };
   }, []);
 
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -101,37 +98,20 @@ export function Transcript({
     setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight);
   }, []);
 
-  // ── 智能滚动：GSAP 驱动，无节流 ──────────────────────────────────
-  // 流式期间（最后一项是正在流出的 assistant）用 scrollTop 直接跟随，
-  // 避免每 token 重启 GSAP tween 导致的抖动。非流式用 GSAP 动画收尾。
+  // ── 智能滚动 ──────────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     if (!stick.current) return;
 
-    // 检测流式状态：最后一项是否是正在 streaming 的 assistant
-    const last = items[items.length - 1];
-    const isStreaming = last?.kind === "assistant" && last.streaming;
-
-    if (resizeFrame.current !== null) cancelAnimationFrame(resizeFrame.current);
-    resizeFrame.current = requestAnimationFrame(() => {
-      resizeFrame.current = null;
+    if (rAF.current !== null) cancelAnimationFrame(rAF.current);
+    rAF.current = requestAnimationFrame(() => {
+      rAF.current = null;
       if (!stick.current) return;
-      if (isStreaming) {
-        // 流式：直接设置 scrollTop，零延迟零抖动
-        el.scrollTop = el.scrollHeight;
-      } else {
-        // 非流式：用 virtualizer.scrollToIndex 精确滚到底部
-        const v = virtualizerRef.current;
-        if (v) {
-          const lastIdx = v.options.count - 1;
-          if (lastIdx >= 0) v.scrollToIndex(lastIdx, { align: "end" });
-        }
-      }
+      el.scrollTop = el.scrollHeight;
     });
-  }, [items]);
+  }, []);
 
-  // 新问题提交时强制到底
   const onNewQuestion = useCallback(() => {
     stick.current = true;
     setShowScrollDown(false);
@@ -141,13 +121,10 @@ export function Transcript({
   // ── 内容变化时自动跟随 ──────────────────────────────────────────
   const contentVersion = scrollVersion(items);
   const prevItemsLen = useRef(items.length);
-  // 仅在新用户消息提交时强制到底（工具结果/流式输出不强制）
   useEffect(() => {
     if (items.length > prevItemsLen.current) {
       const last = items[items.length - 1];
-      if (last && last.kind === "user") {
-        onNewQuestion();
-      }
+      if (last && last.kind === "user") onNewQuestion();
     }
     prevItemsLen.current = items.length;
   }, [items.length, onNewQuestion]);
@@ -156,7 +133,7 @@ export function Transcript({
     scrollToBottom();
   }, [contentVersion, scrollToBottom]);
 
-  // ── ResizeObserver：工具结果展开/折叠时保持底部 ──────────────────
+  // ── ResizeObserver ─────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -171,36 +148,11 @@ export function Transcript({
   // ── 预处理 ──────────────────────────────────────────────────────
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
 
-  const turnToIndex = useMemo(() => {
-    const map = new Map<number, number>();
-    let turn = 0;
-    for (let i = 0; i < grouped.length; i++) {
-      const g = grouped[i];
-      const it = g.kind === "group" ? null : g.item;
-      if (it && it.kind === "user") { map.set(turn, i); turn++; }
-    }
-    return map;
-  }, [grouped]);
-
-  const virtualizer = useVirtualizer({
-    count: grouped.length,
-    getScrollElement: useCallback(() => scrollRef.current, []),
-    estimateSize: useCallback(() => 120, []),
-    overscan: 12,
-  });
-
-  const turnToIndexRef = useRef(turnToIndex);
-  turnToIndexRef.current = turnToIndex;
-  const virtualizerRef = useRef(virtualizer);
-  virtualizerRef.current = virtualizer;
-
+  // turn→DOM 元素映射（用于跳转）
+  const turnEls = useRef(new Map<number, HTMLElement>());
   const scrollToTurnRef = useRef((turn: number) => {
-    const idx = turnToIndexRef.current.get(turn);
-    if (idx != null) {
-      // 跳转时不设置 stick.current = true —— 否则 ResizeObserver 检测到
-      // 容器高度变化后立即 scrollToBottom()，把视图拉回底部，用户看不到跳转效果。
-      virtualizerRef.current.scrollToIndex(idx, { align: "start" });
-    }
+    const el = turnEls.current.get(turn);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   useEffect(() => {
     onScrollToTurnReady?.(scrollToTurnRef.current);
@@ -211,11 +163,16 @@ export function Transcript({
     const el = scrollRef.current;
     if (!el) return;
     const savedTop = el.scrollTop;
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       if (scrollRef.current) scrollRef.current.scrollTop = savedTop;
     }, 250);
-    return () => clearTimeout(timer);
   }, []);
+
+  // ── 入场动画 ──────────────────────────────────────────────────────
+  const entranceRef = useEntranceAnimation<HTMLDivElement>(
+    items.length > 0 ? `${items[0].id}|${items[items.length - 1].id}` : undefined,
+    items.length,
+  );
 
   // ── 子调用收集 ──────────────────────────────────────────────────
   const subcallsByParent = new Map<string, ToolItem[]>();
@@ -245,102 +202,100 @@ export function Transcript({
     if (it.kind === "user") userTurn.set(it.id, nt++);
   }
 
-  const renderItem = (g: (typeof grouped)[number]) => {
-    if (g.kind === "group") {
-      return <ToolGroup key={g.id} tools={g.tools} onCollapse={scheduleMeasure} />;
-    }
-    const it = g.item;
-    switch (it.kind) {
-      case "user": {
-        const tn = userTurn.get(it.id);
-        return (
-          <div key={it.id} data-turn={tn != null ? tn : undefined}>
-            <UserMessage
-              key={it.id} text={it.text} turn={tn}
-              open={tn != null && openTurn === tn}
-              onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
-              onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }}
-            />
-          </div>
-        );
-      }
-      case "assistant":
-        return <AssistantMessage key={it.id} item={it} onCollapse={scheduleMeasure} />;
-      case "tool":
-        if (it.parentId) return null;
-        if (it.name === "todo_write" || it.name === "exit_plan_mode") return null;
-        return <ToolCard key={it.id} item={it} subcalls={subcallsByParent.get(it.id)} />;
-      case "phase":
-        return <div key={it.id} className="phase">{it.text}</div>;
-      case "notice":
-        if (it.level === "warn") {
-          if (dismissedErrors.has(it.id)) return null;
-          return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
-        }
-        if (it.text.startsWith("diagnostics:")) {
-          const clean = it.text.includes("— clean");
-          return (
-            <div key={it.id} className={`flex items-center gap-1.5 px-4 py-1 text-[11px] ${clean ? "text-ok" : "text-warning"}`}>
-              <span className="shrink-0">{clean ? "✔" : "⚠"}</span>
-              <span>{it.text}</span>
-            </div>
-          );
-        }
-        return <div key={it.id} className="notice">{it.text}</div>;
-      case "compaction":
-        return <CompactionCard key={it.id} item={it} />;
-    }
-  };
-
   const scrollDown = useCallback(() => {
     stick.current = true;
     setShowScrollDown(false);
-    // 用 virtualizer.scrollToIndex 替代 scrollTop=scrollHeight，
-    // 避免虚拟列表末测量项的估算高度不准导致滚不到真正的底部。
-    const v = virtualizerRef.current;
-    if (v && grouped.length > 0) {
-      v.scrollToIndex(grouped.length - 1, { align: "end" });
-    }
-  }, [grouped.length]);
+    scrollToBottom();
+  }, [scrollToBottom]);
 
   return (
     <div className="transcript" ref={scrollRef} onScroll={onScroll}>
-      <div className="max-w-[--maxw] mx-auto px-8">
+      <div className="max-w-[--maxw] mx-auto px-8" ref={entranceRef}>
         {items.length === 0 && (
           <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
         )}
         <StreamingIndicator running={running} items={items} />
-        <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
-          {virtualizer.getVirtualItems().map((virtualItem) => (
-            <div
-              key={virtualItem.key}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: "absolute", top: 0, left: 0, width: "100%",
-                display: "flex", flexDirection: "column",
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-            >
-              {renderItem(grouped[virtualItem.index])}
-            </div>
-          ))}
-        </div>
+        {grouped.map((g) => {
+          if (g.kind === "group") {
+            return <ToolGroup key={g.id} tools={g.tools} onCollapse={scheduleMeasure} />;
+          }
+          const it = g.item;
+          switch (it.kind) {
+            case "user": {
+              const tn = userTurn.get(it.id);
+              return (
+                <div
+                  key={it.id}
+                  data-turn={tn != null ? tn : undefined}
+                  data-entrance={it.id}
+                  ref={(el) => {
+                    if (el && tn != null) turnEls.current.set(tn, el);
+                  }}
+                >
+                  <UserMessage
+                    text={it.text} turn={tn}
+                    open={tn != null && openTurn === tn}
+                    onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
+                    onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }}
+                  />
+                </div>
+              );
+            }
+            case "assistant":
+              return (
+                <div key={it.id} data-entrance={it.id}>
+                  <AssistantMessage item={it} onCollapse={scheduleMeasure} />
+                </div>
+              );
+            case "tool":
+              if (it.parentId) return null;
+              if (it.name === "todo_write" || it.name === "exit_plan_mode") return null;
+              return (
+                <div key={it.id} data-entrance={it.id}>
+                  <ToolCard item={it} subcalls={subcallsByParent.get(it.id)} />
+                </div>
+              );
+            case "phase":
+              return <div key={it.id} className="phase">{it.text}</div>;
+            case "notice":
+              if (it.level === "warn") {
+                if (dismissedErrors.has(it.id)) return null;
+                return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
+              }
+              if (it.text.startsWith("diagnostics:")) {
+                const clean = it.text.includes("— clean");
+                return (
+                  <div key={it.id} className={`flex items-center gap-1.5 px-4 py-1 text-[11px] ${clean ? "text-ok" : "text-warning"}`}>
+                    <span className="shrink-0">{clean ? "✔" : "⚠"}</span>
+                    <span>{it.text}</span>
+                  </div>
+                );
+              }
+              return <div key={it.id} className="notice">{it.text}</div>;
+            case "compaction":
+              return <CompactionCard key={it.id} item={it} />;
+            default:
+              return null;
+          }
+        })}
       </div>
-      {/* 回到底部按钮 —— 固定右下角，背景虚化透明 */}
+      {/* 回到底部按钮 —— 居中圆形，accent 色调 */}
       {showScrollDown && (
         <button
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-1.5 rounded-full border border-border-soft backdrop-blur-md bg-bg-elev/70 text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-elev/90 hover:border-fg-faint/30 active:scale-95 transition-all px-3 py-1.5 shadow-lg"
+          className="absolute left-1/2 bottom-8 z-20 flex items-center justify-center w-9 h-9 rounded-full border border-accent/20 bg-bg-elev text-fg-dim cursor-pointer hover:text-accent hover:border-accent/40 hover:bg-bg-elev-2 active:scale-95 transition-all shadow-lg"
+          style={{ transform: "translateX(-50%)" }}
           onClick={scrollDown}
           aria-label="回到底部"
         >
-          <ArrowDown size={14} />
-          <span className="text-[11px] font-medium">到底</span>
+          <ArrowDown size={15} />
         </button>
       )}
     </div>
   );
 }
+
+
+
 
 // ── CompactionCard ──────────────────────────────────────────────────
 type CompactionItem = Extract<Item, { kind: "compaction" }>;

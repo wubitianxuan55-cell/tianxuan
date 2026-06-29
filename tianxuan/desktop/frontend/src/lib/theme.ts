@@ -27,6 +27,11 @@ function normalizeTheme(value: unknown): Theme | null {
       return "ice";
     case "forest":
       return "forest";
+    // Migrate removed themes to their closest dark default
+    case "midnight":
+    case "neon":
+    case "mono":
+      return "dark";
     default:
       return null;
   }

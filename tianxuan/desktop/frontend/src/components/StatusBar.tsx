@@ -3,7 +3,7 @@ import { Cpu, Wallet, Coins } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
-import type { BalanceInfo, ContextInfo, JobView, WireUsage } from "../lib/types";
+import type { BalanceInfo, ContextInfo, JobView, WireApproval, WireUsage } from "../lib/types";
 
 // ─── 模型价格表（与 StatsPanel 共用逻辑）─────────────────────────
 
@@ -93,7 +93,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, agentMode, yolo, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
+  context, usage, balance, jobs, running, agentMode, yolo, approval, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -102,6 +102,7 @@ export const StatusBar = memo(function StatusBar({
   running: boolean;
   agentMode?: string;
   yolo?: boolean;
+  approval?: WireApproval;
   turnStartAt: number;
   turnTokens: number;
   sessionTotal?: number;
@@ -216,19 +217,25 @@ export const StatusBar = memo(function StatusBar({
 
       {/* ── 右: badge 区 ── */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* 统一模式 badge */}
-        {agentMode && agentMode !== "" && (
-          <span className={`${fontSize} px-1.5 py-px rounded border font-medium ${
-            agentMode === "explore" ? "text-info bg-info/10 border-info/20" :
-            agentMode === "orchestrate" ? "text-accent bg-accent-soft border-accent/30" :
-            "text-ok bg-ok/10 border-ok/20"
-          }`}>
-            {agentMode === "explore" ? "探索" : agentMode === "develop" ? "开发" : "编排"}
-          </span>
-        )}
+        {/* 统一模式 badge — 带子状态说明 */}
+        {agentMode && agentMode !== "" && (() => {
+          const isExplore = agentMode === "explore";
+          const isOrchestrate = agentMode === "orchestrate";
+          const isPlanApproval = approval?.tool === "exit_plan_mode";
+          const subLabel = isExplore ? "·只读" : isOrchestrate ? (isPlanApproval ? "·规划中" : "·执行中") : yolo ? "·YOLO" : "·可写";
+          const modeName = isExplore ? "探索" : isOrchestrate ? "编排" : "开发";
+          const colorClass = isExplore ? "text-info bg-info/10 border-info/20" :
+            isOrchestrate ? (isPlanApproval ? "text-accent bg-accent-soft border-accent/30" : "text-ok bg-ok/10 border-ok/20") :
+            "text-ok bg-ok/10 border-ok/20";
+          return (
+            <span className={`${fontSize} px-1.5 py-px rounded border font-medium ${colorClass}`}>
+              {modeName}{subLabel}
+            </span>
+          );
+        })()}
 
-        {/* YOLO badge */}
-        {yolo && (
+        {/* YOLO badge — 仅非开发模式时独立显示 */}
+        {yolo && agentMode !== "develop" && (
           <Tooltip label="YOLO：自动批准所有工具">
             <span className="ds-chip ds-chip--accent">YOLO</span>
           </Tooltip>

@@ -51,9 +51,9 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 		if a.planMode.Load() && !t.ReadOnly() {
 			return toolOutcome{
-				output:  fmt.Sprintf("blocked: %q is a writer tool and plan mode is read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", call.Name),
+				output:  fmt.Sprintf("blocked: %q is a writer tool — currently read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", call.Name),
 				blocked: true,
-				errMsg:  "blocked: plan mode is read-only",
+				errMsg:  "blocked: read-only mode",
 			}
 		}
 		if a.gate != nil {

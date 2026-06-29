@@ -3,8 +3,6 @@ import {
   Ban,
   Check,
   ChevronRight,
-  Eye,
-  EyeOff,
   Loader2,
   X,
 } from "lucide-react";
@@ -55,7 +53,6 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
   const expandable = hasArgs || hasOutput;
 
   const [open, setOpen] = useState(false);
-  const [showOutput, setShowOutput] = useState(false);
 
   const effectiveOpen = open;
 
@@ -67,17 +64,16 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
 
   const outputLines = item.output ? item.output.split("\n").length : 0;
 
-  // 紧凑尺寸基准（比原来整体缩一级）
-  const rowPy = compact ? "py-0.5" : "py-1";
-  const rowPx = compact ? "px-1.5" : "px-2";
-  const fontSize = compact ? "text-[11px]" : "text-[12px]";
-  const chevronSize = compact ? 10 : 12;
-  const summarySize = compact ? "text-[10px]" : "text-[10.5px]";
-  const innerPx = compact ? "px-1.5" : "px-2";
-  const innerPb = compact ? "pb-1.5" : "pb-2";
+  const rowPy = compact ? "py-0" : "py-0.5";
+  const rowPx = compact ? "px-1" : "px-1.5";
+  const fontSize = compact ? "text-[10px]" : "text-[11px]";
+  const chevronSize = compact ? 10 : 11;
+  const summarySize = compact ? "text-[9px]" : "text-[10px]";
+  const innerPx = compact ? "px-1" : "px-1.5";
+  const innerPb = compact ? "pb-1" : "pb-1.5";
 
   return (
-    <div className={`my-0.5 rounded-lg overflow-hidden border transition-colors duration-300 ${
+    <div className={`my-px rounded-md overflow-hidden border transition-colors duration-300 ${
       item.status === "error" && !item.recoverable ? "border-err/40" :
       item.status === "error" && item.recoverable ? "border-fg-faint/30" :
       item.status === "running" ? "border-accent/30 bg-accent/[0.02] shadow-[0_0_6px_var(--accent-soft)]" :
@@ -103,7 +99,7 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
           className={`shrink-0 ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-faint/60" : item.status === "running" ? "text-accent" : "text-fg-faint"}`}
           size={chevronSize + 2}
         />
-        <span className={`font-mono font-medium truncate ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[10.5px]" : "text-[11px]"}`}>
+        <span className={`font-mono font-medium truncate ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[9px]" : "text-[10px]"}`}>
           {item.name}
         </span>
         {subject && (
@@ -136,28 +132,15 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
 
           {hasArgs && (
             <div className={`${innerPx} ${innerPb}`}>
-              {item.args && <CodeViewer value={pretty(item.args)} language="json" maxHeight={100} />}
+              {item.args && <CodeViewer value={pretty(item.args)} language="json" maxHeight={60} />}
             </div>
           )}
-
           {hasOutput && (
-            <div
-              className="flex items-center gap-1 px-2 py-1 text-[10.5px] text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft border-t border-border-soft"
-              onClick={(e) => { e.stopPropagation(); setShowOutput((v) => !v); }}
-            >
-              {showOutput ? <EyeOff size={10} /> : <Eye size={10} />}
-              <span>
-                {showOutput ? "隐藏输出" : "显示输出"}
-                {outputLines > 0 && ` (${outputLines}L)`}
-              </span>
-            </div>
-          )}
-
-          {showOutput && hasOutput && (
             <div className={`${innerPx} ${innerPb}`}>
-              <CodeViewer value={item.output!} maxHeight={240} />
+              <div className="text-[9px] text-fg-faint/60 uppercase tracking-wider mb-0.5 select-none">输出 · {outputLines}L</div>
+              <CodeViewer value={item.output!} maxHeight={160} />
               {item.truncated && (
-                <div className="mt-1 px-2 py-0.5 border border-border-soft rounded bg-bg-soft text-fg-dim text-[10.5px]">
+                <div className="mt-1 px-2 py-0.5 border border-border-soft rounded bg-bg-soft text-fg-dim text-[10px]">
                   {t("tool.truncated")}
                 </div>
               )}

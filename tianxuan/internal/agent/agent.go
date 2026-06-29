@@ -257,7 +257,9 @@ type AgentRunner struct {
 	// memQueue, when non-nil, lets the remember/forget tools fold a turn-tail note
 	// about a just-made memory change into the next turn, so it applies this
 	// session without touching the cache-stable prefix. Set via SetMemoryQueue.
-	memQueue memory.Queue
+	memQueue     memory.Queue
+	sessionSaver memory.SessionSaver
+	promoter     memory.SessionFactPromoter
 
 	// archive, when non-nil, records session messages to persistent storage
 	// for cross-session Dream/Distill analysis (V7.0).
@@ -434,6 +436,11 @@ func (a *AgentRunner) SetAgentMode(mode string) {
 // memory change in the current session. The controller wires itself in.
 func (a *AgentRunner) SetMemoryQueue(q memory.Queue) { a.memQueue = q }
 
+// SetSessionSaver installs the sink the remember tool uses when session=true.
+func (a *AgentRunner) SetSessionSaver(s memory.SessionSaver) { a.sessionSaver = s }
+
+// SetPromoter installs the sink the promote_session_facts tool uses.
+func (a *AgentRunner) SetPromoter(p memory.SessionFactPromoter) { a.promoter = p }
 // SetArchive installs the session archive store for cross-session Dream/Distill.
 // nil disables archiving. V7.0.
 func (a *AgentRunner) SetLSPManager(m interface {
@@ -1011,4 +1018,3 @@ func (a *AgentRunner) finalReadinessCheck() (blocked bool, reason string) {
 func finalReadinessRetryMessage(reason string) string {
 	return "Host final-answer readiness check failed. Before giving a final answer, address the missing host-observable receipts: " + reason + ". Run the required tool calls, then answer when readiness is satisfied. If the blocked item needs user input, call the ask tool with concrete options and wait for its tool result; do not ask in prose."
 }
-

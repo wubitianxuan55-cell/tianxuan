@@ -1,5 +1,22 @@
 # Tianxuan 版本变更日志
 
+## V10.15.0 (2026-06-29) — 启动黑屏热修复
+
+### 🔥 关键修复：启动黑屏
+- react-virtuoso 在 WebView2 中与 React 18 不兼容，触发 error #321 导致黑屏
+- 回退到 DOM 原生滚动方案（@tanstack/react-virtual 保留为构建依赖）
+
+### 🧠 会话记忆升级
+- 新增 `promote_session_facts` 工具：临时会话记忆一键提升为永久存储
+- remember(session=true) 记忆跨轮次存活
+
+### 🎨 前端优化
+- JumpBar/MessageNavigator 解耦 threadEl DOM 引用
+- store.ts ensureAssistant 移除，流式 text/reasoning 事件优化
+- ToolCard 紧凑化（节省 30-40% 垂直空间）
+
+---
+
 ## V10.14.0 (2026-06-29) — 自我进化迭代
 
 ### 🧠 Reasonix 吸收

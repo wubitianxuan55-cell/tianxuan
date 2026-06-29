@@ -4,7 +4,6 @@ import type { Item } from "../lib/store";
 
 interface JumpBarProps {
   items: Item[];
-  threadEl?: HTMLElement | null;
   scrollToTurn?: (turn: number) => void;
 }
 
@@ -13,7 +12,7 @@ interface JumpBarProps {
  * 显示轮次编号。↑↓ 键盘导航，点击滚动到对应轮次。
  * 轮次超过 15 时容器可滚动，始终显示活跃轮次。
  */
-export function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
+export function JumpBar({ items, scrollToTurn }: JumpBarProps) {
   const [active, setActive] = useState<number | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
@@ -43,20 +42,8 @@ export function JumpBar({ items, threadEl, scrollToTurn }: JumpBarProps) {
 
   const scrollTo = useCallback((turn: number) => {
     setActive(turn);
-    if (scrollToTurn) {
-      scrollToTurn(turn);
-    } else if (threadEl) {
-      // Fallback: DOM querySelector. With virtual scrolling, only visible
-      // + overscan items exist in the DOM. For elements outside the viewport,
-      // estimate scroll position by turn number (120px ~ average item height).
-      const el = threadEl.querySelector(`[data-turn="${turn}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        threadEl.scrollTo({ top: turn * 120, behavior: "smooth" });
-      }
-    }
-  }, [threadEl, scrollToTurn]);
+    scrollToTurn?.(turn);
+  }, [scrollToTurn]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

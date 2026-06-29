@@ -100,7 +100,7 @@ func estimateTokens(s string) int {
 	if len(s) == 0 {
 		return 0
 	}
-	return len(s) / 4
+	return (len(s) + 3) / 4
 }
 
 // Format returns a compact human-readable representation of the diagnostics.

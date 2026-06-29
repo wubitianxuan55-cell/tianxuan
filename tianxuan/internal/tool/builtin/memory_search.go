@@ -25,7 +25,7 @@ type memorySearch struct{}
 func (memorySearch) Name() string { return "memory_search" }
 
 func (memorySearch) Description() string {
-	return "Search saved memories by keyword. Returns matching memory entries ranked by relevance. Use this to find prior context, user preferences, or project facts before answering — don't ask the user about something memory may already record."
+	return "Search saved memories by keyword. Returns matching memory entries ranked by relevance with preview descriptions. Use this to find prior context, user preferences, or project facts before answering — don't ask the user about something memory may already record."
 }
 
 func (memorySearch) Schema() json.RawMessage {
@@ -64,7 +64,7 @@ func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, er
 		return "No memories matched your query.", nil
 	}
 
-	// Return top 10 results.
+	// Return top 10 results with preview descriptions.
 	limit := len(matches)
 	if limit > 10 {
 		limit = 10
@@ -73,9 +73,12 @@ func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, er
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("Found %d matching memories:\n\n", len(matches)))
 	for i, m := range matches[:limit] {
-		// Score indicator: ████ for high relevance, ██ for medium, █ for low
 		bars := scoreBars(m.Score, len(p.Query))
-		fmt.Fprintf(&b, "%d. %s %s\n", i+1, bars, m.Name)
+		preview := m.Preview
+		if len(preview) > 160 {
+			preview = preview[:160] + "…"
+		}
+		fmt.Fprintf(&b, "%d. %s %s\n   %s\n", i+1, bars, m.Name, preview)
 	}
 	if len(matches) > limit {
 		fmt.Fprintf(&b, "\n... and %d more. Narrow your query for fewer results.\n", len(matches)-limit)

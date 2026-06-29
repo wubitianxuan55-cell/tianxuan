@@ -105,7 +105,6 @@ export default function App() {
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("files");
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
-  const [threadEl, setThreadEl] = useState<HTMLElement | null>(null);
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
@@ -562,8 +561,8 @@ export default function App() {
               <Skeleton />
             ) : (
               <>
-                <Transcript onPrompt={send} onRewind={rewind} running={state.running} onThreadEl={setThreadEl} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
-                {state.items.length > 1 && <JumpBar items={state.items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />}
+                <Transcript onPrompt={send} onRewind={rewind} running={state.running} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
+                {state.items.length > 1 && <JumpBar items={state.items} scrollToTurn={scrollToTurn ?? undefined} />}
               </>
             )}
             </CompactContext.Provider>
@@ -688,7 +687,7 @@ export default function App() {
               <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
             {rightTab === "messages" && (
-              <MessageNavigator items={state.items} threadEl={threadEl} scrollToTurn={scrollToTurn ?? undefined} />
+              <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />
             )}
           </div>
         </div>

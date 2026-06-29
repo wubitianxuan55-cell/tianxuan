@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import {
   Ban,
   Check,
@@ -32,7 +32,7 @@ function StatusGlyph({ status, recoverable }: { status: ToolItem["status"]; reco
   return <Check className="text-ok" size={12} />;
 }
 
-export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
+export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
   const t = useT();
   const compact = useCompact();
   const diffs = diffsFor(item.name, item.args);
@@ -161,4 +161,4 @@ export function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolIt
       </div>
     </div>
   );
-}
+});

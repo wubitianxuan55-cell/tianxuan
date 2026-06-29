@@ -31,21 +31,23 @@ func (rememberTool) Description() string {
 		"Do NOT save what the repo already records (code structure, git history) or facts that only matter to the current conversation; " +
 		"if asked to remember one of those, save instead the non-obvious point behind it. " +
 		"Before saving, check the loaded memory index for an entry that already covers this — reuse that name to update it rather than create a near-duplicate, and use `forget` to drop one that is now wrong. " +
-		"The saved index loads into context at the start of each session."
+		"The saved index loads into context at the start of each session. " +
+		"Set session=true to save tentatively — the fact is visible this session but not persisted to disk until you call promote_session_facts."
 }
 
 func (rememberTool) Schema() json.RawMessage {
 	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"name": {"type": "string", "description": "Short kebab-case slug identifying the fact, e.g. \"prefers-tabs\". Reusing a name overwrites that memory — do that to update an existing fact. Omit to derive one from the description."},
-			"title": {"type": "string", "description": "Short human-readable label shown in the memory index, e.g. \"Prefers tabs\". Omit to derive one from the name."},
-			"description": {"type": "string", "description": "One-line hook shown in the index — the phrase a future session reads to decide whether to open this memory. Make it specific."},
-			"type": {"type": "string", "enum": ["user", "feedback", "project", "reference"], "description": "Category of the fact."},
-			"body": {"type": "string", "description": "The fact itself (Markdown). For feedback/project, include a \"**Why:**\" line and a \"**How to apply:**\" line; link related memories with [[their-name]]."}
-		},
-		"required": ["description", "body"]
-	}`)
+"type": "object",
+"properties": {
+  "name": {"type": "string", "description": "Short kebab-case slug identifying the fact, e.g. \"prefers-tabs\". Reusing a name overwrites that memory — do that to update an existing fact. Omit to derive one from the description."},
+  "title": {"type": "string", "description": "Short human-readable label shown in the memory index, e.g. \"Prefers tabs\". Omit to derive one from the name."},
+  "description": {"type": "string", "description": "One-line hook shown in the index — the phrase a future session reads to decide whether to open this memory. Make it specific."},
+  "type": {"type": "string", "enum": ["user", "feedback", "project", "reference"], "description": "Category of the fact."},
+  "body": {"type": "string", "description": "The fact itself (Markdown). For feedback/project, include a \"**Why:**\" line and a \"**How to apply:**\" line; link related memories with [[their-name]]."},
+  "session": {"type": "boolean", "description": "If true, save to session-only memory (not permanent). Session facts persist across turns and are re-injected each turn. Use for tentative/temporary facts. Call promote_session_facts to finalize them."}
+},
+"required": ["description", "body"]
+}`)
 }
 
 func (t rememberTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
@@ -55,6 +57,7 @@ func (t rememberTool) Execute(ctx context.Context, args json.RawMessage) (string
 		Description string `json:"description"`
 		Type        string `json:"type"`
 		Body        string `json:"body"`
+		Session     bool   `json:"session"`
 	}
 	if err := json.Unmarshal(args, &in); err != nil {
 		return "", fmt.Errorf("invalid arguments: %w", err)
@@ -69,13 +72,29 @@ func (t rememberTool) Execute(ctx context.Context, args json.RawMessage) (string
 	if name == "" {
 		name = in.Description
 	}
-	path, err := t.store.Save(Memory{
+	m := Memory{
 		Name:        name,
 		Title:       in.Title,
 		Description: in.Description,
 		Type:        NormalizeType(in.Type),
 		Body:        in.Body,
-	})
+	}
+
+	// Session-only save: store in-memory, not to disk.
+	if in.Session {
+		ss, ok := SessionSaverFromContext(ctx)
+		if !ok {
+			return "", fmt.Errorf("session memory unavailable")
+		}
+		note := ss.SaveSession(m)
+		if q, ok := QueueFromContext(ctx); ok {
+			q.QueueMemory(note)
+		}
+		return fmt.Sprintf("Saved to session memory (\"%s\"). It applies this session. Call promote_session_facts to make it permanent.", slug(name)), nil
+	}
+
+	// Permanent save: write to disk.
+	path, err := t.store.Save(m)
 	if err != nil {
 		return "", err
 	}

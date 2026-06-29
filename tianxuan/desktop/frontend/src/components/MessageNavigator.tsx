@@ -5,7 +5,6 @@ import type { Item } from "../lib/store";
 
 interface Props {
   items: Item[];
-  threadEl?: HTMLElement | null;
   scrollToTurn?: (turn: number) => void;
 }
 
@@ -16,7 +15,7 @@ interface TurnEntry { turn: number; text: string; id: string; }
  * 列出所有用户消息，显示轮次编号 + 首行文字预览，
  * 点击/键盘导航后跳转到对话中对应轮次。
  */
-export function MessageNavigator({ items, threadEl, scrollToTurn }: Props) {
+export function MessageNavigator({ items, scrollToTurn }: Props) {
   const [active, setActive] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
@@ -48,20 +47,8 @@ export function MessageNavigator({ items, threadEl, scrollToTurn }: Props) {
   // ── 跳转到指定轮次 ──
   const scrollTo = useCallback((turn: number) => {
     setActive(turn);
-    if (scrollToTurn) {
-      scrollToTurn(turn);
-    } else if (threadEl) {
-      // Fallback: DOM querySelector. With virtual scrolling, only visible
-      // + overscan items exist in the DOM. For elements outside the viewport,
-      // estimate scroll position by turn number (120px ~ average item height).
-      const el = threadEl.querySelector('[data-turn="' + turn + '"]');
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        threadEl.scrollTo({ top: turn * 120, behavior: "smooth" });
-      }
-    }
-  }, [threadEl, scrollToTurn]);
+    scrollToTurn?.(turn);
+  }, [scrollToTurn]);
 
   // ── 键盘导航 ──
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

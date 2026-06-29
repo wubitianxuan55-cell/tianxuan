@@ -617,9 +617,12 @@ func estimateTextTokens(s string) int {
 	}
 	bytes := len(s)
 	runes := utf8.RuneCountInString(s)
+	// ASCII / European text: ~4 bytes per token
+	// CJK / multi-byte text: ~2 characters per token (BPE tokenizer)
 	byBytes := (bytes + 3) / 4
-	if runes > byBytes {
-		return runes
+	byRunes := (runes + 1) / 2
+	if byRunes > byBytes {
+		return byRunes
 	}
 	return byBytes
 }

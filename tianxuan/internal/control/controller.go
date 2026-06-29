@@ -131,6 +131,9 @@ type Controller struct {
 	// a fresh memory takes effect this session without busting the prompt cache;
 	// it joins the prefix naturally on the next session.
 	pendingMemory []string
+	// sessionFacts holds temporary memories the model saved with session=true.
+	// They persist across turns and can be promoted via PromoteSessionFacts().
+	sessionFacts []memory.Memory
 	// goal is set via /goal — the stopping condition for the session.
 	goal string
 }
@@ -227,11 +230,11 @@ func New(opts Options) *Controller {
 			}
 		})
 		c.executor.SetMemoryQueue(c)
+		c.executor.SetSessionSaver(c)
+		c.executor.SetPromoter(c)
 	}
 	return c
 }
-
-
 // rebindCheckpoints points the store at the (possibly new) session, loading any
 // checkpoints already on disk, and resets the turn boundaries. Called on
 // construction and whenever the session path changes (NewSession/Resume/SetSessionPath).

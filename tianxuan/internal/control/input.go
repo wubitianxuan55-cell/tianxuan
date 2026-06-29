@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"tianxuan/internal/skill"
@@ -37,6 +38,7 @@ func (c *Controller) Compose(text string) string {
 	mode := c.agentMode
 	notes := c.pendingMemory
 	c.pendingMemory = nil
+	sessionFacts := c.sessionFacts
 	// V3.0: profile is now in L2 RuntimeLayer via SetProject, no longer
 	// injected as turn-tail prefix. Keep this block for backward compat
 	// when ctxMgr is not wired.
@@ -72,6 +74,20 @@ func (c *Controller) Compose(text string) string {
 			b.WriteString("- " + n + "\n")
 		}
 		b.WriteString("</memory-update>\n\n")
+		text = b.String() + text
+	}
+
+	// Session facts — temporary memories saved with session=true. These persist
+	// across turns and are re-injected each turn. The model can also call
+	// memory_search to find them (they're in the session, not on disk).
+	if len(sessionFacts) > 0 {
+		var b strings.Builder
+		b.WriteString("<session-facts>\n")
+		b.WriteString("You saved these temporary facts this session (call promote_session_facts to make them permanent):\n")
+		for _, f := range sessionFacts {
+			fmt.Fprintf(&b, "- [%s] %s: %s\n", f.Name, f.Title, f.Description)
+		}
+		b.WriteString("</session-facts>\n\n")
 		text = b.String() + text
 	}
 

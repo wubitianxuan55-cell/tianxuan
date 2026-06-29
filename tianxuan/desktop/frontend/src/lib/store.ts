@@ -40,12 +40,6 @@ type Action =
   | { type: "tcca"; report: TCCAReport }
   | { type: "history"; messages: HistoryMessage[] } | { type: "clearApproval" } | { type: "clearAsk" } | { type: "reset" };
 
-function ensureAssistant(s: ControllerState): { items: Item[]; id: string; seq: number } {
-  if (s.currentAssistant && s.items.some(it => it.id === s.currentAssistant && it.kind === "assistant"))
-    return { items: s.items, id: s.currentAssistant, seq: s.seq };
-  const id = `a${s.seq}`;
-  return { items: [...s.items, { kind: "assistant", id, text: "", reasoning: "", streaming: true }], id, seq: s.seq + 1 };
-}
 
 function flushPendingUser(s: ControllerState): ControllerState {
   if (s.pendingUser === undefined) return s;
@@ -64,17 +58,24 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
   switch (e.kind) {
     case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, turnSteps: [] };
     case "text": case "reasoning": {
-      const { items, id, seq } = ensureAssistant(s);
+      // 反向查找最后一个 assistant 项追加文本——与 message 事件一致。
+      // 避免 tool_dispatch 清空 currentAssistant 后创建新卡片。
       const delta = e.text ?? e.reasoning ?? "";
-      // 直接索引更新：ensureAssistant 保证最后一项就是目标 assistant
-      // 原 items.map() 每次 O(n) 遍历全数组 → 现 O(1) 直接定位
-      const idx = items.length - 1;
-      const it = items[idx] as Extract<Item, { kind: "assistant" }>;
-      const next = [...items];
-      next[idx] = e.kind === "text"
-        ? { ...it, text: it.text + delta }
-        : { ...it, reasoning: it.reasoning + delta };
-      return { ...s, items: next, currentAssistant: id, seq };
+      let idx = -1;
+      for (let i = s.items.length - 1; i >= 0; i--) {
+        if (s.items[i].kind === "assistant") { idx = i; break; }
+      }
+      if (idx >= 0) {
+        const it = s.items[idx] as Extract<Item, { kind: "assistant" }>;
+        const next = [...s.items];
+        next[idx] = e.kind === "text"
+          ? { ...it, text: it.text + delta, streaming: true }
+          : { ...it, reasoning: it.reasoning + delta, streaming: true };
+        return { ...s, items: next, currentAssistant: it.id };
+      }
+      // 没有 assistant 项时才创建新的
+      const id = `a${s.seq}`;
+      return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.kind === "text" ? delta : "", reasoning: e.kind === "reasoning" ? delta : "", streaming: true }], currentAssistant: id };
     }
     case "message": {
       // 始终更新最后一个 assistant，不创建新的。

@@ -21,3 +21,23 @@ func QueueFromContext(ctx context.Context) (Queue, bool) {
 	q, ok := ctx.Value(queueKey{}).(Queue)
 	return q, ok && q != nil
 }
+
+// SessionSaver is an optional interface for saving a fact to session-only memory
+// (not written to disk). The controller implements this and stamps it on the
+// agent context; the remember tool uses it when session=true.
+type SessionSaver interface {
+	SaveSession(m Memory) string // returns a human-readable note
+}
+
+type sessionKey struct{}
+
+// WithSessionSaver stamps s onto ctx.
+func WithSessionSaver(ctx context.Context, s SessionSaver) context.Context {
+	return context.WithValue(ctx, sessionKey{}, s)
+}
+
+// SessionSaverFromContext returns the session saver, if any.
+func SessionSaverFromContext(ctx context.Context) (SessionSaver, bool) {
+	s, ok := ctx.Value(sessionKey{}).(SessionSaver)
+	return s, ok && s != nil
+}

@@ -146,11 +146,15 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	if a.memQueue != nil {
 		cctx = memory.WithQueue(cctx, a.memQueue)
 	}
-	start := time.Now()
-	// V10.12: if the tool implements ContextualTool, pass rich session context
-	// alongside the standard context — borrowed from opencode's ToolContext pattern.
+	if a.sessionSaver != nil {
+		cctx = memory.WithSessionSaver(cctx, a.sessionSaver)
+	}
+	if a.promoter != nil {
+		cctx = memory.WithPromoter(cctx, a.promoter)
+	}
 	var result string
 	var err error
+	start := time.Now()
 	if ct, ok := t.(tool.ContextualTool); ok {
 		tc := tool.ToolContext{
 			SessionID:  a.sessionID,

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { ChevronRight, FolderOpen } from "lucide-react";
 import { ToolCard } from "./ToolCard";
 import { useCompact } from "../hooks/useCompact";
@@ -9,7 +9,7 @@ import type { Item } from "../lib/store";
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
 // ToolGroup collapses consecutive same-name tool calls into a single row.
-export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse?: () => void }) {
+export const ToolGroup = memo(function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse?: () => void }) {
   const [open, setOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   useGSAPCollapse(contentRef, open);
@@ -59,7 +59,7 @@ export function ToolGroup({ tools, onCollapse }: { tools: ToolItem[]; onCollapse
       </div>
     </div>
   );
-}
+});
 
 // scanGroups walks items and replaces runs of ≥2 consecutive same-name tools
 // with a single synthetic "group" marker.

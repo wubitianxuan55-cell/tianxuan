@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"tianxuan/internal/memory"
+	"tianxuan/internal/tool/builtin"
 )
 
 // --- memory ---
@@ -129,10 +130,68 @@ func (c *Controller) Memory() *memory.Set {
 }
 
 // refreshMemoryLocked re-discovers memory from disk so a later Memory() reflects
-// a just-applied write. Caller holds c.mu.
+// a just-applied write, and updates the search index so memory_search finds the
+// change immediately. Caller holds c.mu.
 func (c *Controller) refreshMemoryLocked() {
 	if c.mem == nil {
 		return
 	}
 	c.mem = memory.Load(memory.Options{CWD: c.mem.CWD, UserDir: c.mem.UserDir})
+	builtin.SetMemorySearchIndex(c.mem.Search)
+}
+
+// SessionRemember saves a fact to session-only memory (not written to disk).
+// Session facts persist across turns within the session, are injected into
+// every turn's context, and can be promoted to permanent storage later.
+func (c *Controller) SessionRemember(m memory.Memory) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sessionFacts = append(c.sessionFacts, m)
+}
+
+// PromoteSessionFacts saves all current session facts to permanent storage.
+// Each fact is deduplicated against existing permanent memories by name:
+// if a permanent memory with the same name exists, it is updated; otherwise
+// a new permanent memory is created. After promotion, session facts are cleared.
+// Returns the number of facts promoted.
+func (c *Controller) PromoteSessionFacts() (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil || len(c.sessionFacts) == 0 {
+		return 0, nil
+	}
+	n := 0
+	for _, m := range c.sessionFacts {
+		if _, err := c.mem.Store.Save(m); err != nil {
+			return n, fmt.Errorf("promoting %q: %w", m.Name, err)
+		}
+		n++
+	}
+	c.sessionFacts = nil
+	c.refreshMemoryLocked()
+	return n, nil
+}
+
+// SessionFacts returns the current session-only facts (for the memory panel).
+func (c *Controller) SessionFacts() []memory.Memory {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]memory.Memory, len(c.sessionFacts))
+	copy(out, c.sessionFacts)
+	return out
+}
+
+// SaveSession implements memory.SessionSaver. The remember tool calls this
+// when session=true to save a fact to session-only memory (not on disk).
+func (c *Controller) SaveSession(m memory.Memory) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sessionFacts = append(c.sessionFacts, m)
+	return "Saved to session memory (\"" + slugifyName(m.Name) + "\"): " + m.Description
+}
+
+func slugifyName(name string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	s = strings.NewReplacer(" ", "-", "_", "-", ".", "-").Replace(s)
+	return s
 }

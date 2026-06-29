@@ -1,7 +1,14 @@
 ---
 name: v10-14-project-baseline
 title: V10.14.0 项目基准
-description: V10.14.0 项目基准 — 当前版本、构建命令、核心变更
+description: V10.14.0 项目基准 — 旧版本（已归档，当前 V10.15.0）
+metadata:
+  type: project
+---
+
+# V10.14.0 项目基准（已归档）
+
+> **当前版本**: V10.15.0 — 参见 [[v10-15-project-baseline]]
 metadata:
   type: project
 ---

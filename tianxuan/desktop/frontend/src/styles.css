@@ -1101,6 +1101,8 @@ body {
   /* GPU compositor layer: avoids full layout on streaming text growth */
   transform: translateZ(0);
   will-change: transform;
+  /* 防止流式文本增长时触发父级重排 */
+  contain: layout style;
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-shiny-text { animation: none; }

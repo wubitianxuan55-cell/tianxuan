@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Item } from "../lib/store";
+import { useItems } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
@@ -63,10 +64,9 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
 }
 
 export function Transcript({
-  items, onPrompt, onRewind, running, onThreadEl, onScrollToTurnReady,
+  onPrompt, onRewind, running, onThreadEl, onScrollToTurnReady,
   cwd, cwdName, sessions, onResumeSession, meta,
 }: {
-  items: Item[];
   onPrompt: (text: string) => void;
   onRewind?: (turn: number, scope: string) => void;
   running: boolean;
@@ -78,6 +78,7 @@ export function Transcript({
   onResumeSession?: (path: string) => Promise<void>;
   meta?: import("../lib/types").Meta;
 }) {
+  const items = useItems();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const resizeFrame = useRef<number | null>(null);

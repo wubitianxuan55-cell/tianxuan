@@ -45,15 +45,16 @@ func newStreamBatcher(sink event.Sink) *streamBatcher {
 	}
 }
 
-// addText queues a text chunk. If the buffer exceeds maxBytes or the oldest
-// queued chunk is older than maxDelay, emits a batched Text event.
+// addText queues a text chunk. If the buffer exceeds maxBytes, the oldest
+// queued chunk is older than maxDelay, or the chunk contains a newline
+// (natural visual break), emits a batched Text event immediately.
 func (b *streamBatcher) addText(s string) {
 	now := time.Now()
 	if b.textBuf.Len() == 0 {
 		b.textLast = now
 	}
 	b.textBuf.WriteString(s)
-	if b.textBuf.Len() >= b.maxBytes || now.Sub(b.textLast) >= b.maxDelay {
+	if b.textBuf.Len() >= b.maxBytes || now.Sub(b.textLast) >= b.maxDelay || strings.Contains(s, "\n") {
 		b.flushText()
 	}
 }

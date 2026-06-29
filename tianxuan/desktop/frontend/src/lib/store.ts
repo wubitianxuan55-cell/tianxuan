@@ -186,7 +186,14 @@ export function useController() {
 
   useEffect(() => {
     const off = onEvent((e) => {
-      dispatch({ type: "event", e });
+      // 流式 text/reasoning 事件绕过 React 18 自动批处理，确保每个 chunk 即时渲染。
+      // 原理：用 setTimeout(0) 将 dispatch 推迟到下一宏任务，每个事件独立渲染帧，
+      // 避免 React 将多个连续 chunk 合并到一个渲染周期导致"一段一段蹦出来"。
+      if (e.kind === "text" || e.kind === "reasoning") {
+        setTimeout(() => dispatch({ type: "event", e }), 0);
+      } else {
+        dispatch({ type: "event", e });
+      }
       if (e.kind === "turn_done") {
         app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {});
         app.Balance().then(b => dispatch({ type: "balance", balance: b })).catch(() => {});
@@ -247,4 +254,13 @@ export function useController() {
   const rewind = useCallback(async (turn: number, scope: string) => { if (scope === "fork") await app.Fork(turn).catch(() => {}); else if (scope === "summ-from") await app.SummarizeFrom(turn).catch(() => {}); else if (scope === "summ-upto") await app.SummarizeUpTo(turn).catch(() => {}); else await app.Rewind(turn, scope).catch(() => {}); const ms = await app.History().catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
 
   return { state, send, cancel, approve, answerQuestion, setPlan, setBypass, setAgentMode, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc, updateFact };
+}
+
+// useItems 订阅 items 数组，与 useController 分离。
+// 流式输出时 items 高频变化（每次 text/reasoning 事件），通过独立 hook 避免
+// useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
+// 使用 useShallow 做浅比较：仅当 items 长度或元素引用变化时才触发重渲染，
+// 非 items 字段（meta/context/balance 等）的变化不会影响此 hook。
+export function useItems(): Item[] {
+  return useStore(s => s.items);
 }

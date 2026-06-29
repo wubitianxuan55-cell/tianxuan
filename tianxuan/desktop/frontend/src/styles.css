@@ -967,34 +967,6 @@ body {
   }
 }
 
-/* ── reasoning (思考过程) ────────────────────────────────────────────────── */
-.reasoning__head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  font-size: 11px;
-  color: var(--fg-faint);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  transition: color var(--dur-fast);
-  user-select: none;
-}
-.reasoning__head:hover {
-  color: var(--fg-dim);
-}
-.reasoning__head[data-running] {
-  color: var(--accent);
-}
-.reasoning__chevron {
-  flex-shrink: 0;
-  transition: transform var(--dur-fast);
-}
-.reasoning__chevron--open {
-  transform: rotate(90deg);
-}
-
 /* ── message entrance ───────────────────────────────────────────────────── */
 @keyframes anim-fade-in {
   to { opacity: 1; }

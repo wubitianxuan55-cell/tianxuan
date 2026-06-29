@@ -79,31 +79,31 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
   const reasoningTruncated = item.reasoning && reasoningDisplay !== item.reasoning;
 
   return (
-    <div className={`relative ${compact ? "py-0.5" : "py-1"} ${thinkOnly ? "bg-bg-soft rounded-md px-3 py-2" : ""}`}>
+    <div className={`relative ${compact ? "py-0.5" : "py-1"} ${thinkOnly ? "bg-bg-soft rounded-md px-2.5 py-1.5" : ""}`}>
       {item.reasoning && (
-        <div className="mb-1">
+        <div className="mb-0.5">
           <button
             type="button"
-            className="flex items-center gap-1.5 text-fg-faint text-[11px] font-medium bg-transparent border-0 cursor-pointer py-0.5 hover:text-fg-dim select-none"
+            className="flex items-center gap-1 text-fg-faint text-[10.5px] font-medium bg-transparent border-0 cursor-pointer py-0.5 hover:text-fg-dim select-none"
             data-running={reasoningRunning ? "" : undefined}
             onClick={toggleReasoning}
             aria-expanded={reasoningOpen}
           >
             <ChevronRight
               className={`shrink-0 transition-transform duration-200 ${reasoningOpen ? "rotate-90" : ""}`}
-              size={12}
+              size={11}
             />
             <span>{t("msg.thinking")}</span>
-            <span className="text-fg-faint/50">
+            <span className="text-fg-faint/40">
               {reasoningRunning
                 ? reasoningTruncated
-                  ? `…${reasoningDisplay.length} 字符`
+                  ? `…${reasoningDisplay.length}c`
                   : t("msg.thinkingRunning") ?? "…"
-                : `${reasoningLines} 段`}
+                : `${reasoningLines}s`}
             </span>
           </button>
           <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
-            <div className={`pl-3 ml-1 border-l-2 border-accent/30 bg-accent/[0.03] rounded-sm text-fg-dim/80 text-xs leading-relaxed whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[300px] py-1" : "max-h-[500px] py-1.5"}`}>
+            <div className={`pl-2 ml-0.5 border-l border-accent/20 rounded-sm text-fg-dim/70 text-[11px] leading-snug whitespace-pre-wrap overflow-y-auto ${compact ? "max-h-[200px] py-0.5" : "max-h-[350px] py-1"}`}>
               {reasoningDisplay}
             </div>
           </div>

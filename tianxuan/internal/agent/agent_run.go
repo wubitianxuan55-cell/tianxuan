@@ -83,7 +83,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		a.steerCount = 0 // V8.0 P0-3: reset steer counter each turn
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
-	// V5.13: ���ò������籩��·������ turn = ����ͼ��
+	a.repeatSuccessCounts = nil // V10.13: 每轮重置成功循环计数
+	// V5.13: 重置参数风暴断路器——每个 turn 独立统计
 	if a.paramStorm != nil {
 		a.paramStorm.Reset()
 	}
@@ -251,6 +252,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		// V4.2: wait for stream() pre-execution goroutines to finish before
 		// dispatching the full batch — avoids races and double-execution.
 		emptyFinalBlocks = 0 // V10.0: reset empty-final counter when model calls tools successfully
+		// V10.13: Grace Round 守卫 — grace 轮次中模型仍调用工具则退出。
+		// 移植自 Reasonix，防止 MaxSteps 限制下无限循环。
+		if graceRound {
+			return fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
+		}
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
 		// V8.0 P0-2: deterministic pruning — skip duplicate tool results.

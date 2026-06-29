@@ -152,5 +152,12 @@ func (a *AgentRunner) readFileForPrecheck(path string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return string(b), true
+	content := string(b)
+	// Populate the tool cache so the subsequent Execute() call (edit_file,
+	// multi_edit, etc.) reuses this read instead of hitting the disk again.
+	// V10.13: 消除 precheck→execute 的重复文件 I/O，对大文件效果显著。
+	if a.tc != nil {
+		a.tc.set(path, 0, content)
+	}
+	return content, true
 }

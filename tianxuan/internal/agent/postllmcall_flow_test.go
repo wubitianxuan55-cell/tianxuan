@@ -48,8 +48,10 @@ func TestPostLLMCallAbsentStreamsReasoningLive(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if len(reasoningEvents) != 2 {
-		t.Fatalf("want 2 live reasoning events (one per chunk), got %d: %v", len(reasoningEvents), reasoningEvents)
+	// V10.13: batcher maxBytes 8→32 后，相邻 reasoning chunk 可能被合并。
+	// 因此接受 1 或 2 个事件，但内容必须完整。
+	if len(reasoningEvents) < 1 || len(reasoningEvents) > 2 {
+		t.Fatalf("want 1-2 live reasoning events, got %d: %v", len(reasoningEvents), reasoningEvents)
 	}
 	if joined := strings.Join(reasoningEvents, ""); joined != "think A think B" {
 		t.Fatalf("streamed reasoning = %q, want the full chain", joined)

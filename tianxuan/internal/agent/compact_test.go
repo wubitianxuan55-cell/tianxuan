@@ -68,7 +68,8 @@ func TestMaybeCompact_NilUsage_LowPrompt_NoOp(t *testing.T) {
 func TestMaybeCompact_WithUsage_StillWorks(t *testing.T) {
 	a := testAgentC(3000, 0.8, 3)
 	s := NewSession("system prompt")
-	for i := 0; i < 20; i++ {
+	// V10.13: 增加到 40 对消息，确保超过 minRecentTokens=2000 的 tail 预算
+	for i := 0; i < 40; i++ {
 		s.Add(provider.Message{Role: provider.RoleUser, Content: "build feature " + strings.Repeat("a", 150)})
 		s.Add(provider.Message{Role: provider.RoleAssistant, Content: "implementing " + strings.Repeat("b", 200)})
 	}

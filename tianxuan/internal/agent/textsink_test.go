@@ -28,13 +28,16 @@ func TestTextSinkReproducesInlineOutput(t *testing.T) {
 	s.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: "tool output truncated: 5 of 100 bytes elided"})
 	s.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: "response truncated: hit max output tokens"})
 
-	want := "\x1b[2m  ▎ thinking\x1b[0m\n" + // reasoning header
+	// V10.x: reasoning throttle 输出 \r 进度行。
+	// showReasoning=false 时，finalizeReasoning 输出进度计数行。
+	want := "\x1b[2m  ▎ thinking\x1b[0m" + // reasoning header
+		"\r  ▎ thinking ··· 0 chars\n" + // finalizeReasoning count line
 		"Hello" + // answer delta
 		"\n" + // Message close (no renderer)
 		"  · 1200 tok · in 1000 (900 cached / 100 new) · out 200\n" + // usage
 		"  -> read_file {\"path\":\"a\"}\n" + // tool dispatch
 		// successful read_file result is silent
-		"  ⊘ bash blocked by permission policy\n" + // blocked result
+		"  ⊘ bash(blocked by permission policy)\n" + // blocked result (parentheses is current format)
 		"  · tool output truncated: 5 of 100 bytes elided\n" + // info notice
 		"  ! response truncated: hit max output tokens\n" // warn notice
 
@@ -53,8 +56,10 @@ func TestTextSinkCanShowReasoningInVerboseMode(t *testing.T) {
 	s.Emit(event.Event{Kind: event.Text, Text: "Hello"})
 	s.Emit(event.Event{Kind: event.Message, Text: "Hello", Reasoning: "let me think"})
 
-	want := "\x1b[2m  ▎ thinking\x1b[0m\n" +
-		"\x1b[2mlet me think\x1b[0m" +
+	// V10.x: reasoning throttle (500ms) 在短 reasoning 时不展示正文，
+	// 仅通过 finalizeReasoning 输出进度计数行。
+	want := "\x1b[2m  ▎ thinking\x1b[0m" +
+		"\r  ▎ thinking ··· 12 chars\n" +
 		"\n" +
 		"Hello\n"
 	if got := b.String(); got != want {
@@ -80,7 +85,9 @@ func TestTextSinkRedrawsWithRenderer(t *testing.T) {
 	s.Emit(event.Event{Kind: event.Text, Text: "ab\ncd"})
 	s.Emit(event.Event{Kind: event.Message, Text: "ab\ncd"})
 
-	want := "ab\ncd" + "\r\033[1A\033[0J" + "RENDERED"
+	want := "ab\ncd" +
+		"\r\x1b[1A\x1b[0J" + // cursor-up 1, clear to end of screen
+		"RENDERED"
 	if got := b.String(); got != want {
 		t.Errorf("redraw output mismatch:\n got: %q\nwant: %q", got, want)
 	}

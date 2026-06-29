@@ -18,6 +18,8 @@ func TestTextSinkSkipsPartialDispatch(t *testing.T) {
 	s.Emit(event.Event{Kind: event.TurnStarted})
 	s.Emit(event.Event{Kind: event.ToolDispatch, Tool: event.Tool{ID: "c1", Name: "read_file", Partial: true}})
 	s.Emit(event.Event{Kind: event.ToolDispatch, Tool: event.Tool{ID: "c1", Name: "read_file", Args: `{"path":"a"}`}})
+	// V10.x: 工具 dispatch 使用批处理，需要后续事件触发 flush。
+	s.Emit(event.Event{Kind: event.Text, Text: "x"})
 
 	got := b.String()
 	if n := strings.Count(got, "-> read_file"); n != 1 {

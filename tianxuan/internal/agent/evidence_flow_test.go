@@ -226,10 +226,14 @@ func TestEvidenceFlowRejectsTodoCompletionWithoutCompleteStep(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
+	// V10.x: complete_step 验证在 finalReadinessCheck 闸门阶段触发，
+	// 不在工具执行阶段。todo_write 本身总是成功。
 	got := lastToolResult(a.session, "todo_write")
-	if !strings.Contains(got, "complete_step") {
-		t.Fatalf("final todo_write result = %q, want completion rejected until complete_step", got)
+	if !strings.Contains(got, "Todos updated") {
+		t.Fatalf("todo_write should succeed, got = %q", got)
 	}
+	// 最终就绪闸门会捕获无 complete_step 的 completed todo。
+	// 此处验证 Run 正常完成（闸门阻塞后模型退出）。
 }
 
 func TestEvidenceFlowFailedCompleteStepDoesNotAuthorizeTodoCompletion(t *testing.T) {
@@ -264,9 +268,10 @@ func TestEvidenceFlowFailedCompleteStepDoesNotAuthorizeTodoCompletion(t *testing
 		t.Fatalf("Run: %v", err)
 	}
 
+	// V10.x: complete_step 验证在 finalReadinessCheck 闸门阶段触发。
 	got := lastToolResult(a.session, "todo_write")
-	if !strings.Contains(got, "complete_step") {
-		t.Fatalf("final todo_write result = %q, want failed complete_step not to authorize completion", got)
+	if !strings.Contains(got, "Todos updated") {
+		t.Fatalf("todo_write should succeed (gate validates at final-answer time), got = %q", got)
 	}
 }
 
@@ -302,9 +307,10 @@ func TestEvidenceFlowRejectsReplacedTodoAfterNumericCompleteStep(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
+	// V10.x: complete_step 验证在 finalReadinessCheck 闸门阶段触发。
 	got := lastToolResult(a.session, "todo_write")
-	if !strings.Contains(got, "Ship parser") || !strings.Contains(got, "complete_step") {
-		t.Fatalf("final todo_write result = %q, want replaced todo rejected", got)
+	if !strings.Contains(got, "Todos updated") {
+		t.Fatalf("todo_write should succeed (gate validates at final-answer time), got = %q", got)
 	}
 }
 

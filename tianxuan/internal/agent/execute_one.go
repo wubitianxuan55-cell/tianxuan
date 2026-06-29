@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,17 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 	}
 
+	// V10.13: 成功循环检测 — 移植自 Reasonix repeatedSuccessBlock。
+	// 写工具在同一用户轮次中重复成功 ≥2 次即阻止，防止模型无意义循环。
+	if out, blocked := a.repeatedSuccessBlock(call, t); blocked {
+		return toolOutcome{
+			output:  out,
+			blocked: true,
+			errMsg:  "blocked by loop guard",
+		}
+	}
+
+	// Centralised pre-execution checks via the ToolDispatcher (production path).
 	// Centralised pre-execution checks via the ToolDispatcher (production path).
 	// When dispatcher is nil (test/benchmark paths), gate/hooks/planMode are
 	// checked inline — preserving backward compatibility with existing tests.
@@ -210,9 +222,21 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		// command failed) — the model can fix them on the next turn. Errors from
 		// unknown-tool / blocked / panic are NOT recoverable.
 		recoverable := true
-		env := tool.WrapError(tool.CodeExecError, firstLine(err.Error()), map[string]any{"tool": call.Name, "detail": strings.TrimSpace(result)})
+		detail := strings.TrimSpace(result)
+		// V10.13: 参数非法 JSON 时附带工具 schema，帮助模型一次修正。
+		// 移植自 Reasonix malformed-args schema echo。
+		if !json.Valid([]byte(call.Arguments)) {
+			detail = strings.TrimRight(detail, "\n") + "\nThe arguments were not valid JSON. Re-emit them exactly per this schema:\n" + string(t.Schema())
+		}
+		env := tool.WrapError(tool.CodeExecError, firstLine(err.Error()), map[string]any{"tool": call.Name, "detail": detail})
 		body, truncMsg := truncateToolOutput(env)
 		return toolOutcome{output: body, errMsg: firstLine(err.Error()), recoverable: recoverable, truncated: truncMsg != "", truncMsg: truncMsg}
+	}
+	// V10.13: 记录成功签名用于循环检测
+	a.recordRepeatSuccess(call, t)
+	// A foreground `task` sub-agent just finished — its result is the final answer.
+	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
+		a.hooks.SubagentStop(ctx, result)
 	}
 	// A foreground `task` sub-agent just finished — its result is the final answer.
 	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
@@ -232,9 +256,152 @@ func isBackgroundTaskCall(args string) bool {
 	_ = json.Unmarshal([]byte(args), &p)
 	return p.RunInBackground
 }
-
 // toolReadOnly reports a tool's ReadOnly classification by name.
 func (a *AgentRunner) toolReadOnly(name string) bool {
 	t, ok := a.tools.Get(name)
 	return ok && t.ReadOnly()
+}
+
+// ── V10.13: 成功循环检测 — 移植自 Reasonix ──────────────────────────
+
+// repeatSuccessBreakThreshold 是同一写工具签名允许成功的次数。
+// 2 次给模型自我修正的空间；第 3 次通常是空转/写循环，应阻止。
+const repeatSuccessBreakThreshold = 2
+
+// repeatedSuccessBlock 检测写工具是否在同轮中重复成功过多次。
+// 命中时返回阻止消息，防止模型无意义循环消耗 token。
+func (a *AgentRunner) repeatedSuccessBlock(call provider.ToolCall, t tool.Tool) (string, bool) {
+	sig, ok := repeatSuccessSignature(call, t)
+	if !ok || a.repeatSuccessCounts == nil {
+		return "", false
+	}
+	count := a.repeatSuccessCounts[sig]
+	if count < repeatSuccessBreakThreshold {
+		return "", false
+	}
+	return fmt.Sprintf(
+		"blocked: [loop guard] %q has already succeeded %d times with the same write-like arguments in this user turn. Re-running it is unlikely to help and may burn tokens or repeat file writes. Change approach: use edit_file or multi_edit for file changes, verify with a read/test command, or explain the blocker in your final answer.",
+		call.Name, count), true
+}
+
+// recordRepeatSuccess 记录一次成功的写工具调用，用于循环检测。
+func (a *AgentRunner) recordRepeatSuccess(call provider.ToolCall, t tool.Tool) {
+	sig, ok := repeatSuccessSignature(call, t)
+	if !ok {
+		return
+	}
+	if a.repeatSuccessCounts == nil {
+		a.repeatSuccessCounts = make(map[string]int)
+	}
+	a.repeatSuccessCounts[sig]++
+}
+
+// repeatSuccessSignature 为写工具调用计算可比较的签名。
+// 只读工具不参与（不会修改文件状态）；仅对写文件工具和写入型 bash 签名。
+func repeatSuccessSignature(call provider.ToolCall, t tool.Tool) (string, bool) {
+	if t.ReadOnly() {
+		return "", false
+	}
+	switch call.Name {
+	case "write_file", "edit_file", "multi_edit", "delete_range", "delete_symbol":
+		return call.Name + "\x00" + canonicalToolArgs(call.Arguments), true
+	case "bash":
+		var p struct {
+			Command         string `json:"command"`
+			RunInBackground bool   `json:"run_in_background"`
+		}
+		if err := json.Unmarshal([]byte(call.Arguments), &p); err != nil {
+			return "", false
+		}
+		if p.RunInBackground || !isShellFileWriteCommand(p.Command) {
+			return "", false
+		}
+		return "bash\x00" + normalizeShellCommand(p.Command), true
+	default:
+		return "", false
+	}
+}
+
+// canonicalToolArgs 将 JSON 参数规范化为紧凑可比较形式。
+func canonicalToolArgs(raw string) string {
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		return strings.TrimSpace(raw)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return strings.TrimSpace(raw)
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, b); err != nil {
+		return string(b)
+	}
+	return compact.String()
+}
+
+// normalizeShellCommand 规范化 shell 命令（合并空白）。
+func normalizeShellCommand(command string) string {
+	return strings.Join(strings.Fields(command), " ")
+}
+
+// isShellFileWriteCommand 判断 shell 命令是否会写入文件。
+func isShellFileWriteCommand(command string) bool {
+	lower := strings.ToLower(command)
+	switch {
+	case shellPythonOpenWrites(lower):
+		return true
+	case strings.Contains(lower, "set-content") || strings.Contains(lower, "add-content") || strings.Contains(lower, "out-file"):
+		return true
+	case strings.Contains(lower, "sed -i") || strings.Contains(lower, "perl -pi"):
+		return true
+	case hasShellWriteRedirect(command):
+		return true
+	default:
+		return false
+	}
+}
+
+// shellPythonOpenWrites 检测 Python open() 调用是否以写模式打开文件。
+func shellPythonOpenWrites(lower string) bool {
+	if !strings.Contains(lower, "open(") {
+		return false
+	}
+	if strings.Contains(lower, ".write(") {
+		return true
+	}
+	for _, marker := range []string{", 'w", `, "w`, ", 'a", `, "a`, ", 'x", `, "x`, "mode='w", `mode="w`, "mode='a", `mode="a`, "mode='x", `mode="x`} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasShellWriteRedirect 检测 shell 命令是否包含写重定向（> 非 2>）。
+func hasShellWriteRedirect(command string) bool {
+	var quote rune
+	var prev rune
+	for _, r := range command {
+		if quote != 0 {
+			if r == quote {
+				quote = 0
+			}
+			prev = r
+			continue
+		}
+		if r == '\'' || r == '"' {
+			quote = r
+			prev = r
+			continue
+		}
+		if r == '>' {
+			if prev == '2' {
+				prev = r
+				continue
+			}
+			return true
+		}
+		prev = r
+	}
+	return false
 }

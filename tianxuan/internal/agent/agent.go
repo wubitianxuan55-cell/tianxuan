@@ -181,6 +181,10 @@ type AgentRunner struct {
 	steerCount   int    // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
 	dedupHashes  map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
 
+	// V10.13: 成功循环检测 — 移植自 Reasonix repeatedSuccessBlock。
+	// 检测写工具在同一用户轮次中重复成功调用，阈值 2 次后阻止。
+	repeatSuccessCounts map[string]int
+
 	// V6.0: 回忆提醒开关（recall_reminder.go）
 	recallReminderFired bool
 

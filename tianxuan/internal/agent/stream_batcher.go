@@ -40,7 +40,7 @@ type streamBatcher struct {
 func newStreamBatcher(sink event.Sink) *streamBatcher {
 	return &streamBatcher{
 		sink:     sink,
-		maxBytes: 8,
+		maxBytes: 32,
 		maxDelay: 4 * time.Millisecond,
 	}
 }

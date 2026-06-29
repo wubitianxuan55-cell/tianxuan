@@ -14,11 +14,13 @@ func TestSessionRouteFeatures_IsComplex(t *testing.T) {
 		expected bool
 	}{
 		{"empty session", SessionRouteFeatures{}, false},
-		{"low counts", SessionRouteFeatures{TurnCount: 5, RecentErrors: 1, PendingTodos: 2, FilesModified: 3}, false},
+		{"low counts", SessionRouteFeatures{TurnCount: 4, RecentErrors: 1, PendingTodos: 2, FilesModified: 3}, false},
 
-		// Individual threshold triggers
-		{"turn count > 10", SessionRouteFeatures{TurnCount: 11}, true},
-		{"turn count == 10 not triggered", SessionRouteFeatures{TurnCount: 10}, false},
+		// Individual threshold triggers (V10.12: TurnCount lowered 10->5)
+		{"turn count > 5", SessionRouteFeatures{TurnCount: 6}, true},
+		{"turn count == 5 not triggered", SessionRouteFeatures{TurnCount: 5}, false},
+		{"has written files", SessionRouteFeatures{HasWrittenFiles: true}, true},
+		{"has used sub agent", SessionRouteFeatures{HasUsedSubAgent: true}, true},
 		{"recent errors >= 3", SessionRouteFeatures{RecentErrors: 3}, true},
 		{"recent errors == 2 not triggered", SessionRouteFeatures{RecentErrors: 2}, false},
 		{"pending todos > 3", SessionRouteFeatures{PendingTodos: 4}, true},
@@ -26,8 +28,8 @@ func TestSessionRouteFeatures_IsComplex(t *testing.T) {
 		{"files modified > 8", SessionRouteFeatures{FilesModified: 9}, true},
 		{"files modified == 8 not triggered", SessionRouteFeatures{FilesModified: 8}, false},
 
-		// Multiple signals but below thresholds — still not complex
-		{"below all thresholds", SessionRouteFeatures{TurnCount: 10, RecentErrors: 2, PendingTodos: 3, FilesModified: 8}, false},
+		// Multiple signals but below thresholds
+		{"below all thresholds", SessionRouteFeatures{TurnCount: 5, RecentErrors: 2, PendingTodos: 3, FilesModified: 8}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,13 +47,14 @@ func TestAutoRouteWithSession(t *testing.T) {
 		features SessionRouteFeatures
 		wantPro  bool
 	}{
-		// Complex session → pro regardless of input
-		{"complex forces pro for short input", "继续", SessionRouteFeatures{TurnCount: 11}, true},
-		{"complex forces pro for empty input", "", SessionRouteFeatures{RecentErrors: 3}, true},
+		// Complex session -> pro regardless of input
+		{"complex forces pro for short input", "hi", SessionRouteFeatures{TurnCount: 6}, true},
+		{"has written files forces pro", "hi", SessionRouteFeatures{HasWrittenFiles: true}, true},
+		{"recent errors forces pro", "", SessionRouteFeatures{RecentErrors: 3}, true},
 
 		// Simple session falls back to input-text heuristic
 		{"simple short input", "hi", SessionRouteFeatures{}, false},       // flash
-		{"simple long input", "请帮我重构整个认证模块", SessionRouteFeatures{}, true}, // pro
+		{"simple long input", "refactor the entire auth module", SessionRouteFeatures{}, true}, // pro via keywords
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,8 +78,8 @@ func TestAutoRouteProviderWithSession_NilFlash(t *testing.T) {
 func TestAutoRouteProviderWithSession_ComplexSession(t *testing.T) {
 	def := &stubProvider{name: "default"}
 	flash := &stubProvider{name: "flash"}
-	// Complex session → pro (default)
-	result := AutoRouteProviderWithSession("继续", SessionRouteFeatures{TurnCount: 11}, def, flash)
+	// Complex session -> pro (default)
+	result := AutoRouteProviderWithSession("hi", SessionRouteFeatures{TurnCount: 6}, def, flash)
 	if result != def {
 		t.Errorf("complex session should use default (pro), got %v", result)
 	}
@@ -85,7 +88,7 @@ func TestAutoRouteProviderWithSession_ComplexSession(t *testing.T) {
 func TestAutoRouteProviderWithSession_SimpleSession(t *testing.T) {
 	def := &stubProvider{name: "default"}
 	flash := &stubProvider{name: "flash"}
-	// Simple session + short input → flash
+	// Simple session + short input -> flash
 	result := AutoRouteProviderWithSession("hi", SessionRouteFeatures{}, def, flash)
 	if result != flash {
 		t.Errorf("simple session with short input should use flash, got %v", result)
@@ -116,8 +119,6 @@ func TestCollectSessionRouteFeatures_FilesModified(t *testing.T) {
 	})
 
 	t.Run("result content (no JSON) does not contribute", func(t *testing.T) {
-		// Simulate the old buggy behavior: RoleTool.Content is "File edited successfully"
-		// which contains no JSON path. The fixed code reads from ToolCall.Arguments.
 		msgs := []provider.Message{
 			{Role: provider.RoleUser, Content: "edit x.go"},
 			{
@@ -190,9 +191,83 @@ func TestCollectSessionRouteFeatures_FilesModified(t *testing.T) {
 			{Role: provider.RoleTool, ToolCallID: "c1", Name: "edit_file", Content: "error: old_string not found"},
 		}
 		f := collectFeaturesFromMessages(msgs)
-		// The tool call was still made to this file; we count the attempt.
 		if f.FilesModified != 1 {
 			t.Errorf("FilesModified = %d, want 1 (error attempts still count)", f.FilesModified)
+		}
+	})
+}
+
+// TestCollectSessionRouteFeatures_WriteToolsAndSubAgent verifies the new
+// HasWrittenFiles and HasUsedSubAgent signals detected from tool calls.
+func TestCollectSessionRouteFeatures_WriteToolsAndSubAgent(t *testing.T) {
+	t.Run("detects write tools", func(t *testing.T) {
+		msgs := []provider.Message{
+			{Role: provider.RoleUser, Content: "edit file"},
+			{
+				Role: provider.RoleAssistant,
+				ToolCalls: []provider.ToolCall{
+					{ID: "c1", Name: "edit_file", Arguments: `{"path":"x.go","old_string":"a","new_string":"b"}`},
+				},
+			},
+			{Role: provider.RoleTool, ToolCallID: "c1", Name: "edit_file", Content: "success"},
+		}
+		f := collectFeaturesFromMessages(msgs)
+		if !f.HasWrittenFiles {
+			t.Error("HasWrittenFiles should be true when edit_file is used")
+		}
+	})
+
+	t.Run("detects bash as write-adjacent", func(t *testing.T) {
+		msgs := []provider.Message{
+			{Role: provider.RoleUser, Content: "run tests"},
+			{
+				Role: provider.RoleAssistant,
+				ToolCalls: []provider.ToolCall{
+					{ID: "c1", Name: "bash", Arguments: `{"command":"go test ./..."}`},
+				},
+			},
+			{Role: provider.RoleTool, ToolCallID: "c1", Name: "bash", Content: "ok"},
+		}
+		f := collectFeaturesFromMessages(msgs)
+		if !f.HasWrittenFiles {
+			t.Error("HasWrittenFiles should be true when bash is used")
+		}
+	})
+
+	t.Run("detects sub agent", func(t *testing.T) {
+		msgs := []provider.Message{
+			{Role: provider.RoleUser, Content: "research this"},
+			{
+				Role: provider.RoleAssistant,
+				ToolCalls: []provider.ToolCall{
+					{ID: "c1", Name: "task", Arguments: `{"prompt":"research X"}`},
+				},
+			},
+			{Role: provider.RoleTool, ToolCallID: "c1", Name: "task", Content: "done"},
+		}
+		f := collectFeaturesFromMessages(msgs)
+		if !f.HasUsedSubAgent {
+			t.Error("HasUsedSubAgent should be true when task tool is used")
+		}
+	})
+
+	t.Run("read-only session has no write flags", func(t *testing.T) {
+		msgs := []provider.Message{
+			{Role: provider.RoleUser, Content: "read foo.go"},
+			{
+				Role: provider.RoleAssistant,
+				ToolCalls: []provider.ToolCall{
+					{ID: "c1", Name: "read_file", Arguments: `{"path":"foo.go"}`},
+					{ID: "c2", Name: "grep", Arguments: `{"pattern":"func"}`},
+				},
+			},
+		}
+		f := collectFeaturesFromMessages(msgs)
+		if f.HasWrittenFiles {
+			t.Error("HasWrittenFiles should be false for read-only tools")
+		}
+		if f.HasUsedSubAgent {
+			t.Error("HasUsedSubAgent should be false without task tool")
 		}
 	})
 }
@@ -229,7 +304,6 @@ func TestCollectSessionRouteFeatures_RecentErrors(t *testing.T) {
 	t.Run("only counts last 6 tool results", func(t *testing.T) {
 		msgs := []provider.Message{
 			{Role: provider.RoleUser, Content: "q"},
-			// 7 error tool results, but only last 6 counted
 			{Role: provider.RoleTool, Name: "t", Content: "error: 1"},
 			{Role: provider.RoleTool, Name: "t", Content: "error: 2"},
 			{Role: provider.RoleTool, Name: "t", Content: "error: 3"},
@@ -270,11 +344,22 @@ func collectFeaturesFromMessages(msgs []provider.Message) SessionRouteFeatures {
 		}
 	}
 
-	// FilesModified: walk assistant ToolCalls, not RoleTool.Content
+	// Walk assistant ToolCalls to extract FilesModified + write/sub-agent signals.
 	seen := map[string]bool{}
 	for _, m := range msgs {
 		if m.Role == provider.RoleAssistant && len(m.ToolCalls) > 0 {
 			for _, tc := range m.ToolCalls {
+				// Write tools detection
+				if tc.Name == "edit_file" || tc.Name == "write_file" ||
+					tc.Name == "multi_edit" || tc.Name == "delete_range" ||
+					tc.Name == "delete_symbol" || tc.Name == "bash" {
+					f.HasWrittenFiles = true
+				}
+				// Sub-agent detection
+				if tc.Name == "task" {
+					f.HasUsedSubAgent = true
+				}
+				// File counting
 				for _, name := range []string{"edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol"} {
 					if tc.Name == name {
 						path := extractFilePath(tc.Name, tc.Arguments)

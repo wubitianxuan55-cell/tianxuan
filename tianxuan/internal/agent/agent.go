@@ -583,6 +583,9 @@ type Options struct {
 	// When true, simple inputs route to flash, complex ones to pro.
 	// Requires a flash provider to be set via SetFlashProvider().
 	AutoRoute bool
+	// RouterKeywords appends custom keywords that trigger pro routing.
+	// Merged with the built-in complexKeywords list (V10.12).
+	RouterKeywords []string
 
 	// BudgetLimit is the per-session cost budget in yuan (V5.15).
 	// <=0 means unlimited. When set, the agent tracks cumulative cost
@@ -673,7 +676,10 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		r.paramStorm = NewParamStormBreaker(*opts.ParamStorm)
 	}
 	r.routeHistory = NewRouteHistory()
-	r.activeProv = prov // Ĭ��ʹ���� provider
+	if len(opts.RouterKeywords) > 0 {
+		SetRouterKeywords(opts.RouterKeywords)
+	}
+	r.activeProv = prov // 默认使用 pro provider
 	// V5.15: Ԥ���ſ�
 	if opts.BudgetLimit > 0 {
 		r.budgetGate = NewBudgetGate(opts.BudgetLimit)

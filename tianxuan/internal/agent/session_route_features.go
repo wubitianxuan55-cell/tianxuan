@@ -10,10 +10,12 @@ import (
 //
 // 缓存安全: 纯运行时读取，不修改任何进入 API 消息数组的内容。
 type SessionRouteFeatures struct {
-	TurnCount     int // total turns this session
-	RecentErrors  int // tool errors in last 3 turns
-	PendingTodos  int // incomplete todo items
-	FilesModified int // distinct files edited this session
+	TurnCount       int  // total turns this session
+	RecentErrors    int  // tool errors in last 3 turns
+	PendingTodos    int  // incomplete todo items
+	FilesModified   int  // distinct files edited this session
+	HasWrittenFiles bool // any write tool (edit_file/write_file/multi_edit/bash) used
+	HasUsedSubAgent bool // any sub-agent spawned (task tool)
 }
 
 // IsComplex reports whether the session state indicates a complex task
@@ -21,15 +23,28 @@ type SessionRouteFeatures struct {
 // Thresholds are deliberately conservative — flash is the default,
 // pro is the escalation.
 func (f SessionRouteFeatures) IsComplex() bool {
-	if f.TurnCount > 10 {
+	// Turn-based: 5+ turns indicates a sustained conversation likely doing real work.
+	if f.TurnCount > 5 {
 		return true
 	}
+	// Write tools: the session has already modified files, so subsequent turns
+	// are likely refactoring / editing — flash may not handle complex edits.
+	if f.HasWrittenFiles {
+		return true
+	}
+	// Sub-agent usage: spawning sub-agents is a strong signal of complex workflow.
+	if f.HasUsedSubAgent {
+		return true
+	}
+	// Error-prone: consistently failing tool calls may indicate model capability gap.
 	if f.RecentErrors >= 3 {
 		return true
 	}
+	// Multi-step planning: many pending todos suggest complex orchestration.
 	if f.PendingTodos > 3 {
 		return true
 	}
+	// Extensive editing: touching 9+ distinct files is a large-scale change.
 	if f.FilesModified > 8 {
 		return true
 	}
@@ -98,19 +113,26 @@ func (a *AgentRunner) collectSessionRouteFeatures() SessionRouteFeatures {
 	}
 	a.todoMu.Unlock()
 
-	// Count distinct edited files from assistant tool calls (not tool results).
-	// Previously this iterated RoleTool messages and passed m.Content to
-	// extractFilePath — but m.Content is the execution result string (e.g.
-	// "File edited successfully"), NOT the JSON arguments. extractFilePath
-	// scans for JSON-encoded "path" keys so it always returned "", making
-	// FilesModified permanently 0 and the Pro-model auto-escalation dead.
-	//
-	// Fix: walk assistant messages, iterate their ToolCalls, and extract
-	// the path from ToolCall.Arguments (which IS the raw JSON parameters).
+	// Count distinct edited files + write-tool + sub-agent signals from
+	// assistant tool calls.
+	// Iterates assistant messages with ToolCalls.Arguments (JSON parameters),
+	// not RoleTool.Content (execution result string — see V10.12.0 bugfix).
 	seen := map[string]bool{}
 	for _, m := range msgs {
 		if m.Role == provider.RoleAssistant && len(m.ToolCalls) > 0 {
 			for _, tc := range m.ToolCalls {
+				// Write tools detection: any session that has used a write tool
+				// is likely doing real development work.
+				if tc.Name == "edit_file" || tc.Name == "write_file" ||
+					tc.Name == "multi_edit" || tc.Name == "delete_range" ||
+					tc.Name == "delete_symbol" || tc.Name == "bash" {
+					f.HasWrittenFiles = true
+				}
+				// Sub-agent detection: task tool spawns child agents.
+				if tc.Name == "task" {
+					f.HasUsedSubAgent = true
+				}
+				// File counting (for FilesModified signal).
 				for _, name := range []string{"edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol"} {
 					if tc.Name == name {
 						path := extractFilePath(tc.Name, tc.Arguments)

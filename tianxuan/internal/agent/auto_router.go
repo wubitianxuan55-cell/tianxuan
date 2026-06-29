@@ -18,11 +18,38 @@ const (
 )
 
 // complexKeywords — 这些关键词暗示任务需要深度推理，路由到 pro。
+// 可通过 Options.RouterKeywords 追加自定义关键词（V10.12）。
 var complexKeywords = []string{
 	"refactor", "architecture", "design", "debug", "security",
 	"review", "audit", "migrate", "optimize", "rewrite",
 	"implement", "analyze", "漏洞", "安全", "重构", "架构",
 	"设计", "调试", "审查", "迁移", "优化", "重写", "实现", "分析",
+}
+
+// SetRouterKeywords merges custom keywords with the built-in list.
+// Call once during agent construction. Subsequent calls replace, not append.
+// A nil or empty slice leaves the built-in defaults unchanged.
+func SetRouterKeywords(custom []string) {
+	if len(custom) == 0 {
+		return
+	}
+	merged := make([]string, 0, len(complexKeywords)+len(custom))
+	seen := make(map[string]bool, len(complexKeywords)+len(custom))
+	for _, kw := range complexKeywords {
+		lower := strings.ToLower(kw)
+		if !seen[lower] {
+			seen[lower] = true
+			merged = append(merged, kw)
+		}
+	}
+	for _, kw := range custom {
+		lower := strings.ToLower(kw)
+		if !seen[lower] {
+			seen[lower] = true
+			merged = append(merged, kw)
+		}
+	}
+	complexKeywords = merged
 }
 
 // AutoRoute 根据输入内容启发式选择模型。

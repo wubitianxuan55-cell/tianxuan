@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Cpu, Wallet, Coins } from "lucide-react";
+import { Cpu, Wallet, Coins, GitBranch } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -93,7 +93,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, agentMode, yolo, approval, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model,
+  context, usage, balance, jobs, running, agentMode, yolo, approval, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, onOpenChanges,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -109,6 +109,7 @@ export const StatusBar = memo(function StatusBar({
   bridgeAlive?: boolean;
   model?: string;
   onOpenStats?: () => void;
+  onOpenChanges?: () => void;
 }) {
   const compact = useCompact();
   const now = useTick(running);
@@ -268,6 +269,17 @@ export const StatusBar = memo(function StatusBar({
 
         {/* 后台任务 — 文字标注 */}
         {jobs && jobs.length > 0 && <JobsChip jobs={jobs} compact={compact} />}
+
+        {/* 变更 — 单击打开变更面板 */}
+        {onOpenChanges && (
+          <button
+            className={`inline-flex items-center gap-1 ${fontSize} px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors`}
+            onClick={onOpenChanges}
+            title="查看文件变更"
+          >
+            <GitBranch size={compact ? 11 : 12} />
+          </button>
+        )}
 
         {/* 余额 — 文字标注 */}
         {balance?.available && balance.display && (

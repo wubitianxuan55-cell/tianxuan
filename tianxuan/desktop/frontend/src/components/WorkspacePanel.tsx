@@ -118,11 +118,13 @@ export function WorkspacePanel({
   onClose,
   onToggleMaximized,
   onPreviewModeChange,
+  initialViewMode,
 }: {
   open: boolean;
   cwd?: string;
   maximized: boolean;
   panelWidth?: number;
+  initialViewMode?: "files" | "changed";
   onClose: () => void;
   onToggleMaximized: () => void;
   onPreviewModeChange?: (active: boolean) => void;
@@ -140,7 +142,7 @@ export function WorkspacePanel({
   const [treeVisible, setTreeVisible] = useState(true);
   const [treeWidth, setTreeWidth] = useState(loadWorkspaceTreeWidth);
   const [treeResizing, setTreeResizing] = useState(false);
-  const [viewMode, setViewMode] = useState<"files" | "changed">("files");
+  const [viewMode, setViewMode] = useState<"files" | "changed">(initialViewMode ?? "files");
   const [workspaceChanges, setWorkspaceChanges] = useState<WorkspaceChangeView[] | null>(null);
 
   const loadDir = useCallback(async (dir: string) => {
@@ -177,7 +179,18 @@ export function WorkspacePanel({
     setFilter("");
     setTreeVisible(true);
     void loadDir("");
+    // auto-load changes if entering in changed mode
+    if (viewMode === "changed" && workspaceChanges === null) {
+      void loadWorkspaceChanges();
+    }
   }, [cwd, loadDir, open]);
+
+  // auto-load workspace changes when switching to changed view
+  useEffect(() => {
+    if (open && viewMode === "changed" && workspaceChanges === null) {
+      void loadWorkspaceChanges();
+    }
+  }, [viewMode, open, workspaceChanges, loadWorkspaceChanges]);
 
   const refreshSelected = useCallback(() => {
     if (!selectedPath) return;
@@ -545,58 +558,75 @@ export function WorkspacePanel({
         <div className="flex-1 min-h-0 overflow-auto px-1.5 pb-3">
           {viewMode === "changed" ? (
             workspaceChanges === null ? (
-              <div className="empty-state">加载中…</div>
+              <div className="flex flex-col items-center justify-center gap-3 py-12">
+                <div className="w-6 h-6 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
+                <span className="text-fg-faint text-[12px]">加载变更中…</span>
+              </div>
             ) : workspaceChanges.length === 0 ? (
-              <div className="empty-state">本会话暂无文件变更</div>
+              <div className="flex flex-col items-center justify-center gap-2 py-12">
+                <FileText size={28} className="text-fg-faint/30" />
+                <span className="text-fg-faint text-[12.5px]">本会话暂无文件变更</span>
+                <span className="text-fg-faint/40 text-[11px]">编辑文件后变更会自动出现在这里</span>
+              </div>
             ) : (
-              workspaceChanges.map((ch) => {
-                const dir = ch.path.includes("/") ? ch.path.slice(0, ch.path.lastIndexOf("/")) : "";
-                return (
-                  <button
-                    className="w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] border-l-transparent"
-                    key={ch.path}
-                    onClick={() => { setViewMode("files"); selectFile(ch.path); }}
-                    title={ch.path}
-                  >
-                    <FileText size={14} className="shrink-0 text-fg-faint" />
-                    <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
-                      <span className="min-w-0 truncate text-fg">{ch.path.split("/").pop()}</span>
-                      {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
-                    </span>
-                    <span className="flex items-center gap-1.5 shrink-0 text-[10.5px] tabular-nums font-mono">
-                      {ch.added > 0 && <span className="text-ok">+{ch.added}</span>}
-                      {ch.removed > 0 && <span className="text-err">-{ch.removed}</span>}
-                    </span>
-                  </button>
-                );
-              })
+              <div>
+                <div className="flex items-center gap-3 px-2 py-1.5 mb-1 text-[11px] text-fg-faint">
+                  <span className="font-medium">{workspaceChanges.length} 个文件</span>
+                  <span className="text-border/40">·</span>
+                  <span className="text-ok">+{workspaceChanges.reduce((s, c) => s + c.added, 0)}</span>
+                  <span className="text-err">-{workspaceChanges.reduce((s, c) => s + c.removed, 0)}</span>
+                </div>
+                {workspaceChanges.map((ch) => {
+                  const dir = ch.path.includes("/") ? ch.path.slice(0, ch.path.lastIndexOf("/")) : "";
+                  return (
+                    <button
+                      className="w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] border-l-transparent"
+                      key={ch.path}
+                      onClick={() => { setViewMode("files"); selectFile(ch.path); }}
+                      title={ch.path}
+                    >
+                      <FileText size={14} className="shrink-0 text-fg-faint" />
+                      <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
+                        <span className="min-w-0 truncate text-fg">{ch.path.split("/").pop()}</span>
+                        {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
+                      </span>
+                      <span className="flex items-center gap-1.5 shrink-0 text-[10.5px] tabular-nums font-mono">
+                        {ch.added > 0 && <span className="text-ok">+{ch.added}</span>}
+                        {ch.removed > 0 && <span className="text-err">-{ch.removed}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )
-          ) : (flattened
-            ? flattened.map(({ path, entry }) => {
-                const cleanPath = path.replace(/\/$/, "");
-                const dir = parentPath(path);
-                return (
-                  <button
-                    className={`w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] ${
-                      selectedPath === path ? "!border-l-accent bg-sidebar-active !text-fg" : "border-l-transparent"
-                    }`}
-                    key={path}
-                    onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
-                    title={cleanPath}
-                  >
-                    {entry.isDir ? (
-                      <Folder size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-dim"}`} />
-                    ) : (
-                      <FileText size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-faint"}`} />
-                    )}
-                    <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
-                      <span className={`min-w-0 truncate ${selectedPath === path ? "text-accent font-medium" : "text-fg"}`}>{basename(path)}</span>
-                      {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
-                    </span>
-                  </button>
-                );
-              })
-            : renderRows("", 0))}
+          ) : (
+            flattened
+              ? flattened.map(({ path, entry }) => {
+                  const cleanPath = path.replace(/\/$/, "");
+                  const dir = parentPath(path);
+                  return (
+                    <button
+                      className={`w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] ${
+                        selectedPath === path ? "!border-l-accent bg-sidebar-active !text-fg" : "border-l-transparent"
+                      }`}
+                      key={path}
+                      onClick={() => (entry.isDir ? toggleDir(path) : selectFile(path))}
+                      title={cleanPath}
+                    >
+                      {entry.isDir ? (
+                        <Folder size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-dim"}`} />
+                      ) : (
+                        <FileText size={14} className={`shrink-0 ${selectedPath === path ? "text-accent" : "text-fg-faint"}`} />
+                      )}
+                      <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.15]">
+                        <span className={`min-w-0 truncate ${selectedPath === path ? "text-accent font-medium" : "text-fg"}`}>{basename(path)}</span>
+                        {dir && <span className="min-w-0 truncate text-fg-faint text-[10.5px] font-mono">{dir}</span>}
+                      </span>
+                    </button>
+                  );
+                })
+              : renderRows("", 0)
+          )}
         </div>
       </section>
     </aside>

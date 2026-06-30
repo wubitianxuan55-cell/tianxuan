@@ -103,6 +103,7 @@ export default function App() {
   const [capsOpen, setCapsOpen] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("files");
+  const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
@@ -671,9 +672,10 @@ export default function App() {
                 cwd={state.meta?.cwd}
                 maximized={workspacePanelMaximized}
                 panelWidth={workspacePanelMaximized ? viewportWidth - effectiveSidebarWidth : effectiveWorkspacePanelWidth}
-                onClose={() => setWorkspacePanel(false)}
+                onClose={() => { setWorkspacePanel(false); setPendingViewMode(null); }}
                 onToggleMaximized={() => setWorkspacePanelMaximized((value: boolean) => !value)}
                 onPreviewModeChange={handleWorkspacePreviewModeChange}
+                initialViewMode={pendingViewMode ?? undefined}
               />
             ) : rightTab === "runtime" ? (
               <RuntimePanel counts={toolCounts} />

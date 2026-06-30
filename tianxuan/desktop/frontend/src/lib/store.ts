@@ -58,14 +58,19 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
   switch (e.kind) {
     case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, turnSteps: [] };
     case "text": case "reasoning": {
-      // 反向查找最后一个 assistant 项追加文本——与 message 事件一致。
-      // 避免 tool_dispatch 清空 currentAssistant 后创建新卡片。
+      // 反向查找最后一个 assistant 项追加文本。若最后 assistant 已终结
+      //（上一轮 turn_done 已将 streaming 置 false）且当前轮活跃，则创建新项
+      // 而非追加到旧轮次消息——修复跨轮次文本覆盖。
       const delta = e.text ?? e.reasoning ?? "";
       let idx = -1;
       for (let i = s.items.length - 1; i >= 0; i--) {
         if (s.items[i].kind === "assistant") { idx = i; break; }
       }
-      if (idx >= 0) {
+      const needNew = idx < 0 || (
+        (s.items[idx] as Extract<Item, { kind: "assistant" }>).streaming === false &&
+        s.turnActive
+      );
+      if (!needNew) {
         const it = s.items[idx] as Extract<Item, { kind: "assistant" }>;
         const next = [...s.items];
         next[idx] = e.kind === "text"
@@ -73,24 +78,29 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
           : { ...it, reasoning: it.reasoning + delta, streaming: true };
         return { ...s, items: next, currentAssistant: it.id };
       }
-      // 没有 assistant 项时才创建新的
+      // 没有可追加的活跃 assistant 项时创建新的
       const id = `a${s.seq}`;
       return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.kind === "text" ? delta : "", reasoning: e.kind === "reasoning" ? delta : "", streaming: true }], currentAssistant: id };
     }
     case "message": {
       // 始终更新最后一个 assistant，不创建新的。
-      // 避免 tool_dispatch 清空 currentAssistant 后 message 创建重复项。
+      // 若最后 assistant 已终结（上一轮结束）且当前轮活跃，则创建新项
+      // 而非覆盖旧轮次消息——修复跨轮次文本覆盖。
       let idx = -1;
       for (let i = s.items.length - 1; i >= 0; i--) {
         if (s.items[i].kind === "assistant") { idx = i; break; }
       }
-      if (idx >= 0) {
+      const needNew = idx < 0 || (
+        (s.items[idx] as Extract<Item, { kind: "assistant" }>).streaming === false &&
+        s.turnActive
+      );
+      if (!needNew) {
         const it = s.items[idx] as Extract<Item, { kind: "assistant" }>;
         const next = [...s.items];
         next[idx] = { ...it, text: e.text ?? it.text, reasoning: e.reasoning ?? it.reasoning, streaming: false };
         return { ...s, items: next, currentAssistant: undefined };
       }
-      // 没有任何 assistant 项时才创建新的（首轮且模型直接回了 message）
+      // 没有任何可更新的 assistant 项时创建新的（首轮且模型直接回了 message）
       const id = `a${s.seq}`;
       return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.text ?? "", reasoning: e.reasoning ?? "", streaming: false }], currentAssistant: undefined };
     }

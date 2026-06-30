@@ -220,8 +220,10 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		return strings.TrimSpace(buf2.String()), nil
 	}
 
-	// Plain mode: merged output
+	// Plain mode: merged output — apply same truncation as JSON mode for safety.
 	out := stdoutBuf.String()
+	const plainMaxBytes = 48 * 1024
+	out, _ = truncateStream(out, plainMaxBytes)
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return out, fmt.Errorf("command timed out (> %s)", bashTimeout)

@@ -147,21 +147,18 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 			break
 		}
 	}
-	// Drain any remainder to learn the true total without buffering the rest.
-	remaining := 0
-	for scanner.Scan() {
-		remaining++
-	}
+	// Quick check for remaining lines without draining the entire file.
+	// (Avoids O(n) scan over huge files just to compute "more lines" count.)
+	hasMore := scanner.Scan()
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	totalSeen := lineNo + remaining
 
-	if totalSeen == 0 {
+	if lineNo == 0 && !hasMore {
 		return "(empty file)", nil
 	}
 	if len(collected) == 0 {
-		return fmt.Sprintf("(offset %d is past EOF — file has %d lines)", p.Offset, totalSeen), nil
+		return fmt.Sprintf("(offset %d is past EOF — file has %d lines)", p.Offset, lineNo), nil
 	}
 
 	var b strings.Builder
@@ -182,14 +179,13 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		}
 	}
 
-	more := totalSeen - (p.Offset + len(collected))
-	if more > 0 {
+	if hasMore {
 		if showLineNumbers {
-			fmt.Fprintf(&b, "\n[%d more line(s); pass offset=%d to continue]\n",
-				more, p.Offset+len(collected))
+			fmt.Fprintf(&b, "\n[more lines available; pass offset=%d to continue]\n",
+				p.Offset+len(collected))
 		} else {
-			fmt.Fprintf(&b, "\n[%d more line(s); pass offset=%d to continue]\n",
-				more, p.Offset+len(collected))
+			fmt.Fprintf(&b, "\n[more lines available; pass offset=%d to continue]\n",
+				p.Offset+len(collected))
 		}
 	}
 	return b.String(), nil

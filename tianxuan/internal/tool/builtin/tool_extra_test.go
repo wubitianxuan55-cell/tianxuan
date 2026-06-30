@@ -49,8 +49,8 @@ func TestReadFileLargeFile(t *testing.T) {
 	if strings.Contains(out, "4→line 4") {
 		t.Errorf("should not contain fourth line: %s", out)
 	}
-	// Pagination hint.
-	if !strings.Contains(out, "97 more line") {
+	// Pagination hint (exact count unknown without draining file).
+	if !strings.Contains(out, "more lines available") {
 		t.Errorf("pagination hint missing: %s", out)
 	}
 }

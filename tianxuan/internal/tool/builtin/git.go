@@ -243,10 +243,10 @@ func (gitCommit) Execute(ctx context.Context, args json.RawMessage) (string, err
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
 
-	// V10.6: 检测 main/master 分支直接提交，发出警告
+	// V10.6: 检测 main/master 分支直接提交，发出警告（amend=true 放行发布提交）
 	branchRaw, _ := runGit(ctx, "branch", "--show-current")
 	branch := strings.TrimSpace(branchRaw)
-	if branch == "main" || branch == "master" {
+	if (branch == "main" || branch == "master") && !p.Amend {
 		return "", fmt.Errorf("🔴 禁止在 %s 分支上直接提交！请使用 git_worktree 创建功能分支进行开发。\n  git_worktree add path=<dir> branch=<feature-branch>\n  如果这是发布提交，请使用 amend=true 参数确认。", branch)
 	}
 

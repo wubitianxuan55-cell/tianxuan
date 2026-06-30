@@ -242,10 +242,6 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
 		a.hooks.SubagentStop(ctx, result)
 	}
-	// A foreground `task` sub-agent just finished — its result is the final answer.
-	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
-		a.hooks.SubagentStop(ctx, result)
-	}
 	result = SmartCompress(call.Name, result)
 	env := tool.WrapResult(tool.CodeOK, map[string]any{"tool": call.Name, "result": result})
 	body, truncMsg := truncateToolOutput(env)

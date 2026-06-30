@@ -46,7 +46,7 @@ func (memorySearch) CompactSchema() json.RawMessage   { return compactSchema["me
 func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, error) {
 	idx := memorySearchIndex
 	if idx == nil {
-		return "No memory index available. Save some memories first with the remember tool.", nil
+		return "", fmt.Errorf("memory index not available — save some memories first with the remember tool")
 	}
 
 	var p struct {

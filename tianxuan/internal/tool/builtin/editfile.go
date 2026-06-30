@@ -135,8 +135,14 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("old_string is not unique in %s; add more surrounding context", p.Path)
 	}
 
+	// Preserve the original file permission bits (e.g. executable scripts).
+	fi, err := os.Stat(p.Path)
+	mode := os.FileMode(0o644)
+	if err == nil {
+		mode = fi.Mode().Perm()
+	}
 	updated := strings.Replace(content, oldStr, newStr, 1)
-	if err := os.WriteFile(p.Path, []byte(updated), 0o644); err != nil {
+	if err := os.WriteFile(p.Path, []byte(updated), mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("edited %s", p.Path), nil

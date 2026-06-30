@@ -204,6 +204,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			// V7.0: ��բ��ֹͣ������ֹģ����ǰֹͣ
 			// V10.0: Grace Round — model produced summary, done.
 			if graceRound {
+				// V10.16: clean up grace-round nudge from session before exit
+				if len(a.session.Messages) > 0 {
+					a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
+				}
 				return nil
 			}
 
@@ -255,6 +259,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		// V10.13: Grace Round 守卫 — grace 轮次中模型仍调用工具则退出。
 		// 移植自 Reasonix，防止 MaxSteps 限制下无限循环。
 		if graceRound {
+			a.preWG.Wait() // drain pre-exec goroutines started during grace streaming
+			// V10.16: 清理 grace round nudge，防止残留到下一用户轮次
+			if len(a.session.Messages) > 0 {
+				a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
+			}
 			return fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
 		}
 		a.preWG.Wait()

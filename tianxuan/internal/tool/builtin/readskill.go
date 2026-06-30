@@ -3,6 +3,7 @@ package builtin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"tianxuan/internal/tool"
 )
@@ -34,15 +35,18 @@ func (r readSkill) Execute(_ context.Context, args json.RawMessage) (string, err
 	var in struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(args, &in); err != nil || in.Name == "" {
-		return "error: read_skill requires a 'name' parameter", nil
+	if err := json.Unmarshal(args, &in); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if in.Name == "" {
+		return "", fmt.Errorf("read_skill requires a 'name' parameter")
 	}
 	if r.resolve == nil {
-		return "error: read_skill resolver not configured", nil
+		return "", fmt.Errorf("read_skill resolver not configured")
 	}
 	content, err := r.resolve(in.Name)
 	if err != nil {
-		return "skill not found: " + in.Name, nil
+		return "", fmt.Errorf("skill not found: %s", in.Name)
 	}
 	return content, nil
 }

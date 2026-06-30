@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/sandbox"
@@ -298,10 +299,18 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 	}
 	// ceil division: (maxBytes+1)/2 so an odd maxBytes doesn't lose a byte
 	half := (maxBytes + 1) / 2
+	// Adjust half to a valid UTF-8 boundary so we don't split multi-byte runes.
+	for half > 0 && half < len(s) && !utf8.RuneStart(s[half]) {
+		half--
+	}
 	head := s[:half]
 	tailStart := len(s) - half
-	if tailStart < half {
-		tailStart = half
+	if tailStart <= half {
+		tailStart = half // prevent head/tail overlap when just barely over maxBytes
+	}
+	// Adjust tailStart to a valid UTF-8 boundary.
+	for tailStart < len(s) && !utf8.RuneStart(s[tailStart]) {
+		tailStart++
 	}
 	tail := s[tailStart:]
 	result := head + fmt.Sprintf("\n... (%d bytes elided) ...\n", len(s)-maxBytes) + tail

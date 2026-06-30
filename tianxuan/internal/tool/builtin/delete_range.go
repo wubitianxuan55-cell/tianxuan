@@ -99,8 +99,9 @@ func (d deleteRange) preview(args json.RawMessage) (diff.Change, error) {
 		lineSep = "\r\n"
 	}
 
-	// Strip \r for matching (split on \n after removing \r).
-	lines := strings.Split(strings.ReplaceAll(original, "\r", ""), "\n")
+	// Strip \r\n to \n for matching (normalize CRLF→LF without removing
+	// legitimate \r characters inside string literals or comments).
+	lines := strings.Split(strings.ReplaceAll(original, "\r\n", "\n"), "\n")
 	startLine := findUniqueLine(lines, p.StartAnchor)
 	if startLine == -2 {
 		return diff.Change{}, fmt.Errorf("start_anchor is not unique in %s; add more surrounding context", p.Path)

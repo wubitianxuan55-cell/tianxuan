@@ -76,6 +76,10 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	if p.Limit <= 0 {
 		p.Limit = readFileDefaultLimit
 	}
+	const readFileMaxLimit = 10000
+	if p.Limit > readFileMaxLimit {
+		p.Limit = readFileMaxLimit
+	}
 	// V10.5: line_numbers defaults to true (backward-compatible)
 	showLineNumbers := true
 	if p.LineNumbers != nil {

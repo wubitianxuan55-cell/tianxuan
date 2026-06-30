@@ -264,9 +264,9 @@ func (a *AgentRunner) toolReadOnly(name string) bool {
 
 // ── V10.13: 成功循环检测 — 移植自 Reasonix ──────────────────────────
 
-// repeatSuccessBreakThreshold 是同一写工具签名允许成功的次数。
+// repeatSuccessAllowed 是同一写工具签名允许成功的最大次数。
 // 2 次给模型自我修正的空间；第 3 次通常是空转/写循环，应阻止。
-const repeatSuccessBreakThreshold = 2
+const repeatSuccessAllowed = 2
 
 // repeatedSuccessBlock 检测写工具是否在同轮中重复成功过多次。
 // 命中时返回阻止消息，防止模型无意义循环消耗 token。
@@ -276,7 +276,7 @@ func (a *AgentRunner) repeatedSuccessBlock(call provider.ToolCall, t tool.Tool) 
 		return "", false
 	}
 	count := a.repeatSuccessCounts[sig]
-	if count < repeatSuccessBreakThreshold {
+	if count < repeatSuccessAllowed {
 		return "", false
 	}
 	return fmt.Sprintf(

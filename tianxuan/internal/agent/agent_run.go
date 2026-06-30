@@ -307,8 +307,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		}
 
 		// V10.0: advance canonical todo state for successful complete_step calls
-
-		// V10.0: advance canonical todo state for successful complete_step calls
 		for i, call := range calls {
 			if call.Name == "complete_step" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
 				step := extractStepFromArgs(call.Arguments)

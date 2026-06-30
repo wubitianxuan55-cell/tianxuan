@@ -54,10 +54,8 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
 
   const [open, setOpen] = useState(false);
 
-  const effectiveOpen = open;
-
   const bodyRef = useRef<HTMLDivElement>(null);
-  useGSAPCollapse(bodyRef, effectiveOpen && expandable);
+  useGSAPCollapse(bodyRef, open && expandable);
 
   const quiet =
     item.readOnly && !hasNested && item.status !== "error" && item.status !== "stopped";
@@ -89,7 +87,7 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
       >
         {expandable ? (
           <ChevronRight
-            className={`shrink-0 transition-transform duration-200 ${effectiveOpen ? "rotate-90" : ""}`}
+            className={`shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
             size={chevronSize}
           />
         ) : (

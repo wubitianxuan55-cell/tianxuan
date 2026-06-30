@@ -479,6 +479,17 @@ export default function App() {
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
+              onOpenChanges={() => {
+                setPendingViewMode("changed");
+                if (workspacePanelOpen && rightTab === "files") {
+                  // 面板已打开→先关再开，initialViewMode 才能生效
+                  setWorkspacePanel(false);
+                  setTimeout(() => setWorkspacePanel(true), 50);
+                } else {
+                  setRightTab("files");
+                  setWorkspacePanel(true);
+                }
+              }}
             />
             </CompactContext.Provider>
           </footer>

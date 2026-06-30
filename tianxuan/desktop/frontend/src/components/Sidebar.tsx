@@ -21,7 +21,6 @@ export interface SidebarProps {
   onLoadMore: () => void;
   onResumeSession: (path: string) => void;
   onDeleteSession: (path: string) => void;
-  refreshSessions: () => Promise<SessionMeta[]>;
   onOpenHistory: () => void;
   onOpenMemory: () => void;
   showPlan: boolean;
@@ -48,7 +47,6 @@ export function Sidebar({
   onLoadMore,
   onResumeSession,
   onDeleteSession,
-  refreshSessions,
   onOpenHistory,
   onOpenMemory,
   showPlan,
@@ -195,7 +193,6 @@ export function Sidebar({
                         onClick={e => {
                           e.stopPropagation();
                           void onDeleteSession(session.path);
-                          void refreshSessions();
                         }}
                       >
                         ×

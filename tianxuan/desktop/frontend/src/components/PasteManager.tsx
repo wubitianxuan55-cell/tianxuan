@@ -33,7 +33,6 @@ export function usePasteBlocks(
   const t = useT();
   const [pastedBlocks, setPastedBlocks] = useState<PastedBlock[]>([]);
   const [openPastedLabels, setOpenPastedLabels] = useState<string[]>([]);
-  const [pendingPaste, setPendingPaste] = useState(0);
   const pastedBlocksRef = useRef<PastedBlock[]>([]);
   const nextPasteId = useRef(1);
 
@@ -91,14 +90,9 @@ export function usePasteBlocks(
     setOpenPastedLabels([]);
   }, []);
 
-  const setPendingPasteCount = useCallback((n: number) => {
-    setPendingPaste((prev) => Math.max(0, prev + n));
-  }, []);
-
   return {
     pastedBlocks,
     openPastedLabels,
-    pendingPaste,
     activePastedBlocks,
     onPaste,
     expandBlocks,
@@ -106,7 +100,6 @@ export function usePasteBlocks(
     removeBlock,
     expandBlock,
     clearBlocks,
-    setPendingPasteCount,
   };
 }
 

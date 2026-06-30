@@ -12,7 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// trayIcon16 is a 16x16 purple "T" icon in PNG format.
+// trayIconPNG is a 32x32 holographic hexagon icon in PNG format.
 //
 //go:embed tray_icon.png
 var trayIconPNG []byte

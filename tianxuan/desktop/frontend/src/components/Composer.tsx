@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Clock, Eye, FileText, FolderGit2, FolderPlus, Search, Square, Trash2, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Clock, FolderGit2, FolderPlus, Search, Square, X } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
@@ -9,31 +9,16 @@ import { useStore } from "../lib/store";
 import { SlashMenu } from "./SlashMenu";
 import { ArgMenu } from "./ArgMenu";
 import { FileMenu } from "./FileMenu";
+import { usePasteBlocks, PasteBlocksUI } from "./PasteManager";
 
 interface Attachment { path: string; previewUrl: string; }
 
-const LONG_PASTE_MIN_CHARS = 2000;
-const LONG_PASTE_MIN_LINES = 20;
+
 const COMPOSER_MIN_HEIGHT = 86;
 const COMPOSER_MAX_HEIGHT = 360;
 const COMPOSER_MAX_VIEWPORT_RATIO = 0.4;
 const INPUT_HISTORY_KEY = "reasonix.inputHistory";
 const MAX_INPUT_HISTORY = 50;
-
-type PastedBlock = { label: string; text: string };
-
-function lineCount(s: string): number {
-  if (s === "") return 0;
-  return s.split(/\r\n|\r|\n/).length;
-}
-
-function shouldFoldPaste(s: string): boolean {
-  return s.length >= LONG_PASTE_MIN_CHARS || lineCount(s) >= LONG_PASTE_MIN_LINES;
-}
-
-function renderPastedBlock(block: PastedBlock): string {
-  return `${block.label}\n\n--- Begin ${block.label} ---\n${block.text}\n--- End ${block.label} ---`;
-}
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -65,11 +50,7 @@ export function Composer({
   const [text, setText] = useState("");
   const debouncedText = useDebounce(text, 80);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [pastedBlocks, setPastedBlocks] = useState<PastedBlock[]>([]);
-  const [openPastedLabels, setOpenPastedLabels] = useState<string[]>([]);
   const [pendingPaste, setPendingPaste] = useState(0);
-  const pastedBlocksRef = useRef<PastedBlock[]>([]);
-  const nextPasteId = useRef(1);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -79,6 +60,7 @@ export function Composer({
   const [composerHeight, setComposerHeight] = useState<number | null>(loadComposerHeight);
   const [composerResizing, setComposerResizing] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const paste = usePasteBlocks(text, setText, taRef);
   const composerCardRef = useRef<HTMLDivElement>(null);
   const workspaceAnchorRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
@@ -116,8 +98,7 @@ export function Composer({
   }, [turnActive, turnStartAt]);
   useEffect(() => {
     if (wasRunning.current && !running && text.trim() === "") {
-      pastedBlocksRef.current = [];
-      setPastedBlocks([]); setOpenPastedLabels([]);
+      paste.clearBlocks();
     }
     wasRunning.current = running;
   }, [running, text]);
@@ -171,19 +152,13 @@ export function Composer({
     requestAnimationFrame(() => { const ta = taRef.current; if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = next.length; } });
   };
 
-  const expandPastedBlocks = (displayText: string): string => {
-    let expanded = displayText;
-    for (const b of pastedBlocksRef.current) { if (expanded.includes(b.label)) expanded = expanded.split(b.label).join(renderPastedBlock(b)); }
-    return expanded;
-  };
-
   const submit = () => {
     if (disabled) return;
     const tTrim = text.trim();
     if ((!tTrim && attachments.length === 0) || pendingPaste > 0) return;
     const refs = attachments.map((a) => `@${a.path}`).join(" ");
     const displayText = [tTrim, refs].filter(Boolean).join(tTrim && refs ? " " : "");
-    const submitText = [expandPastedBlocks(tTrim), refs].filter(Boolean).join(tTrim && refs ? " " : "");
+    const submitText = [paste.expandBlocks(tTrim), refs].filter(Boolean).join(tTrim && refs ? " " : "");
     if (displayText.trim()) {
       try {
         const history = JSON.parse(sessionStorage.getItem(INPUT_HISTORY_KEY) || "[]") as string[];
@@ -209,32 +184,15 @@ export function Composer({
     }
   };
 
+  // 粘贴处理：先拦截图片，文本折叠交给 usePasteBlocks hook
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
     if (files.length > 0) { e.preventDefault(); void attachImageFiles(files); return; }
-    // Detect screenshot/image in clipboard (no file object, just image data).
     const hasImageData = Array.from(e.clipboardData.items).some(
       (it) => it.type.startsWith("image/")
     );
-    if (hasImageData) {
-      // Notify: screenshot paste is detected but needs Go-side SaveClipboardImage.
-      // The user can drag-drop the image or save it as a file first.
-      e.preventDefault();
-      return;
-    }
-    const pasted = e.clipboardData.getData("text");
-    if (!shouldFoldPaste(pasted)) return;
-    e.preventDefault();
-    const ta = e.currentTarget;
-    const start = ta.selectionStart ?? text.length;
-    const end = ta.selectionEnd ?? text.length;
-    const id = nextPasteId.current++;
-    const label = t("composer.pastedLabel", { id, lines: lineCount(pasted) });
-    const block: PastedBlock = { label, text: pasted };
-    const next = text.slice(0, start) + label + text.slice(end);
-    pastedBlocksRef.current = [...pastedBlocksRef.current, block];
-    setPastedBlocks((prev) => [...prev, block]); setText(next);
-    requestAnimationFrame(() => { const n = taRef.current; if (n) { n.focus(); n.selectionStart = n.selectionEnd = start + label.length; } });
+    if (hasImageData) { e.preventDefault(); return; }
+    paste.onPaste(e);
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -262,11 +220,6 @@ export function Composer({
     else if (menuMode === "slasharg" && argRes) pickArg(argRes.items[active]);
     else if (menuMode === "at") pickEntry(atMatches[active]);
   };
-
-  const activePastedBlocks = pastedBlocks.filter((b) => text.includes(b.label));
-  const togglePastedPreview = (label: string) => setOpenPastedLabels((p) => p.includes(label) ? p.filter((x) => x !== label) : [...p, label]);
-  const removePastedBlock = (b: PastedBlock) => { pastedBlocksRef.current = pastedBlocksRef.current.filter((x) => x.label !== b.label); setPastedBlocks((p) => p.filter((x) => x.label !== b.label)); setOpenPastedLabels((p) => p.filter((x) => x !== b.label)); setTextCaretEnd(text.split(b.label).join("")); };
-  const expandPastedBlock = (b: PastedBlock) => { pastedBlocksRef.current = pastedBlocksRef.current.filter((x) => x.label !== b.label); setPastedBlocks((p) => p.filter((x) => x.label !== b.label)); setOpenPastedLabels((p) => p.filter((x) => x !== b.label)); setTextCaretEnd(text.split(b.label).join(b.text)); };
 
   // ── 工作区菜单 ──
   const workspaceName = useMemo(() => { if (!cwd) return ""; const parts = cwd.split(/[/\\]/).filter(Boolean); return parts.length > 0 ? parts[parts.length - 1] : cwd; }, [cwd]);
@@ -409,27 +362,13 @@ export function Composer({
       )}
 
       {/* ── 粘贴块 ── */}
-      {activePastedBlocks.length > 0 && (
-        <div className="pb-1.5">
-          {activePastedBlocks.map((block) => {
-            const open = openPastedLabels.includes(block.label);
-            return (
-              <div className="mb-1 border border-border-soft rounded-lg overflow-hidden" key={block.label}>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
-                  <FileText size={14} className="text-fg-faint shrink-0" />
-                  <span className="font-mono text-xs text-fg-dim min-w-0 truncate">{block.label}</span>
-                  <div className="flex items-center gap-0.5 ml-auto">
-                    <ActionBtn title={open ? "收起预览" : "展开预览"} onClick={() => togglePastedPreview(block.label)}><Eye size={13} /></ActionBtn>
-                    <ActionBtn title="展开内容" onClick={() => expandPastedBlock(block)}><span className="text-[11px]">展开</span></ActionBtn>
-                    <ActionBtn title="移除" danger onClick={() => removePastedBlock(block)}><Trash2 size={13} /></ActionBtn>
-                  </div>
-                </div>
-                {open && <pre className="m-0 p-2 bg-bg text-fg-dim text-xs leading-relaxed whitespace-pre-wrap break-words max-h-[140px] overflow-y-auto border-t border-border-soft">{block.text}</pre>}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <PasteBlocksUI
+        blocks={paste.activePastedBlocks}
+        openLabels={paste.openPastedLabels}
+        onTogglePreview={paste.togglePreview}
+        onExpand={paste.expandBlock}
+        onRemove={paste.removeBlock}
+      />
 
       {/* ── 输入卡片 ── */}
       <div
@@ -539,11 +478,3 @@ export function Composer({
   );
 }
 
-/** 粘贴块操作按钮 */
-function ActionBtn({ title, danger, onClick, children }: { title: string; danger?: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" className={`px-1.5 py-0.5 bg-transparent border-0 rounded text-fg-faint cursor-pointer text-[11px] transition-colors ${danger ? "hover:text-err hover:bg-bg-soft" : "hover:text-fg hover:bg-bg-soft"}`} title={title} onClick={onClick}>
-      {children}
-    </button>
-  );
-}

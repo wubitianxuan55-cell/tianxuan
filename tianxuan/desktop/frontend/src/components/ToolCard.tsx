@@ -63,11 +63,11 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
   const outputLines = item.output ? item.output.split("\n").length : 0;
 
   const rowPy = compact ? "py-0" : "py-0.5";
-  const rowPx = compact ? "px-1" : "px-1.5";
-  const fontSize = compact ? "text-[10px]" : "text-[11px]";
-  const chevronSize = compact ? 10 : 11;
-  const summarySize = compact ? "text-[9px]" : "text-[10px]";
-  const innerPx = compact ? "px-1" : "px-1.5";
+  const rowPx = compact ? "px-1" : "px-2";
+  const fontSize = compact ? "text-[12px]" : "text-[13px]";
+  const chevronSize = compact ? 11 : 12;
+  const summarySize = compact ? "text-[11px]" : "text-[12px]";
+  const innerPx = compact ? "px-1" : "px-2";
   const innerPb = compact ? "pb-1" : "pb-1.5";
 
   return (
@@ -97,7 +97,7 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
           className={`shrink-0 ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-faint/60" : item.status === "running" ? "text-accent" : "text-fg-faint"}`}
           size={chevronSize + 2}
         />
-        <span className={`font-mono font-medium truncate ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[9px]" : "text-[10px]"}`}>
+        <span className={`font-mono font-medium truncate ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[11px]" : "text-[12px]"}`}>
           {item.name}
         </span>
         {subject && (
@@ -138,7 +138,7 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
               <div className="text-[9px] text-fg-faint/60 uppercase tracking-wider mb-0.5 select-none">输出 · {outputLines}L</div>
               <CodeViewer value={item.output!} maxHeight={160} />
               {item.truncated && (
-                <div className="mt-1 px-2 py-0.5 border border-border-soft rounded bg-bg-soft text-fg-dim text-[10px]">
+                <div className="mt-1 px-2 py-0.5 border border-border-soft rounded bg-bg-soft text-fg-dim text-[11px]">
                   {t("tool.truncated")}
                 </div>
               )}
@@ -146,12 +146,12 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
           )}
 
           {item.error && !item.recoverable && (
-            <div className={`${innerPx} py-1 text-err text-[11px] leading-snug border-t border-err/20`}>
+            <div className={`${innerPx} py-1 text-err text-[12px] leading-snug border-t border-err/20`}>
               {item.error}
             </div>
           )}
           {item.error && item.recoverable && (
-            <div className={`${innerPx} py-1 text-fg-faint/60 text-[11px] leading-snug border-t border-fg-faint/15`}>
+            <div className={`${innerPx} py-1 text-fg-faint/60 text-[12px] leading-snug border-t border-fg-faint/15`}>
               {item.error}
             </div>
           )}

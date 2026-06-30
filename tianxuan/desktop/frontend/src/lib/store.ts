@@ -24,6 +24,7 @@ interface ControllerState {
   usage?: WireUsage; context: ContextInfo; meta?: Meta; balance?: BalanceInfo; jobs: JobView[];
   tcca?: TCCAReport;
   currentAssistant?: string; pendingUser?: string; discardTurn?: boolean;
+  lastAssistantIdx: number; // 最后一个 assistant 项的索引，避免流式 text/reasoning 事件中 O(n) 反向查找
   turnStartAt: number; turnTokens: number; seq: number;
   sessionTotal: number;
   perTurnUsage: WireUsage | null | undefined; // V5.30: whole-turn accumulated usage
@@ -55,15 +56,18 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
   if (s.discardTurn) { if (e.kind === "turn_done") return { ...s, discardTurn: false, running: false, turnActive: false, currentAssistant: undefined }; return s; }
   if (s.pendingUser !== undefined && e.kind !== "turn_started" && e.kind !== "turn_done") s = flushPendingUser(s);
   switch (e.kind) {
-    case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, turnSteps: [] };
+    case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, lastAssistantIdx: -1, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, turnSteps: [] };
     case "text": case "reasoning": {
-      // 反向查找最后一个 assistant 项追加文本。若最后 assistant 已终结
-      //（上一轮 turn_done 已将 streaming 置 false）且当前轮活跃，则创建新项
-      // 而非追加到旧轮次消息——修复跨轮次文本覆盖。
+      // O(1) 查找最后一个 assistant 项：用 lastAssistantIdx 避免流式时每 chunk O(n) 扫描。
+      // 若最后 assistant 已终结（上一轮 turn_done 已将 streaming 置 false）且当前轮活跃，
+      // 则创建新项而非追加到旧轮次消息——修复跨轮次文本覆盖。
       const delta = e.text ?? e.reasoning ?? "";
-      let idx = -1;
-      for (let i = s.items.length - 1; i >= 0; i--) {
-        if (s.items[i].kind === "assistant") { idx = i; break; }
+      let idx = s.lastAssistantIdx;
+      // 验证缓存索引有效性（非流式事件间可能有 items 变更）
+      if (idx < 0 || idx >= s.items.length || s.items[idx].kind !== "assistant") {
+        for (let i = s.items.length - 1; i >= 0; i--) {
+          if (s.items[i].kind === "assistant") { idx = i; break; }
+        }
       }
       const needNew = idx < 0 || (
         (s.items[idx] as Extract<Item, { kind: "assistant" }>).streaming === false &&
@@ -75,19 +79,22 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
         next[idx] = e.kind === "text"
           ? { ...it, text: it.text + delta, streaming: true }
           : { ...it, reasoning: it.reasoning + delta, streaming: true };
-        return { ...s, items: next, currentAssistant: it.id };
+        return { ...s, items: next, currentAssistant: it.id, lastAssistantIdx: idx };
       }
       // 没有可追加的活跃 assistant 项时创建新的
       const id = `a${s.seq}`;
-      return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.kind === "text" ? delta : "", reasoning: e.kind === "reasoning" ? delta : "", streaming: true }], currentAssistant: id };
+      const newIdx = s.items.length;
+      return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.kind === "text" ? delta : "", reasoning: e.kind === "reasoning" ? delta : "", streaming: true }], currentAssistant: id, lastAssistantIdx: newIdx };
     }
     case "message": {
       // 始终更新最后一个 assistant，不创建新的。
       // 若最后 assistant 已终结（上一轮结束）且当前轮活跃，则创建新项
       // 而非覆盖旧轮次消息——修复跨轮次文本覆盖。
-      let idx = -1;
-      for (let i = s.items.length - 1; i >= 0; i--) {
-        if (s.items[i].kind === "assistant") { idx = i; break; }
+      let idx = s.lastAssistantIdx;
+      if (idx < 0 || idx >= s.items.length || s.items[idx].kind !== "assistant") {
+        for (let i = s.items.length - 1; i >= 0; i--) {
+          if (s.items[i].kind === "assistant") { idx = i; break; }
+        }
       }
       const needNew = idx < 0 || (
         (s.items[idx] as Extract<Item, { kind: "assistant" }>).streaming === false &&
@@ -97,11 +104,12 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
         const it = s.items[idx] as Extract<Item, { kind: "assistant" }>;
         const next = [...s.items];
         next[idx] = { ...it, text: e.text ?? it.text, reasoning: e.reasoning ?? it.reasoning, streaming: false };
-        return { ...s, items: next, currentAssistant: undefined };
+        return { ...s, items: next, currentAssistant: undefined, lastAssistantIdx: idx };
       }
       // 没有任何可更新的 assistant 项时创建新的（首轮且模型直接回了 message）
       const id = `a${s.seq}`;
-      return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.text ?? "", reasoning: e.reasoning ?? "", streaming: false }], currentAssistant: undefined };
+      const newIdx = s.items.length;
+      return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "assistant", id, text: e.text ?? "", reasoning: e.reasoning ?? "", streaming: false }], currentAssistant: undefined, lastAssistantIdx: newIdx };
     }
     case "tool_dispatch": {
       const t = e.tool; if (!t) return s;
@@ -151,7 +159,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
       const finalItems: Item[] = e.err ? [...finalized, { kind: "notice", id: `e${s.seq}`, level: "warn", text: e.err }] : finalized;
       const st = (s.usage?.totalTokens != null && s.usage.totalTokens > 0) ? s.sessionTotal + s.usage.totalTokens : s.sessionTotal;
       // V5.30: 设 perTurnUsage=null 触发 StatsPanel 创建末轮 TurnRecord
-      return { ...s, items: finalItems, running: false, turnActive: false, currentAssistant: undefined, approval: undefined, ask: undefined, perTurnUsage: null, seq: s.seq + 1, sessionTotal: st };
+      return { ...s, items: finalItems, running: false, turnActive: false, currentAssistant: undefined, lastAssistantIdx: -1, approval: undefined, ask: undefined, perTurnUsage: null, seq: s.seq + 1, sessionTotal: st };
     }
     default: return s;
   }
@@ -179,7 +187,7 @@ const initialState: ControllerState = {
   approval: undefined, ask: undefined, usage: undefined,
   context: { used: 0, window: 0 }, meta: undefined, balance: undefined,
   tcca: undefined,
-  jobs: [], currentAssistant: undefined, pendingUser: undefined, discardTurn: false,
+  jobs: [], currentAssistant: undefined, pendingUser: undefined, discardTurn: false, lastAssistantIdx: -1,
   turnStartAt: 0, turnTokens: 0, seq: 0, sessionTotal: 0, sessionNonce: 0, perTurnUsage: null, turnSteps: [],
   _dispatch: () => {},
 };
@@ -202,11 +210,11 @@ export function useController() {
 
   useEffect(() => {
     const off = onEvent((e) => {
-      // 流式 text 事件绕过 React 18 自动批处理，确保每个 chunk 即时渲染。
-      // reasoning 不走 setTimeout —— 异步会导致与 tool_dispatch 等同步事件
-      // 交错执行，错误地创建多个思考卡。
-      if (e.kind === "text") {
-        setTimeout(() => dispatch({ type: "event", e }), 0);
+      // 流式 text/reasoning 用 queueMicrotask 确保每次 chunk 即时渲染，
+      // 不被 React 18 自动批处理合并。同步 dispatch 会导致多个事件在同一
+      // 微任务中批量更新从而不渲染中间态。
+      if (e.kind === "text" || e.kind === "reasoning") {
+        queueMicrotask(() => dispatch({ type: "event", e }));
       } else {
         dispatch({ type: "event", e });
       }

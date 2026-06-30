@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from "react";
-import { Check, ChevronRight, Copy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -11,20 +11,6 @@ import type { Item } from "../lib/store";
 
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
-// ── 头像图标 ──────────────────────────────────────────────────────────
-
-function AiAvatar({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z" />
-      <path d="M8 14v-2a4 4 0 0 1 8 0v2" />
-      <path d="M4 22h16a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2z" />
-      <circle cx="9" cy="19" r="1" fill="currentColor" />
-      <circle cx="15" cy="19" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
 function UserAvatar({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -34,38 +20,8 @@ function UserAvatar({ size = 14 }: { size?: number }) {
   );
 }
 
-// ── 复制按钮 ──────────────────────────────────────────────────────────
 
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCallback(async () => {
-    try { await navigator.clipboard.writeText(text); } catch { /* noop */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [text]);
-  return (
-    <button
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 border-0 rounded bg-transparent text-fg-faint/50 text-[10px] cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
-      onClick={copy}
-      title="复制"
-    >
-      {copied ? <Check size={10} className="text-ok" /> : <Copy size={10} />}
-      {copied ? "已复制" : "复制"}
-    </button>
-  );
-}
-
-// ── 推理图标 ──────────────────────────────────────────────────────────
-
-function BrainIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.95.5A3.5 3.5 0 0 1 2 17a3.5 3.5 0 0 1 2.67-3.38A3 3 0 0 1 4 8a3 3 0 0 1 3.22-2.98A2.5 2.5 0 0 1 9.5 2Z" />
-      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.95.5A3.5 3.5 0 0 0 22 17a3.5 3.5 0 0 0-2.67-3.38A3 3 0 0 0 20 8a3 3 0 0 0-3.22-2.98A2.5 2.5 0 0 0 14.5 2Z" />
-      <path d="M12 13a3 3 0 0 1-1.5-2.5 3 3 0 0 1 1.5-2.5" />
-    </svg>
-  );
-}
+// ── 推理区 ────────────────────────────────────────────────────────────
 
 // ── UserMessage ───────────────────────────────────────────────────────────
 
@@ -159,18 +115,9 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
 
   // 流式处理中的纯文本（不渲染 Markdown）
   const streaming = item.streaming ?? false;
-
   return (
     <div className="flex justify-start my-2" data-entrance={item.id}>
-      <div className="flex items-start gap-2 max-w-[92%] min-w-[120px]">
-        {/* AI 头像 */}
-        <span className={`shrink-0 rounded-full flex items-center justify-center mt-0.5 ${
-          streaming ? "w-7 h-7 bg-accent/20 text-accent animate-pulse" : "w-7 h-7 bg-bg-soft text-fg-faint"
-        }`}>
-          <AiAvatar size={14} />
-        </span>
-
-        <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
           {/* 推理区 */}
           {item.reasoning && (
             <div className="mb-1.5">
@@ -182,7 +129,6 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
                 onClick={toggleReasoning}
                 aria-expanded={reasoningOpen}
               >
-                <BrainIcon size={11} />
                 <span className="font-medium">{reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinking")}</span>
                 <span className="text-fg-faint/50 text-[10px] ml-auto">
                   {reasoningRunning
@@ -210,20 +156,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
               <MemoMarkdown text={item.text} streaming={streaming} />
             </div>
           )}
-
-          {/* 操作栏 — 流式完成后显示 */}
-          {!streaming && item.text && (
-            <div className="flex items-center gap-1 mt-1 opacity-0 hover:opacity-100 transition-opacity">
-              <CopyBtn text={item.text} />
-            </div>
-          )}
-
-          {/* 纯推理无正文时显示提示 */}
-          {!item.text && item.reasoning && !streaming && (
-            <div className="text-fg-faint/40 text-[11px] italic mt-1">{t("msg.reasoningOnly")}</div>
-          )}
         </div>
-      </div>
     </div>
   );
 });

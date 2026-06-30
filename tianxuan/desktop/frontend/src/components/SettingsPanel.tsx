@@ -664,12 +664,12 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
   const themeOptions: Theme[] = ["dark", "light", "warm", "ice", "forest"];
 
     const themeColors: Record<Theme, { bg: string; accent: string; fg: string; label: string }> = {
-    auto:   { bg: "#0b0f15", accent: "#e8815b", fg: "#e6ebf2", label: t("settings.themeAuto") },
-    dark:   { bg: "#0b0f15", accent: "#e8815b", fg: "#e6ebf2", label: t("settings.themeDark") },
-    light:  { bg: "#f8f6f2", accent: "#d4724a", fg: "#1a1c20", label: t("settings.themeLight") },
-    warm:   { bg: "#1e1814", accent: "#e8946b", fg: "#f0e8dd", label: "暖色" },
-    ice:    { bg: "#0a111a", accent: "#6ea8fe", fg: "#e0e8f2", label: "冰蓝" },
-    forest: { bg: "#0d1510", accent: "#7ebd85", fg: "#e0ece2", label: "森林" },
+    auto:   { bg: "#060b14", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeAuto") },
+    dark:   { bg: "#060b14", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeDark") },
+    light:  { bg: "#f8f6f2", accent: "#3b82f6", fg: "#1a1c20", label: t("settings.themeLight") },
+    warm:   { bg: "#1e1814", accent: "#a855f7", fg: "#f0e8dd", label: "暖色" },
+    ice:    { bg: "#0a111a", accent: "#6ee7ff", fg: "#e0e8f2", label: "冰蓝" },
+    forest: { bg: "#0d1510", accent: "#4ade80", fg: "#e0ece2", label: "森林" },
   };
 
   const tc = themeColors[theme] ?? themeColors.dark;

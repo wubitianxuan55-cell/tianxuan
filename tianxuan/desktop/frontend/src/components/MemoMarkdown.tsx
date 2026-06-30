@@ -18,13 +18,13 @@ export const MemoMarkdown = memo(function MemoMarkdown({ text, streaming }: Memo
   return (
     <div className="break-words overflow-wrap-break-word">
       {streaming ? (
-        <pre className="!font-sans whitespace-pre-wrap !bg-transparent !p-0 !m-0 !text-[inherit] !border-0 leading-relaxed">
+        <div className="!font-sans whitespace-pre-wrap !bg-transparent !p-0 !m-0 !text-[inherit] !border-0 leading-relaxed">
           {text || ""}
           <span className="inline-block w-[2px] h-[1em] bg-accent align-middle ml-px animate-pulse" />
-        </pre>
+        </div>
       ) : (
         <Markdown text={text || ""} />
       )}
     </div>
   );
-});
+}, (prev, next) => prev.text === next.text && prev.streaming === next.streaming);

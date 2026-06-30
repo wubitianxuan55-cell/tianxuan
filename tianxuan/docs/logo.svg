@@ -1,28 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="170" viewBox="0 0 760 170" role="img" aria-label="tianxuan — DeepSeek-native coding agent">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="170" viewBox="0 0 760 170" role="img" aria-label="tianxuan — AI coding agent">
   <title>tianxuan</title>
   <defs>
-    <linearGradient id="tx-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#d97757"/>
-      <stop offset="33%" stop-color="#e8a87c"/>
-      <stop offset="66%" stop-color="#d97757"/>
-      <stop offset="100%" stop-color="#c45d3a"/>
+    <linearGradient id="holo-text" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00e5ff"/>
+      <stop offset="25%" stop-color="#6ee7ff"/>
+      <stop offset="55%" stop-color="#a855f7"/>
+      <stop offset="80%" stop-color="#ff2d95"/>
+      <stop offset="100%" stop-color="#4f8cf7"/>
     </linearGradient>
-    <linearGradient id="tx-grad-mark" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#d97757"/>
-      <stop offset="50%" stop-color="#e8a87c"/>
-      <stop offset="100%" stop-color="#c45d3a"/>
-    </linearGradient>
+
+    <radialGradient id="holo-node" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#6ee7ff" stop-opacity="0.9"/>
+      <stop offset="70%" stop-color="#a855f7" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#4f8cf7" stop-opacity="0.3"/>
+    </radialGradient>
+
+    <radialGradient id="holo-core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="15%" stop-color="#e0f7ff" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#6ee7ff" stop-opacity="0.85"/>
+      <stop offset="75%" stop-color="#a855f7" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#4f8cf7" stop-opacity="0.15"/>
+    </radialGradient>
+
+    <filter id="core-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <filter id="node-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <filter id="ring-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
   </defs>
 
-  <!-- Icon: simplified diamond mark (V8.x redesign) -->
-  <g transform="translate(105, 85)">
-    <polygon points="0,-44 30,0 0,44 -30,0" fill="url(#tx-grad-mark)" opacity="0.95"/>
-    <polygon points="0,-32 22,0 0,32 -22,0" fill="#1a1a2e" opacity="0.18"/>
+  <!-- ====== 图标区域 (左: 90×140) ====== -->
+  <g transform="translate(85, 85)">
+    <!-- 外环 -->
+    <circle cx="0" cy="0" r="62" fill="none" stroke="#6ee7ff" stroke-width="0.8" stroke-dasharray="12 6 2 6 12 40" opacity="0.2" filter="url(#ring-glow)"/>
+
+    <!-- 辐射连线 -->
+    <line x1="0" y1="0" x2="0" y2="-48" stroke="#6ee7ff" stroke-width="1.8" opacity="0.45"/>
+    <line x1="0" y1="0" x2="41.6" y2="-24" stroke="#a855f7" stroke-width="1.8" opacity="0.45"/>
+    <line x1="0" y1="0" x2="41.6" y2="24" stroke="#ff2d95" stroke-width="1.8" opacity="0.45"/>
+    <line x1="0" y1="0" x2="0" y2="48" stroke="#4f8cf7" stroke-width="1.8" opacity="0.45"/>
+    <line x1="0" y1="0" x2="-41.6" y2="24" stroke="#00e5ff" stroke-width="1.8" opacity="0.45"/>
+    <line x1="0" y1="0" x2="-41.6" y2="-24" stroke="#6ee7ff" stroke-width="1.8" opacity="0.45"/>
+
+    <!-- 外围连线 -->
+    <line x1="0" y1="-48" x2="41.6" y2="-24" stroke="#6ee7ff" stroke-width="1" opacity="0.18"/>
+    <line x1="41.6" y1="-24" x2="41.6" y2="24" stroke="#a855f7" stroke-width="1" opacity="0.18"/>
+    <line x1="41.6" y1="24" x2="0" y2="48" stroke="#ff2d95" stroke-width="1" opacity="0.18"/>
+    <line x1="0" y1="48" x2="-41.6" y2="24" stroke="#4f8cf7" stroke-width="1" opacity="0.18"/>
+    <line x1="-41.6" y1="24" x2="-41.6" y2="-24" stroke="#00e5ff" stroke-width="1" opacity="0.18"/>
+    <line x1="-41.6" y1="-24" x2="0" y2="-48" stroke="#6ee7ff" stroke-width="1" opacity="0.18"/>
+
+    <!-- 6个外围节点 -->
+    <circle cx="0" cy="-48" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="0" cy="-48" r="3" fill="#ffffff" opacity="0.6"/>
+    <circle cx="41.6" cy="-24" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="41.6" cy="-24" r="3" fill="#ffffff" opacity="0.6"/>
+    <circle cx="41.6" cy="24" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="41.6" cy="24" r="3" fill="#ffffff" opacity="0.6"/>
+    <circle cx="0" cy="48" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="0" cy="48" r="3" fill="#ffffff" opacity="0.6"/>
+    <circle cx="-41.6" cy="24" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="-41.6" cy="24" r="3" fill="#ffffff" opacity="0.6"/>
+    <circle cx="-41.6" cy="-24" r="8" fill="url(#holo-node)" filter="url(#node-glow)" opacity="0.85"/>
+    <circle cx="-41.6" cy="-24" r="3" fill="#ffffff" opacity="0.6"/>
+
+    <!-- 核心节点 -->
+    <circle cx="0" cy="0" r="14" fill="url(#holo-core)" filter="url(#core-glow)"/>
+    <circle cx="0" cy="0" r="10" fill="url(#holo-node)"/>
+    <circle cx="0" cy="0" r="4" fill="#ffffff" opacity="0.9"/>
+    <circle cx="0" cy="0" r="1.5" fill="#ffffff"/>
   </g>
 
-  <!-- Wordmark: "tianxuan" -->
-  <text x="165" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" letter-spacing="-0.5" fill="url(#tx-grad)">tianxuan</text>
+  <!-- ====== 文字区域 ====== -->
+  <!-- 主标题 "tianxuan" -->
+  <text x="170" y="98" font-family="system-ui, -apple-system, sans-serif" font-size="50" font-weight="700" letter-spacing="-0.5" fill="url(#holo-text)">tianxuan</text>
 
-  <!-- Tagline -->
-  <text x="167" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="400" fill="#c0c4cc" opacity="0.7">DeepSeek-native coding agent</text>
+  <!-- 副标题 -->
+  <text x="172" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="400" fill="#808ea0" opacity="0.7">AI coding agent</text>
 </svg>

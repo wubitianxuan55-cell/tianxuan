@@ -362,6 +362,7 @@ export const zhTW: Record<DictKey, string> = {
   "rewind.summFrom": "從此處開始摘要",
   "rewind.summUpto": "摘要到此處",
   "msg.copied": "已複製",
+  "msg.reasoningOnly": "（僅推理，無正文輸出）",
 
   // tool card summaries
   "tool.stepOne": "{n} 個步驟",

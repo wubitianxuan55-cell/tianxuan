@@ -363,6 +363,7 @@ export const en = {
   "rewind.summFrom": "Summarize from here",
   "rewind.summUpto": "Summarize up to here",
   "msg.copied": "Copied",
+  "msg.reasoningOnly": "(reasoning only, no visible output)",
 
   // tool card summaries
   "tool.stepOne": "{n} step",

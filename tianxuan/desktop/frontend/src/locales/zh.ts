@@ -364,6 +364,7 @@ export const zh: Record<DictKey, string> = {
   "rewind.summFrom": "从这里起摘要",
   "rewind.summUpto": "摘要到这里",
   "msg.copied": "已复制",
+  "msg.reasoningOnly": "（仅推理，无正文输出）",
 
   // 工具卡片摘要
   "tool.stepOne": "{n} 步",

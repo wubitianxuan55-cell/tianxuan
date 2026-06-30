@@ -56,6 +56,17 @@ func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 	if score <= 0 {
 		return
 	}
+	// V10.16: 区分 "on"（始终规划，旧 PlanModeMarker）和 "ask"（自动检测，
+	// 切换 orchestrate 模式）。V10.13 错误地将两者统一为 orchestrate，导致
+	// AutoPlan="on" 的测试和行为回归。
+	if mode == autoPlanOn {
+		if score >= 1 {
+			c.SetPlanMode(true)
+			c.notice("auto plan: complex task detected, entering plan mode")
+		}
+		return
+	}
+	// "ask" mode: classifier + heuristic → orchestrate
 	if classifier != nil && score <= 2 {
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()

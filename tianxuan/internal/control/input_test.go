@@ -143,14 +143,14 @@ func TestRunTurnAutoPlanComplexTask(t *testing.T) {
 	if err := c.runTurn(context.Background(), input); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("complex task should auto-enter plan mode, inputs=%q", runner.inputs)
 	}
 	if !c.PlanMode() {
 		t.Fatal("controller plan mode should be on after auto-plan")
 	}
-	if len(notices) != 1 || !strings.Contains(notices[0], "auto plan") {
-		t.Fatalf("notice = %v, want one auto-plan notice", notices)
+	if len(notices) != 1 || !strings.Contains(notices[0], "auto mode: switched to orchestrate") {
+		t.Fatalf("notice = %v, want one orchestrate notice", notices)
 	}
 }
 
@@ -161,14 +161,12 @@ func TestRunTurnAutoPlanSkipsSimpleQuestion(t *testing.T) {
 	if err := c.runTurn(context.Background(), "解释一下这个函数做什么？"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("simple question should not auto-plan: inputs=%q", runner.inputs)
 	}
-	if c.PlanMode() {
-		t.Fatal("controller plan mode should remain off")
-	}
+	// maybeAutoMode may set explore mode (which sets planMode), but auto-plan
+	// (orchestrate mode) must not trigger.
 }
-
 func TestRunTurnAutoPlanOff(t *testing.T) {
 	runner := &fakeTurnRunner{}
 	c := New(Options{AutoPlan: "off", Runner: runner})
@@ -193,7 +191,7 @@ func TestRunTurnAutoPlanClassifierBorderlineTrue(t *testing.T) {
 	if err := c.runTurn(context.Background(), "实现一个小的配置入口"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("classifier true should auto-plan, inputs=%q", runner.inputs)
 	}
 	if classifier.calls != 1 {
@@ -209,7 +207,7 @@ func TestRunTurnAutoPlanClassifierBorderlineFalse(t *testing.T) {
 	if err := c.runTurn(context.Background(), "实现一个小的配置入口"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("classifier false should skip auto-plan, inputs=%q", runner.inputs)
 	}
 	if c.PlanMode() {
@@ -228,7 +226,7 @@ func TestRunTurnAutoPlanClassifierFallback(t *testing.T) {
 	if err := c.runTurn(context.Background(), "实现 README 文档更新"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("score 2 should fall back to heuristic auto-plan, inputs=%q", runner.inputs)
 	}
 	if classifier.calls != 1 {
@@ -244,7 +242,7 @@ func TestRunTurnAutoPlanTypedNilClassifierFallsBack(t *testing.T) {
 	if err := c.runTurn(context.Background(), "实现 README 文档更新"); err != nil {
 		t.Fatal(err)
 	}
-	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if len(runner.inputs) != 1 || !strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("typed nil classifier should fall back to heuristic auto-plan, inputs=%q", runner.inputs)
 	}
 }
@@ -262,10 +260,8 @@ func TestRunTurnAutoPlanScoresRawPromptNotResolvedRefs(t *testing.T) {
 	if len(runner.inputs) != 1 {
 		t.Fatalf("runner inputs = %d, want 1", len(runner.inputs))
 	}
-	if strings.HasPrefix(runner.inputs[0], PlanModeMarker) {
+	if strings.HasPrefix(runner.inputs[0], OrchestrateModeMarker) {
 		t.Fatalf("resolved context should not trigger auto-plan when raw prompt is simple: %q", runner.inputs[0])
 	}
-	if c.PlanMode() {
-		t.Fatal("controller plan mode should remain off")
-	}
+	// maybeAutoMode may set explore mode from the raw prompt, but auto-plan must not.
 }

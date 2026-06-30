@@ -86,7 +86,7 @@ func TestAutoPlanGateEndToEnd(t *testing.T) {
 
 	msgs := ag.Session().Messages
 	if got := firstUserMessage(msgs); !strings.HasPrefix(got, PlanModeMarker) {
-		t.Fatalf("first model input = %q, want the auto-plan marker prefixed", got)
+		t.Fatalf("first model input = %q, want the plan-mode marker prefixed", got)
 	}
 	if c.PlanMode() {
 		t.Fatal("plan mode should be off after approval")

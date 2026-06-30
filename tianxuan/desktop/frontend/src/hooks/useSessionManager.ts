@@ -1,5 +1,5 @@
 // 会话管理 hook — 列表刷新 + CRUD + 分页 + 侧边栏状态
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { SessionMeta } from "../lib/types";
 
 const PAGE_SIZE = 10;
@@ -15,20 +15,23 @@ export function useSessionManager(
   const [sidebarQuery, setSidebarQuery] = useState("");
   const [newSessionDone, setNewSessionDone] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  // 缓存全量列表，loadMore 不再重复请求
+  const allSessionsRef = useRef<SessionMeta[]>([]);
 
   const refreshSessions = useCallback(async () => {
     const sessions = await listSessions();
+    allSessionsRef.current = sessions;
     setHasMore(sessions.length > PAGE_SIZE);
     setSidebarSessions(sessions.slice(0, PAGE_SIZE));
     return sessions;
   }, [listSessions]);
 
-  const loadMore = useCallback(async () => {
-    const sessions = await listSessions();
-    const next = sessions.slice(0, sidebarSessions.length + PAGE_SIZE);
-    setHasMore(next.length < sessions.length);
+  const loadMore = useCallback(() => {
+    const all = allSessionsRef.current;
+    const next = all.slice(0, sidebarSessions.length + PAGE_SIZE);
+    setHasMore(next.length < all.length);
     setSidebarSessions(next);
-  }, [listSessions, sidebarSessions.length]);
+  }, [sidebarSessions.length]);
 
   const startNewSession = useCallback(async () => {
     await newSession();
@@ -49,9 +52,13 @@ export function useSessionManager(
   const handleDeleteSession = useCallback(
     async (path: string) => {
       await deleteSession(path);
-      await refreshSessions();
+      // 乐观更新缓存，避免删除后列表闪烁
+      allSessionsRef.current = allSessionsRef.current.filter(s => s.path !== path);
+      const visible = allSessionsRef.current.slice(0, sidebarSessions.length);
+      setHasMore(visible.length < allSessionsRef.current.length);
+      setSidebarSessions(visible);
     },
-    [deleteSession, refreshSessions],
+    [deleteSession, sidebarSessions.length],
   );
 
   const handleRenameSession = useCallback(

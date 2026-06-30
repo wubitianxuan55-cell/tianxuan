@@ -382,6 +382,7 @@ export default function App() {
           onLoadMore={loadMore}
           onResumeSession={onResumeSession}
           onDeleteSession={onDeleteSession}
+          onRenameSession={handleRenameSession}
           onOpenHistory={openHistory}
           onOpenMemory={openMemory}
           showPlan={showPlan}

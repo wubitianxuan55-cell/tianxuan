@@ -1,4 +1,5 @@
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useState, useEffect } from "react";
 import {
   SquarePen, Brain, Blocks, FileText, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
@@ -21,6 +22,7 @@ export interface SidebarProps {
   onLoadMore: () => void;
   onResumeSession: (path: string) => void;
   onDeleteSession: (path: string) => void;
+  onRenameSession: (path: string, title: string) => void;
   onOpenHistory: () => void;
   onOpenMemory: () => void;
   showPlan: boolean;
@@ -47,6 +49,7 @@ export function Sidebar({
   onLoadMore,
   onResumeSession,
   onDeleteSession,
+  onRenameSession,
   onOpenHistory,
   onOpenMemory,
   showPlan,
@@ -62,6 +65,17 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useT();
   const toggleTitle = collapsed ? t("sidebar.expand") : t("sidebar.collapse");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  // 内联重命名
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  // 搜索防抖：本地输入即时更新，200ms 后才同步到父组件触发过滤
+  const [localQuery, setLocalQuery] = useState(searchQuery);
+  useEffect(() => { setLocalQuery(searchQuery); }, [searchQuery]);
+  useEffect(() => {
+    const timer = setTimeout(() => onSearchChange(localQuery), 200);
+    return () => clearTimeout(timer);
+  }, [localQuery]);
 
   return (
     <>
@@ -137,13 +151,13 @@ export function Sidebar({
             <input
               className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag"
               placeholder={t("sidebar.search")}
-              value={searchQuery}
-              onChange={e => onSearchChange(e.target.value)}
+              value={localQuery}
+              onChange={e => setLocalQuery(e.target.value)}
               onKeyDown={e => e.stopPropagation()}
             />
             <div className="min-h-0 overflow-y-auto pr-0.5">
               {(() => {
-                const q = searchQuery.trim().toLowerCase();
+                const q = localQuery.trim().toLowerCase();
                 const visible = q
                   ? sessions.filter((s: SessionMeta) =>
                       (s.title || s.preview || "").toLowerCase().includes(q) ||
@@ -174,34 +188,64 @@ export function Sidebar({
                         className={`shrink-0 mt-0.5 ${session.current ? "text-accent" : "text-fg-faint"}`}
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span
-                          className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-[12.5px] leading-[1.35] font-medium ${
-                            session.current ? "text-accent" : ""
-                          }`}
-                        >
-                          {sessionTitle(session, t("history.emptySession"))}
-                        </span>
+                        {renameTarget === session.path ? (
+                          <input
+                            className="w-full bg-bg border border-accent rounded px-1 py-0 text-fg text-[12.5px] outline-none"
+                            value={renameDraft}
+                            onChange={e => setRenameDraft(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") { e.preventDefault(); void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); setRenameTarget(null); }
+                              if (e.key === "Escape") { e.preventDefault(); setRenameTarget(null); }
+                            }}
+                            onBlur={() => setRenameTarget(null)}
+                            autoFocus
+                            onClick={e => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span
+                            className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-[12.5px] leading-[1.35] font-medium cursor-text ${
+                              session.current ? "text-accent" : ""
+                            }`}
+                            onDoubleClick={e => {
+                              if (session.current) return;
+                              e.stopPropagation();
+                              setRenameTarget(session.path);
+                              setRenameDraft(sessionTitle(session, ""));
+                            }}
+                            title="双击重命名"
+                          >
+                            {sessionTitle(session, t("history.emptySession"))}
+                          </span>
+                        )}
                         <span className="text-fg-faint font-mono text-[10.5px]">
                           {session.current ? t("history.current") : sessionTime(session.modTime)}
                         </span>
                       </span>
                     </button>
                     {!session.current && (
-                      <button
-                        className="hidden group-hover:block bg-transparent border-0 text-fg-faint text-[15px] cursor-pointer px-1 py-0.5 rounded-[3px] mt-1 hover:text-err"
-                        title="删除"
-                        onClick={e => {
-                          e.stopPropagation();
-                          void onDeleteSession(session.path);
-                        }}
-                      >
-                        ×
-                      </button>
+                      deleteConfirm === session.path ? (
+                        <span className="flex items-center gap-1 shrink-0">
+                          <button className="bg-transparent border-0 text-[10px] text-err cursor-pointer px-1 py-0.5 rounded hover:bg-err/10" onClick={e => { e.stopPropagation(); void onDeleteSession(session.path); setDeleteConfirm(null); }}>
+                            确认
+                          </button>
+                          <button className="bg-transparent border-0 text-[10px] text-fg-faint cursor-pointer px-1 py-0.5 rounded hover:bg-bg-soft" onClick={e => { e.stopPropagation(); setDeleteConfirm(null); }}>
+                            取消
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          className="hidden group-hover:block bg-transparent border-0 text-fg-faint text-[15px] cursor-pointer px-1 py-0.5 rounded-[3px] mt-1 hover:text-err"
+                          title="删除"
+                          onClick={e => { e.stopPropagation(); setDeleteConfirm(session.path); }}
+                        >
+                          ×
+                        </button>
+                      )
                     )}
                   </div>
                 ));
               })()}
-              {hasMore && !searchQuery && (
+              {hasMore && !localQuery && (
                 <button
                   className="w-full mt-1 py-1.5 text-fg-faint text-[11.5px] border border-border-soft rounded-md bg-transparent cursor-pointer hover:text-fg hover:bg-sidebar-hover transition-colors"
                   onClick={() => void onLoadMore()}

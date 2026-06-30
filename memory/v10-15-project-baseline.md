@@ -1,7 +1,7 @@
 ---
 name: v10-15-project-baseline
 title: V10.15.0 项目基准
-description: V10.15.0 项目基准 — 当前版本、构建命令、核心变更
+description: V10.15.0 项目基准 — 旧版本（已归档，当前 V10.16.0）
 metadata:
   type: project
 ---

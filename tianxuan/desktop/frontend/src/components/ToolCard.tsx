@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import {
   Ban,
   Check,
@@ -35,8 +35,8 @@ function StatusGlyph({ status, recoverable }: { status: ToolItem["status"]; reco
 export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
   const t = useT();
   const compact = useCompact();
-  const diffs = diffsFor(item.name, item.args);
-  const subject = subjectOf(item.name, item.args);
+  const diffs = useMemo(() => diffsFor(item.name, item.args), [item.name, item.args]);
+  const subject = useMemo(() => subjectOf(item.name, item.args), [item.name, item.args]);
   const Icon = ICONS[item.name] ?? mcpOr(item.name);
   const nested = subcalls ?? [];
   const hasNested = nested.length > 0;

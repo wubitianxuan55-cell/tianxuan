@@ -175,14 +175,17 @@ export function Transcript({
   );
 
   // ── 子调用收集 ──────────────────────────────────────────────────
-  const subcallsByParent = new Map<string, ToolItem[]>();
-  for (const it of items) {
-    if (it.kind === "tool" && it.parentId) {
-      const arr = subcallsByParent.get(it.parentId) ?? [];
-      arr.push(it);
-      subcallsByParent.set(it.parentId, arr);
+  const subcallsByParent = useMemo(() => {
+    const map = new Map<string, ToolItem[]>();
+    for (const it of items) {
+      if (it.kind === "tool" && it.parentId) {
+        const arr = map.get(it.parentId) ?? [];
+        arr.push(it);
+        map.set(it.parentId, arr);
+      }
     }
-  }
+    return map;
+  }, [items]);
 
   const [dismissedErrors, setDismissedErrors] = useState(new Set<string>());
   const [openTurn, setOpenTurn] = useState<number | null>(null);
@@ -196,11 +199,14 @@ export function Transcript({
     return () => document.removeEventListener("mousedown", onDown);
   }, [openTurn]);
 
-  const userTurn = new Map<string, number>();
-  let nt = 0;
-  for (const it of items) {
-    if (it.kind === "user") userTurn.set(it.id, nt++);
-  }
+  const userTurn = useMemo(() => {
+    const map = new Map<string, number>();
+    let nt = 0;
+    for (const it of items) {
+      if (it.kind === "user") map.set(it.id, nt++);
+    }
+    return map;
+  }, [items]);
 
   const scrollDown = useCallback(() => {
     stick.current = true;

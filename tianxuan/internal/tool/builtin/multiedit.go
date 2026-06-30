@@ -129,7 +129,13 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 		}
 	}
 
-	if err := os.WriteFile(p.Path, []byte(content), 0o644); err != nil {
+	// Preserve original file permissions (e.g. executable scripts).
+	fi, err := os.Stat(p.Path)
+	mode := os.FileMode(0o644)
+	if err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.WriteFile(p.Path, []byte(content), mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("multi_edit %s: %d edits applied (%d total replacements)", p.Path, len(p.Edits), applied), nil

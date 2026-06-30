@@ -114,6 +114,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		var ringBuf []string
 		ringPos := 0
 		var pendingAfter int // context lines to emit after the last match
+		emittedLines := map[int]bool{} // tracks emitted line numbers for O(1) dedup
 
 		for sc.Scan() {
 			ln++
@@ -149,12 +150,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 					if ctxStart < 1 {
 						ctxStart = 1
 					}
-					already := map[int]bool{}
-					for _, m := range out {
-						if m.file == file {
-							already[m.line] = true
-						}
-					}
+					already := emittedLines
 					for ctxLine := ctxStart; ctxLine < ln; ctxLine++ {
 						if already[ctxLine] {
 							continue

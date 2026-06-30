@@ -139,6 +139,13 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	upTo := p.Offset + p.Limit + 1
 
+	// Check for cancellation before potentially long scan
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
+
 	var collected []string
 	lineNo := 0
 	for scanner.Scan() {

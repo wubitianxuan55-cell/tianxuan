@@ -106,7 +106,12 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 		result += fileLE
 	}
 
-	if err := os.WriteFile(p.Path, []byte(result), 0o644); err != nil {
+	// Preserve original file permissions.
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(p.Path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.WriteFile(p.Path, []byte(result), mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("edit_lines %s: replaced lines %d-%d (%d lines) → %d lines", p.Path, p.StartLine, p.EndLine, p.EndLine-p.StartLine+1, len(out)-len(lines)+(p.EndLine-p.StartLine+1)), nil

@@ -103,7 +103,12 @@ func (n notebookEdit) Execute(ctx context.Context, raw json.RawMessage) (string,
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(a.Path, out, 0o644); err != nil {
+	// Preserve original file permissions.
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(a.Path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.WriteFile(a.Path, out, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", a.Path, err)
 	}
 	return fmt.Sprintf("%s in %s (cell %d; %d cells total)", summary, a.Path, idx, len(nb.cells)), nil

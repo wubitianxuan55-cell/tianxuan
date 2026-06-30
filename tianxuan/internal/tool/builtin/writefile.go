@@ -56,7 +56,12 @@ func (w writeFile) Execute(ctx context.Context, args json.RawMessage) (string, e
 			return "", fmt.Errorf("mkdir %s: %w", dir, err)
 		}
 	}
-	if err := os.WriteFile(p.Path, []byte(p.Content), 0o644); err != nil {
+	// Preserve original file permissions.
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(p.Path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.WriteFile(p.Path, []byte(p.Content), mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("wrote %d bytes to %s", len(p.Content), p.Path), nil

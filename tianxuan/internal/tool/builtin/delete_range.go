@@ -47,7 +47,12 @@ func (d deleteRange) Execute(ctx context.Context, args json.RawMessage) (string,
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(change.Path, []byte(change.NewText), 0o644); err != nil {
+	// Preserve original file permissions.
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(change.Path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := os.WriteFile(change.Path, []byte(change.NewText), mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", change.Path, err)
 	}
 	return change.Diff, nil

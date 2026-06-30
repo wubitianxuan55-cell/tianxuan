@@ -93,6 +93,13 @@ func (s *updateSink) Emit(e event.Event) {
 		if e.Tool.Err != "" {
 			status = "failed"
 			text = e.Tool.Err
+		} else {
+			// V10.16: unwrap ToolEnvelope JSON to extract the actual tool result
+			// text for ACP clients. The model sees the full envelope; the client
+			// should see just the result.
+			if unwrapped := unwrapToolResult(e.Tool.Output); unwrapped != "" {
+				text = unwrapped
+			}
 		}
 		s.send(toolCallUpdateMsg{
 			SessionUpdate: "tool_call_update",
@@ -219,7 +226,21 @@ func (s *updateSink) requestPermission(a event.Approval) {
 // textBlock builds a text content block.
 func textBlock(text string) ContentBlock { return ContentBlock{Type: "text", Text: text} }
 
-// rawJSON returns args as a raw JSON value when it is valid JSON, else nil so the
+// unwrapToolResult extracts the actual tool result text from a ToolEnvelope JSON
+// wrapper. When the output is JSON like {"ok":true,...,"data":{"result":"..."}},
+// it returns the inner result string. Otherwise it returns "" and the caller
+// falls back to the original text.
+func unwrapToolResult(output string) string {
+	var env struct {
+		Data struct {
+			Result string `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(output), &env); err != nil || env.Data.Result == "" {
+		return ""
+	}
+	return env.Data.Result
+}
 // rawInput field is omitted rather than carrying a malformed payload.
 func rawJSON(args string) json.RawMessage {
 	if args == "" || !json.Valid([]byte(args)) {

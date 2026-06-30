@@ -159,6 +159,8 @@ export function Transcript({
   }, [onScrollToTurnReady]);
 
   // ── 折叠/展开保持滚动 ──────────────────────────────────────────
+  // 250ms 与 GSAP collapse 动画时长耦合（useGSAPCollapse 默认 duration）。
+  // 若动画时长变更，此处需同步调整。
   const scheduleMeasure = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;

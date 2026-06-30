@@ -80,7 +80,9 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
   const reasoningRunning = !!(item.streaming && !item.text && item.reasoning);
   const [userToggled, setUserToggled] = useState(false);
   const [reasoningOpenState, setReasoningOpenState] = useState(false);
-  const reasoningOpen = userToggled ? reasoningOpenState : false;
+  // V10.16: 流式期间默认展示推理（用户可见模型思考过程），
+  // 流式结束后折叠。用户手动切换后尊重用户选择。
+  const reasoningOpen = userToggled ? reasoningOpenState : !!item.streaming;
   useGSAPCollapse(reasoningBodyRef, reasoningOpen);
   const toggleReasoning = useCallback(() => {
     setUserToggled(true);

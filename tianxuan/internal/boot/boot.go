@@ -132,6 +132,11 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	sysPrompt = memory.Compose(sysPrompt, mem)
 	builtin.SetMemorySearchIndex(mem.Search) // V5.31: wire search index to memory_search tool
 
+	// 新项目自动初始化：创建默认 AGENTS.md 记忆文件
+	if mem.Empty() {
+		memory.InitDefaults(mem)
+	}
+
 	// Skills: discover playbooks (built-in + project/custom/global) and fold their
 	// one-liner index into the same cache-stable prefix — names + descriptions
 	// only; bodies load on demand via run_skill or "/<name>". Bodies never enter

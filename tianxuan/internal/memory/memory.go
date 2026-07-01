@@ -211,3 +211,28 @@ func Compose(base string, s *Set) string {
 	}
 	return strings.TrimRight(base, "\n") + "\n\n" + block
 }
+
+// InitDefaults creates default memory files when a project has none. It writes
+// AGENTS.md with a minimal template so the memory panel isn't empty on first
+// open. Existing files are never overwritten.
+func InitDefaults(s *Set) {
+	if s == nil {
+		return
+	}
+	path := s.DocPath(ScopeProject)
+	if _, err := os.Stat(path); err == nil {
+		return // already exists
+	}
+	defaultContent := `# Project memory
+
+## Notes
+
+<!-- 在这里记录项目约定、架构决策、编码规范等。AI 助手每轮对话前会读取此文件。 -->
+
+`
+	if err := os.WriteFile(path, []byte(defaultContent), 0644); err != nil {
+		return
+	}
+	// Reload so the new doc appears immediately
+	s.Docs = discoverDocs(s.CWD, s.UserDir)
+}

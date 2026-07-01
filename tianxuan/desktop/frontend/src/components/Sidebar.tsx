@@ -197,7 +197,7 @@ export function Sidebar({
                               if (e.key === "Enter") { e.preventDefault(); void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); setRenameTarget(null); }
                               if (e.key === "Escape") { e.preventDefault(); setRenameTarget(null); }
                             }}
-                            onBlur={() => setRenameTarget(null)}
+                            onBlur={() => { void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); setRenameTarget(null); }}
                             autoFocus
                             onClick={e => e.stopPropagation()}
                           />

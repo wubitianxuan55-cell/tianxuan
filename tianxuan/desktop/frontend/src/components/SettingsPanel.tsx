@@ -663,13 +663,32 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
   const { t, pref, setPref } = useI18n();
   const themeOptions: Theme[] = ["dark", "light", "warm", "ice", "forest"];
 
+  // 字体偏好（localStorage + DOM attribute）
+  const [uiFont, setUiFont] = useState(() => {
+    try { return localStorage.getItem("tianxuan.uiFont") || ""; } catch { return ""; }
+  });
+  const [monoFont, setMonoFont] = useState(() => {
+    try { return localStorage.getItem("tianxuan.monoFont") || ""; } catch { return ""; }
+  });
+  const applyFont = (kind: "ui" | "mono", value: string) => {
+    const attr = kind === "ui" ? "data-font-family" : "data-mono-font-family";
+    if (value) {
+      document.documentElement.setAttribute(attr, value);
+      localStorage.setItem(`tianxuan.${kind === "ui" ? "uiFont" : "monoFont"}`, value);
+    } else {
+      document.documentElement.removeAttribute(attr);
+      localStorage.removeItem(`tianxuan.${kind === "ui" ? "uiFont" : "monoFont"}`);
+    }
+    if (kind === "ui") setUiFont(value); else setMonoFont(value);
+  };
+
     const themeColors: Record<Theme, { bg: string; accent: string; fg: string; label: string }> = {
-    auto:   { bg: "#060b14", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeAuto") },
-    dark:   { bg: "#060b14", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeDark") },
-    light:  { bg: "#f8f6f2", accent: "#3b82f6", fg: "#1a1c20", label: t("settings.themeLight") },
-    warm:   { bg: "#1e1814", accent: "#a855f7", fg: "#f0e8dd", label: "暖色" },
-    ice:    { bg: "#0a111a", accent: "#6ee7ff", fg: "#e0e8f2", label: "冰蓝" },
-    forest: { bg: "#0d1510", accent: "#4ade80", fg: "#e0ece2", label: "森林" },
+    auto:   { bg: "#0b0f15", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeAuto") },
+    dark:   { bg: "#0b0f15", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeDark") },
+    light:  { bg: "#f7f4ef", accent: "#3b82f6", fg: "#1f1d1a", label: t("settings.themeLight") },
+    warm:   { bg: "#fdf6e3", accent: "#a855f7", fg: "#3d2b1f", label: "暖色" },
+    ice:    { bg: "#0d1b2a", accent: "#6ee7ff", fg: "#e0e8f2", label: "冰蓝" },
+    forest: { bg: "#0f1a0f", accent: "#4ade80", fg: "#e0ecd8", label: "森林" },
   };
 
   const tc = themeColors[theme] ?? themeColors.dark;
@@ -740,7 +759,7 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
 
       <div className="mb-4">
         <label className="text-fg-dim text-[13px] font-medium mb-2 block">界面字体</label>
-        <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent">
+        <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={uiFont} onChange={e => applyFont("ui", e.target.value)}>
           <option value="">系统默认</option>
           <option value="pingfang">苹方 (PingFang SC)</option>
           <option value="yahei">微软雅黑</option>
@@ -750,7 +769,7 @@ function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Them
 
       <div className="mb-4">
         <label className="text-fg-dim text-[13px] font-medium mb-2 block">等宽字体</label>
-        <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent">
+        <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={monoFont} onChange={e => applyFont("mono", e.target.value)}>
           <option value="">系统默认</option>
           <option value="cascadia">Cascadia Code</option>
           <option value="jetbrains">JetBrains Mono</option>

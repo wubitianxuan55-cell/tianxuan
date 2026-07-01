@@ -51,14 +51,20 @@ export function useSessionManager(
 
   const handleDeleteSession = useCallback(
     async (path: string) => {
-      await deleteSession(path);
+      try {
+        await deleteSession(path);
+      } catch {
+        // 删除失败→重新拉取列表恢复正确状态
+        await refreshSessions();
+        return;
+      }
       // 乐观更新缓存，避免删除后列表闪烁
       allSessionsRef.current = allSessionsRef.current.filter(s => s.path !== path);
       const visible = allSessionsRef.current.slice(0, sidebarSessions.length);
       setHasMore(visible.length < allSessionsRef.current.length);
       setSidebarSessions(visible);
     },
-    [deleteSession, sidebarSessions.length],
+    [deleteSession, refreshSessions, sidebarSessions.length],
   );
 
   const handleRenameSession = useCallback(

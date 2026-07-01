@@ -170,6 +170,10 @@ export default function App() {
 
   const panelOpenRef = useRef(workspacePanelOpen);
   panelOpenRef.current = workspacePanelOpen;
+  const reopenTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // 清理 reopen timer
+  useEffect(() => () => { if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current); }, []);
 
   useEffect(() => {
     const onResize = () => {
@@ -479,17 +483,19 @@ export default function App() {
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
-              onOpenChanges={() => {
+              onOpenChanges={useCallback(() => {
                 setPendingViewMode("changed");
                 if (workspacePanelOpen && rightTab === "files") {
-                  // 面板已打开→先关再开，initialViewMode 才能生效
                   setWorkspacePanel(false);
-                  setTimeout(() => setWorkspacePanel(true), 50);
+                  const id = setTimeout(() => setWorkspacePanel(true), 50);
+                  // 防止快速双击堆积多个 timer
+                  if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
+                  reopenTimerRef.current = id;
                 } else {
                   setRightTab("files");
                   setWorkspacePanel(true);
                 }
-              }}
+              }, [workspacePanelOpen, rightTab])}
             />
             </CompactContext.Provider>
           </footer>

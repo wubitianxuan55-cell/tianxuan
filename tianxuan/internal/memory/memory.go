@@ -212,27 +212,43 @@ func Compose(base string, s *Set) string {
 	return strings.TrimRight(base, "\n") + "\n\n" + block
 }
 
-// InitDefaults creates default memory files when a project has none. It writes
-// AGENTS.md with a minimal template so the memory panel isn't empty on first
-// open. Existing files are never overwritten.
+// InitDefaults creates default memory files when a project or user config has
+// none. It writes AGENTS.md at both the user-global level (shared across all
+// projects) and the project level (project-specific). Existing files are never
+// overwritten.
 func InitDefaults(s *Set) {
 	if s == nil {
 		return
 	}
-	path := s.DocPath(ScopeProject)
-	if _, err := os.Stat(path); err == nil {
-		return // already exists
+	// 用户级记忆：所有项目共享
+	if s.UserDir != "" {
+		userPath := filepath.Join(s.UserDir, defaultDocName)
+		if _, err := os.Stat(userPath); os.IsNotExist(err) {
+			os.WriteFile(userPath, []byte(userDefaultContent), 0644)
+		}
 	}
-	defaultContent := `# Project memory
+	// 项目级记忆：当前项目专属
+	projPath := s.DocPath(ScopeProject)
+	if _, err := os.Stat(projPath); os.IsNotExist(err) {
+		os.WriteFile(projPath, []byte(projectDefaultContent), 0644)
+	}
+	// Reload so the new docs appear immediately
+	s.Docs = discoverDocs(s.CWD, s.UserDir)
+}
+
+const userDefaultContent = `# User memory
+
+## Preferences
+
+<!-- 在这里记录你的个人偏好、工作习惯、常用约定等。所有项目共享此文件。 -->
+
+- 思考输出说中文
+`
+
+const projectDefaultContent = `# Project memory
 
 ## Notes
 
-<!-- 在这里记录项目约定、架构决策、编码规范等。AI 助手每轮对话前会读取此文件。 -->
+<!-- 在这里记录项目约定、架构决策、编码规范等。每个项目独立。 -->
 
 `
-	if err := os.WriteFile(path, []byte(defaultContent), 0644); err != nil {
-		return
-	}
-	// Reload so the new doc appears immediately
-	s.Docs = discoverDocs(s.CWD, s.UserDir)
-}

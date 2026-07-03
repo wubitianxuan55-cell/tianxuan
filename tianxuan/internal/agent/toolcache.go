@@ -15,7 +15,14 @@ type toolCache struct {
 	items    map[string]*cacheItem
 	pathKeys map[string]map[string]struct{} // path → set of cache keys (O(1) invalidate)
 	ttl      time.Duration
+	grace    time.Duration // skip Stat for entries younger than this
 }
+
+// defaultCacheGrace is the window after a cache entry was set during which we
+// skip os.Stat revalidation — the entry is fresh enough that an external
+// modification is extremely unlikely. Write tools already invalidate the cache
+// immediately. Beyond this window we Stat-check as before for safety.
+const defaultCacheGrace = 5 * time.Second
 
 type cacheItem struct {
 	content string
@@ -25,11 +32,13 @@ type cacheItem struct {
 
 // newToolCache creates a cache with the given TTL. Zero or negative TTL means
 // no expiry (entries live until invalidated by a write or clear).
+// grace sets the Stat-bypass window; 0 disables the optimisation.
 func newToolCache(ttl time.Duration) *toolCache {
 	return &toolCache{
 		items:    make(map[string]*cacheItem),
 		pathKeys: make(map[string]map[string]struct{}),
 		ttl:      ttl,
+		grace:    defaultCacheGrace,
 	}
 }
 
@@ -51,8 +60,14 @@ func (c *toolCache) get(path string, offset int) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	// Fast path: TTL not expired and mtime still matches.
-	if (c.ttl <= 0 || time.Since(ci.cached) <= c.ttl) {
+	// Grace period: entries cached within the grace window skip os.Stat.
+	// Write tools already invalidate the cache, so the only way the file changes
+	// during the grace window is an external process — vanishingly rare in a turn.
+	if c.grace > 0 && time.Since(ci.cached) <= c.grace {
+		return ci.content, true
+	}
+	// Standard path: TTL not expired and mtime still matches.
+	if c.ttl <= 0 || time.Since(ci.cached) <= c.ttl {
 		fi, err := os.Stat(path)
 		if err != nil || !fi.ModTime().Equal(ci.mtime) {
 			c.invalidatePath(path)

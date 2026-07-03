@@ -34,7 +34,7 @@ func TestSearchIndexBuildAndSearch(t *testing.T) {
 		Body:        "Authentication module must be done by end of July. Database migration by August.",
 	})
 
-	idx := store.BuildSearchIndex()
+	idx := store.BuildSearchIndex(nil)
 	if idx == nil {
 		t.Fatal("BuildSearchIndex returned nil")
 	}
@@ -65,7 +65,7 @@ func TestSearchIndexBuildAndSearch(t *testing.T) {
 func TestSearchIndexEmptyStore(t *testing.T) {
 	dir := t.TempDir()
 	store := Store{Dir: dir}
-	idx := store.BuildSearchIndex()
+	idx := store.BuildSearchIndex(nil)
 	if idx != nil {
 		t.Fatal("expected nil index for empty store")
 	}
@@ -74,7 +74,7 @@ func TestSearchIndexEmptyStore(t *testing.T) {
 // TestSearchIndexDisabledStore returns nil.
 func TestSearchIndexDisabledStore(t *testing.T) {
 	store := Store{Dir: ""}
-	idx := store.BuildSearchIndex()
+	idx := store.BuildSearchIndex(nil)
 	if idx != nil {
 		t.Fatal("expected nil index for disabled store")
 	}
@@ -90,7 +90,7 @@ func TestSearchIndexNilReceiver(t *testing.T) {
 
 // TestSearchIndexEmptyQuery returns nil.
 func TestSearchIndexEmptyQuery(t *testing.T) {
-	idx := &SearchIndex{entries: map[string][]string{"test": {"a"}}}
+	idx := &SearchIndex{entries: map[string][]tfEntry{"test": {{name: "a", tf: 1}}}}
 	if matches := idx.Search(""); matches != nil {
 		t.Fatal("expected nil for empty query")
 	}
@@ -99,11 +99,18 @@ func TestSearchIndexEmptyQuery(t *testing.T) {
 // TestSearchIndexRanking returns results sorted by score.
 func TestSearchIndexRanking(t *testing.T) {
 	idx := &SearchIndex{
-		entries: map[string][]string{
-			"auth":     {"auth-docs", "login-flow"},
-			"database": {"db-migration", "auth-docs"},
-			"migration": {"db-migration"},
+		entries: map[string][]tfEntry{
+			"auth":      {{name: "auth-docs", tf: 1}, {name: "login-flow", tf: 1}},
+			"database":  {{name: "db-migration", tf: 1}, {name: "auth-docs", tf: 1}},
+			"migration": {{name: "db-migration", tf: 1}},
 		},
+		docLen:    map[string]int{"auth-docs": 10, "login-flow": 8, "db-migration": 12},
+		previews:  map[string]string{"auth-docs": "Auth docs", "login-flow": "Login flow", "db-migration": "DB migration"},
+		kinds:     map[string]Kind{"auth-docs": KindSemantic, "login-flow": KindSemantic, "db-migration": KindSemantic},
+		totalDocs: 3,
+		avgDocLen: 10.0,
+		k1:        1.2,
+		b:         0.75,
 	}
 
 	matches := idx.Search("auth database")
@@ -112,7 +119,7 @@ func TestSearchIndexRanking(t *testing.T) {
 	}
 	// auth-docs matches both "auth" and "database" → score 2 → should be first
 	if matches[0].Name != "auth-docs" {
-		t.Fatalf("expected auth-docs first (score 2), got %s (score %d)", matches[0].Name, matches[0].Score)
+		t.Fatalf("expected auth-docs first (score 2), got %s (score %d)", matches[0].Name, int(matches[0].Score))
 	}
 }
 
@@ -155,8 +162,8 @@ func TestLoadBuildsSearchIndex(t *testing.T) {
 	})
 
 	// Can't easily test Load() because it depends on global config paths,
-	// but we can test Store.BuildSearchIndex() which Load() calls internally.
-	idx := store.BuildSearchIndex()
+	// but we can test Store.BuildSearchIndex(nil) which Load() calls internally.
+	idx := store.BuildSearchIndex(nil)
 	if idx == nil {
 		t.Fatal("BuildSearchIndex returned nil")
 	}

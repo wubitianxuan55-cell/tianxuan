@@ -38,12 +38,11 @@ function loadComposerHeight(): number | null {
 }
 
 export function Composer({
-  running, cwd, onSend, onCancel, agentMode, onSetAgentMode, yolo, onToggleYolo, onPickFolder, disabled,
+  running, cwd, onSend, onCancel, permLevel, onSetPermLevel, onPickFolder, disabled,
 }: {
   running: boolean; cwd?: string;
   onSend: (displayText: string, submitText?: string) => void;
-  onCancel: () => string | undefined; agentMode?: string; onSetAgentMode?: (m: "explore" | "develop" | "orchestrate") => void;
-  yolo?: boolean; onToggleYolo?: () => void;
+  onCancel: () => string | undefined; permLevel?: string; onSetPermLevel?: (p: "ask" | "auto" | "yolo") => void;
   onPickFolder: (path?: string) => Promise<string>; disabled?: boolean;
 }) {
   const t = useT();
@@ -435,37 +434,27 @@ export function Composer({
             </div>
           )}
 
-          {/* 统一模式按钮（V9.0：Mode + AgentMode 合并） */}
+          {/* 权限级别选择器：询问 / 自动 / YOLO */}
           <div className="flex gap-[3px]">
-            {(["explore", "develop", "orchestrate"] as const).map((am) => {
-              const labels: Record<string, string> = { explore: t("composer.modeExplore"), develop: t("composer.modeDevelop"), orchestrate: t("composer.modeOrchestrate") };
-              const descs: Record<string, string> = { explore: t("composer.modeExploreDesc"), develop: t("composer.modeDevelopDesc"), orchestrate: t("composer.modeOrchestrateDesc") };
+            {(["ask", "auto", "yolo"] as const).map((level) => {
+              const labels: Record<string, string> = { ask: "询问", auto: "自动", yolo: "⚡ YOLO" };
+              const descs: Record<string, string> = { ask: "写入前需确认（默认）", auto: "写入无需确认，deny 规则仍生效", yolo: "跳过所有确认提示" };
+              const isYolo = level === "yolo";
               return (
-                <button key={am} type="button"
+                <button key={level} type="button"
                   className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[var(--dur-fast)] active:scale-[0.97] ${
-                    agentMode === am ? "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]" : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"
+                    permLevel === level
+                      ? isYolo ? "text-err bg-err/10 border-err/20 shadow-[0_0_0_1px_var(--err)]" : "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]"
+                      : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"
                   }`}
-                  onClick={() => { if (agentMode !== am && onSetAgentMode) onSetAgentMode(am); }}
-                  title={descs[am]}
+                  onClick={() => { if (permLevel !== level && onSetPermLevel) onSetPermLevel(level); }}
+                  title={descs[level]}
                 >
-                  {labels[am]}
+                  {labels[level]}
                 </button>
               );
             })}
           </div>
-
-          {/* YOLO 开关（V9.0：独立 toggle，仅在 develop/orchestrate 下可见） */}
-          {agentMode !== "explore" && onToggleYolo && (
-            <button type="button"
-              className={`flex items-center gap-1.5 px-2 py-0.5 border rounded text-[10px] cursor-pointer transition-[color,background,border] duration-[var(--dur-fast)] ${
-                yolo ? "text-err bg-err/10 border-err/20" : "text-fg-faint border-border-soft/50 hover:text-fg-dim hover:bg-bg-soft"
-              }`}
-              onClick={onToggleYolo}
-              title={t("composer.yoloToggleDesc")}
-            >
-              {yolo ? "⚡ YOLO" : t("composer.yoloToggle")}
-            </button>
-          )}
 
 {/* 快捷提示 */}
           <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-1.5">

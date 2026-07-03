@@ -5,9 +5,25 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Check, Copy } from "lucide-react";
-import "katex/dist/katex.min.css";
 import { CodeViewer } from "./CodeViewer";
 import { openExternal } from "../lib/bridge";
+
+// KaTeX CSS 延迟注入：避免非数学对话的 ~23KB CSS 开销。
+// 有数学内容时才加载（$$ 或 $ 包裹的公式）。
+let katexCssLoaded = false;
+
+function ensureKatexCss() {
+  if (katexCssLoaded) return;
+  katexCssLoaded = true;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = new URL("katex/dist/katex.min.css", import.meta.url).href;
+  document.head.appendChild(link);
+}
+
+function hasMathContent(text: string): boolean {
+  return text.includes("$$") || (text.includes("$") && /\$\S[^$]*\S\$/.test(text));
+}
 
 // ── 代码块复制按钮 ──────────────────────────────────────────────────
 
@@ -105,6 +121,7 @@ function normalizeMath(s: string): string {
 }
 
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
+  if (hasMathContent(text)) ensureKatexCss();
   return (
     <div className="md text-[14px] leading-relaxed">
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={components}>

@@ -224,6 +224,7 @@ export const zh: Record<DictKey, string> = {
   // 提问卡片
   "ask.customPlaceholder": "输入你自己的答案…",
   "ask.justChat": "只是聊聊",
+  "ask.dragHint": "拖拽移动",
 
   // 历史抽屉
   "history.title": "历史",
@@ -266,6 +267,20 @@ export const zh: Record<DictKey, string> = {
   "memory.forget": "删除",
   "memory.confirmForget": "确认删除",
   "memory.deadLink": "没有名为「{name}」的记忆",
+  "memory.typeUser": "用户",
+  "memory.typeProject": "项目",
+  "memory.typeFeedback": "反馈",
+  "memory.typeSemantic": "语义",
+  "memory.typeEpisodic": "情景",
+  "memory.typeProcedural": "规程",
+  "memory.typeReference": "参考",
+  "memory.changeType": "更改类型",
+  "memory.typeCurrent": "当前类型",
+  "memory.promoteToUser": "提升为用户级",
+  "memory.promoteToProject": "设为项目级",
+  "memory.promoteToFeedback": "设为反馈级",
+
+  // 设置抽屉
 
   // 设置抽屉
   "settings.title": "设置",

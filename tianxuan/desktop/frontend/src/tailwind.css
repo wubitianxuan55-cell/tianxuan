@@ -43,8 +43,8 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-err: var(--err);
-  --color-info: #7aa2f7;
-  --color-warning: #e0af68;
+  --color-info: var(--info);
+  --color-warning: var(--warn);
 
   /* ── diff ── */
   --color-add-bg: var(--add-bg);

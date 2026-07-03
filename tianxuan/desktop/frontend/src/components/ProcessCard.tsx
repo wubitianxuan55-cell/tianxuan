@@ -73,37 +73,6 @@ export function ProcessToolIcon(props: IconProps & { tone?: ProcessTone }) {
   );
 }
 
-export function ProcessInfoIcon(props: IconProps & { tone?: ProcessTone }) {
-  return (
-    <ProcessIcon {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </ProcessIcon>
-  );
-}
-
-export function ProcessPhaseIcon(props: IconProps & { tone?: ProcessTone }) {
-  return (
-    <ProcessIcon {...props}>
-      <path d="M4 7h9" />
-      <path d="M4 12h7" />
-      <path d="M4 17h5" />
-      <path d="M16 7h4" />
-      <path d="M16 12h4" />
-      <path d="M16 17h4" />
-    </ProcessIcon>
-  );
-}
-
-export function ProcessCompactIcon(props: IconProps & { tone?: ProcessTone }) {
-  return (
-    <ProcessIcon {...props}>
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </ProcessIcon>
-  );
-}
-
 /** 根据 ProcessState 返回对应的 tone。 */
 export function processStateToTone(state: ProcessState): ProcessTone {
   switch (state) {

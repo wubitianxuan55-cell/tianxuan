@@ -282,15 +282,28 @@ func (r *mdRenderer) renderFenced(buf *strings.Builder, n ast.Node, src []byte, 
 		isDiff = strings.Contains(strings.ToLower(info), "diff")
 	}
 	prefix := strings.Repeat(" ", indent) + dim("│ ")
+	skipped := 0
+	hadGap := false
+	flushSkipped := func() {
+		if skipped > 0 {
+			buf.WriteString(prefix)
+			buf.WriteString(dim(fmt.Sprintf("… %d context line(s) omitted …", skipped)))
+			buf.WriteString("\n")
+			skipped = 0
+		}
+	}
 	for i := 0; i < n.Lines().Len(); i++ {
 		l := n.Lines().At(i)
 		line := strings.TrimRight(string(l.Value(src)), "\n")
 		if isDiff {
 			trimmed := strings.TrimLeft(line, " ")
 			if trimmed == "" || (trimmed[0] != '+' && trimmed[0] != '-') {
-				// Context lines: show a dimmed indicator on first omitted block.
+				// Context lines: count them and show a dim summary line when a run ends.
+				skipped++
+				hadGap = true
 				continue
 			}
+			flushSkipped()
 			if trimmed[0] == '+' {
 				buf.WriteString(prefix)
 				buf.WriteString(green(line))
@@ -307,6 +320,9 @@ func (r *mdRenderer) renderFenced(buf *strings.Builder, n ast.Node, src []byte, 
 		buf.WriteString(prefix)
 		buf.WriteString(accent(line))
 		buf.WriteString("\n")
+	}
+	if isDiff && hadGap {
+		flushSkipped()
 	}
 	buf.WriteString("\n")
 }

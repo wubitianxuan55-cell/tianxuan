@@ -91,7 +91,7 @@ func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
 		omitted, originalBytes, omittedLines, originalLines)
 
 	out.WriteString(fmt.Sprintf(
-		"\n\n[cache hygiene: omitted %d byte(s), %d line(s); use narrower read/grep/bash ranges for details]",
+		"\n\n[%d byte(s), %d line(s) elided above — use read_file with offset+limit, grep with narrower pattern, or bash with head/tail for details]",
 		omitted, omittedLines))
 	return out.String(), notice
 }

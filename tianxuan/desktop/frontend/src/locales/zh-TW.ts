@@ -222,6 +222,7 @@ export const zhTW: Record<DictKey, string> = {
   // ask card
   "ask.customPlaceholder": "輸入你自己的答案…",
   "ask.justChat": "直接對話",
+  "ask.dragHint": "拖曳移動",
 
   // history drawer
   "history.title": "歷史",
@@ -264,6 +265,20 @@ export const zhTW: Record<DictKey, string> = {
   "memory.forget": "忘記",
   "memory.confirmForget": "確認忘記",
   "memory.deadLink": "未找到名為「{name}」的記憶",
+  "memory.typeUser": "使用者",
+  "memory.typeProject": "專案",
+  "memory.typeFeedback": "回饋",
+  "memory.typeSemantic": "語義",
+  "memory.typeEpisodic": "情景",
+  "memory.typeProcedural": "規程",
+  "memory.typeReference": "參考",
+  "memory.changeType": "更改類型",
+  "memory.typeCurrent": "當前類型",
+  "memory.promoteToUser": "提升為用戶級",
+  "memory.promoteToProject": "設為專案級",
+  "memory.promoteToFeedback": "設為回饋級",
+
+  // settings drawer
 
   // settings drawer
   "settings.title": "設定",

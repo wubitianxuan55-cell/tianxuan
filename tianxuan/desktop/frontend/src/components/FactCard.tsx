@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useState, type ReactNode } from "react";
 import type { MemoryFact } from "../lib/types";
+import { factTypeLabel } from "../lib/factTypeLabel";
 
 function uniqueLinks(body: string, names: Set<string>) {
   const links: { name: string; exists: boolean }[] = [];
@@ -65,8 +66,9 @@ export function FactCard(p: {
   onJump: (name: string) => void;
   onSave: (name: string, body: string) => void;
   onForget: () => void;
+  onChangeType: (name: string, newType: string) => void;
 }) {
-  const { fact, factNames, expanded, highlight, onToggle, onJump, onSave, onForget } = p;
+  const { fact, factNames, expanded, highlight, onToggle, onJump, onSave, onForget, onChangeType } = p;
   const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(fact.body);
@@ -164,6 +166,31 @@ export function FactCard(p: {
             <pre className="m-0 mt-2 bg-bg-soft border border-border-soft rounded-md p-3 text-fg-dim text-xs leading-relaxed whitespace-pre-wrap max-h-[360px] overflow-y-auto font-mono">
               {renderWithLinks(fact.body, factNames, onJump)}
             </pre>
+          )}
+          {onChangeType && !editing && (
+            <div className="mt-2 pt-2 border-t border-border-soft flex items-center gap-1 flex-wrap">
+              <span className="text-fg-faint text-[10px] mr-1">{t("memory.changeType")}:</span>
+              {(["user", "project", "feedback"] as const).map((tgt) => {
+                const isCurrent = fact.type === tgt;
+                return (
+                  <button
+                    key={tgt}
+                    type="button"
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded border transition-colors ${
+                      isCurrent
+                        ? "border-accent/30 bg-accent-soft text-accent cursor-default"
+                        : "border-border-soft bg-transparent text-fg-faint hover:text-fg hover:border-fg-faint/60 cursor-pointer"
+                    }`}
+                    disabled={isCurrent}
+                    onClick={() => onChangeType(fact.name, tgt)}
+                    title={isCurrent ? t("memory.typeCurrent") : t(`memory.promoteTo${tgt.charAt(0).toUpperCase() + tgt.slice(1)}` as never)}
+                  >
+                    {tgt === "user" ? <ArrowUp size={10} /> : tgt === "feedback" ? <ArrowDown size={10} /> : null}
+                    {factTypeLabel(t, tgt)}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {links.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">

@@ -33,9 +33,22 @@ const (
 	TypeReference Type = "reference" // pointers to external resources (URLs, tickets)
 )
 
+// Kind classifies a memory by cognitive function (LangMem-inspired).
+// Orthogonal to Type — Kind controls how the memory is injected and retrieved.
+type Kind string
+
+const (
+	KindSemantic   Kind = "semantic"   // facts, preferences, constraints → L1 prefix + search
+	KindEpisodic   Kind = "episodic"   // past experiences, solutions → tag-triggered injection
+	KindProcedural Kind = "procedural" // rules, best practices → always-on injection
+)
+
 // validTypes is the closed set the `remember` tool accepts; anything else
 // normalises to TypeProject.
 var validTypes = map[Type]bool{TypeUser: true, TypeFeedback: true, TypeProject: true, TypeReference: true}
+
+// validKinds is the closed set for the Kind field.
+var validKinds = map[Kind]bool{KindSemantic: true, KindEpisodic: true, KindProcedural: true}
 
 // NormalizeType coerces an arbitrary string to a known Type, defaulting to
 // TypeProject so a sloppy tool argument never blocks a save.
@@ -47,13 +60,25 @@ func NormalizeType(s string) Type {
 	return TypeProject
 }
 
+// NormalizeKind coerces an arbitrary string to a known Kind, defaulting to
+// KindSemantic so existing memories without an explicit kind stay semantic.
+func NormalizeKind(s string) Kind {
+	k := Kind(strings.ToLower(strings.TrimSpace(s)))
+	if validKinds[k] {
+		return k
+	}
+	return KindSemantic
+}
+
 // Memory is one stored fact.
 type Memory struct {
-	Name        string // kebab-case slug; also the file stem (<name>.md)
-	Title       string // human-readable index label; falls back to a de-kebabed Name
-	Description string // one-line summary used for the index and recall
-	Type        Type
-	Body        string // the fact itself (Markdown)
+	Name        string   // kebab-case slug; also the file stem (<name>.md)
+	Title       string   // human-readable index label; falls back to a de-kebabed Name
+	Description string   // one-line summary used for the index and recall
+	Type        Type     // category: user / feedback / project / reference
+	Kind        Kind     // cognitive function: semantic / episodic / procedural
+	Tags        []string // trigger tags for episodic memories (empty for others)
+	Body        string   // the fact itself (Markdown)
 }
 
 // ArchivedMemory is a saved fact that has been removed from active memory but
@@ -169,9 +194,36 @@ func (s Store) Delete(name string) error {
 	return err
 }
 
+// ChangeType changes the Type of a saved memory (e.g. promote to "user" level
+// or demote to "project"/"feedback"). The memory is reloaded from disk, its
+// Type updated, and re-saved — all other fields are preserved.
+func (s Store) ChangeType(name string, newType Type) error {
+	if s.Dir == "" {
+		return fmt.Errorf("memory store unavailable (no user config dir)")
+	}
+	name = slug(name)
+	if name == "" {
+		return fmt.Errorf("memory needs a name")
+	}
+	var target *Memory
+	for _, m := range s.List() {
+		if m.Name == name {
+			copy := m
+			target = &copy
+			break
+		}
+	}
+	if target == nil {
+		return fmt.Errorf("memory %q not found", name)
+	}
+	target.Type = newType
+	_, err := s.Save(*target)
+	return err
+}
+
 // render serializes a memory to frontmatter + body. The frontmatter mirrors the
-// auto-memory shape (name / description / metadata.type) so the files are
-// interchangeable with that ecosystem and re-readable by loadMemory.
+// auto-memory shape (name / description / metadata.type / metadata.kind) so the
+// files are interchangeable with that ecosystem and re-readable by loadMemory.
 func render(m Memory, name string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
@@ -182,6 +234,12 @@ func render(m Memory, name string) string {
 	b.WriteString("description: " + oneLine(m.Description) + "\n")
 	b.WriteString("metadata:\n")
 	b.WriteString("  type: " + string(NormalizeType(string(m.Type))) + "\n")
+	if k := NormalizeKind(string(m.Kind)); k != KindSemantic {
+		b.WriteString("  kind: " + string(k) + "\n")
+	}
+	if len(m.Tags) > 0 {
+		b.WriteString("  tags: [" + strings.Join(m.Tags, ", ") + "]\n")
+	}
 	b.WriteString("---\n\n")
 	b.WriteString(strings.TrimSpace(m.Body))
 	b.WriteString("\n")
@@ -226,9 +284,17 @@ func (s Store) flushIndex(lines map[string]string) error {
 // reindex rewrites the MEMORY.md line for name, preserving every other managed
 // line. The line is "- [<title>](<name>.md) — <description>"; title falls back
 // to a de-kebabed name so the index reads as a label, never a bare slug.
+// Kind is shown as a prefix tag when non-semantic: [E] for episodic, [P] for procedural.
 func (s Store) reindex(name string, m Memory) error {
 	lines := s.indexLinesExcept(name)
-	lines[name] = fmt.Sprintf("- [%s](%s.md) — %s", displayTitle(m.Title, name), name, oneLine(m.Description))
+	kindTag := ""
+	switch NormalizeKind(string(m.Kind)) {
+	case KindEpisodic:
+		kindTag = "[E] "
+	case KindProcedural:
+		kindTag = "[P] "
+	}
+	lines[name] = fmt.Sprintf("- %s[%s](%s.md) — %s", kindTag, displayTitle(m.Title, name), name, oneLine(m.Description))
 	return s.flushIndex(lines)
 }
 
@@ -344,6 +410,8 @@ func loadMemory(path string) (Memory, bool) {
 		Title:       fm["title"],
 		Description: fm["description"],
 		Type:        NormalizeType(fm["type"]),
+		Kind:        NormalizeKind(fm["kind"]),
+		Tags:        parseTags(fm["tags"]),
 		Body:        strings.TrimSpace(body),
 	}
 	if m.Name == "" {
@@ -379,4 +447,40 @@ func displayTitle(title, name string) string {
 		return t
 	}
 	return strings.ReplaceAll(name, "-", " ")
+}
+
+// parseTags parses a frontmatter tags value. Accepts JSON array syntax
+// [a, b, c] or comma-separated plain text. Returns nil for empty input.
+func parseTags(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	// JSON array: [a, b, c] or ["a", "b"]
+	if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
+		inner := strings.TrimSpace(raw[1 : len(raw)-1])
+		if inner == "" {
+			return nil
+		}
+		parts := strings.Split(inner, ",")
+		var out []string
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			p = strings.Trim(p, "\"'")
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	// Plain comma-separated
+	parts := strings.Split(raw, ",")
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

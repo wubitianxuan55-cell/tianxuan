@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
 /** 统一的工具栏按钮 — 5 处重复 className 合并为单个组件 */
-export function ToolbarButton({
+export const ToolbarButton = memo(function ToolbarButton({
   onClick,
   disabled,
   title,
@@ -22,4 +22,4 @@ export function ToolbarButton({
       {children}
     </button>
   );
-}
+});

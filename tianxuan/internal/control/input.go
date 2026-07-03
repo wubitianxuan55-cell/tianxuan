@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"tianxuan/internal/memory"
 	"tianxuan/internal/skill"
 )
 
@@ -13,53 +14,19 @@ import (
 // prompt prefix is left untouched and the toggle costs nothing in cache hits.
 const PlanModeMarker = "[Read-only mode — explore the codebase first (read_file, ls, grep, glob, web_fetch, task are available; writers are refused by the harness), then present a LAYERED plan as your reply and stop — do not write files, edit, or run side-effecting bash. Structure the plan as a two-level markdown list: each PHASE is a top-level numbered list item (a coherent milestone, e.g. \"1. Add the config loader\"), and each phase's concrete, verifiable sub-steps are bullets indented beneath it (e.g. \"   - parse the TOML into Config\"). Use plain numbered list items for phases — do NOT write phases as markdown headings (##, ###) — so both levels parse. Keep phases few (about 2-6). Wrap the entire plan in <plan>...</plan> tags so the frontend can extract and display it in the plan panel. The user will be asked to approve before any changes are made.]"
 
-// ExploreModeMarker is the turn prefix for explore mode (V6.0 P3).
-// Stronger than PlanModeMarker: explicitly states this is a read-only exploration
-// session and the model should research, not plan for changes.
-const ExploreModeMarker = "[Explore mode — read-only research. You are in exploration mode: investigate the codebase, understand architecture, trace call chains, and answer questions. Use read_file, ls, grep, glob, codegraph tools, and read-only task sub-agents liberally. Do NOT propose or write any code changes — this is pure research. Present your findings clearly with file:line citations.]"
-
-// DevelopModeMarker is the turn prefix for develop mode (V6.0 P3).
-// This is the default: full tools, no restrictions beyond normal gates.
-const DevelopModeMarker = ""
-
-// OrchestrateModeMarker is the turn prefix for orchestrate mode (V6.0 P3).
-// Mimics MiMo-Code's compose mode: built-in planning→execution→review→TDD flow.
-// Plan mode is on initially; after plan approval, execution proceeds with
-// structured checkpoints.
-const OrchestrateModeMarker = "[Orchestrate mode — structured delivery. You are in orchestration mode with a built-in plan→execute→verify workflow. First, explore and present a layered plan (use <plan>...</plan> tags). After the plan is approved, implement each phase systematically: mark the sub-step in_progress with todo_write, execute, sign off with complete_step attaching evidence, and move to the next. Run tests after each phase. Only stop when every phase is complete and verified.]"
-
-// Compose applies the mode-appropriate marker to a turn's text, returning
-// the message to actually send to the model. The frontend keeps showing the
-// raw text as the user bubble.
-// V6.0 P3: uses agentMode to select the right marker (explore/develop/orchestrate).
+// Compose applies the plan-mode marker to a turn's text when plan mode is active,
+// then appends memory updates, session facts, background job notes, and memory
+// block injections. The frontend keeps showing the raw text as the user bubble.
 func (c *Controller) Compose(text string) string {
 	c.mu.Lock()
 	plan := c.planMode
-	mode := c.agentMode
 	notes := c.pendingMemory
 	c.pendingMemory = nil
 	sessionFacts := c.sessionFacts
-	// V3.0: profile is now in L2 RuntimeLayer via SetProject, no longer
-	// injected as turn-tail prefix. Keep this block for backward compat
-	// when ctxMgr is not wired.
-	profile := ""
-	if c.ctxMgr == nil {
-		// Legacy: inject profile in first user message.
-		// (This path is never reached with ctxMgr wired.)
-	}
 	c.mu.Unlock()
 
-	if profile != "" {
-		text = "<project-profile>\n" + profile + "\n</project-profile>\n\n" + text
-	}
-
-	// V6.0 P3: mode-specific marker (replaces legacy plan-mode marker)
-	if mode == "explore" {
-		text = ExploreModeMarker + "\n\n" + text
-	} else if mode == "orchestrate" && plan {
-		text = OrchestrateModeMarker + "\n\n" + text
-	} else if plan {
-		// Legacy plan mode (backward compat when agentMode is empty)
+	// Plan mode: prepend marker so the model researches before acting.
+	if plan {
 		text = PlanModeMarker + "\n\n" + text
 	}
 
@@ -99,6 +66,20 @@ func (c *Controller) Compose(text string) string {
 			text = "<background-jobs>\n" + note + "\n</background-jobs>\n\n" + text
 		}
 	}
+	// V10.18+: LangMem-inspired kind-aware memory injection.
+	// Procedural rules → always injected (every turn).
+	// Episodic memories → injected when user input matches trigger tags.
+	if c.mem != nil {
+		if rules := c.mem.ProceduralBlock(); rules != "" {
+			text = rules + "\n\n" + text
+		}
+		if episodic := c.mem.EpisodicMatches(text); len(episodic) > 0 {
+			if block := memory.EpisodicBlock(episodic); block != "" {
+				text = block + "\n\n" + text
+			}
+		}
+	}
+
 	return text
 }
 

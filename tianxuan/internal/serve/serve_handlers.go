@@ -433,7 +433,7 @@ func (s *Server) settings(w http.ResponseWriter, _ *http.Request) {
 		},
 		"configPath":    config.SourcePath(),
 		"providerKinds": provider.Kinds(),
-		"bypass":        s.ctrl.Bypass(),
+		"autoApprove":   s.ctrl.PermLevel() != "ask",
 	})
 }
 
@@ -443,7 +443,11 @@ func (s *Server) setBypass(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad body", 400)
 		return
 	}
-	s.ctrl.SetBypass(body.On)
+	if body.On {
+		s.ctrl.SetPermLevel("yolo")
+	} else {
+		s.ctrl.SetPermLevel("ask")
+	}
 	w.WriteHeader(204)
 }
 

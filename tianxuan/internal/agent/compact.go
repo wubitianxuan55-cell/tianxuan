@@ -27,7 +27,6 @@ type CompactionConfig struct {
 	TailTokens      int     // verbatim recent-tail budget in tokens
 	RecentKeep      int     // min recent messages to keep verbatim (fallback)
 	ArchiveDir      string  // archive directory for saved sessions
-	L2Dir           string  // L2 persistence directory
 
 	// Internal state
 	LastPrompt   int  // prompt tokens from last turn

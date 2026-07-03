@@ -20,7 +20,7 @@ func (g gateApprover) Approve(ctx context.Context, tool, subject string, args js
 	// was the approval) or while YOLO/bypass mode is on. Deny rules already bit
 	// before this point, so they still block.
 	g.c.mu.Lock()
-	auto := g.c.autoApprove || g.c.bypass
+	auto := g.c.autoApprove || g.c.permLevel != "ask"
 	g.c.mu.Unlock()
 	if auto {
 		return true, false, nil

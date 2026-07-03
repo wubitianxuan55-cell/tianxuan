@@ -3,11 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
+import { sessionTitle } from "../lib/session";
 import type { Meta, SessionMeta } from "../lib/types";
-
-function sessionTitle(session: SessionMeta, fallback: string): string {
-  return session.title || session.preview || fallback;
-}
 
 function formatTimeAgo(ms: number): string {
   const diff = Date.now() - ms;
@@ -19,7 +16,6 @@ function formatTimeAgo(ms: number): string {
   return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-// 快捷命令 — 对标 Cline HomeView 的命令卡片
 const QUICK_COMMANDS = [
   { icon: <Search size={14} />, label: "探索代码库", prompt: "explore this codebase — identify the key modules, their responsibilities, and how they connect" },
   { icon: <Bug size={14} />, label: "修复 Bug", prompt: "fix this bug: " },
@@ -50,7 +46,6 @@ export function Welcome({
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // 快捷键横幅：首次显示，localStorage 记录
   useEffect(() => {
     try {
       if (!localStorage.getItem("tianxuan.shortcutsSeen")) {
@@ -83,7 +78,6 @@ export function Welcome({
 
   return (
     <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto px-6 overflow-y-auto">
-      {/* 项目语境提示 — 增强版：显示项目+分支+模型 */}
       {cwdName && (
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 mb-5 rounded-full bg-accent-soft border border-accent/20 text-fg-dim ${compact ? "text-[11px]" : "text-[12px]"}`}>
           <FolderOpen size={compact ? 12 : 13} className="text-accent" />
@@ -92,11 +86,9 @@ export function Welcome({
         </div>
       )}
 
-      {/* Logo + Tagline */}
       <img src={logo} className={`rounded-[10px] mb-3 ${compact ? "w-8 h-8" : "w-10 h-10"}`} alt="tianxuan" />
       <div className={`text-fg-dim mb-7 ${compact ? "text-[13px]" : "text-[14px]"}`} style={{fontFamily: "var(--ds-font-display)", fontWeight: 500, letterSpacing: "-0.01em"}}>{t("welcome.tagline")}</div>
 
-      {/* 智能输入框 */}
       <div className="w-full border border-border-soft bg-bg-elev rounded-2xl shadow-[var(--ds-shadow-composer)] hover:border-fg-faint/30 focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] transition-all duration-[var(--dur-base)]">
         <textarea
           ref={taRef}
@@ -130,7 +122,6 @@ export function Welcome({
         </div>
       </div>
 
-      {/* 快捷键横幅 — 首次引导 */}
       {showShortcuts && (
         <div className="w-full mt-3 animate-[toast-in_0.3s_ease-out]">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-soft border border-accent/15 text-[11px] text-fg-dim">
@@ -148,7 +139,6 @@ export function Welcome({
         </div>
       )}
 
-      {/* 快捷命令网格 — 对标 Cline HomeView 的命令面板 */}
       <div className={`grid grid-cols-3 gap-2 mt-4 w-full ${compact ? "[&_button]:p-2 [&_button]:text-[11px]" : ""}`}>
         {QUICK_COMMANDS.map((cmd) => (
           <button
@@ -163,7 +153,6 @@ export function Welcome({
         ))}
       </div>
 
-      {/* 最近会话 — 增强为卡片式 */}
       {recentSessions.length > 0 && onResumeSession && (
         <div className="w-full mt-5 pt-4 border-t border-border-soft">
           <div className={`font-semibold text-fg-faint uppercase tracking-wider mb-2.5 flex items-center gap-1.5 ${compact ? "text-[10px]" : "text-[11px]"}`}>

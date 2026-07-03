@@ -99,6 +99,7 @@ type chatTUI struct {
 	pendingCommit *[]string
 	renderer      *mdRenderer
 	showReasoning bool // Ctrl+O / /verbose: show raw thinking text in the CLI
+	autoReasoning bool // auto-expand reasoning on tool errors (until next turn)
 	// reasoningLineIdx is the transcript index of the live "▎ thinking…" marker
 	// while a reasoning block streams; it's rewritten to "▎ thought for Ns" when
 	// the block closes. -1 when no block is open. transcriptDirty forces a
@@ -627,8 +628,8 @@ func (m chatTUI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.unsendPending()
 			case m.state == tuiRunning:
 				m.ctrl.Cancel()
-			case m.ctrl.Bypass():
-				m.ctrl.SetBypass(false) // back out of YOLO
+			case m.ctrl.PermLevel() != "ask":
+				m.ctrl.SetPermLevel("ask") // back out of YOLO
 			case m.planMode:
 				m.planMode = false
 				m.ctrl.SetPlanMode(false)
@@ -938,17 +939,57 @@ func (m chatTUI) transcriptHeight() int {
 	return 1
 }
 
+// reasoningPreview extracts a one-line summary from the reasoning text for the
+// collapsed "thought Ns: …" label. Returns the first substantive sentence (up to
+// 60 chars) or "" if the text is too short.
+func reasoningPreview(raw string) string {
+	// Skip leading whitespace-only lines.
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Strip common bullet markers.
+		line = strings.TrimLeft(line, "-*#> ")
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Take first sentence (up to period, or truncate at 60 chars).
+		if dot := strings.IndexByte(line, '.'); dot > 10 && dot < 60 {
+			return line[:dot+1]
+		}
+		if len(line) > 25 && len(line) <= 60 {
+			return line
+		}
+		if len(line) > 60 {
+			return line[:57] + "…"
+		}
+		// Too short to be a meaningful preview — skip.
+	}
+	return ""
+}
+
 // commitReasoning closes the live thinking block: the "▎ thinking…" marker is
 // rewritten in place to a dim "▎ thought for Ns" summary, and in verbose mode the
 // accumulated reasoning text is inserted beneath it. The viewport re-wraps from
 // m.transcript, so the in-place rewrite is flagged via transcriptDirty.
+// When autoReasoning is true, reasoning is always shown inline — used when the
+// model hits errors and the user needs visibility into its decision path.
 func (m *chatTUI) commitReasoning() {
 	if m.reasoningLineIdx < 0 {
 		return
 	}
 	secs := int(time.Since(m.thinkStart).Seconds())
-	m.transcript[m.reasoningLineIdx] = dim(fmt.Sprintf("  ▎ "+i18n.M.ChatThoughtForFmt, secs))
-	if m.showReasoning && m.reasoning.Len() > 0 {
+	// Extract a brief summary line from the reasoning text for the collapsed view.
+	summary := reasoningPreview(m.reasoning.String())
+	label := dim(fmt.Sprintf("  ▎ "+i18n.M.ChatThoughtForFmt, secs))
+	if summary != "" {
+		label = dim(fmt.Sprintf("  ▎ thought %ds: %s", secs, summary))
+	}
+	m.transcript[m.reasoningLineIdx] = label
+	if (m.showReasoning || m.autoReasoning) && m.reasoning.Len() > 0 {
 		raw := strings.TrimRight(m.reasoning.String(), "\n")
 		at := m.reasoningLineIdx + 1
 		lines := strings.Split(raw, "\n")
@@ -1447,12 +1488,12 @@ func pastedImagePath(src string) (string, bool) {
 // status line's mode tag ([auto]/[plan]/[YOLO]) reflects the result.
 func (m *chatTUI) cycleMode() {
 	switch {
-	case m.ctrl.Bypass():
-		m.ctrl.SetBypass(false) // YOLO → normal
+	case m.ctrl.PermLevel() == "yolo":
+		m.ctrl.SetPermLevel("ask") // YOLO → normal
 	case m.planMode:
 		m.planMode = false
 		m.ctrl.SetPlanMode(false)
-		m.ctrl.SetBypass(true) // plan → YOLO
+		m.ctrl.SetPermLevel("yolo") // plan → YOLO
 	default:
 		m.planMode = true
 		m.ctrl.SetPlanMode(true) // normal → plan
@@ -1502,6 +1543,7 @@ func (m *chatTUI) startTurnWithRaw(sent, displayed, restore, raw string, attachm
 
 	m.state = tuiRunning
 	m.runStart = time.Now()
+	m.autoReasoning = false // fresh turn: don't inherit auto-expand from previous errors
 	m.elapsed = 0
 	m.turnTokens = 0
 	m.turnCostUSD = 0
@@ -1601,15 +1643,25 @@ func (m *chatTUI) ingestEvent(e event.Event) {
 		case planApprovalTool:
 			// No longer a tool, but guard anyway: the plan is the assistant's reply.
 		default:
-			m.commitLine(fmt.Sprintf("  -> %s %s", e.Tool.Name, compactArgs(e.Tool.Args)))
+			label := fmt.Sprintf("  -> %s %s", e.Tool.Name, compactArgs(e.Tool.Args))
+			if e.Tool.ReadOnly {
+				label = dim(label)
+			}
+			m.commitLine(label)
 		}
 
 	case event.ToolResult:
 		// A successful result is silent (it only feeds the model); a blocked call
-		// surfaces a "⊘ name <reason>" line.
+		// surfaces a "⊘ name <reason>" line. A tool error auto-expands reasoning
+		// so the user sees what the model was thinking before the failed call.
 		if e.Tool.Err != "" {
 			m.finalizeStreamed()
-			m.commitLine(fmt.Sprintf("  ⊘ %s %s", e.Tool.Name, e.Tool.Err))
+			m.autoReasoning = true
+			errLine := fmt.Sprintf("  ⊘ %s %s", e.Tool.Name, e.Tool.Err)
+			if e.Tool.Recoverable {
+				errLine = dim(errLine)
+			}
+			m.commitLine(errLine)
 		}
 
 	case event.Usage:

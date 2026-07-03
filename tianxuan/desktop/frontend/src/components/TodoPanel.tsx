@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -28,9 +28,15 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
 
   const done = todos.filter((td) => td.status === "completed").length;
   const current = todos.find((td) => td.status === "in_progress");
-  const allDone = todos.length > 0 && done === todos.length;
   const summary = current?.activeForm || current?.content || todos[todos.length - 1]?.content || "";
   const pct = todos.length > 0 ? Math.round((done / todos.length) * 100) : 0;
+
+  // 自动滚动到进行中任务
+  useEffect(() => {
+    if (open && currentRef.current) {
+      currentRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [open]);
 
   const itemPy = compact ? "py-[5px]" : "py-[7px]";
   const itemPx = compact ? "px-[7px] pl-[9px]" : "px-[7px] pl-[11px]";
@@ -40,7 +46,12 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
     <PromptShelf
       titleId="todo-shelf-title"
       title={t("todo.title")}
-      badges={<PromptBadge>{done}/{todos.length}</PromptBadge>}
+      badges={
+        <PromptBadge>
+          {done}/{todos.length}
+          {pct > 0 && pct < 100 && ` · ${pct}%`}
+        </PromptBadge>
+      }
       meta={!open ? summary : undefined}
       role="region"
       headerActions={
@@ -48,42 +59,50 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
           <PromptHeaderAction onClick={() => setOpen((v) => !v)}>
             {open ? t("common.collapse") : t("common.expand")}
           </PromptHeaderAction>
-          {allDone && (
-            <PromptHeaderAction onClick={onDismiss}>
-              {t("common.close")}
-            </PromptHeaderAction>
-          )}
+          <PromptHeaderAction onClick={onDismiss}>
+            ✕
+          </PromptHeaderAction>
         </>
       }
     >
-      {/* Thin progress bar */}
-      <div className="h-[3px] bg-border-soft">
+      {/* 进度条 — 加高+渐变色+百分比标注 */}
+      <div className="h-[5px] bg-border-soft relative">
         <div
-          className={`h-full transition-[width] duration-500 ease-out ${pct >= 100 ? "bg-ok" : "bg-accent"}`}
+          className={`h-full transition-[width] duration-700 ease-out rounded-r-sm ${
+            pct >= 100
+              ? "bg-ok"
+              : "bg-gradient-to-r from-accent via-accent to-ok/70"
+          }`}
           style={{ width: `${pct}%` }}
         />
+        {pct >= 100 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-[9px] font-bold text-ok tracking-wider">✓ 全部完成</span>
+          </div>
+        )}
       </div>
 
-      {/* List */}
+      {/* 任务列表 */}
       <ul ref={listRef} className="m-0 p-0 list-none" style={{ overflow: "hidden" }}>
         {todos.map((td, i) => {
           const isPhase = td.level === 0;
           const isSub = td.level != null && td.level > 0;
+          const isCurrent = td.status === "in_progress";
           return (
             <li
               key={i}
-              ref={td.status === "in_progress" ? currentRef : undefined}
+              ref={isCurrent ? currentRef : undefined}
               className={`relative flex items-center gap-2.5 ${itemPx} ${itemPy} border-b border-border-soft last:border-b-0 transition-colors duration-200 ${
-                td.status === "in_progress"
-                  ? "bg-accent-soft"
+                isCurrent
+                  ? "bg-accent-soft/70"
                   : "bg-transparent hover:bg-bg-elev"
               } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
             >
-              {/* Left accent strip */}
-              {td.status === "in_progress" && !isSub && (
-                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm" />
+              {/* 左强调条 — 进行中带微动画 */}
+              {isCurrent && !isSub && (
+                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm animate-pulse" />
               )}
-              {/* Sub-item trail */}
+              {/* 子任务连接线 */}
               {isSub && (
                 <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
               )}
@@ -95,13 +114,13 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
                   isPhase ? "font-medium text-fg" : "text-fg-dim"
                 } ${
                   td.status === "completed"
-                    ? "line-through text-fg-faint"
-                    : td.status === "in_progress"
-                      ? "text-fg font-medium"
+                    ? "line-through text-fg-faint/60"
+                    : isCurrent
+                      ? "text-fg font-semibold"
                       : ""
                 } ${itemTextSize}`}
               >
-                {td.status === "in_progress" && td.activeForm ? td.activeForm : td.content}
+                {isCurrent && td.activeForm ? td.activeForm : td.content}
               </span>
             </li>
           );

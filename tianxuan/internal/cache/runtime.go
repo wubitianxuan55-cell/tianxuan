@@ -35,6 +35,10 @@ type ProjectState struct {
 	TopDirs      []string
 	TotalFiles   int
 	Dependencies []string
+	// RootPath is the workspace root directory name (not full path — just the
+	// basename, e.g. "tianxuan"). Injected into L2 so the agent knows which
+	// project it's working in after a workspace switch. V10.18+.
+	RootPath string
 	// V3.3: reserved for future multimodal content (images, diagrams, file previews).
 	// Inserted at the end of L2 so it doesn't disturb the cache-stable prefix.
 	Extra []string `json:"extra,omitempty"`
@@ -303,13 +307,18 @@ func (rc *RuntimeLayer) verboseSystemPrompt() string {
 	var parts []string
 
 	// Project state (locked, always included after first turn)
-	if rc.project.Language != "" {
+	if rc.project.Language != "" || rc.project.RootPath != "" {
 		var sb strings.Builder
 		sb.WriteString("## Project\n")
+		if rc.project.RootPath != "" {
+			sb.WriteString("- Root: " + rc.project.RootPath + "\n")
+		}
 		if rc.project.Module != "" {
 			sb.WriteString("- Module: " + rc.project.Module + "\n")
 		}
-		sb.WriteString("- Language: " + rc.project.Language + "\n")
+		if rc.project.Language != "" {
+			sb.WriteString("- Language: " + rc.project.Language + "\n")
+		}
 		if len(rc.project.EntryPoints) > 0 {
 			sb.WriteString("- Entry points: " + strings.Join(rc.project.EntryPoints, ", ") + "\n")
 		}
@@ -357,14 +366,19 @@ func (rc *RuntimeLayer) verboseSystemPrompt() string {
 func (rc *RuntimeLayer) compactSystemPrompt() string {
 	var lines []string
 
-	// Project line: @p m=module l=lang ep=entry dir=dirs files=N
-	if rc.project.Language != "" {
+	// Project line: @p root=name m=module l=lang ep=entry dir=dirs files=N
+	if rc.project.Language != "" || rc.project.RootPath != "" {
 		var sb strings.Builder
 		sb.WriteString("@p")
+		if rc.project.RootPath != "" {
+			sb.WriteString(" root=" + rc.project.RootPath)
+		}
 		if rc.project.Module != "" {
 			sb.WriteString(" m=" + rc.project.Module)
 		}
-		sb.WriteString(" l=" + rc.project.Language)
+		if rc.project.Language != "" {
+			sb.WriteString(" l=" + rc.project.Language)
+		}
 		if len(rc.project.EntryPoints) > 0 {
 			sb.WriteString(" ep=" + strings.Join(rc.project.EntryPoints, ","))
 		}

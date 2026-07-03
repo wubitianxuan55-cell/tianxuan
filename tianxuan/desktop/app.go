@@ -121,16 +121,19 @@ func (a *App) buildController() {
 	// folder (the remembered one, else home) before anything reads/writes config,
 	// .env, memory, or skills relative to cwd.
 	ensureWorkspace()
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd, _ = os.UserHomeDir()
+		_ = os.Chdir(cwd)
+	}
 	// 持久化当前工作空间：正常启动/关闭时从未调用 saveWorkspace，
 	// 导致下次启动无法恢复。现在每次 buildController 都保存当前 cwd。
-	if cwd, err := os.Getwd(); err == nil {
-		saveWorkspace(cwd)
-	}
+	saveWorkspace(cwd)
 
 	// Resolve the active model to its canonical "provider/model" ref up front so
 	// the switcher can mark it current.
 	model := ""
-	if cfg, err := config.Load(); err == nil {
+	if cfg, errCfg := config.Load(); errCfg == nil {
 		// Drive the Go-side catalogue (i18n.M) from the configured language so the
 		// backend-provided slash UI — command descriptions, sub-command hints,
 		// listing notices — comes through localized, matching the frontend.
@@ -154,14 +157,14 @@ func (a *App) buildController() {
 	a.activeTabID = tab.ID
 	a.mu.Unlock()
 
-	ctrl, err := boot.Build(ctx, boot.Options{
+	ctrl, buildErr := boot.Build(ctx, boot.Options{
 		Model: model, RequireKey: false, Sink: a.sink,
-		SessionDir: config.WorkspaceSessionDir(""),
+		SessionDir: config.WorkspaceSessionDir(cwd),
 	})
-	if err != nil {
+	if buildErr != nil {
 		a.mu.Lock()
-		a.startupErr = err.Error()
-		tab.StartupErr = err.Error()
+		a.startupErr = buildErr.Error()
+		tab.StartupErr = buildErr.Error()
 		a.ready = true
 		tab.Ready = true
 		a.mu.Unlock()

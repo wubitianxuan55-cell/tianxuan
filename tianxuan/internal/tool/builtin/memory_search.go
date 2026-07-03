@@ -25,14 +25,15 @@ type memorySearch struct{}
 func (memorySearch) Name() string { return "memory_search" }
 
 func (memorySearch) Description() string {
-	return "Search saved memories by keyword. Returns matching memory entries ranked by relevance with preview descriptions. Use this to find prior context, user preferences, or project facts before answering — don't ask the user about something memory may already record."
+	return "Search saved memories by keyword. Returns matching memory entries ranked by relevance with preview descriptions. Optionally filter by kind: semantic (facts/prefs), episodic (past experiences), procedural (rules). Use this to find prior context, user preferences, or project facts before answering — don't ask the user about something memory may already record."
 }
 
 func (memorySearch) Schema() json.RawMessage {
 	return json.RawMessage(`{
 "type":"object",
 "properties":{
-  "query":{"type":"string","description":"Search query — one or more keywords. The tool OR-matches tokens and ranks by relevance."}
+  "query":{"type":"string","description":"Search query — one or more keywords. The tool OR-matches tokens and ranks by relevance."},
+  "kind":{"type":"string","enum":["semantic","episodic","procedural"],"description":"Filter by cognitive kind. Omit to search all."}
 },
 "required":["query"]
 }`)
@@ -51,6 +52,7 @@ func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, er
 
 	var p struct {
 		Query string `json:"query"`
+		Kind  string `json:"kind"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -59,7 +61,12 @@ func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("query is required")
 	}
 
-	matches := idx.Search(p.Query)
+	var matches []memory.SearchMatch
+	if p.Kind != "" {
+		matches = idx.SearchByKind(p.Query, memory.NormalizeKind(p.Kind))
+	} else {
+		matches = idx.Search(p.Query)
+	}
 	if len(matches) == 0 {
 		return "No memories matched your query.", nil
 	}
@@ -73,7 +80,7 @@ func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, er
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("Found %d matching memories:\n\n", len(matches)))
 	for i, m := range matches[:limit] {
-		bars := scoreBars(m.Score, len(p.Query))
+		bars := scoreBars(int(m.Score*100), len(p.Query))
 		preview := m.Preview
 		if len(preview) > 160 {
 			preview = preview[:160] + "…"

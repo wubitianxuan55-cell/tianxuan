@@ -7,7 +7,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"tianxuan/internal/agent"
 	"tianxuan/internal/event"
 )
 
@@ -39,15 +38,9 @@ func normalizeAutoPlan(mode string) string {
 func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 	c.mu.Lock()
 	mode := c.autoPlan
-	am := c.agentMode
 	classifier := c.classifier
 	c.mu.Unlock()
 
-	// V9.0: If already in a planning mode (explore/orchestrate), skip.
-	// Only auto-switch from develop mode.
-	if am != "" && am != "develop" {
-		return
-	}
 	if mode == autoPlanOff {
 		return
 	}
@@ -56,9 +49,7 @@ func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 	if score <= 0 {
 		return
 	}
-	// V10.16: 区分 "on"（始终规划，旧 PlanModeMarker）和 "ask"（自动检测，
-	// 切换 orchestrate 模式）。V10.13 错误地将两者统一为 orchestrate，导致
-	// AutoPlan="on" 的测试和行为回归。
+	// "on": always enter plan mode for complex tasks
 	if mode == autoPlanOn {
 		if score >= 1 {
 			c.SetPlanMode(true)
@@ -66,7 +57,7 @@ func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 		}
 		return
 	}
-	// "ask" mode: classifier + heuristic → orchestrate
+	// "ask" mode: classifier + heuristic → enter plan mode
 	if classifier != nil && score <= 2 {
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
@@ -76,8 +67,8 @@ func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 				if reason != "" {
 					c.notice("auto plan classifier: " + reason)
 				}
-				c.SetAgentMode("orchestrate")
-				c.notice("auto mode: switched to orchestrate (multi-step task detected)")
+				c.SetPlanMode(true)
+				c.notice("auto plan: entering plan mode (multi-step task detected)")
 				return
 			}
 			return
@@ -85,8 +76,8 @@ func (c *Controller) maybeAutoPlan(ctx context.Context, input string) {
 		c.notice("auto plan classifier failed; falling back to heuristic: " + err.Error())
 	}
 	if score >= 1 {
-		c.SetAgentMode("orchestrate")
-		c.notice("auto mode: switched to orchestrate (multi-step task detected)")
+		c.SetPlanMode(true)
+		c.notice("auto plan: entering plan mode (multi-step task detected)")
 	}
 }
 
@@ -192,24 +183,4 @@ func (c *Controller) maybeClarifyVagueInput(input string) bool {
 		Text: "[Clarify] Your request is brief. What exactly do you want to achieve? " +
 			"You can use read_file/ls/grep to explore — currently in read-only mode."})
 	return true
-}
-
-// maybeAutoMode classifies the user input and sets the agent mode automatically
-// when no mode has been manually selected via /mode. Classification is heuristic
-// and deterministic — same input always yields the same mode, preserving cache
-// stability. Only fires on the first unclassified turn; subsequent turns reuse
-// the locked-in mode. Manual /mode always takes precedence.
-// V8.19: auto-mode classification.
-func (c *Controller) maybeAutoMode(input string) {
-	c.mu.Lock()
-	mode := c.agentMode
-	c.mu.Unlock()
-	if mode != "" {
-		return // manually set via /mode or already classified
-	}
-	classified := agent.ClassifyMode(input)
-	c.SetAgentMode(classified)
-	if classified != "develop" {
-		c.notice("auto mode: " + classified + " (classified from input)")
-	}
 }

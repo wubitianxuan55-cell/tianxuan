@@ -341,9 +341,17 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 
 	// Close the response body when the context is canceled so scanner.Scan()
 	// unblocks instead of hanging indefinitely on a stalled connection.
+	// Also exits when readStream completes normally (idleDone) to avoid
+	// leaking this goroutine until ctx expires.
+	idleDone := make(chan struct{})
+	defer close(idleDone)
 	go func() {
-		<-ctx.Done()
-		resp.Body.Close()
+		select {
+		case <-ctx.Done():
+			resp.Body.Close()
+		case <-idleDone:
+			// readStream exited normally; nothing to clean up.
+		}
 	}()
 
 	acc := map[int]*provider.ToolCall{}
@@ -361,10 +369,9 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	//   - at 120s idle: forcibly close the body (hard timeout for true disconnects)
 	const idleNoticeTimeout = 60 * time.Second
 	const idleHardTimeout   = 120 * time.Second
-	lastData := time.Now()
+	var lastDataNano atomic.Int64
+	lastDataNano.Store(time.Now().UnixNano())
 	keepaliveSent := false
-	idleDone := make(chan struct{})
-	defer close(idleDone)
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
@@ -375,7 +382,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				elapsed := time.Since(lastData)
+				elapsed := time.Since(time.Unix(0, lastDataNano.Load()))
 				if elapsed > idleHardTimeout {
 					resp.Body.Close()
 					return
@@ -388,7 +395,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 		}
 	}()
 	for scanner.Scan() {
-		lastData = time.Now()
+		lastDataNano.Store(time.Now().UnixNano())
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || !strings.HasPrefix(line, "data:") {
 			continue

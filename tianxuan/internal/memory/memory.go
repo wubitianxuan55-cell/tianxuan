@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -38,11 +40,12 @@ func Load(opts Options) *Set {
 		cwd = "."
 	}
 	store := StoreFor(opts.UserDir, cwd)
+	docs := discoverDocs(cwd, opts.UserDir)
 	return &Set{
-		Docs:    discoverDocs(cwd, opts.UserDir),
+		Docs:    docs,
 		Store:   store,
 		Index:   store.Index(),
-		Search:  store.BuildSearchIndex(),
+		Search:  store.BuildSearchIndex(docs),
 		CWD:     cwd,
 		UserDir: opts.UserDir,
 	}
@@ -155,10 +158,15 @@ func (s *Set) DocBlock() string {
 	return b.String()
 }
 
-// buildFullBlock returns the complete memory block (docs + index).
+// buildFullBlock returns the complete memory block (docs + index + profile).
 func (s *Set) buildFullBlock() string {
 	var b strings.Builder
 	b.WriteString("# Memory\n\n")
+
+	// User profile: auto-aggregated from user-type semantic memories.
+	if profile := s.ProfileBlock(); profile != "" {
+		b.WriteString(profile + "\n\n")
+	}
 
 	for _, d := range s.Docs {
 		fmt.Fprintf(&b, "\n## %s (%s)\n\n%s\n", d.Path, d.Scope, strings.TrimSpace(d.Body))
@@ -177,7 +185,14 @@ func (s *Set) buildFullBlock() string {
 // Includes doc paths and first line, plus the complete MEMORY.md index.
 func (s *Set) buildCompactBlock() string {
 	var b strings.Builder
-	b.WriteString("# Memory\n\nDocs available:\n\n")
+	b.WriteString("# Memory\n\n")
+
+	// User profile: auto-aggregated from user-type semantic memories.
+	if profile := s.ProfileBlock(); profile != "" {
+		b.WriteString(profile + "\n\n")
+	}
+
+	b.WriteString("Docs available:\n\n")
 	for _, d := range s.Docs {
 		first := strings.TrimSpace(d.Body)
 		if idx := strings.Index(first, "\n"); idx >= 0 {
@@ -211,6 +226,134 @@ func Compose(base string, s *Set) string {
 	}
 	return strings.TrimRight(base, "\n") + "\n\n" + block
 }
+
+// ─── LangMem-inspired kind-aware memory blocks ───────────────────────────
+
+// ProfileBlock auto-aggregates Type=user semantic memories into a structured
+// user profile. Only semantic memories are included (episodic and procedural are
+// handled separately). Returns "" when there are no user-typed semantic memories.
+func (s *Set) ProfileBlock() string {
+	if s == nil {
+		return ""
+	}
+	memories := s.Store.List()
+	var userFacts []string
+	for _, m := range memories {
+		if m.Kind != KindSemantic || m.Type != TypeUser {
+			continue
+		}
+		if d := strings.TrimSpace(m.Description); d != "" {
+			userFacts = append(userFacts, "- "+d)
+		}
+	}
+	if len(userFacts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("## User Profile (auto-aggregated)\n")
+	for _, f := range userFacts {
+		b.WriteString(f + "\n")
+	}
+	return b.String()
+}
+
+// ProceduralBlock returns all procedural memories as an always-active rules block.
+// These are injected every turn, not just at boot. Returns "" when there are none.
+func (s *Set) ProceduralBlock() string {
+	if s == nil {
+		return ""
+	}
+	memories := s.Store.List()
+	var rules []string
+	for _, m := range memories {
+		if m.Kind != KindProcedural {
+			continue
+		}
+		body := strings.TrimSpace(m.Body)
+		if body == "" {
+			continue
+		}
+		rules = append(rules, body)
+	}
+	if len(rules) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("<procedural-rules>\n")
+	b.WriteString("These rules ALWAYS apply — follow them in every response:\n\n")
+	for i, r := range rules {
+		fmt.Fprintf(&b, "%d. %s\n", i+1, r)
+	}
+	b.WriteString("</procedural-rules>")
+	return b.String()
+}
+
+// EpisodicMatches finds episodic memories whose tags match any tokens in the
+// input text. Used to inject relevant past experiences as few-shot context.
+// Returns at most 3 matches, sorted by tag overlap count.
+func (s *Set) EpisodicMatches(input string) []Memory {
+	if s == nil || input == "" {
+		return nil
+	}
+	memories := s.Store.List()
+	inputLower := strings.ToLower(input)
+	type scored struct {
+		m     Memory
+		score int
+	}
+	var candidates []scored
+	for _, m := range memories {
+		if m.Kind != KindEpisodic || len(m.Tags) == 0 {
+			continue
+		}
+		overlap := 0
+		for _, tag := range m.Tags {
+			if strings.Contains(inputLower, strings.ToLower(tag)) {
+				overlap++
+			}
+		}
+		if overlap > 0 {
+			candidates = append(candidates, scored{m, overlap})
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].score > candidates[j].score
+	})
+	if len(candidates) > 3 {
+		candidates = candidates[:3]
+	}
+	out := make([]Memory, len(candidates))
+	for i, c := range candidates {
+		out[i] = c.m
+	}
+	return out
+}
+
+// EpisodicBlock formats episodic memories as few-shot examples for turn-tail
+// injection. Uses the observation→action→result pattern where available.
+func EpisodicBlock(mm []Memory) string {
+	if len(mm) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("<episodic-memory>\n")
+	b.WriteString("Past experiences relevant to the current task:\n\n")
+	for _, m := range mm {
+		b.WriteString(fmt.Sprintf("## %s\n", m.Title))
+		b.WriteString(strings.TrimSpace(m.Body) + "\n\n")
+	}
+	b.WriteString("Use these past experiences to inform your approach — avoid repeating mistakes, apply successful patterns.\n")
+	b.WriteString("</episodic-memory>")
+	return b.String()
+}
+
+// ─── LinkGraph: [[memory-name]] cross-reference resolver ──────────────────
+
+// linkRefRe matches [[name]] references in memory bodies.
+var linkRefRe = regexp.MustCompile(`\[\[([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?)\]\]`)
 
 // InitDefaults creates default memory files when a project or user config has
 // none. It writes AGENTS.md at both the user-global level (shared across all

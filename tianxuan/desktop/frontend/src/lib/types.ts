@@ -147,9 +147,9 @@ export interface Meta {
   agentMode?: string; // "explore"|"develop"|"orchestrate"
 }
 
-// AgentMode is the unified runtime mode (V9.0: Mode + AgentMode merged).
-// explore: read-only research; develop: full-tool development; orchestrate: plan→execute→verify
-export type AgentMode = "explore" | "develop" | "orchestrate";
+// PermLevel controls permission strictness for tool execution.
+// ask: prompt before writes (default); auto: allow writes; yolo: skip all approval.
+export type PermLevel = "ask" | "auto" | "yolo";
 
 export interface CommandInfo {
   name: string; // without the leading slash
@@ -315,7 +315,8 @@ export interface SettingsView {
   agent: AgentView;
   configPath: string;
   providerKinds: string[]; // provider implementations the kernel registered (for the kind picker)
-  bypass: boolean; // live YOLO state (runtime-only) — whether approvals are skipped this session
+  bypass: boolean; // DEPRECATED — use permLevel instead
+  permLevel?: string; // live permission level this session (\"ask\"|\"auto\"|\"yolo\")
 }
 
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;

@@ -158,7 +158,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	if ct, ok := t.(tool.ContextualTool); ok {
 		tc := tool.ToolContext{
 			SessionID:  a.sessionID,
-			AgentName:  string(a.agentMode),
+			AgentName:  "agent",
 			ToolCallID: call.ID,
 			Messages:   a.session.Messages,
 		}

@@ -22,7 +22,7 @@ func (m chatTUI) View() tea.View {
 
 	var modeTag string
 	switch {
-	case m.ctrl.Bypass():
+	case m.ctrl.PermLevel() == "yolo":
 		modeTag = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).Render("[YOLO]")
 	case m.planMode:
 		modeTag = yellow("[plan]")

@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { CloseButton } from "./CloseButton";
 
 /** DrawerHeader — standardized header for all slide-out drawer panels.
  *  Provides uniform layout, spacing, and close-button position. */
-export function DrawerHeader({
+export const DrawerHeader = memo(function DrawerHeader({
   onClose,
   children,
 }: {
@@ -16,14 +16,14 @@ export function DrawerHeader({
       <CloseButton onClick={onClose} />
     </header>
   );
-}
+});
 
 /** DrawerTitle — semantic title text inside a DrawerHeader. */
-export function DrawerTitle({ text }: { text: string }) {
+export const DrawerTitle = memo(function DrawerTitle({ text }: { text: string }) {
   return <span className="text-[15px] font-semibold text-fg">{text}</span>;
-}
+});
 
 /** DrawerSubtitle — supplementary metadata below or beside the title. */
-export function DrawerSubtitle({ text }: { text: string }) {
+export const DrawerSubtitle = memo(function DrawerSubtitle({ text }: { text: string }) {
   return <div className="mt-[3px] text-fg-faint text-[11px]">{text}</div>;
-}
+});

@@ -104,7 +104,7 @@ func (a *App) Settings() SettingsView {
 		Agent:         AgentView{Temperature: cfg.Agent.Temperature, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt},
 		ConfigPath:    config.SourcePath(),
 		ProviderKinds: provider.Kinds(),
-		Bypass:        a.ctrl != nil && a.ctrl.Bypass(),
+		Bypass:        a.ctrl != nil && a.ctrl.PermLevel() != "ask",
 	}
 	for i := range cfg.Providers {
 		p := &cfg.Providers[i]

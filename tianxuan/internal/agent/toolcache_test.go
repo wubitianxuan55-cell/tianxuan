@@ -27,6 +27,7 @@ func TestToolCache_BasicGetSet(t *testing.T) {
 
 func TestToolCache_InvalidateOnWrite(t *testing.T) {
 	c := newToolCache(-1)
+	c.grace = 0 // disable grace optimisation so mtime invalidation is tested
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "f.txt")
 	os.WriteFile(f, []byte("v1"), 0644)
@@ -48,6 +49,7 @@ func TestToolCache_InvalidateOnWrite(t *testing.T) {
 func TestToolCache_TOCTOU_ConcurrentGetSet(t *testing.T) {
 	// 并发 stress test：get 和 set 同时运行，验证缓存不会丢失有效条目。
 	c := newToolCache(-1) // no TTL
+	c.grace = 0           // disable grace so we exercise the Stat path in the race
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "f.txt")
 	os.WriteFile(f, []byte("initial"), 0644)
@@ -138,5 +140,40 @@ func TestToolCache_OffsetKeys(t *testing.T) {
 	}
 	if !ok5 || v5 != "56789" {
 		t.Fatal("offset 5 cache miss")
+	}
+}
+
+func TestToolCache_GraceSkipsStat(t *testing.T) {
+	// The grace period should return cached content without Stat for fresh entries.
+	c := newToolCache(-1)
+	c.grace = 5 * time.Second
+	tmp := t.TempDir()
+	f := filepath.Join(tmp, "f.txt")
+	os.WriteFile(f, []byte("v1"), 0644)
+
+	c.set(f, 0, "v1")
+
+	// Modify file behind the cache's back — should still hit because within grace.
+	os.WriteFile(f, []byte("v2"), 0644)
+
+	val, ok := c.get(f, 0)
+	if !ok {
+		t.Fatal("cache miss within grace period")
+	}
+	if val != "v1" {
+		t.Fatalf("expected cached 'v1', got %q", val)
+	}
+
+	// After grace expires, Stat should invalidate the stale entry.
+	// Advance cached time to simulate age.
+	c.mu.Lock()
+	for k := range c.items {
+		c.items[k].cached = time.Now().Add(-10 * time.Second)
+	}
+	c.mu.Unlock()
+
+	_, ok = c.get(f, 0)
+	if ok {
+		t.Fatal("stale cache should be invalidated after grace")
 	}
 }

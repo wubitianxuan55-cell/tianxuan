@@ -405,61 +405,6 @@ func TestGlobNoMatches(t *testing.T) {
 	}
 }
 
-// TestWebSearchParseDuckDuckGo 直接测试 DuckDuckGo Lite HTML 解析器。
-func TestWebSearchParseDuckDuckGo(t *testing.T) {
-	html := `<!doctype html>
-<html><body>
-<table>
-<tr><td><a rel="nofollow" href="https://example.com/page1">Example Page One</a> </td></tr>
-<tr><td><span class="link-text">example.com/page1</span></td></tr>
-<tr><td><span class="snippet">This is the first search result snippet about example.</span></td></tr>
-<tr><td><a rel="nofollow" href="https://golang.org/pkg/net/http">Go HTTP Package</a> </td></tr>
-<tr><td><span class="link-text">golang.org/pkg/net/http</span></td></tr>
-<tr><td><span class="snippet">Package http provides HTTP client and server implementations.</span></td></tr>
-</table>
-</body></html>`
-
-	results := parseDuckDuckGoLite(html, 5)
-	if len(results) < 2 {
-		t.Fatalf("expected >= 2 results, got %d", len(results))
-	}
-	if results[0].Title != "Example Page One" {
-		t.Errorf("result[0].Title = %q, want %q", results[0].Title, "Example Page One")
-	}
-	if results[0].URL != "https://example.com/page1" {
-		t.Errorf("result[0].URL = %q", results[0].URL)
-	}
-	if !strings.Contains(results[0].Snippet, "first search result") {
-		t.Errorf("result[0].Snippet = %q, want snippet about example", results[0].Snippet)
-	}
-	if results[1].Title != "Go HTTP Package" {
-		t.Errorf("result[1].Title = %q", results[1].Title)
-	}
-}
-
-// TestWebSearchEmptyQuery 验证空查询返回错误。
-func TestWebSearchEmptyQuery(t *testing.T) {
-	_, err := webSearch{}.Execute(context.Background(), argsJSON(t, map[string]any{"query": ""}))
-	if err == nil || !strings.Contains(err.Error(), "query is required") {
-		t.Errorf("expected 'query is required', got %v", err)
-	}
-}
-
-// TestWebSearchDuckDuckGoInternalLinks 验证 DuckDuckGo 内部链接被过滤。
-func TestWebSearchFilterInternalLinks(t *testing.T) {
-	html := `<a rel="nofollow" href="https://example.com/real">Real Result</a>
-<a href="/settings">DuckDuckGo Settings</a>
-<a rel="nofollow" href="https://duckduckgo.com/about">About DDG</a>
-<a rel="nofollow" href="javascript:void(0)">JS Link</a>`
-
-	results := parseDuckDuckGoLite(html, 5)
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result (real one), got %d: %+v", len(results), results)
-	}
-	if results[0].URL != "https://example.com/real" {
-		t.Errorf("URL = %q, want example.com/real", results[0].URL)
-	}
-}
 
 func TestTruncateStream(t *testing.T) {
 	tests := []struct {
@@ -520,4 +465,3 @@ func TestTruncateStream(t *testing.T) {
 		})
 	}
 }
-

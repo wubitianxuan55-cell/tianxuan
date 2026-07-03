@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { useI18n } from "../lib/i18n";
 import { Blocks, Cpu, Brain, Wrench } from "lucide-react";
 
-export function Skeleton() {
+export const Skeleton = memo(function Skeleton() {
   const { t } = useI18n();
 
   return (
@@ -34,7 +35,7 @@ export function Skeleton() {
       </div>
     </div>
   );
-}
+});
 
 function Card({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (

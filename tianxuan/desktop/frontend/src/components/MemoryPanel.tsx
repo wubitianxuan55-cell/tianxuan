@@ -17,11 +17,12 @@ export function MemoryPanel(p: {
   onForget: (name: string) => Promise<void> | void;
   onSaveDoc: (path: string, body: string) => Promise<void> | void;
   onSaveFact: (name: string, body: string) => Promise<void> | void;
+  onChangeType: (name: string, newType: string) => Promise<void> | void;
   onAcceptMemorySuggestion: (candidate: MemorySuggestion) => Promise<void> | void;
   onAcceptSkillSuggestion: (candidate: SkillSuggestion) => Promise<void> | void;
   onRefreshSuggestions: () => Promise<MemorySuggestionsView | null>;
 }) {
-  const { view, onClose, onRemember, onForget, onSaveDoc, onSaveFact, onAcceptMemorySuggestion, onAcceptSkillSuggestion, onRefreshSuggestions } = p;
+  const { view, onClose, onRemember, onForget, onSaveDoc, onSaveFact, onChangeType, onAcceptMemorySuggestion, onAcceptSkillSuggestion, onRefreshSuggestions } = p;
   const t = useT();
   const [note, setNote] = useState("");
   const [scope, setScope] = useState("");
@@ -133,6 +134,14 @@ export function MemoryPanel(p: {
       Promise.resolve(onSaveFact(name, body)).finally(() => setBusy(false));
     },
     [onSaveFact],
+  );
+
+  const changeType = useCallback(
+    (name: string, newType: string) => {
+      setBusy(true);
+      Promise.resolve(onChangeType(name, newType)).finally(() => setBusy(false));
+    },
+    [onChangeType],
   );
 
   // 键盘快捷键（用 useCallback 避免重复注册）
@@ -312,6 +321,7 @@ export function MemoryPanel(p: {
                         onJump={jumpTo}
                         onSave={saveFact}
                         onForget={() => forgetFact(fact.name)}
+                        onChangeType={changeType}
                       />
                     </div>
                   ))}

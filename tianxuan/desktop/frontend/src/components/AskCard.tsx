@@ -50,7 +50,6 @@ export function AskCard({
     const onResize = () => {
       setPos((p) => {
         if (!p) return p;
-        // 重新测量卡片尺寸（max-w-lg 可能触发宽度变化）
         const r = cardRef.current?.getBoundingClientRect();
         if (r) cardSize.current = { w: r.width, h: r.height };
         return clamp(p.x, p.y);
@@ -63,13 +62,13 @@ export function AskCard({
   // ── 拖拽事件 ──────────────────────────────────────────────────
   const startDrag = useCallback(
     (e: React.PointerEvent) => {
-      if (e.button !== 0) return; // 仅左键
+      if (e.button !== 0) return;
       e.preventDefault();
       dragging.current = true;
       dragStart.current = { x: e.clientX, y: e.clientY };
       setPos((p) => {
         posStart.current = p ?? { x: 0, y: 0 };
-        return p; // 保持当前值，不触发额外渲染
+        return p;
       });
 
       const onMove = (me: PointerEvent) => {
@@ -98,7 +97,19 @@ export function AskCard({
     [clamp],
   );
 
-  // ── 问题交互（不变）────────────────────────────────────────────
+  // ── 键盘：Enter 提交 ──────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey && allAnswered) {
+        e.preventDefault();
+        submit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // ── 问题交互 ────────────────────────────────────────────────
   const toggle = (q: WireAskQuestion, label: string) => {
     setCustom((c) => ({ ...c, [q.id]: "" }));
     setSel((s) => {
@@ -129,11 +140,14 @@ export function AskCard({
     );
   };
 
+  // 卡片标题：优先用 ask.title，否则用第一个问题的 header
+  const cardTitle = ask.questions[0]?.header || "";
+
   return (
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
       <div
         ref={cardRef}
-        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl p-5 pt-7 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
+        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl p-5 pt-8 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
         style={{
           boxShadow: "var(--ds-shadow-panel)",
           ...(pos
@@ -143,19 +157,28 @@ export function AskCard({
       >
         {/* 拖拽手柄 */}
         <div
-          className="absolute top-0 left-0 right-0 h-7 cursor-grab flex items-start justify-center pt-2 select-none"
+          className="absolute top-0 left-0 right-0 h-7 cursor-grab flex items-start justify-center pt-2 select-none group"
           onPointerDown={startDrag}
-          title="拖拽移动"
+          title={t("ask.dragHint")}
         >
-          <span className="w-8 h-1 rounded-full bg-fg-faint/25" />
+          <span className="w-8 h-1 rounded-full bg-fg-faint/25 group-hover:bg-fg-faint/50 group-hover:w-10 transition-all duration-200" />
         </div>
+
+        {/* 卡片标题 */}
+        {cardTitle && ask.questions.length === 1 && (
+          <div className="flex items-center gap-2 -mt-1">
+            <span className="w-1 h-4 rounded-full bg-accent shrink-0" />
+            <span className="text-fg text-[15px] font-semibold leading-tight">{cardTitle}</span>
+          </div>
+        )}
 
         {ask.questions.map((q) => (
           <div className="flex flex-col gap-3" key={q.id}>
-            {q.header && (
+            {/* 多问题时显示各自 header */}
+            {q.header && ask.questions.length > 1 && (
               <div className="flex items-center gap-2">
                 <span className="w-1 h-4 rounded-full bg-accent shrink-0" />
-                <span className="text-fg text-[15px] font-semibold leading-tight">{q.header}</span>
+                <span className="text-fg text-[14px] font-semibold leading-tight">{q.header}</span>
               </div>
             )}
             <div className="text-fg-dim text-[13px] leading-relaxed">{q.prompt}</div>
@@ -173,14 +196,16 @@ export function AskCard({
                     onClick={() => toggle(q, o.label)}
                   >
                     <span
-                      className={`shrink-0 w-[18px] h-[18px] mt-px rounded-full border-2 flex items-center justify-center transition-colors duration-150 ${
-                        on
-                          ? "border-accent bg-accent"
-                          : "border-fg-faint"
+                      className={`shrink-0 mt-px flex items-center justify-center transition-colors duration-150 ${
+                        q.multi
+                          ? `w-[18px] h-[18px] rounded border-2 ${on ? "border-accent bg-accent" : "border-fg-faint"}`
+                          : `w-[18px] h-[18px] rounded-full border-2 ${on ? "border-accent bg-accent" : "border-fg-faint"}`
                       }`}
                     >
                       {on && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent-fg" />
+                        q.multi
+                          ? <span className="text-accent-fg text-[10px] font-bold">✓</span>
+                          : <span className="w-1.5 h-1.5 rounded-full bg-accent-fg" />
                       )}
                     </span>
                     <span className="flex flex-col gap-0.5 min-w-0">
@@ -200,6 +225,12 @@ export function AskCard({
               placeholder={t("ask.customPlaceholder")}
               value={custom[q.id] ?? ""}
               onChange={(e) => setTyped(q, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && allAnswered) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
             />
           </div>
         ))}

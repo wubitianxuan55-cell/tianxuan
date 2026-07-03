@@ -22,7 +22,7 @@ var compactDesc = map[string]string{
 	"kill_shell":     "终止后台任务",
 	"wait":           "阻塞等待后台任务结束",
 	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全,支持重试)",
-	"web_search":     "搜索公开网页(通过DuckDuckGo)，返回标题/URL/摘要",
+	"web_search":     "搜索公开网页(通过Tavily/Brave/SearXNG)，返回标题/URL/摘要",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
 	"complete_step":  "完成计划步骤(须可验证证据,禁止纯manual)",
 	"notebook_edit":  "编辑Jupyter Notebook单元格(.ipynb)",
@@ -31,7 +31,7 @@ var compactDesc = map[string]string{
 	"git_commit":     "提交暂存变更(可stage_all/amend/自动生成消息)",
 	"git_log":        "显示提交历史(支持count/path/author过滤)",
 	"git_worktree":   "管理git工作树(添加/删除/列出)",
-	"memory_search":  "搜索已保存的记忆(关键词,返回相关条目)",
+	"memory_search":  "搜索记忆(关键词+kind过滤,BM25排序)",
 	"read_skill":     "读取指定技能(skill)的完整内容",
 }
 
@@ -87,7 +87,7 @@ var compactSchema = map[string]json.RawMessage{
 	"git_worktree": json.RawMessage(
 		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
 	"memory_search": json.RawMessage(
-		`{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`),
+		`{"type":"object","properties":{"query":{"type":"string"},"kind":{"type":"string"}},"required":["query"]}`),
 	"read_skill": json.RawMessage(
 		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
 }

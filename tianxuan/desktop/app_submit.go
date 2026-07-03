@@ -81,27 +81,17 @@ func (a *App) Compact() error {
 	return ctrl.Compact(a.ctx, "")
 }
 
-// SetAgentMode switches the agent runtime mode: "explore" (read-only research),
-// "develop" (full tools, default), or "orchestrate" (plan→execute→verify).
-func (a *App) SetAgentMode(mode string) {
+// SetPermLevel sets the permission strictness: "ask" (default), "auto", "yolo".
+func (a *App) SetPermLevel(level string) {
 	if ctrl := a.ctrlByTabID(""); ctrl != nil {
-		ctrl.SetAgentMode(mode)
+		ctrl.SetPermLevel(level)
 	}
 }
 
-// AgentMode returns the current agent runtime mode, for the status-bar indicator.
-func (a *App) AgentMode() string {
+// PermLevel returns the current permission level for the status-bar indicator.
+func (a *App) PermLevel() string {
 	if ctrl := a.ctrlByTabID(""); ctrl != nil {
-		return ctrl.AgentMode()
+		return ctrl.PermLevel()
 	}
-	return ""
-}
-
-// SetBypass toggles YOLO mode for the session: auto-approve every tool call
-// (writers and bash run without asking). Deny rules still apply. Runtime-only —
-// not written to config, so it resets on relaunch.
-func (a *App) SetBypass(on bool) {
-	if ctrl := a.ctrlByTabID(""); ctrl != nil {
-		ctrl.SetBypass(on)
-	}
+	return "ask"
 }

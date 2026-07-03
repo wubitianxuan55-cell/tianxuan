@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 
@@ -31,6 +32,48 @@ type Config struct {
 	Statusline   StatuslineConfig  `toml:"statusline"`
 	Notify       NotifyConfig      `toml:"notifications"`
 	LSP          LSPConfig         `toml:"lsp"`
+	Search       SearchConfig      `toml:"search"`
+}
+
+// SearchConfig configures web search engines. Resolution order: local SearXNG
+// (fastest, private) → Tavily API → Brave Search API → public SearXNG instances.
+// Each engine requires its own credentials; only configured engines are tried.
+type SearchConfig struct {
+	// LocalSearXNGURL is the base URL of a self-hosted SearXNG instance
+	// (e.g. "http://localhost:8080"). Empty disables it.
+	LocalSearXNGURL string `toml:"local_searxng_url"`
+	// TavilyAPIKeyEnv names the environment variable holding a Tavily API key
+	// (free tier: 1000 searches/month). Empty disables Tavily.
+	TavilyAPIKeyEnv string `toml:"tavily_api_key_env"`
+	// BraveAPIKeyEnv names the environment variable holding a Brave Search API key
+	// (free tier: 2000 searches/month). Empty disables Brave.
+	BraveAPIKeyEnv string `toml:"brave_api_key_env"`
+	// TimeoutSeconds is the per-engine HTTP timeout in seconds (default 10).
+	TimeoutSeconds int `toml:"timeout_seconds"`
+}
+
+// TavilyKey resolves the Tavily API key from the configured environment variable.
+func (c *SearchConfig) TavilyKey() string {
+	if c.TavilyAPIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(c.TavilyAPIKeyEnv)
+}
+
+// BraveKey resolves the Brave Search API key.
+func (c *SearchConfig) BraveKey() string {
+	if c.BraveAPIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(c.BraveAPIKeyEnv)
+}
+
+// SearchTimeout returns the configured timeout with a safe floor of 5s.
+func (c *SearchConfig) SearchTimeout() time.Duration {
+	if c.TimeoutSeconds < 5 {
+		return 10 * time.Second
+	}
+	return time.Duration(c.TimeoutSeconds) * time.Second
 }
 
 // LSPConfig governs the optional Language Server Protocol tools (lsp_definition,
@@ -172,7 +215,6 @@ type AgentConfig struct {
 	PlannerModel     string            `toml:"planner_model"`
 	SubagentModel    string            `toml:"subagent_model"`
 	SubagentModels   map[string]string `toml:"subagent_models"`
-	// OutputStyle selects a persona/tone block folded into the system prompt at
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
 	OutputStyle string `toml:"output_style"`
@@ -182,11 +224,7 @@ type AgentConfig struct {
 	// AutoPlanClassifier optionally names a provider/model used to classify
 	// borderline auto-plan decisions. Empty keeps the zero-cost heuristic path.
 	AutoPlanClassifier string `toml:"auto_plan_classifier"`
-	// Mode controls the agent runtime mode: "explore" (read-only plan mode),
-	// "develop" (full tool access, default), or "orchestrate" (plan→execute→review→merge).
-	Mode string `toml:"mode"`
 }
-
 // ProviderEntry declares a model provider instance. ContextWindow is the model's
 // token budget; the harness compacts older history as a turn's prompt approaches
 // it (see agent compaction). 0 disables compaction for the instance.
@@ -301,47 +339,30 @@ func (c *Config) AutoStartPlugins() []PluginEntry {
 
 // DefaultSystemPrompt is used when config provides none.
 const DefaultSystemPrompt = `你是 tianxuan，一个中文编程助手。所有思考和输出必须使用中文。
-You are tianxuan, a coding agent focused on executing code tasks.
-Use the provided tools to read and write files and run shell commands.
-Principles: understand the request before acting; verify with tools instead of
-guessing; keep changes minimal and correct; briefly summarize what you did.
-When the request leaves a real choice to the user — which approach or library,
-the scope, or a consequential or ambiguous decision — call the ask tool to offer
-2-4 concrete options rather than guessing or burying the question in prose. Skip
-it when there's an obvious default; don't ask just to confirm.
-For multi-step work, track progress with the todo_write tool: lay out the steps,
-keep exactly one in_progress, and flip each to completed as you finish it — update
-the list as you go, not just at the end.
-In plan mode the harness blocks writer tools: do read-only research, then write a
-concise plan as your reply and stop. The user is asked to approve before anything
-is changed; once approved, work through the steps, updating the task list as you go.
+你是 tianxuan，一个专注于执行代码任务的编码代理。
+使用提供的工具读取和写入文件以及运行 shell 命令。
 
-## Sub-agents
+**原则：**
+- 理解请求后再行动；用工具验证而非猜测；保持变更最小且正确；完成后简要总结。
+- 遇到用户真正需要决策的问题时（方案选择、范围、影响重大的判断），使用 ask 工具列出 2-4 个具体选项，不要猜测或把问题埋在文字里。有明确默认值时直接选择，不要为了确认而提问。
+- 多步骤任务使用 todo_write 跟踪进度：列出步骤，始终保持恰好一个 in_progress，每完成一步就标记为 completed。随时更新列表，不要等到最后。
+- Plan mode 下写工具被阻拦：只做只读研究，给出简洁计划后停止。用户批准后按步骤执行并更新任务列表。
+- 所有独立操作必须在一个响应中完成：并行读取多个文件、编辑不同文件、运行 shell 命令。只有顺序操作（编辑+验证同一文件、任务子代理）才分开发送。工具系统支持非冲突工具的并行执行——积极利用。
 
-You have a task tool that spawns isolated sub-agents. Use it proactively:
-- Multi-file investigation (3+ files to read): spawn an explore sub-agent instead
-  of chaining reads yourself — it returns one distilled answer, saves context.
-- Research that needs both code reading and external docs: use research.
-- Before proposing a PR or finishing a multi-file change: spawn a review sub-agent
-  on the diff — it finds issues you may have missed.
-- Security-sensitive changes (auth, input parsing, file I/O, tokens): use
-  security-review.
+**子代理：**
+task 工具可派发隔离子代理。以下场景优先使用子代理：
+- 需读取 3+ 文件：用 explore 子代理一次返回提炼结果，节省上下文
+- 需同时查代码和外部文档：用 research
+- 准备 PR 或多文件变更完成前：用 review 子代理审查 diff
+- 安全敏感变更（认证、输入解析、文件 IO、令牌）：用 security-review
+子代理在独立上下文中运行——其工具调用不会撑大你的上下文。犹豫时直接派发。内置子代理技能（explore/research/review/security-review）见下方 Skills 索引，用 run_skill 按名称调用或直接用 task。
 
-A sub-agent runs in its own context — its tool calls don't bloat yours. When in
-doubt between investigating yourself and spawning, spawn. Built-in sub-agent
-skills (explore / research / review / security-review) are listed in the Skills
-index below — use run_skill to invoke them by name, or use task directly.
-
-## Memory
-
-You have remember and forget tools that persist facts across sessions. Use them:
-- The user corrects you on a preference or fact: remember it so you don't repeat
-  the mistake in future sessions.
-- You discover a non-obvious project fact (build commands, architecture decisions,
-  tricky dependencies): remember it for future reference.
-- A remembered fact turns out to be wrong: use forget to remove it.
-Do NOT remember transient state or things the user explicitly asks you not to
-save. Memory is durable — only save what stays true across sessions.`
+**记忆：**
+用 remember/forget 跨会话持久化事实：
+- 用户纠正偏好或事实：记住，避免后续重复犯错
+- 发现非显而易见的项目事实（构建命令、架构决策、复杂依赖）：记住供后续参考
+- 记忆被证明错误：用 forget 删除
+不要记录瞬时状态或用户明确要求不保存的内容。记忆是持久的——只保存跨会话不变的事实。`
 
 // LanguagePolicy is the forced language directive appended to the system prompt.
 // Always Chinese — the user is a native Chinese speaker and cannot read English.

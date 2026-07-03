@@ -54,7 +54,7 @@ func (b *streamBatcher) addText(s string) {
 		b.textLast = now
 	}
 	b.textBuf.WriteString(s)
-	if b.textBuf.Len() >= b.maxBytes || now.Sub(b.textLast) >= b.maxDelay || strings.Contains(s, "\n") {
+	if b.textBuf.Len() >= b.maxBytes || now.Sub(b.textLast) >= b.maxDelay || byteContainsNewline(s) {
 		b.flushText()
 	}
 }
@@ -102,4 +102,15 @@ func (b *streamBatcher) flushReasoning() {
 	}
 	b.sink.Emit(event.Event{Kind: event.Reasoning, Text: b.reasoningBuf.String()})
 	b.reasoningBuf.Reset()
+}
+
+// byteContainsNewline is a specialised byte-scan for newline characters that
+// avoids the allocation and Unicode normalisation of strings.Contains.
+func byteContainsNewline(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			return true
+		}
+	}
+	return false
 }

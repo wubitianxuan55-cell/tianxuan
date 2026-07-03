@@ -1,5 +1,6 @@
 import { memo, useState } from "react";
 import { useT } from "../lib/i18n";
+import { factTypeLabel } from "../lib/factTypeLabel";
 
 type ArchivedItem = {
   name: string;
@@ -34,8 +35,7 @@ export const ArchivesSection = memo(function ArchivesSection(p: {
               className="border border-border-soft rounded-lg px-3 py-2 bg-bg-soft/50 opacity-70 hover:opacity-100 transition-opacity"
             >
               <div className="flex items-center gap-2">
-                <span className="text-fg-dim text-[12px] font-medium">{a.title || a.name}</span>
-                <span className="badge badge--muted">{a.type}</span>
+                <span className="badge badge--muted">{factTypeLabel(st, a.type)}</span>
                 {a.archivedAt && (
                   <span className="text-fg-faint text-[10px] ml-auto font-mono">
                     {new Date(a.archivedAt).toLocaleDateString()}

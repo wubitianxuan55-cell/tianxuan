@@ -319,9 +319,8 @@ func chatREPL(args []string) int {
 	// event and blocks until the user answers via ctrl.Approve. Sub-agents (the
 	// task tool) keep their headless gate from setup — no UI to prompt through.
 	ctrl.EnableInteractiveApproval()
-	// YOLO: skip every approval prompt for the session (deny rules still apply).
 	if *yolo {
-		ctrl.SetBypass(true)
+		ctrl.SetPermLevel("yolo")
 	}
 
 	m := newChatTUI(ctrl, missing, eventCh, termW)
@@ -350,7 +349,7 @@ func chatREPL(args []string) int {
 		}
 		c.EnableInteractiveApproval()
 		if *yolo {
-			c.SetBypass(true)
+			c.SetPermLevel("yolo")
 		}
 		return c, nil
 	}

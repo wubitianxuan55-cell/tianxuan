@@ -103,27 +103,17 @@ type Controller struct {
 	cancel      context.CancelFunc
 	running     bool
 	planMode    bool
-	agentMode   string // V6.0 P3: "explore"|"develop"|"orchestrate"
 	sessionPath string
 	approvals   map[string]chan approvalReply
 	asks        map[string]chan []event.AskAnswer
 	granted     map[string]bool
 	nextID      int
-	// turn counts model turns this session, passed to hooks in their payload.
 	turn int
-	// autoApprove auto-allows writer tool calls without prompting. Set only while
-	// executing a just-approved plan: approving the plan is the go-ahead, so the
-	// model shouldn't re-prompt for every write of the work it just got cleared to
-	// do. Deny rules still bite (those never reach the approver). Reset when the
-	// execution turn returns.
 	autoApprove bool
 
-	// bypass is "YOLO" mode: while set, every approval prompt is auto-allowed for
-	// the rest of the session (writers and bash run without asking). It is a
-	// deliberate, session-scoped opt-in (the --dangerously-skip-permissions flag or
-	// a runtime toggle), never persisted. Deny rules are unaffected — they're
-	// resolved before the approver, so a denied tool is still blocked in YOLO mode.
-	bypass bool
+	// permLevel controls permission strictness: "ask" (prompt before writes, default),
+	// "auto" (allow writes without asking), or "yolo" (skip all prompts).
+	permLevel string
 
 	// pendingMemory holds memory notes added mid-session (via "#" quick-add or a
 	// memory edit) that haven't yet been folded into a turn. Compose drains it
@@ -217,6 +207,7 @@ func New(opts Options) *Controller {
 		pluginCtx:    pluginCtx,
 		ctxMgr:           opts.CtxMgr,
 		cpRoot:           opts.WorkspaceRoot,
+		permLevel:    "ask",
 		approvals:    map[string]chan approvalReply{},
 		asks:         map[string]chan []event.AskAnswer{},
 		granted:      map[string]bool{},
@@ -347,7 +338,6 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	if c.isPlanMode() && c.maybeClarifyVagueInput(raw) {
 		return nil // question emitted, wait for user response
 	}
-	c.maybeAutoMode(raw)
 	c.maybeAutoPlan(ctx, raw)
 
 	// V3.0 Phase 5: ContextManager handles first-turn orchestration.
@@ -390,14 +380,8 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	}
 	c.mu.Lock()
 	plan := c.planMode
-	mode := c.agentMode
 	c.mu.Unlock()
 	if !plan {
-		return nil
-	}
-
-	// V6.0 P3: explore mode never gates — it just answers questions
-	if mode == "explore" {
 		return nil
 	}
 
@@ -427,12 +411,7 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 		c.mu.Unlock()
 	}()
 
-	// V6.0 P3: mode-specific post-approval message
-	msg := planApprovedMessage
-	if mode == "orchestrate" {
-		msg = orchestrateApprovedMessage
-	}
-	return c.runner.Run(ctx, msg)
+	return c.runner.Run(ctx, orchestrateApprovedMessage)
 }
 
 // lastAssistantText returns the content of the most recent assistant message with
@@ -582,30 +561,22 @@ func (c *Controller) SetPlanMode(v bool) {
 	}
 }
 
-// SetAgentMode switches the agent runtime mode and propagates to the executor.
-func (c *Controller) SetAgentMode(mode string) {
+// SetPermLevel sets the permission strictness: "ask" (default, prompt before writes),
+// "auto" (allow writes without asking), or "yolo" (skip all prompts).
+func (c *Controller) SetPermLevel(level string) {
 	c.mu.Lock()
-	c.agentMode = mode
-	// V6.0 P3: sync controller's planMode flag for Compose
-	switch mode {
-	case "explore":
-		c.planMode = true
-	case "develop":
-		c.planMode = false
-	case "orchestrate":
-		c.planMode = true
-	}
+	c.permLevel = level
 	c.mu.Unlock()
 	if c.executor != nil {
-		c.executor.SetAgentMode(mode)
+		c.executor.SetPermLevel(level)
 	}
 }
 
-// AgentMode returns the current mode.
-func (c *Controller) AgentMode() string {
+// PermLevel returns the current permission level.
+func (c *Controller) PermLevel() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.agentMode
+	return c.permLevel
 }
 
 // PlanMode reports whether outgoing turns currently receive the plan-mode
@@ -917,20 +888,4 @@ func (c *Controller) Jobs() []jobs.View {
 		return nil
 	}
 	return c.jobs.Running()
-}
-
-// SetBypass turns YOLO/bypass mode on or off for the session: while on, every
-// approval prompt is auto-allowed (writers and bash run without asking). Deny
-// rules still block. Runtime-only — never written to config.
-func (c *Controller) SetBypass(on bool) {
-	c.mu.Lock()
-	c.bypass = on
-	c.mu.Unlock()
-}
-
-// Bypass reports whether YOLO/bypass mode is on, for the status-bar indicator.
-func (c *Controller) Bypass() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.bypass
 }

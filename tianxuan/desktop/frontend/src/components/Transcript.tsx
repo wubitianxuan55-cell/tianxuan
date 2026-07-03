@@ -13,6 +13,7 @@ import { useEntranceAnimation } from "../lib/useEntranceAnimation";
 
 // ── 滚动参数 ──────────────────────────────────────────────────────────
 const BOTTOM_THRESHOLD_PX = 80;
+const NOOP_SCROLL = () => {};
 
 function isNearBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
@@ -146,6 +147,10 @@ export function Transcript({
   }, [scrollToBottom]);
 
   // ── 预处理 ──────────────────────────────────────────────────────
+  // items 重置（新会话/切换会话）时清空 turnEls，防止残留旧 DOM 引用。
+  useEffect(() => {
+    if (items.length === 0) turnEls.current.clear();
+  }, [items.length === 0]);
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
 
   // turn→DOM 元素映射（用于跳转）
@@ -154,10 +159,12 @@ export function Transcript({
     const el = turnEls.current.get(turn);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  // V10.17.1: Transcript 卸载时清除 App 中的 scrollToTurn，避免
+  // 重新挂载后 MessageNavigator/JumpBar 仍持有旧实例的 turnEls 引用导致跳转失效。
   useEffect(() => {
     onScrollToTurnReady?.(scrollToTurnRef.current);
+    return () => onScrollToTurnReady?.(NOOP_SCROLL);
   }, [onScrollToTurnReady]);
-
   // ── 折叠/展开保持滚动 ──────────────────────────────────────────
   // 250ms 与 GSAP collapse 动画时长耦合（useGSAPCollapse 默认 duration）。
   // 若动画时长变更，此处需同步调整。
@@ -237,7 +244,11 @@ export function Transcript({
                   data-turn={tn != null ? tn : undefined}
                   data-entrance={it.id}
                   ref={(el) => {
-                    if (el && tn != null) turnEls.current.set(tn, el);
+                    if (el && tn != null) {
+                      turnEls.current.set(tn, el);
+                    } else if (tn != null) {
+                      turnEls.current.delete(tn);
+                    }
                   }}
                 >
                   <UserMessage

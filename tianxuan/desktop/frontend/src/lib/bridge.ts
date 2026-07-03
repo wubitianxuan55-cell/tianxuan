@@ -111,6 +111,8 @@ export interface AppBindings {
   Forget(name: string): Promise<void>;
   SaveDoc(path: string, body: string): Promise<string>;
   UpdateFact(name: string, body: string): Promise<string>;
+  ChangeFactType(name: string, type: string): Promise<string>;
+  MemorySuggestions(): Promise<MemorySuggestionsView>;
   MemorySuggestions(): Promise<MemorySuggestionsView>;
   AcceptMemorySuggestion(candidate: MemorySuggestion): Promise<string>;
   AcceptSkillSuggestion(candidate: SkillSuggestion): Promise<string>;
@@ -128,9 +130,9 @@ export interface AppBindings {
   RemovePermissionRule(list: string, rule: string): Promise<void>;
   SetSandbox(bash: string, network: boolean, workspaceRoot: string, allowWrite: string[]): Promise<void>;
   SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string): Promise<void>;
-  // SetBypass toggles YOLO mode (auto-approve every tool call this session; deny
-  // rules still apply). Runtime-only — not written to config.
-  SetBypass(on: boolean): Promise<void>;
+  // SetPermLevel controls permission strictness: "ask" (default, prompt before writes),
+  // "auto" (allow writes without asking), or "yolo" (skip all prompts).
+  SetPermLevel(level: string): Promise<void>;
   // Auto-updater (desktop/updater_app.go): the injected build version, a manifest
   // check, applying an update (win/linux self-update; macOS opens the download
   // page), and opening that page directly. Progress streams on "updater:progress".
@@ -238,5 +240,4 @@ import {
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 
 type AssertNever<T extends never> = T;
-export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow">>;
-
+export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel">>;

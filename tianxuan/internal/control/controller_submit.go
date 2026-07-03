@@ -81,7 +81,7 @@ func (c *Controller) Submit(input string) {
 			limit := 8
 			if len(matches) < limit { limit = len(matches) }
 			for i, m := range matches[:limit] {
-				sb.WriteString(fmt.Sprintf("  %d. [%d] %s\n", i+1, m.Score, m.Name))
+				sb.WriteString(fmt.Sprintf("  %d. [%.0f] %s\n", i+1, m.Score, m.Name))
 			}
 			if len(matches) > limit {
 				sb.WriteString(fmt.Sprintf("  ... and %d more\n", len(matches)-limit))
@@ -100,22 +100,22 @@ func (c *Controller) Submit(input string) {
 		c.SetGoal(goal)
 		c.notice("goal set: " + goal)
 		return
-	case strings.HasPrefix(trimmed, "/mode") || strings.HasPrefix(trimmed, "/mode "):
-		mode := strings.TrimSpace(strings.TrimPrefix(trimmed, "/mode"))
-		switch mode {
-		case "explore", "e":
-			c.SetAgentMode("explore")
-			c.notice("mode: explore (read-only research)")
-		case "develop", "dev", "d":
-			c.SetAgentMode("develop")
-			c.notice("mode: develop (full tools)")
-		case "orchestrate", "orch", "o":
-			c.SetAgentMode("orchestrate")
-			c.notice("mode: orchestrate (plan → execute → verify)")
+	case strings.HasPrefix(trimmed, "/perm") || strings.HasPrefix(trimmed, "/perm "):
+		level := strings.TrimSpace(strings.TrimPrefix(trimmed, "/perm"))
+		switch level {
+		case "ask", "a":
+			c.SetPermLevel("ask")
+			c.notice("权限级别: 询问 (写入前需确认)")
+		case "auto", "w":
+			c.SetPermLevel("auto")
+			c.notice("权限级别: 自动 (写入无需确认)")
+		case "yolo", "y":
+			c.SetPermLevel("yolo")
+			c.notice("权限级别: YOLO (跳过所有确认)")
 		case "":
-			c.notice("current mode: " + c.AgentMode() + " | usage: /mode explore|develop|orchestrate (or e/dev/o)")
+			c.notice("当前权限: " + c.PermLevel() + " | 用法: /perm ask|auto|yolo (或 a/w/y)")
 		default:
-			c.notice("unknown mode: " + mode + " — use explore/develop/orchestrate (or e/dev/o)")
+			c.notice("未知权限级别: " + level + " — 使用 ask/auto/yolo (或 a/w/y)")
 		}
 		return
 	case strings.HasPrefix(trimmed, "/distill"):

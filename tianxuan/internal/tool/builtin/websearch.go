@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -20,23 +19,30 @@ func init() { tool.RegisterBuiltin(webSearch{}) }
 type webSearch struct{}
 
 const (
-	webSearchTimeout    = 15 * time.Second
-	webSearchMaxRetries = 2         // exponential backoff: 1s, 2s
-	webSearchMaxRead    = 512 << 10 // 512 KB
+	webSearchTimeout    = 15 * time.Second  // per-engine HTTP timeout
+	webSearchMaxRetries = 1                 // retries per engine: 0, 1 (= 1 retry)
+	webSearchMaxRead    = 512 << 10         // 512 KB
+	webSearchTotalLimit = 20 * time.Second  // total execution deadline
 )
 
-// searxNGInstances — 公开 SearXNG 实例，返回 JSON 格式结果.
-// DuckDuckGo 已全面封杀非浏览器客户端 (CAPTCHA 202), SearXNG 作为主引擎.
-var searxNGInstances = []string{
-	"https://searx.be",
-	"https://search.sapti.me",
-	"https://searx.dresden.network",
+// --- search engine interface ---
+
+// searchEngine abstracts a single search backend.
+type searchEngine interface {
+	// Name returns a human-readable label for error messages.
+	Name() string
+	// Available reports whether this engine is configured and ready.
+	Available() bool
+	// Search executes a search and returns results (never nil on success).
+	Search(ctx context.Context, query string, limit int) ([]searchResult, error)
 }
+
+// --- webSearch tool implementation ---
 
 func (webSearch) Name() string { return "web_search" }
 
 func (webSearch) Description() string {
-	return "搜索公开网页（通过 SearXNG / DuckDuckGo）。返回带标题、URL 和摘要的排序结果。当答案的正确性依赖于当前状态时使用——任何随时间变化的内容（事件、价格、发布版本、现实世界的状态）。基于训练数据组合此类答案会编造过时数据；先搜索，然后将答案立足于结果中。对于常青/定义性问题不需要此工具。"
+	return "搜索公开网页（通过 SearXNG / Tavily / Brave Search）。返回带标题、URL 和摘要的结果。当答案的正确性依赖于当前状态时使用——任何随时间变化的内容（事件、价格、发布版本、现实世界的状态）。先搜索再回答；常青问题不需要此工具。"
 }
 
 func (webSearch) Schema() json.RawMessage {
@@ -55,36 +61,14 @@ func (webSearch) ReadOnly() bool { return true }
 func (webSearch) CompactDescription() string { return compactDesc["web_search"] }
 func (webSearch) CompactSchema() json.RawMessage   { return compactSchema["web_search"] }
 
-// searchHTTPClient returns an HTTP client with SSRF protection and HTTP/1.1
-// forced — DuckDuckGo blocks HTTP/2 connections from non-browser clients with
-// EOF, so we force HTTP/1.1 to at least get a proper response.
-func searchHTTPClient() *http.Client {
-	dialer := &net.Dialer{Timeout: webSearchTimeout}
-	return &http.Client{
-		Timeout: webSearchTimeout,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, err := net.SplitHostPort(addr)
-				if err != nil {
-					return nil, err
-				}
-				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-				if err != nil {
-					return nil, err
-				}
-				for _, ip := range ips {
-					if blockedFetchIP(ip.IP) {
-						return nil, fmt.Errorf("refusing to fetch internal address %s", host)
-					}
-				}
-				return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
-			},
-			ForceAttemptHTTP2: false, // DuckDuckGo blocks HTTP/2 bots with EOF
-		},
-	}
+// engineError records a failed engine attempt for diagnostics.
+type engineError struct {
+	name    string
+	err     error
+	elapsed time.Duration
 }
 
-func (webSearch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+func (ws webSearch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
 		Query string `json:"query"`
 		TopK  int    `json:"topK"`
@@ -102,37 +86,163 @@ func (webSearch) Execute(ctx context.Context, args json.RawMessage) (string, err
 		p.TopK = 10
 	}
 
-	// Try SearXNG first (JSON API, no CAPTCHA), fallback to DDG.
-	results, err := searchSearXNG(ctx, p.Query, p.TopK)
-	if err == nil && len(results) > 0 {
-		return formatResults(results), nil
+	engines := ws.buildEngines()
+
+	// Parallel execution: every engine fires in its own goroutine.
+	// First success wins; failures are collected for diagnostics.
+	resultCh := make(chan []searchResult, 1)
+	errCh := make(chan engineError, len(engines))
+
+	ctx, cancel := context.WithTimeout(ctx, webSearchTotalLimit)
+	defer cancel()
+
+	for _, eng := range engines {
+		eng := eng
+		go func() {
+			start := time.Now()
+			results, err := eng.Search(ctx, p.Query, p.TopK)
+			elapsed := time.Since(start)
+			if err != nil {
+				errCh <- engineError{name: eng.Name(), err: err, elapsed: elapsed}
+				return
+			}
+			if len(results) == 0 {
+				errCh <- engineError{name: eng.Name(), err: fmt.Errorf("no results"), elapsed: elapsed}
+				return
+			}
+			select {
+			case resultCh <- results:
+			default:
+				// another engine already won, discard
+			}
+		}()
 	}
 
-	// Fallback: DuckDuckGo Lite (HTTP/1.1 to avoid EOF).
-	results, err = searchDuckDuckGo(ctx, p.Query, p.TopK)
-	if err == nil && len(results) > 0 {
-		return formatResults(results), nil
+	// Collect: first result wins, or accumulate all failures.
+	var failures []engineError
+	for i := 0; i < len(engines); i++ {
+		select {
+		case results := <-resultCh:
+			return formatResults(results), nil
+		case fe := <-errCh:
+			failures = append(failures, fe)
+		case <-ctx.Done():
+			// Timeout — drain any remaining errors that arrive quickly.
+			failures = append(failures, engineError{name: "timeout", err: ctx.Err()})
+			for j := i + 1; j < len(engines); j++ {
+				select {
+				case fe := <-errCh:
+					failures = append(failures, fe)
+				case <-time.After(100 * time.Millisecond):
+				}
+			}
+			i = len(engines) // break outer loop
+		}
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("all search engines failed, last error: %w", err)
+	// All engines failed — build detailed diagnostic.
+	var diag strings.Builder
+	diag.WriteString("所有搜索引擎失败：")
+	for _, f := range failures {
+		fmt.Fprintf(&diag, "\n  • %s (%v): %v", f.name, f.elapsed.Round(time.Millisecond), f.err)
 	}
-	return "（未找到搜索结果）", nil
+	if searchCfg == nil || (searchCfg.TavilyAPIKeyEnv == "" && searchCfg.BraveAPIKeyEnv == "" && searchCfg.LocalSearXNGURL == "") {
+		diag.WriteString("\n\n💡 提示：配置搜索 API 可大幅提高成功率：")
+		diag.WriteString("\n  1. Tavily（免费 1000次/月）：注册 tavily.com → 设环境变量 TAVILY_API_KEY")
+		diag.WriteString("\n  2. Brave Search（免费 2000次/月）：注册 api.search.brave.com → 设环境变量 BRAVE_API_KEY")
+		diag.WriteString("\n  3. 自建 SearXNG：docker run -d -p 8080:8080 searxng/searxng")
+		diag.WriteString("\n  然后在 tianxuan.toml 中配置 [search] 节。")
+	}
+	return "", fmt.Errorf("%s", diag.String())
 }
 
-// --- SearXNG ---
+// buildEngines returns engines in priority order: local SearXNG → Tavily → Brave → public SearXNG.
+func (webSearch) buildEngines() []searchEngine {
+	var engines []searchEngine
+	cfg := searchCfg // may be nil
 
-type searxNGResponse struct {
-	Results []struct {
-		Title   string `json:"title"`
-		URL     string `json:"url"`
-		Content string `json:"content"`
-	} `json:"results"`
+	// 1. Local SearXNG (fastest, private)
+	if cfg != nil && cfg.LocalSearXNGURL != "" {
+		engines = append(engines, &localSearxNGEngine{baseURL: cfg.LocalSearXNGURL})
+	}
+
+	// 2. Tavily Search API
+	if cfg != nil && cfg.TavilyKey() != "" {
+		engines = append(engines, &tavilyEngine{apiKey: cfg.TavilyKey()})
+	}
+
+	// 3. Brave Search API
+	if cfg != nil && cfg.BraveKey() != "" {
+		engines = append(engines, &braveEngine{apiKey: cfg.BraveKey()})
+	}
+
+	// 4. Public SearXNG instances (always available as fallback)
+	engines = append(engines, &publicSearxNGEngine{})
+
+	return engines
 }
 
-func searchSearXNG(ctx context.Context, query string, limit int) ([]searchResult, error) {
+// --- HTTP client ---
+
+func searchHTTPClient() *http.Client {
+	timeout := webSearchTimeout
+	if searchCfg != nil {
+		timeout = searchCfg.SearchTimeout()
+	}
+	dialer := &net.Dialer{Timeout: timeout}
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+				if err != nil {
+					return nil, err
+				}
+				for _, ip := range ips {
+					if blockedFetchIP(ip.IP) {
+						return nil, fmt.Errorf("refusing to connect to internal address %s", host)
+					}
+				}
+				return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+			},
+			ForceAttemptHTTP2: false,
+		},
+	}
+}
+
+// --- Local SearXNG Engine ---
+
+type localSearxNGEngine struct{ baseURL string }
+
+func (e *localSearxNGEngine) Name() string    { return "local-searxng" }
+func (e *localSearxNGEngine) Available() bool  { return e.baseURL != "" }
+func (e *localSearxNGEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
+	return trySearXNG(ctx, e.baseURL, query, limit)
+}
+
+// --- Public SearXNG Engine ---
+
+// publicSearxNGInstances — publicly accessible SearXNG instances returning JSON.
+var publicSearxNGInstances = []string{
+	"https://searx.be",
+	"https://search.sapti.me",
+	"https://searx.dresden.network",
+	"https://search.bus-hit.me",
+	"https://searx.tuxcloud.net",
+	"https://search.ipv6s.net",
+}
+
+type publicSearxNGEngine struct{}
+
+func (e *publicSearxNGEngine) Name() string   { return "public-searxng" }
+func (e *publicSearxNGEngine) Available() bool { return true }
+func (e *publicSearxNGEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
 	var lastErr error
-	for _, baseURL := range searxNGInstances {
+	for _, baseURL := range publicSearxNGInstances {
 		results, err := trySearXNG(ctx, baseURL, query, limit)
 		if err == nil && len(results) > 0 {
 			return results, nil
@@ -141,6 +251,147 @@ func searchSearXNG(ctx context.Context, query string, limit int) ([]searchResult
 	}
 	return nil, lastErr
 }
+
+// --- Tavily Search API Engine ---
+
+type tavilyEngine struct{ apiKey string }
+
+func (e *tavilyEngine) Name() string   { return "tavily" }
+func (e *tavilyEngine) Available() bool { return e.apiKey != "" }
+
+type tavilyRequest struct {
+	Query         string `json:"query"`
+	SearchDepth   string `json:"search_depth,omitempty"`
+	MaxResults    int    `json:"max_results,omitempty"`
+	IncludeAnswer bool   `json:"include_answer,omitempty"`
+}
+
+type tavilyResponse struct {
+	Results []struct {
+		Title   string  `json:"title"`
+		URL     string  `json:"url"`
+		Content string  `json:"content"`
+		Score   float64 `json:"score"`
+	} `json:"results"`
+	Answer string `json:"answer,omitempty"`
+}
+
+func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
+	body, err := json.Marshal(tavilyRequest{
+		Query:      query,
+		MaxResults: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.tavily.com/search", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+e.apiKey)
+	httpReq.Header.Set("User-Agent", "tianxuan/1.0")
+
+	resp, err := searchHTTPClient().Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, webSearchMaxRead))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var tr tavilyResponse
+	if err := json.Unmarshal(respBody, &tr); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	results := make([]searchResult, 0, limit)
+	for _, r := range tr.Results {
+		if len(results) >= limit {
+			break
+		}
+		results = append(results, searchResult{
+			Title:   strings.TrimSpace(r.Title),
+			URL:     strings.TrimSpace(r.URL),
+			Snippet: truncate(r.Content, 300),
+		})
+	}
+	return results, nil
+}
+
+// --- Brave Search API Engine ---
+
+type braveEngine struct{ apiKey string }
+
+func (e *braveEngine) Name() string   { return "brave" }
+func (e *braveEngine) Available() bool { return e.apiKey != "" }
+
+type braveResponse struct {
+	Web struct {
+		Results []struct {
+			Title       string `json:"title"`
+			URL         string `json:"url"`
+			Description string `json:"description"`
+		} `json:"results"`
+	} `json:"web"`
+}
+
+func (e *braveEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
+	searchURL := fmt.Sprintf("https://api.search.brave.com/res/v1/web/search?q=%s&count=%d",
+		url.QueryEscape(query), limit)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Accept-Encoding", "gzip")
+	httpReq.Header.Set("X-Subscription-Token", e.apiKey)
+	httpReq.Header.Set("User-Agent", "tianxuan/1.0")
+
+	resp, err := searchHTTPClient().Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, webSearchMaxRead))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var br braveResponse
+	if err := json.Unmarshal(respBody, &br); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	results := make([]searchResult, 0, limit)
+	for _, r := range br.Web.Results {
+		if len(results) >= limit {
+			break
+		}
+		results = append(results, searchResult{
+			Title:   strings.TrimSpace(r.Title),
+			URL:     strings.TrimSpace(r.URL),
+			Snippet: truncate(r.Description, 300),
+		})
+	}
+	return results, nil
+}
+
+// --- shared SearXNG implementation ---
 
 func trySearXNG(ctx context.Context, baseURL, query string, limit int) ([]searchResult, error) {
 	searchURL := fmt.Sprintf("%s/search?%s", strings.TrimRight(baseURL, "/"),
@@ -162,37 +413,21 @@ func trySearXNG(ctx context.Context, baseURL, query string, limit int) ([]search
 		if len(results) >= limit {
 			break
 		}
-		snippet := r.Content
-		if len(snippet) > 300 {
-			snippet = snippet[:300]
-		}
 		results = append(results, searchResult{
 			Title:   strings.TrimSpace(r.Title),
 			URL:     strings.TrimSpace(r.URL),
-			Snippet: strings.TrimSpace(snippet),
+			Snippet: truncate(r.Content, 300),
 		})
 	}
 	return results, nil
 }
 
-// --- DuckDuckGo Lite (fallback) ---
-
-func searchDuckDuckGo(ctx context.Context, query string, limit int) ([]searchResult, error) {
-	searchURL := "https://lite.duckduckgo.com/lite/?"
-	searchURL += "q=" + url.QueryEscape(query)
-
-	client := searchHTTPClient()
-	body, err := doSearchRequest(ctx, client, searchURL, webSearchMaxRetries)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for CAPTCHA.
-	if strings.Contains(string(body), "bots use DuckDuckGo") {
-		return nil, fmt.Errorf("DuckDuckGo returned CAPTCHA challenge")
-	}
-
-	return parseDuckDuckGoLite(string(body), limit), nil
+type searxNGResponse struct {
+	Results []struct {
+		Title   string `json:"title"`
+		URL     string `json:"url"`
+		Content string `json:"content"`
+	} `json:"results"`
 }
 
 // --- shared HTTP ---
@@ -258,78 +493,18 @@ func formatResults(results []searchResult) string {
 	return out.String()
 }
 
+// --- helpers ---
+
+func truncate(s string, maxLen int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 type searchResult struct {
 	Title   string
 	URL     string
 	Snippet string
-}
-
-// DuckDuckGo Lite 结果页结构:
-//
-//	<table>
-//	  <tr><td><a rel="nofollow" href="URL">Title</a> </td></tr>
-//	  <tr><td><span class="link-text">display URL</span></td></tr>
-//	  <tr><td><span class="snippet">snippet text</span></td></tr>
-//	</table>
-//
-// 每个结果跨 3 个 <tr>：标题行→链接行→摘要行。
-var (
-	ddgLinkRe    = regexp.MustCompile(`<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>`)
-	ddgSnippetRe = regexp.MustCompile(`<td[^>]*>\s*(?:<span[^>]*>)?([^<]{10,200})\s*(?:</span>)?\s*</td>`)
-	ddgTagRe     = regexp.MustCompile(`<[^>]+>`)
-	ddgBlankRe   = regexp.MustCompile(`\n\s*\n`)
-)
-
-func parseDuckDuckGoLite(html string, limit int) []searchResult {
-	// 策略：找到所有结果链接（rel="nofollow" 的外部链接），
-	// 每个链接对应一个结果。摘要从后续的 <td> 中提取。
-	results := make([]searchResult, 0, limit)
-
-	// 找到所有外部链接（排除 DuckDuckGo 自身的链接）
-	linkMatches := ddgLinkRe.FindAllStringSubmatch(html, -1)
-	for _, m := range linkMatches {
-		if len(results) >= limit {
-			break
-		}
-		href := strings.TrimSpace(m[1])
-		title := strings.TrimSpace(m[2])
-		if title == "" || href == "" {
-			continue
-		}
-		// 排除 DuckDuckGo 内部链接和广告链接
-		if strings.HasPrefix(href, "/") ||
-			strings.Contains(href, "duckduckgo.com") ||
-			strings.Contains(href, "ad.") ||
-			strings.HasPrefix(href, "javascript:") {
-			continue
-		}
-		title = stripTags(title)
-		results = append(results, searchResult{Title: title, URL: href})
-	}
-
-	// 提取摘要文本（<td> 中的较长文本段）
-	snippets := ddgSnippetRe.FindAllStringSubmatch(html, -1)
-	si := 0
-	for i := range results {
-		// 跳过链接行和空白
-		for si < len(snippets) {
-			s := strings.TrimSpace(snippets[si][1])
-			s = stripTags(s)
-			if len(s) > 20 && !strings.HasPrefix(s, "http") {
-				results[i].Snippet = s
-				si++
-				break
-			}
-			si++
-		}
-	}
-
-	return results
-}
-
-func stripTags(s string) string {
-	s = ddgTagRe.ReplaceAllString(s, "")
-	s = strings.TrimSpace(s)
-	s = ddgBlankRe.ReplaceAllString(s, "\n")
-	return s
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,14 +120,21 @@ func rememberWorkspace(dir string) {
 func ensureWorkspace() {
 	if ws := loadWorkspace(); ws != "" {
 		if info, err := os.Stat(ws); err == nil && info.IsDir() && os.Chdir(ws) == nil {
+			slog.Info("workspace restored", "path", ws)
 			return
 		}
+		slog.Warn("saved workspace unavailable, falling back", "path", ws)
 	}
+	cwd, _ := os.Getwd()
 	if cwdWritable() {
+		slog.Info("cwd is writable, using as workspace", "path", cwd)
 		return
 	}
 	if home, err := os.UserHomeDir(); err == nil {
+		slog.Info("falling back to home directory", "path", home)
 		_ = os.Chdir(home)
+	} else {
+		slog.Error("no writable workspace available", "err", err)
 	}
 }
 

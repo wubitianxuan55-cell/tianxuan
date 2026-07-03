@@ -47,7 +47,7 @@ type Meta struct {
 	EventChannel string `json:"eventChannel"`
 	Cwd          string `json:"cwd"`
 	Bypass       bool   `json:"bypass"`     // YOLO mode on (auto-approve every tool call)
-	AgentMode    string `json:"agentMode"`  // "explore"|"develop"|"orchestrate"
+	PermLevel    string `json:"permLevel"`  // "ask"|"auto"|"yolo"
 }
 
 // CommandInfo describes one available slash command for the composer's "/" menu.
@@ -196,9 +196,9 @@ func (a *App) Meta() Meta {
 	ctrl := a.ctrl
 	a.mu.RUnlock()
 	cwd, _ := os.Getwd()
-	agentMode := ""
+	permLevel := "ask"
 	if ctrl != nil {
-		agentMode = ctrl.AgentMode()
+		permLevel = ctrl.PermLevel()
 	}
 	return Meta{
 		Label:        label,
@@ -206,8 +206,8 @@ func (a *App) Meta() Meta {
 		StartupErr:   startupErr,
 		EventChannel: eventChannel,
 		Cwd:          cwd,
-		Bypass:       ctrl != nil && ctrl.Bypass(),
-		AgentMode:    agentMode,
+		Bypass:       ctrl != nil && ctrl.PermLevel() != "ask",
+		PermLevel:    permLevel,
 	}
 }
 
@@ -428,6 +428,23 @@ func (a *App) UpdateFact(name, body string) (string, error) {
 	}
 	return ctrl.UpdateFact(name, body)
 }
+
+// ChangeFactType changes the Type of a saved fact — promote to "user" level,
+// demote to "project"/"feedback", etc. Returns the file written.
+func (a *App) ChangeFactType(name, typ string) (string, error) {
+	a.mu.RLock()
+	ctrl := a.ctrl
+	a.mu.RUnlock()
+	if ctrl == nil {
+		return "", nil
+	}
+	if err := ctrl.ChangeFactType(name, typ); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// SaveDoc overwrites a memory doc with the panel editor's contents. The controller
 
 // SaveDoc overwrites a memory doc with the panel editor's contents. The controller
 // validates path against the recognized memory files. Returns the file written.

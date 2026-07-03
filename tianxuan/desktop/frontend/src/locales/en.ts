@@ -223,6 +223,7 @@ export const en = {
   // ask card
   "ask.customPlaceholder": "Type your own answer…",
   "ask.justChat": "Just chat",
+  "ask.dragHint": "Drag to move",
 
   // history drawer
   "history.title": "History",
@@ -265,6 +266,20 @@ export const en = {
   "memory.forget": "Forget",
   "memory.confirmForget": "Confirm forget",
   "memory.deadLink": "No memory named “{name}”",
+  "memory.typeUser": "User",
+  "memory.typeProject": "Project",
+  "memory.typeFeedback": "Feedback",
+  "memory.typeSemantic": "Semantic",
+  "memory.typeEpisodic": "Episodic",
+  "memory.typeProcedural": "Procedural",
+  "memory.typeReference": "Reference",
+  "memory.changeType": "Change type",
+  "memory.typeCurrent": "Current type",
+  "memory.promoteToUser": "Promote to user-level",
+  "memory.promoteToProject": "Set as project-level",
+  "memory.promoteToFeedback": "Set as feedback",
+
+  // settings drawer
 
   // settings drawer
   "settings.title": "Settings",

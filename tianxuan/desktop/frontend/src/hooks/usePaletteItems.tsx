@@ -8,6 +8,7 @@ import {
   FolderGit2,
 } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { sessionTitle, sessionTime } from "../lib/session";
 import type { SessionMeta } from "../lib/types";
 
 export interface PaletteItem {
@@ -21,16 +22,6 @@ export interface PaletteItem {
   compact?: boolean;
   keywords: string[];
   run: () => void;
-}
-
-function sessionTitle(session: SessionMeta, fallback: string): string {
-  return session.title || session.preview || fallback;
-}
-function sessionTime(ms: number): string {
-  return new Date(ms).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export function usePaletteItems(

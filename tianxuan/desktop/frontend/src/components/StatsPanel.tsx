@@ -146,9 +146,13 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
 
 
   const lastResetRef = useRef(resetKey);
+  // V10.17.5: 新建会话后首个渲染周期，turnSteps 还带着旧会话的 usage 数据——
+  // 跳过一次写入，防止旧数据覆盖新会话的空白统计。
+  const skipWriteRef = useRef(false);
   useEffect(() => {
     if (resetKey === undefined || resetKey === lastResetRef.current) return;
     lastResetRef.current = resetKey;
+    skipWriteRef.current = true;
     saveData(sessionKey, { turns: [], steps: [] });
     turnRef.current = 0;
     stepRef.current = 0;
@@ -168,6 +172,11 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
 
   useEffect(() => {
     if (!turnSteps || turnSteps.length === 0) return;
+    // V10.17.5: 跳过旧数据写入
+    if (skipWriteRef.current) {
+      skipWriteRef.current = false;
+      return;
+    }
     const lastStep = turnSteps[turnSteps.length - 1];
     setData(prev => {
       if (prev.steps.length > 0) {

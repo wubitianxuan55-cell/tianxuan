@@ -205,14 +205,20 @@ func (a *App) SwitchWorkspace(dir string) (string, error) {
 	// Commit the switch: save and tear down the old session, then swap in the new
 	// project's controller with a fresh session file.
 	a.mu.Lock()
-	if a.ctrl != nil {
-		_ = a.ctrl.Snapshot()
-		a.ctrl.Close()
+	old := a.activeCtrlLocked()
+	if old != nil {
+		_ = old.Snapshot()
+		old.Close()
 	}
 	a.ctrl = ctrl
 	a.model = model
 	a.label = ctrl.Label()
 	a.startupErr = ""
+	if tab := a.activeTabLocked(); tab != nil {
+		tab.Ctrl = ctrl
+		tab.Label = ctrl.Label()
+		tab.model = model
+	}
 	a.mu.Unlock()
 	ctrl.EnableInteractiveApproval()
 	if d := ctrl.SessionDir(); d != "" {

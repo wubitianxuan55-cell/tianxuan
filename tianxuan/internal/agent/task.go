@@ -91,7 +91,6 @@ type TaskTool struct {
 	contextWindow int
 	temperature   float64
 	archiveDir    string
-	l2Dir         string // L2 ring persistence for sub-agents
 	sysPrompt     string
 	gate          Gate
 	compiler      TaskCompiler // optional, for cache sharing via Fork
@@ -233,7 +232,6 @@ func FilterRegistry(parent *tool.Registry, names []string, exclude ...string) *t
 }
 
 func (t *TaskTool) SetCompiler(c TaskCompiler) { t.compiler = c }
-func (t *TaskTool) SetL2Dir(dir string)        { t.l2Dir = dir }
 func (t *TaskTool) SetRuntimePrompt(p string)   { t.runtimePrompt = p }
 func (t *TaskTool) SetTemplatePrefix(prefix string) { t.templatePrefix = prefix }
 func (t *TaskTool) SetActiveSchemas(schemas []provider.ToolSchema) { t.activeSchemas = schemas }
@@ -261,7 +259,6 @@ var subUsage provider.Usage
 		Gate:           t.gate,
 		ContextWindow:  t.contextWindow,
 		ArchiveDir:     t.archiveDir,
-		L2Dir:          t.l2Dir,
 	}, sink, &subUsage)
 	if err == nil && len(outputSchema) > 0 {
 		// output_schema set: verify the result is parseable JSON.

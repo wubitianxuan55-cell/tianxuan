@@ -32,7 +32,8 @@ func (rememberTool) Description() string {
 		"if asked to remember one of those, save instead the non-obvious point behind it. " +
 		"Before saving, check the loaded memory index for an entry that already covers this — reuse that name to update it rather than create a near-duplicate, and use `forget` to drop one that is now wrong. " +
 		"The saved index loads into context at the start of each session. " +
-		"Set session=true to save tentatively — the fact is visible this session but not persisted to disk until you call promote_session_facts."
+		"Set session=true to save tentatively — the fact is visible this session but not persisted to disk until you call promote_session_facts. " +
+		"Kind: \"semantic\" (default, facts/prefs), \"episodic\" (past experiences with trigger tags), \"procedural\" (always-active rules)."
 }
 
 func (rememberTool) Schema() json.RawMessage {
@@ -43,8 +44,10 @@ func (rememberTool) Schema() json.RawMessage {
   "title": {"type": "string", "description": "Short human-readable label shown in the memory index, e.g. \"Prefers tabs\". Omit to derive one from the name."},
   "description": {"type": "string", "description": "One-line hook shown in the index — the phrase a future session reads to decide whether to open this memory. Make it specific."},
   "type": {"type": "string", "enum": ["user", "feedback", "project", "reference"], "description": "Category of the fact."},
-  "body": {"type": "string", "description": "The fact itself (Markdown). For feedback/project, include a \"**Why:**\" line and a \"**How to apply:**\" line; link related memories with [[their-name]]."},
-  "session": {"type": "boolean", "description": "If true, save to session-only memory (not permanent). Session facts persist across turns and are re-injected each turn. Use for tentative/temporary facts. Call promote_session_facts to finalize them."}
+  "kind": {"type": "string", "enum": ["semantic", "episodic", "procedural"], "description": "Cognitive function. semantic (default): facts/prefs searchable. episodic: past experiences with trigger tags. procedural: always-active rules."},
+  "tags": {"type": "array", "items": {"type": "string"}, "description": "Trigger keywords for episodic memories. When user input matches, the memory is injected as a few-shot example."},
+  "body": {"type": "string", "description": "The fact itself (Markdown). For episodic, use pattern: observation -> action -> result."},
+  "session": {"type": "boolean", "description": "If true, save to session-only memory (not permanent)."}
 },
 "required": ["description", "body"]
 }`)
@@ -52,12 +55,14 @@ func (rememberTool) Schema() json.RawMessage {
 
 func (t rememberTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var in struct {
-		Name        string `json:"name"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Type        string `json:"type"`
-		Body        string `json:"body"`
-		Session     bool   `json:"session"`
+		Name        string   `json:"name"`
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Type        string   `json:"type"`
+		Kind        string   `json:"kind"`
+		Tags        []string `json:"tags"`
+		Body        string   `json:"body"`
+		Session     bool     `json:"session"`
 	}
 	if err := json.Unmarshal(args, &in); err != nil {
 		return "", fmt.Errorf("invalid arguments: %w", err)
@@ -77,6 +82,8 @@ func (t rememberTool) Execute(ctx context.Context, args json.RawMessage) (string
 		Title:       in.Title,
 		Description: in.Description,
 		Type:        NormalizeType(in.Type),
+		Kind:        NormalizeKind(in.Kind),
+		Tags:        in.Tags,
 		Body:        in.Body,
 	}
 

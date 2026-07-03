@@ -128,6 +128,7 @@ export function makeMockApp(): AppBindings {
     configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
+    permLevel: "ask",
   };
   return {
     async Submit(input) {
@@ -256,7 +257,7 @@ export function makeMockApp(): AppBindings {
         ready: true,
         eventChannel: EVENT_CHANNEL,
         cwd,
-        bypass: settings.bypass,
+        bypass: settings.permLevel !== "ask",
         agentMode: "develop",
       };
     },
@@ -430,6 +431,10 @@ export function makeMockApp(): AppBindings {
       emit({ kind: "notice", level: "info", text: `updated → ${name}` });
       return name;
     },
+    async ChangeFactType(name: string, typ: string) {
+      emit({ kind: "notice", level: "info", text: `type changed → ${name} (${typ})` });
+      return name;
+    },
     async MemorySuggestions() {
       return { memories: [], skills: [], generatedAt: new Date().toISOString(), available: false, source: "mock" };
     },
@@ -479,8 +484,8 @@ export function makeMockApp(): AppBindings {
     async SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string) {
       settings.agent = { temperature, maxSteps, systemPrompt };
     },
-    async SetBypass(on: boolean) {
-      settings.bypass = on;
+    async SetPermLevel(level: string) {
+      settings.permLevel = level;
     },
     async Version() {
       return "v1.0.0 (browser dev)";

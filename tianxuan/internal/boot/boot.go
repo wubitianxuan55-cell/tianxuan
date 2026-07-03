@@ -120,9 +120,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	}
 	sysPrompt += "\n\n" + config.LanguagePolicy
 
-	// V5.28: 减少工具步缓存碎片
-	sysPrompt += "\n\n## V6.0: Batch Execution\n- ALL independent operations MUST be done in ONE response. Read multiple files, edit DIFFERENT files, and run shell commands in parallel.\n- Only sequential operations (edit + verify the SAME file, or task sub-agents) go in separate turns.\n- The tool system supports parallel execution of non-conflicting tools - use it liberally."
-
 	// Persistent memory (TIANXUAN.md / AGENTS.md hierarchy + auto-memory index)
 	// folds into the system prompt exactly here, once: it becomes part of the
 	// durable, cache-stable prefix every turn reuses, so memory costs nothing per
@@ -131,7 +128,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	mem := memory.Load(memory.Options{CWD: ".", UserDir: config.MemoryUserDir()})
 	sysPrompt = memory.Compose(sysPrompt, mem)
 	builtin.SetMemorySearchIndex(mem.Search) // V5.31: wire search index to memory_search tool
-
+	builtin.SetSearchConfig(cfg.Search)     // V10.19: wire search config to web_search tool
 	// 新项目自动初始化：创建默认 AGENTS.md 记忆文件
 	if mem.Empty() {
 		memory.InitDefaults(mem)
@@ -172,6 +169,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		TopDirs:      projectProfile.TopDirs,
 		TotalFiles:   projectProfile.TotalFiles,
 		Dependencies: projectProfile.Dependencies,
+		RootPath:     filepath.Base(cwd),
 	})
 	runtimeCtx.SetCompactL2(true)  // V5.30: L2 紧凑格式，token 减少 ~60%
 	reg := tool.NewRegistry()
@@ -349,7 +347,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		Gate:          headlessGate,
 		ContextWindow: ctxWin,
 		ArchiveDir:    config.ArchiveDir(),
-		L2Dir:         filepath.Join(cwd, ".tianxuan", "l2"),
 		RuntimePrompt: runtimeCtx.SystemPrompt(),
 		// V5.30: 根据技能名查找子代理模板
 		TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
@@ -372,7 +369,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// Identity+Context domains via Fork — DeepSeek serves the shared prefix
 	// from its server-side cache at near-zero token cost.
 	taskTool.SetCompiler(&taskCompilerAdapter{c: compiler})
-	taskTool.SetL2Dir(filepath.Join(cwd, ".tianxuan", "l2"))
 	// V5.25: 注入 L2 运行时上下文，子代理共享父代理的项目/工作区/目标
 	taskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
 
@@ -392,9 +388,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		Gate:          headlessGate,
 		Hooks:         hookRunner,
 		Jobs:          jm,
-		ContextWindow: entry.ContextWindow,
 		ArchiveDir:    config.ArchiveDir(),
-		L2Dir:      filepath.Join(cwd, ".tianxuan", "l2"),
 		Dispatcher: toolDispatcher,
 	}, sink)
 	executor.SetDispatcherPlanMode()
@@ -498,13 +492,13 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	compiler.IdentityLayer().SaveHash(cacheDir) // best-effort
 
 	ctrlOpts := control.Options{
-		Runner:        executor,
-		Executor:      executor,
-		Sink:          sink,
-		Policy:        policy,
-		Label:         label,
-		SystemPrompt:  sysPrompt,
-		SessionDir:    orDefault(opts.SessionDir, config.SessionDir()),
+		Runner:            executor,
+		Executor:          executor,
+		Sink:              sink,
+		Policy:            policy,
+		Label:             label,
+		SystemPrompt:      sysPrompt,
+		SessionDir:        orDefault(opts.SessionDir, config.SessionDir()),
 		Host:          pluginHost,
 		Commands:      cmds,
 		Skills:        skills,
@@ -718,9 +712,7 @@ func orDefault(val, def string) string {
 	return def
 }
 
-// subagentSkillToTemplateKind 将技能名称映射到子代理模板 kind（V5.30）。
 func subagentSkillToTemplateKind(skillName string) cache.TaskKind {
-	_ = skillName // avoid unused-param lint
 	switch skillName {
 	case "explore":
 		return "subagent_explore"

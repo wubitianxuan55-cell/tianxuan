@@ -67,7 +67,7 @@ export default function App() {
     approve,
     answerQuestion,
     setPlan,
-    setBypass,
+    setPermLevel: ctrlSetPermLevel,
     newSession,
     listSessions,
     resumeSession,
@@ -83,9 +83,10 @@ export default function App() {
     forget,
     saveDoc,
     updateFact,
+    changeFactType,
   } = useController();
   const t = useT();
-  const { agentMode, setAgentMode, yolo, toggleYolo, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, setBypass, setModel);
+  const { permLevel, setPermLevel, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, ctrlSetPermLevel, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
@@ -461,10 +462,8 @@ export default function App() {
               cwd={state.meta?.cwd}
               onSend={handleSend}
               onCancel={cancel}
-              agentMode={agentMode}
-              onSetAgentMode={setAgentMode}
-              yolo={yolo}
-              onToggleYolo={toggleYolo}
+              permLevel={permLevel}
+              onSetPermLevel={setPermLevel}
               onPickFolder={switchFolder}
               disabled={state.meta?.ready === false || state.approval != null}
             />
@@ -475,14 +474,12 @@ export default function App() {
               balance={state.balance}
               jobs={state.jobs}
               running={state.running}
-              agentMode={agentMode}
-              yolo={yolo}
-              approval={state.approval}
               bridgeAlive={bridgeAlive}
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
+              permLevel={permLevel}
               onOpenChanges={useCallback(() => {
                 setPendingViewMode("changed");
                 if (workspacePanelOpen && rightTab === "files") {
@@ -625,6 +622,7 @@ export default function App() {
             onForget={onForget}
             onSaveDoc={onSaveDoc}
             onSaveFact={onSaveFact}
+            onChangeType={changeFactType}
             onAcceptMemorySuggestion={onAcceptMemorySuggestion}
             onAcceptSkillSuggestion={onAcceptSkillSuggestion}
             onRefreshSuggestions={onRefreshSuggestions}

@@ -193,12 +193,13 @@ type AgentRunner struct {
 	goalGateReentry  int  // Gate 2: goal-judge reentries
 	verifyGateFired  bool // Gate 3: orchestrate verify fired
 
-	// V6.0 P7: �ỰĿ�꣨/goal ���ã�������ֹͣբ����֤
+	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string
 
-	// V6.0 P3: agent ����ģʽ��"explore"|"develop"|"orchestrate"��
-	agentMode string
-
+	// permLevel controls the permission strictness: "ask" (prompt before writes),
+	// "auto" (allow writes without asking), or "yolo" (skip all approval).
+	// Set via SetPermLevel from the controller. Default "ask".
+	permLevel string
 	// planMode, when true, refuses any tool call whose ReadOnly() is false.
 	// The system prompt and tool list never change with the toggle so the
 	// prompt-cache prefix stays valid; the gating happens at execute time
@@ -412,24 +413,13 @@ func (a *AgentRunner) MergeRuntimePrompt(content string) {
 // SetFlashProvider ��װ flash ģ�� provider �����Զ�·�� (V5.14)��
 // �� nil �����Զ�·�ɡ�
 func (a *AgentRunner) SetFlashProvider(p provider.Provider) { a.flashProv = p }
-
 // SetGoal sets the session-level stopping condition (V6.0 P7).
-// When non-empty, the stop gate checks whether the model's final answer
-// satisfies the goal before allowing the agent to stop.
 func (a *AgentRunner) SetGoal(g string) { a.goal = g }
 
-// SetAgentMode switches the runtime mode (V6.0 P3).
-// "explore" = read-only research, "develop" = full tools, "orchestrate" = plan��execute��verify.
-func (a *AgentRunner) SetAgentMode(mode string) {
-	a.agentMode = mode
-	switch mode {
-	case "explore":
-		a.planMode.Store(true)
-	case "develop":
-		a.planMode.Store(false)
-	case "orchestrate":
-		a.planMode.Store(true) // starts in plan mode; auto-flipped after plan approval
-	}
+// SetPermLevel sets the permission strictness level for this session.
+// "ask" = prompt before writes (default), "auto" = allow writes, "yolo" = skip all.
+func (a *AgentRunner) SetPermLevel(level string) {
+	a.permLevel = level
 }
 
 // SetMemoryQueue installs the sink the remember/forget tools use to apply a
@@ -570,9 +560,7 @@ type Options struct {
 	CompactRatio  float64  // deprecated: use Compaction.Ratio
 	RecentKeep    int      // deprecated: use Compaction.RecentKeep
 	ArchiveDir    string   // deprecated: use Compaction.ArchiveDir
-	// L2Dir is the directory for L2 ring persistence (.tianxuan/l2).
-	// Deprecated: use Compaction.DetailDir (V3.0).
-	L2Dir string
+	// Compaction groups compaction settings (V3.0). When set, overrides the
 	// Compaction groups compaction settings (V3.0). When set, overrides the
 	// deprecated individual fields above.
 	Compaction CompactionConfig

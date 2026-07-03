@@ -88,7 +88,29 @@ func (c *Controller) UpdateFact(name, body string) (string, error) {
 		"Memory fact \""+name+"\" was edited. Its current body:\n"+strings.TrimSpace(body))
 	c.refreshMemoryLocked()
 	return path, nil
+	return path, nil
 }
+
+// ChangeFactType changes the Type of a saved fact by name (e.g. promote to
+// "user" level or demote to "project"/"feedback"). All other fields are
+// preserved. Refreshes the memory snapshot and queues a turn-tail note.
+func (c *Controller) ChangeFactType(name, newType string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mem == nil {
+		return nil
+	}
+	t := memory.NormalizeType(newType)
+	if err := c.mem.Store.ChangeType(name, t); err != nil {
+		return err
+	}
+	c.pendingMemory = append(c.pendingMemory,
+		"Memory fact \""+name+"\" type changed to "+string(t)+".")
+	c.refreshMemoryLocked()
+	return nil
+}
+
+// ForgetMemory deletes a saved auto-memory by name — the panel/TUI delete action,
 
 // ForgetMemory deletes a saved auto-memory by name — the panel/TUI delete action,
 // the manual counterpart to the model's `forget` tool. It queues a turn-tail note

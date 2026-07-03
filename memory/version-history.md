@@ -1,7 +1,7 @@
 ---
 name: version-history
 title: 版本历史
-description: 版本历史汇总 — V7.6 到 V10.17 全部主要版本摘要
+description: 版本历史汇总 — V7.6 到 V10.20 全部主要版本摘要
 metadata:
   type: reference
 ---
@@ -10,6 +10,8 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.20.0 | 2026-07-03 | 记忆升降级 + 2阻塞修复 + 2Bug修复 + 清理 — 74文件 |
+| V10.19.0 | 2026-07-03 | 系统模式重构(AgentMode→PermLevel) + 代码清理 + 前端优化 — 71文件 |
 | V10.17.0 | 2026-06-30 | 编码修复+前端全面重设计 — 6分支/22文件 |
 | V10.16.0 | 2026-06-30 | Bug修复+设计加固+性能优化+测试恢复 — 10 commits/30+文件 |
 | V10.15.0 | 2026-06-29 | 启动黑屏热修复 + 会话记忆升级 + 前端优化 |
@@ -23,42 +25,27 @@ metadata:
 | V10.8.0 | — | 3 项智能化优化 |
 | V7.5.0 | — | 初始提交 |
 
-## V10.17.0 详情
+## V10.20.0 详情
 
-### 构建
-- **产物**: `release/v10.17.0/tianxuan-desktop.exe`
-- **SHA256**: `134144907b8d3fb672bc00fe587db3588c4db26a7d8c2e7d0619d352686bee87`
+- **产物**: `release/v10.20.0/tianxuan-desktop.exe`
+- **SHA256**: `fde38adb2259d1eee69c41841916b2c8fe4f49866ae462a0a55f879c3cb2fc3b`
 - **构建命令**: `cd tianxuan/desktop && wails build`
+- **变更**: 74 文件，+1991/-1786 行
 
-### 变更统计
-- 6 个发布分支 · 22 文件
-- Go: 36 包全绿 · TypeScript: 零错误
+1. 🔴 阻塞修复：controller deadlock（Unlock 补回）+ permLevel 出厂 YOLO
+2. 🆕 记忆 Type 升降级：Store→Controller→Wails + FactCard 按钮组
+3. 🐛 StatsPanel 新会话统计不重置（skipWriteRef 守卫）
+4. 🐛 消息面板点击不跳转（turnEls 清理 + items 重置清空）
+5. 🧹 websearch DDG 死代码 ~150 行 + StatusBar agentMode/yolo 清理
 
-### 核心变更
-1. 🔴 编码修复：63 处 U+FFFD → em-dash/中文（含 3 处 LLM 可见）
-2. 🎨 CSS 冲突消除：重复 light/warm 块删除 + @media 统一
-3. 🧠 记忆面板优化：骨架屏 + 自动加载 + FactCard memo
-4. 🔀 变更面板：顶栏 GitBranch 按钮 + 变更视图增强
-5. ⚙️ 设置面板：字体选择器修复 + 紧凑模式开关
-6. 🃏 工具卡重设计：卡片式布局 + 彩色左边框 + 状态徽章 + 工具栏
-7. 💬 文本输出重设计：聊天式布局 + 代码块增强 + 流式光标
+## V10.19.0 详情
 
-## V10.16.0 详情
+- **产物**: `release/v10.19.0/tianxuan-desktop.exe`
+- **SHA256**: `6d4bb02d779b6e75d44a49fc77b2803008dc5a4019fa7738ff36b0d96fae2164`
+- **变更**: 71 文件，+1891/-1704 行
 
-### 构建
-- **产物**: `release/v10.16.0/tianxuan-desktop.exe`
-- **SHA256**: `938d0da7d395175c0de85979eef7a74d15aca5b621d9f60b482076374c3df3c2`
-- **构建命令**: `cd tianxuan/desktop && wails build`
-
-### 变更统计
-- 10 commits · 30+ 文件
-- Go: 36 包全绿 · TypeScript: 零错误
-- 从 9 个测试失败 → 零失败
-
-### 核心变更
-1. 🐛 5 Bug修复：SubagentStop重复/bash截断/git amend/readfile扫描/store.ts跨轮次
-2. ⚠️ 9 设计缺陷：preWG泄漏/nudge残留/CR损坏/UTF-8/权限/参数上限
-3. ⚡ partitionToolCalls 统一冲突键算法 — 延迟降30-50%
-4. 🧪 测试恢复：9→0 失败
-5. 🎨 前端优化：流式纯文本渲染 + useMemo + 推理可见
-6. 🔒 5个写工具权限保留
+1. 系统模式重构：AgentMode(explore/develop/orchestrate) → PermLevel(ask/auto/yolo)
+2. 删除 mode_classifier.go + /perm 命令
+3. DefaultSystemPrompt 精简 ~43→~33 行
+4. 删除 L2Dir 死字段 + stopGate() ~72 行
+5. 前端：usePaletteItems + useGlobalShortcuts + KaTeX 延迟 + 流式预览

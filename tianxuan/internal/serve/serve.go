@@ -78,7 +78,6 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /submit", s.submit)
 	mux.HandleFunc("POST /cancel", s.cancel)
 	mux.HandleFunc("POST /approve", s.approve)
-	mux.HandleFunc("POST /plan", s.plan)
 	mux.HandleFunc("POST /compact", s.compact)
 	mux.HandleFunc("POST /new", s.newSession)
 	mux.HandleFunc("GET /meta", s.meta)
@@ -309,17 +308,6 @@ func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) plan(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		On bool `json:"on"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "bad body", http.StatusBadRequest)
-		return
-	}
-	s.ctrl.SetPlanMode(body.On)
-	w.WriteHeader(http.StatusNoContent)
-}
 
 func (s *Server) compact(w http.ResponseWriter, r *http.Request) {
 	if err := s.ctrl.Compact(r.Context(), ""); err != nil {
@@ -328,7 +316,6 @@ func (s *Server) compact(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
 func (s *Server) newSession(w http.ResponseWriter, _ *http.Request) {
 	if err := s.ctrl.NewSession(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -79,10 +79,8 @@ type chatTUI struct {
 	// Persists across turns until the work completes or a new session starts.
 	todoArgs string
 
-	// planMode mirrors the agent's read-only gate (Tab toggles it). The marker
-	// rides in outgoing user messages so the cache-stable prompt prefix is left
-	// untouched.
-	planMode bool
+
+	// history is a resumed session's messages, committed to scrollback once on
 
 	// history is a resumed session's messages, committed to scrollback once on
 	// the first WindowSizeMsg so a reopened chat shows its prior transcript.
@@ -630,9 +628,7 @@ func (m chatTUI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ctrl.Cancel()
 			case m.ctrl.PermLevel() != "ask":
 				m.ctrl.SetPermLevel("ask") // back out of YOLO
-			case m.planMode:
-				m.planMode = false
-				m.ctrl.SetPlanMode(false)
+			case len(m.attachments) > 0 && strings.TrimSpace(m.input.Value()) == "":
 			case len(m.attachments) > 0 && strings.TrimSpace(m.input.Value()) == "":
 				m.attachments = nil
 			default:
@@ -1077,22 +1073,12 @@ func flushableMarkdownPrefix(buf string) string {
 	return strings.Join(lines[:boundary], "\n")
 }
 
-// planApprovalTool is the Tool name the controller puts on the ApprovalRequest it
-// emits to gate a plan (mirrors control's constant). The banner, status line, and
-// approval handler key on it to render the plan-specific prompt and to keep the
-// [plan] tag in sync when the plan is approved.
-const planApprovalTool = "exit_plan_mode"
-
 // handleApprovalKey resolves a pending approval from a keystroke and re-arms the
 // listener. 1/y/Enter allows once, 2/a allows for the rest of the session,
-// 3/n/Esc denies. Ctrl-C cancels the whole turn via the run context. For a plan
-// approval (planApprovalTool), allowing also drops the local [plan] tag — the
-// controller turns plan mode off on its side.
+// 3/n/Esc denies. Ctrl-C cancels the whole turn via the run context.
 func (m chatTUI) handleApprovalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	answer := func(allow, session bool) (tea.Model, tea.Cmd) {
-		if allow && m.pendingApproval.Tool == planApprovalTool {
-			m.planMode = false
-		}
+		m.ctrl.Approve(m.pendingApproval.ID, allow, session)
 		m.ctrl.Approve(m.pendingApproval.ID, allow, session)
 		m.pendingApproval = nil
 		return m, nil // the next ApprovalRequest / event arrives on eventCh
@@ -1484,19 +1470,13 @@ func pastedImagePath(src string) (string, bool) {
 
 // cycleMode advances the input mode normal → plan → YOLO → normal (Tab),
 // mirroring the desktop composer's Shift+Tab. plan is read-only; YOLO
-// auto-approves every tool call for the session (deny rules still apply). The
-// status line's mode tag ([auto]/[plan]/[YOLO]) reflects the result.
+// Cycle between auto and YOLO permission levels.
 func (m *chatTUI) cycleMode() {
 	switch {
 	case m.ctrl.PermLevel() == "yolo":
-		m.ctrl.SetPermLevel("ask") // YOLO → normal
-	case m.planMode:
-		m.planMode = false
-		m.ctrl.SetPlanMode(false)
-		m.ctrl.SetPermLevel("yolo") // plan → YOLO
+		m.ctrl.SetPermLevel("ask") // YOLO → ask
 	default:
-		m.planMode = true
-		m.ctrl.SetPlanMode(true) // normal → plan
+		m.ctrl.SetPermLevel("yolo") // ask → YOLO
 	}
 }
 
@@ -1537,7 +1517,7 @@ func (m *chatTUI) startTurnWithRaw(sent, displayed, restore, raw string, attachm
 	m.pendingAttachments = cloneAttachments(attachments)
 	m.bubbleStartIdx = len(m.transcript)
 	m.commitLine("") // blank line separating turns
-	m.commitLine(renderUserBubble(displayed, m.width, m.planMode))
+	m.commitLine(renderUserBubble(displayed, m.width))
 	m.bubblePending = true
 	m.turnDiscarded = false
 
@@ -1640,8 +1620,6 @@ func (m *chatTUI) ingestEvent(e event.Event) {
 			// Drive the pinned task list above the input (renderTodoPanel) rather
 			// than printing a tool line; it updates in place as the list evolves.
 			m.todoArgs = e.Tool.Args
-		case planApprovalTool:
-			// No longer a tool, but guard anyway: the plan is the assistant's reply.
 		default:
 			label := fmt.Sprintf("  -> %s %s", e.Tool.Name, compactArgs(e.Tool.Args))
 			if e.Tool.ReadOnly {
@@ -1982,8 +1960,7 @@ func replaySectionsFor(history []provider.Message, width int, renderer *mdRender
 	for _, m := range history {
 		switch m.Role {
 		case provider.RoleUser:
-			content := strings.TrimPrefix(m.Content, control.PlanModeMarker+"\n\n")
-			out = append(out, renderUserBubble(content, width, false)+"\n\n")
+			out = append(out, renderUserBubble(m.Content, width)+"\n\n")
 		case provider.RoleAssistant:
 			body := strings.TrimSpace(m.Content)
 			if body == "" {
@@ -2023,12 +2000,9 @@ func wrapForViewport(text string, width int, fg color.Color) string {
 }
 
 // renderUserBubble styles the just-submitted line with a filled dim background.
-func renderUserBubble(line string, width int, planMode bool) string {
+func renderUserBubble(line string, width int) string {
 	line = displayLineForImageRefs(line)
 	prefix := "› "
-	if planMode {
-		prefix = "› [plan] "
-	}
 	if !colorEnabled {
 		return "│ " + prefix + line
 	}

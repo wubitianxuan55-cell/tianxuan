@@ -8,7 +8,6 @@ import { app } from "../lib/bridge";
 const THINK_TEMPS: Record<string, number> = { fast: 0.1, normal: 0.3, deep: 0.7 };
 
 export function useModeManager(
-  setPlan: (on: boolean) => void,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _setBypass: (...args: any[]) => any,
   setModel: (name: string) => Promise<void>,
@@ -21,9 +20,7 @@ export function useModeManager(
   const setPermLevel = useCallback((level: PermLevel) => {
     setPermLevelState(level);
     app.SetPermLevel(level).catch(() => {});
-    // Plan mode on for all modes — model decides whether to research or act
-    setPlan(true);
-  }, [setPlan]);
+  }, []);
 
   const handleThinkLevelChange = useCallback(async (level: string) => {
     setThinkLevel(level as "fast" | "normal" | "deep");

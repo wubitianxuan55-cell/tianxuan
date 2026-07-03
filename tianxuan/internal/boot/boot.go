@@ -373,7 +373,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	taskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
 
 	// V2.4: centralised ToolDispatcher for pre-execution checks.
-	toolDispatcher := agent.NewToolDispatcher(nil, headlessGate, hookRunner)
+	toolDispatcher := agent.NewToolDispatcher(headlessGate, hookRunner)
 
 	// V6.0 P8: compact toolset — hide redundant tools from model schema
 	if cfg.Tools.Compact {
@@ -391,7 +391,8 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		ArchiveDir:    config.ArchiveDir(),
 		Dispatcher: toolDispatcher,
 	}, sink)
-	executor.SetDispatcherPlanMode()
+
+	// V7.0: session archive for cross-session Dream/Distill
 
 	// V7.0: session archive for cross-session Dream/Distill
 	archiveDir := filepath.Join(cwd, ".tianxuan", "archive")
@@ -450,22 +451,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	reg.Add(command.NewSlashCommandTool(slashEntries))
 
 	label := entry.Model
-	var classifier *control.ProviderAutoPlanClassifier
-
-	// V2.4 two-model mode: if planner_model is configured, switch the executor
-	// into ModePlanner instead of wrapping it in a separate Coordinator.
-	if !strings.EqualFold(strings.TrimSpace(cfg.Agent.AutoPlan), "off") && cfg.Agent.AutoPlanClassifier != "" {
-		cm := cfg.Agent.AutoPlanClassifier
-		ce, ok := cfg.ResolveModel(cm)
-		if !ok {
-			return nil, fmt.Errorf("auto_plan_classifier %q is not a configured provider", cm)
-		}
-		classifierProv, err := NewProvider(ce)
-		if err != nil {
-			return nil, fmt.Errorf("auto_plan_classifier %q: %w", cm, err)
-		}
-		classifier = control.NewProviderAutoPlanClassifier(classifierProv)
-	}
 
 	skillLayer := cache.NewSkillLayer()
 
@@ -512,10 +497,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		PluginCtx:     ctx,
 		CtxMgr:           ctxMgr,
 		WorkspaceRoot:    cwd,
-		AutoPlan:      cfg.Agent.AutoPlan,
-	}
-	if classifier != nil {
-		ctrlOpts.Classifier = classifier
 	}
 	return control.New(ctrlOpts), nil
 }

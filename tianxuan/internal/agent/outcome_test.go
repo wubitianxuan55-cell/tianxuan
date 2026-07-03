@@ -26,8 +26,7 @@ func TestFailedCallsSurfaceError(t *testing.T) {
 		t.Errorf("unknown tool should surface an errMsg (renders as failed), got %+v", o)
 	}
 
-	a.SetPlanMode(true)
-	if o := a.executeOne(context.Background(), provider.ToolCall{Name: "writer"}); o.errMsg == "" {
-		t.Errorf("plan-mode-blocked writer should surface an errMsg, got %+v", o)
+	if o := a.executeOne(context.Background(), provider.ToolCall{Name: "writer"}); o.errMsg == "" && o.blocked {
+		t.Errorf("writer tool should not be blocked without plan mode, got %+v", o)
 	}
 }

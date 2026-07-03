@@ -44,7 +44,7 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
     while (prevIdx >= 0) {
       const pi = out[prevIdx];
       if (pi.kind === "phase" || pi.kind === "notice") { prevIdx--; continue; }
-      if (pi.kind === "tool" && (pi.name === "todo_write" || pi.name === "exit_plan_mode")) { prevIdx--; continue; }
+      if (pi.kind === "tool" && pi.name === "todo_write") { prevIdx--; continue; }
       break;
     }
     const prev = prevIdx >= 0 ? out[prevIdx] : null;
@@ -268,7 +268,7 @@ export function Transcript({
               );
             case "tool":
               if (it.parentId) return null;
-              if (it.name === "todo_write" || it.name === "exit_plan_mode") return null;
+              if (it.name === "todo_write") return null;
               return (
                 <div key={it.id} data-entrance={it.id}>
                   <ToolCard item={it} subcalls={subcallsByParent.get(it.id)} />

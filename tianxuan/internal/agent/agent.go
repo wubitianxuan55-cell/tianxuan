@@ -200,16 +200,9 @@ type AgentRunner struct {
 	// "auto" (allow writes without asking), or "yolo" (skip all approval).
 	// Set via SetPermLevel from the controller. Default "ask".
 	permLevel string
-	// planMode, when true, refuses any tool call whose ReadOnly() is false.
-	// The system prompt and tool list never change with the toggle so the
-	// prompt-cache prefix stays valid; the gating happens at execute time
-	// and the model sees a "blocked" result it can adapt to. Toggled from
-	// the outside via SetPlanMode.
-	planMode atomic.Bool
 
-	// gate, when non-nil, is the per-call permission gate consulted after the
-	// plan-mode check. nil disables gating entirely.
-	// gate is the per-call permission gate consulted in executeOne (hot path).
+	// gate, when non-nil, is the per-call permission gate consulted in
+	// executeOne. nil disables gating entirely.
 	// MUST be set before Run() starts — executeOne is called from concurrent
 	// goroutines (executeBatch → runParallel), and SetGate does not lock.
 	// The happens-before guarantee: Controller.EnableInteractiveApproval calls
@@ -377,11 +370,7 @@ func (a *AgentRunner) SetActiveSchemas(schemas []provider.ToolSchema) {
 	a.activeSchemasMu.Unlock()
 }
 
-// SetPlanMode flips the read-only gate. While true, executeOne refuses any
-// non-ReadOnly tool the model calls and returns a "blocked" result instead of
-// running it. The cache-friendly bits �� system prompt, tools schema, message
-// history �� are left untouched, so the toggle costs nothing in cache hits.
-func (a *AgentRunner) SetPlanMode(v bool) { a.planMode.Store(v) }
+
 
 // SetGate installs the per-call permission gate. MUST be called before the
 // run loop starts — executeOne reads gate from concurrent goroutines and
@@ -803,11 +792,8 @@ func (a *AgentRunner) shouldMidTurnSteer(calls []provider.ToolCall, results []st
 	return false
 }
 
-func (a *AgentRunner) SetDispatcherPlanMode() {
-	if a.dispatcher != nil {
-		a.dispatcher.planMode = &a.planMode
-	}
-}
+
+// SetCtxMgr wires the TCCA context kernel (V3.0 Phase 5).
 
 // SetCtxMgr wires the TCCA context kernel (V3.0 Phase 5).
 func (a *AgentRunner) SetCtxMgr(m *tiancontext.ContextManager) {

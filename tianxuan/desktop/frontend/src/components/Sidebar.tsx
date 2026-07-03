@@ -1,7 +1,7 @@
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useState, useEffect } from "react";
 import {
-  SquarePen, Brain, Blocks, FileText, MessageSquare,
+  SquarePen, Brain, Blocks, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -25,8 +25,6 @@ export interface SidebarProps {
   onRenameSession: (path: string, title: string) => void;
   onOpenHistory: () => void;
   onOpenMemory: () => void;
-  showPlan: boolean;
-  onTogglePlan: () => void;
   onOpenCaps: () => void;
   onOpenSettings: () => void;
   startResize: (e: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -52,8 +50,6 @@ export function Sidebar({
   onRenameSession,
   onOpenHistory,
   onOpenMemory,
-  showPlan,
-  onTogglePlan,
   onOpenCaps,
   onOpenSettings,
   startResize,
@@ -271,16 +267,6 @@ export function Sidebar({
           >
             <Brain size={15} />
             {!collapsed && <span>{t("topbar.memory")}</span>}
-          </button>
-          <button
-            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${
-              collapsed ? "justify-center w-10 !p-0 !gap-0" : ""
-            } ${showPlan ? "text-accent bg-accent-soft hover:bg-accent-soft" : ""}`}
-            onClick={onTogglePlan}
-            title={t("plan.title")}
-          >
-            <FileText size={15} />
-            {!collapsed && <span>{t("plan.title")}</span>}
           </button>
           <button
             className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}

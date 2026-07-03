@@ -1,6 +1,6 @@
 ﻿// Package control is the transport-agnostic session driver. A Controller owns
 // the agent run loop and session lifecycle, takes commands (Send/Cancel/Approve/
-// SetPlanMode/Compact/NewSession/…), and emits everything that happens —
+// Compact/NewSession/…), and emits everything that happens —
 // reasoning, tool calls, approvals, turn completion — as a typed event stream to
 // a single event.Sink.
 //
@@ -53,8 +53,6 @@ type Controller struct {
 	hooks        *hook.Runner // session hook runner; nil-safe (no hooks configured)
 	mem          *memory.Set
 	cleanup      func()
-	autoPlan     string
-	classifier   autoPlanClassifier
 	startedOnce  bool // guards the one-shot SessionStart hook on first turn
 
 	// balanceURL/balanceKey target the active provider's optional wallet-balance
@@ -102,7 +100,6 @@ type Controller struct {
 	mu          sync.Mutex
 	cancel      context.CancelFunc
 	running     bool
-	planMode    bool
 	sessionPath string
 	approvals   map[string]chan approvalReply
 	asks        map[string]chan []event.AskAnswer
@@ -165,8 +162,6 @@ type Options struct {
 	// WorkspaceRoot is the project root checkpoint restores are confined to ("" =
 	// no confinement). Frontends pass the cwd they launched the session in.
 	WorkspaceRoot string
-	AutoPlan      string
-	Classifier    autoPlanClassifier
 }
 
 // New builds a Controller. A nil Sink is replaced with event.Discard.
@@ -174,10 +169,6 @@ func New(opts Options) *Controller {
 	sink := opts.Sink
 	if nilutil.IsNil(sink) {
 		sink = event.Discard
-	}
-	classifier := opts.Classifier
-	if nilutil.IsNil(classifier) {
-		classifier = nil
 	}
 	pluginCtx := opts.PluginCtx
 	if pluginCtx == nil {
@@ -198,8 +189,6 @@ func New(opts Options) *Controller {
 		hooks:        opts.Hooks,
 		mem:          opts.Memory,
 		cleanup:      opts.Cleanup,
-		autoPlan:     normalizeAutoPlan(opts.AutoPlan),
-		classifier:   classifier,
 		balanceURL:   opts.BalanceURL,
 		balanceKey:   opts.BalanceKey,
 		jobs:         opts.Jobs,
@@ -299,46 +288,16 @@ func (c *Controller) Send(input string) {
 func (c *Controller) SendWithRaw(input, raw string) {
 	c.runGuarded(func(ctx context.Context) error { return c.runTurnWithRaw(ctx, input, raw) })
 }
+// runTurn runs one model turn.
 
-// planApprovalTool is the Tool name on the ApprovalRequest the controller emits
-// to gate a proposed plan. Frontends key their plan-approval UI on it (the
-// desktop renders a plan card; the chat TUI a plan banner).
-const planApprovalTool = "exit_plan_mode"
-
-// planApprovedMessage is the follow-up turn sent once the user approves a plan —
-// the in-context nudge to execute and keep the (already-seeded) task list honest.
-const planApprovedMessage = "Plan approved — you are cleared to make changes without asking again. Implement the plan now. Keep the task list current with todo_write, preserving its two-level shape (phases at level 0, their sub-steps at level 1): mark the sub-step you start as in_progress, one in_progress at a time. Sign off each finished sub-step with complete_step, attaching the evidence it's done — the verification you ran, the diff/files you changed, or a manual check. Don't claim a step is done without evidence."
-
-// orchestrateApprovedMessage is the post-plan-approval message for orchestrate mode
-// (V6.0 P3). Stronger than planApprovedMessage: enforces structured phase-by-phase
-// execution with explicit checkpoints between phases.
-const orchestrateApprovedMessage = "Plan approved — orchestrate mode: execute phase by phase. " +
-	"Use tree-structured task IDs in todo_write content: prefix phases with T1/T2/T3 and sub-steps with T1.1/T1.2 etc. " +
-	"For each phase: (1) mark the first sub-step in_progress with todo_write, (2) execute it, " +
-	"(3) sign off with complete_step attaching evidence, (4) repeat for remaining sub-steps. " +
-	"After each phase completes, run tests to verify before moving to the next phase. " +
-	"Keep the task list current at all times. Only stop when every phase is complete and verified."
-
-// runTurn runs one model turn, then applies the plan-approval gate. This is the
-// single, frontend-agnostic plan flow: in plan mode the model just researches
-// (writers are blocked) and writes its plan as a normal answer — no special tool.
-// When the turn ends with a text proposal, the controller asks the user to
-// approve (reusing the ApprovalRequest channel both frontends already render);
-// on approval it exits plan mode, seeds the task list from the plan, and
-// continues straight into execution; on rejection it stays in plan mode so the
-// next turn can revise. Plan mode is only ever set interactively, so the headless
-// `Run` path (which doesn't call this) never blocks on a prompt.
 func (c *Controller) runTurn(ctx context.Context, input string) error {
 	return c.runTurnWithRaw(ctx, input, input)
 }
 
 func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) error {
 	c.maybeSessionStart(ctx)
-	// V8.0 P1-4: plan mode smart clarification — prompt the user when input is too vague.
-	if c.isPlanMode() && c.maybeClarifyVagueInput(raw) {
-		return nil // question emitted, wait for user response
-	}
-	c.maybeAutoPlan(ctx, raw)
+
+	// V3.0 Phase 5: ContextManager handles first-turn orchestration.
 
 	// V3.0 Phase 5: ContextManager handles first-turn orchestration.
 	// ProcessFirstTurn locks the runtime (idempotent). On the first turn,
@@ -378,44 +337,11 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	if err := c.Snapshot(); err != nil {
 		slog.Warn("controller: snapshot after turn", "err", err)
 	}
-	c.mu.Lock()
-	plan := c.planMode
-	c.mu.Unlock()
-	if !plan {
-		return nil
-	}
-
-	proposal := lastAssistantText(c.History())
-	if proposal == "" {
-		return nil // no substantive proposal to gate
-	}
-	// The plan is already visible as the assistant's answer, so the request
-	// carries no subject — it's purely the gate.
-	allow, _, err := c.requestApproval(ctx, planApprovalTool, "")
-	if err != nil {
-		return err
-	}
-	if !allow {
-		return nil // keep planning; plan mode stays on
-	}
-	c.SetPlanMode(false)
-	c.seedPlanTodos(proposal)
-	// The plan is the go-ahead: don't re-prompt for each write of the approved
-	// work. Auto-approve writers for the duration of this execution turn only.
-	c.mu.Lock()
-	c.autoApprove = true
-	c.mu.Unlock()
-	defer func() {
-		c.mu.Lock()
-		c.autoApprove = false
-		c.mu.Unlock()
-	}()
-
-	return c.runner.Run(ctx, orchestrateApprovedMessage)
+	return nil
 }
 
 // lastAssistantText returns the content of the most recent assistant message with
-// non-empty text — the model's final answer for the turn (its plan, in plan mode).
+// non-empty text.
 func lastAssistantText(msgs []provider.Message) string {
 	for i := len(msgs) - 1; i >= 0; i-- {
 		if msgs[i].Role == provider.RoleAssistant && strings.TrimSpace(msgs[i].Content) != "" {
@@ -426,8 +352,8 @@ func lastAssistantText(msgs []provider.Message) string {
 }
 
 // Submit is the one-call entry for a simple frontend: it takes raw user input
-// and does everything — slash-command dispatch, @-reference expansion, plan-mode
-// composition — emitting all output as events. The HTTP/SSE server uses this so
+// and does everything — slash-command dispatch, @-reference expansion —
+// emitting all output as events. The HTTP/SSE server uses this so
 // a browser client only POSTs the typed line.
 //
 // Slash commands route to the matching primitive: /compact and /new run their
@@ -549,17 +475,9 @@ func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
 	}
 }
 
-// SetPlanMode flips the executor's read-only gate without touching the
-// cache-stable prompt prefix, and remembers the state so Compose can prepend the
-// plan-mode marker to outgoing turns.
-func (c *Controller) SetPlanMode(v bool) {
-	c.mu.Lock()
-	c.planMode = v
-	c.mu.Unlock()
-	if c.executor != nil {
-		c.executor.SetPlanMode(v)
-	}
-}
+
+// SetPermLevel sets the permission strictness: "ask" (default, prompt before writes),
+// "auto" (allow writes without asking), or "yolo" (skip all prompts).
 
 // SetPermLevel sets the permission strictness: "ask" (default, prompt before writes),
 // "auto" (allow writes without asking), or "yolo" (skip all prompts).
@@ -579,8 +497,8 @@ func (c *Controller) PermLevel() string {
 	return c.permLevel
 }
 
-// PlanMode reports whether outgoing turns currently receive the plan-mode
-// marker. Frontends use it after Compose because auto-plan may flip the mode.
+
+// SetGoal sets the session goal (set via /goal) and propagates it to the
 // SetGoal sets the session goal (set via /goal) and propagates it to the
 // executor so the stop gate can enforce it.
 func (c *Controller) SetGoal(g string) {
@@ -597,12 +515,6 @@ func (c *Controller) Goal() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.goal
-}
-
-func (c *Controller) PlanMode() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.planMode
 }
 
 // Compact runs one compaction pass on the executor's session on demand.

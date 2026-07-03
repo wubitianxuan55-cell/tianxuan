@@ -22,10 +22,6 @@ const taskGateNudgeHeader = "[system] You still have unfinished tasks — " +
 	"and only stop when every task is truly done."
 
 func (a *AgentRunner) taskGate() bool {
-	// plan mode: can't complete tasks without write tools — don't block
-	if a.planMode.Load() {
-		return false
-	}
 
 	incomplete := countIncompleteTodos(a.session.Messages)
 	if incomplete == 0 {

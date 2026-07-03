@@ -25,7 +25,6 @@ const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ d
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
 const CapabilitiesPanel = lazy(() => import("./components/CapabilitiesPanel").then(m => ({ default: m.CapabilitiesPanel })));
-const PlanPanel = lazy(() => import("./components/PlanPanel").then(m => ({ default: m.PlanPanel })));
 import { RuntimePanel } from "./components/RuntimePanel";
 import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
@@ -37,7 +36,6 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { downloadMarkdown, exportAsMarkdown } from "./lib/export";
 import type { MemorySuggestion, MemorySuggestionsView, MemoryView, SessionMeta, SkillSuggestion } from "./lib/types";
-import { usePlanExtractor } from "./hooks/usePlanExtractor";
 import { useTodoExtractor } from "./hooks/useTodoExtractor";
 import { useModeManager } from "./hooks/useModeManager";
 import { useSessionManager } from "./hooks/useSessionManager";
@@ -66,7 +64,6 @@ export default function App() {
     cancel,
     approve,
     answerQuestion,
-    setPlan,
     setPermLevel: ctrlSetPermLevel,
     newSession,
     listSessions,
@@ -86,7 +83,7 @@ export default function App() {
     changeFactType,
   } = useController();
   const t = useT();
-  const { permLevel, setPermLevel, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(setPlan, ctrlSetPermLevel, setModel);
+  const { permLevel, setPermLevel, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
@@ -94,11 +91,9 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
   const [capsOpen, setCapsOpen] = useState(false);
-  const [showPlan, setShowPlan] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("files");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
-  const [pendingPlanRevision, setPendingPlanRevision] = useState<string | null>(null);
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
@@ -126,14 +121,9 @@ export default function App() {
 
   const { todoItem, todos, showTodos, setDismissedTodo } = useTodoExtractor(state.items);
 
-  const planMarkdown = usePlanExtractor(state.items);
 
-  useEffect(() => {
-    if (!pendingPlanRevision || state.running) return;
-    const text = pendingPlanRevision;
-    setPendingPlanRevision(null);
-    send(text);
-  }, [pendingPlanRevision, send, state.running]);
+
+  // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
 
   // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
   // panel reflects what landed on disk.
@@ -298,7 +288,6 @@ export default function App() {
         if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); return; }
         if (memView !== null) { ke.preventDefault(); setMemView(null); return; }
         if (histView !== null) { ke.preventDefault(); setHistView(null); return; }
-        if (showPlan) { ke.preventDefault(); setShowPlan(false); return; }
         if (workspacePanelOpen) { ke.preventDefault(); setWorkspacePanel(false); return; }
         return;
       }
@@ -313,7 +302,7 @@ export default function App() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [state.running, capsOpen, settingsOpen, memView, histView, showPlan, workspacePanelOpen]);
+  }, [state.running, capsOpen, settingsOpen, memView, histView, workspacePanelOpen]);
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
@@ -390,8 +379,6 @@ export default function App() {
           onRenameSession={handleRenameSession}
           onOpenHistory={openHistory}
           onOpenMemory={openMemory}
-          showPlan={showPlan}
-          onTogglePlan={() => setShowPlan(v => !v)}
           onOpenCaps={() => setCapsOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           startResize={startSidebarResize}
@@ -587,23 +574,16 @@ export default function App() {
           </div>
         </div>
       )}
+      </div>
 
       {state.approval && (
           <ApprovalModal
             approval={state.approval}
             onAnswer={(allow, session) => {
-              // Approving an exit_plan_mode plan leaves plan mode (the controller
-              // flips the executor internally; V9.0 unified mode stays unchanged).
-              if (state.approval!.tool === "exit_plan_mode" && allow) { /* backend handles */ }
               approve(state.approval!.id, allow, session);
-            }}
-            onRevisePlan={(text) => {
-              setPendingPlanRevision(text);
-              approve(state.approval!.id, false, false);
             }}
           />
         )}
-      </div>
 
       {state.ask && (
         <AskCard
@@ -648,16 +628,6 @@ export default function App() {
 
       <Suspense fallback={null}>
         {capsOpen && <CapabilitiesPanel onClose={() => setCapsOpen(false)} />}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {showPlan && (
-          <PlanPanel
-            planContent={planMarkdown}
-            todos={todos}
-            onClose={() => setShowPlan(false)}
-          />
-        )}
       </Suspense>
 
       <CommandPalette

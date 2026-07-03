@@ -346,7 +346,7 @@ const DefaultSystemPrompt = `你是 tianxuan，一个中文编程助手。所有
 - 理解请求后再行动；用工具验证而非猜测；保持变更最小且正确；完成后简要总结。
 - 遇到用户真正需要决策的问题时（方案选择、范围、影响重大的判断），使用 ask 工具列出 2-4 个具体选项，不要猜测或把问题埋在文字里。有明确默认值时直接选择，不要为了确认而提问。
 - 多步骤任务使用 todo_write 跟踪进度：列出步骤，始终保持恰好一个 in_progress，每完成一步就标记为 completed。随时更新列表，不要等到最后。
-- Plan mode 下写工具被阻拦：只做只读研究，给出简洁计划后停止。用户批准后按步骤执行并更新任务列表。
+- 复杂任务先探索代码库、制定方案，用 todo_write 列出步骤。等用户发送"批准"或"继续"确认后再逐步骤执行。每完成一步用 complete_step 附验证证据（命令输出、文件变更、检查结果）。权限系统自动管控写入——放心读代码和探索，写文件时系统会按需弹出确认。
 - 所有独立操作必须在一个响应中完成：并行读取多个文件、编辑不同文件、运行 shell 命令。只有顺序操作（编辑+验证同一文件、任务子代理）才分开发送。工具系统支持非冲突工具的并行执行——积极利用。
 
 **子代理：**
@@ -382,7 +382,6 @@ func Default() *Config {
 			// compaction, not by a round count. Set a positive agent.max_steps only
 			// if you want a hard guard against runaway.
 			MaxSteps: 0,
-			AutoPlan: "on",
 		},
 		// Mode "ask" with no rules keeps `tianxuan run` autonomous (no TTY → ask
 		// resolves to allow) while `tianxuan chat` prompts before writers. Users add

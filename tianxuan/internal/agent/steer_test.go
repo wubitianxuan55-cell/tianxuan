@@ -12,13 +12,13 @@ func TestShouldMidTurnSteer_AllBlockedIsNotFailure(t *testing.T) {
 		{Name: "write_file", Arguments: `{"path":"/x"}`},
 		{Name: "edit_file", Arguments: `{"old":"a","new":"b"}`},
 	}
-	// All "blocked:" results — plan mode, completely normal.
+	// All "blocked:" results — permission denies, completely normal.
 	results := []string{
-		"blocked: write_file is a writer tool and plan mode is read-only",
-		"blocked: edit_file is a writer tool and plan mode is read-only",
+		"blocked: write_file denied by permission",
+		"blocked: edit_file denied by permission",
 	}
 	if a.shouldMidTurnSteer(calls, results) {
-		t.Error("all-blocked batch should NOT trigger steer — it is normal in plan mode")
+		t.Error("all-blocked batch should NOT trigger steer — it is normal with permission gating")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestShouldMidTurnSteer_MixedBlockedAndFailedTriggers(t *testing.T) {
 	}
 	// One blocked, two real failures — non-blocked failures >= 2 should trigger.
 	results := []string{
-		"blocked: writer in plan mode",
+		"blocked: writer denied by permission",
 		"error: no such file",
 		"error: permission denied",
 	}

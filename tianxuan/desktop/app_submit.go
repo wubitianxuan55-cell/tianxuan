@@ -43,12 +43,8 @@ func (a *App) Approve(id string, allow, session bool) {
 	}
 }
 
-// SetPlanMode toggles read-only plan mode.
-func (a *App) SetPlanMode(on bool) {
-	if ctrl := a.ctrlByTabID(""); ctrl != nil {
-		ctrl.SetPlanMode(on)
-	}
-}
+
+// QuestionAnswer is the frontend's reply to one question in an ask_request.
 
 // QuestionAnswer is the frontend's reply to one question in an ask_request.
 type QuestionAnswer struct {

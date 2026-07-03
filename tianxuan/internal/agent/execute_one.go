@@ -35,8 +35,8 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	}
 
 	// Centralised pre-execution checks via the ToolDispatcher (production path).
-	// Centralised pre-execution checks via the ToolDispatcher (production path).
-	// When dispatcher is nil (test/benchmark paths), gate/hooks/planMode are
+	// When dispatcher is nil (test/benchmark paths), gate/hooks are
+	// checked inline — preserving backward compatibility with existing tests.
 	// checked inline — preserving backward compatibility with existing tests.
 	if a.dispatcher != nil {
 		cr := a.dispatcher.Check(ctx, call.Name, json.RawMessage(call.Arguments), t.ReadOnly())
@@ -59,13 +59,6 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			}
 			if len(modifiedArgs) > 0 {
 				call.Arguments = string(modifiedArgs)
-			}
-		}
-		if a.planMode.Load() && !t.ReadOnly() {
-			return toolOutcome{
-				output:  fmt.Sprintf("blocked: %q is a writer tool — currently read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", call.Name),
-				blocked: true,
-				errMsg:  "blocked: read-only mode",
 			}
 		}
 		if a.gate != nil {
@@ -137,7 +130,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	cctx := withCallContext(ctx, call.ID, a.sink, a.asker)
 	if a.evidence != nil {
 		// V10.8: 严格验证只在 Plan Mode 下启用
-		a.evidence.SetStrictVerification(a.planMode.Load())
+		a.evidence.SetStrictVerification(false)
 		cctx = evidence.WithLedger(cctx, a.evidence)
 	}
 	if a.jobs != nil {
@@ -256,6 +249,7 @@ func isBackgroundTaskCall(args string) bool {
 	_ = json.Unmarshal([]byte(args), &p)
 	return p.RunInBackground
 }
+
 // toolReadOnly reports a tool's ReadOnly classification by name.
 func (a *AgentRunner) toolReadOnly(name string) bool {
 	t, ok := a.tools.Get(name)

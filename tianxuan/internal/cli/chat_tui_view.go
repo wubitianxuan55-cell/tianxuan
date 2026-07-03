@@ -24,8 +24,6 @@ func (m chatTUI) View() tea.View {
 	switch {
 	case m.ctrl.PermLevel() == "yolo":
 		modeTag = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).Render("[YOLO]")
-	case m.planMode:
-		modeTag = yellow("[plan]")
 	default:
 		modeTag = dim("[auto]")
 	}
@@ -37,12 +35,8 @@ func (m chatTUI) View() tea.View {
 		status = "  " + modeTag + " · ⟲ rewind"
 	case m.chooser != nil:
 		status = "  " + modeTag + " · " + i18n.M.ChatStatusQuestion
-	case m.pendingApproval != nil && m.pendingApproval.Tool == planApprovalTool:
-		status = "  " + modeTag + " · " + i18n.M.ChatStatusPlanApproval
 	case m.pendingApproval != nil:
 		status = "  " + modeTag + " · " + i18n.M.ChatStatusToolApproval
-	case m.state == tuiRunning:
-		status = fmt.Sprintf("  %s · "+i18n.M.ChatStatusThinkingFmt, modeTag, m.spinner.View(), m.elapsed)
 		if m.turnTokens > 0 {
 			status += " · ↓" + shortTokens(m.turnTokens)
 		}
@@ -226,11 +220,6 @@ func (m chatTUI) renderApprovalBanner() string {
 	}
 	if m.pendingApproval == nil {
 		return ""
-	}
-	// A plan approval shows the gate prompt (the plan itself is already printed as
-	// the assistant's reply); a tool approval names the tool + subject.
-	if m.pendingApproval.Tool == planApprovalTool {
-		return approvalBannerStyle.Width(w).Render("⏸ " + i18n.M.PlanApprovalPrompt)
 	}
 	name, detail := approvalToolDetails(m.pendingApproval.Tool)
 	subj := strings.TrimSpace(m.pendingApproval.Subject)

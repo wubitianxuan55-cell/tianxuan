@@ -116,7 +116,7 @@ func TestUserBubbleEchoedImmediately(t *testing.T) {
 	// Stand in for startTurn's immediate echo (no controller in the unit harness).
 	m.bubbleStartIdx = len(m.transcript)
 	m.commitLine("")
-	m.commitLine(renderUserBubble("hello world", m.width, m.planMode))
+	m.commitLine(renderUserBubble("hello world", m.width))
 	m.bubblePending = true
 	m.state = tuiRunning
 
@@ -296,7 +296,7 @@ func TestUnsendRestoresFoldedPastePlaceholder(t *testing.T) {
 	m.ctrl = control.New(control.Options{})
 	m.bubbleStartIdx = len(m.transcript)
 	m.commitLine("")
-	m.commitLine(renderUserBubble("expanded JSON", m.width, m.planMode))
+	m.commitLine(renderUserBubble("expanded JSON", m.width))
 	m.pendingRestore = "[Pasted text #1 · 5 lines] 这是什么?"
 	m.bubblePending = true
 	m.state = tuiRunning

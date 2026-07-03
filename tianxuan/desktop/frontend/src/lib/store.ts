@@ -257,7 +257,6 @@ export function useController() {
 
   const approve = useCallback((id: string, allow: boolean, session: boolean) => { dispatch({ type: "clearApproval" }); app.Approve(id, allow, session).catch(() => {}); }, [dispatch]);
   const answerQuestion = useCallback((id: string, answers: QuestionAnswer[]) => { dispatch({ type: "clearAsk" }); app.AnswerQuestion(id, answers).catch(() => {}); }, [dispatch]);
-  const setPlan = useCallback((on: boolean) => { app.SetPlanMode(on).catch(() => {}); }, []);
   const setPermLevel = useCallback((level: string) => { app.SetPermLevel(level).catch(() => {}); }, []);
   const newSession = useCallback(async () => { await app.NewSession().catch(() => {}); dispatch({ type: "reset" }); }, [dispatch]);
   const listSessions = useCallback((): Promise<SessionMeta[]> => app.ListSessions().catch(() => []), []);
@@ -277,7 +276,7 @@ export function useController() {
   const changeFactType = useCallback(async (name: string, typ: string) => { await app.ChangeFactType(name, typ).catch(() => {}); }, []);
   const rewind = useCallback(async (turn: number, scope: string) => { if (scope === "fork") await app.Fork(turn).catch(() => {}); else if (scope === "summ-from") await app.SummarizeFrom(turn).catch(() => {}); else if (scope === "summ-upto") await app.SummarizeUpTo(turn).catch(() => {}); else await app.Rewind(turn, scope).catch(() => {}); const ms = await app.History().catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
 
-  return { state, send, cancel, approve, answerQuestion, setPlan, setPermLevel, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc, updateFact, changeFactType };
+  return { state, send, cancel, approve, answerQuestion,  setPermLevel, newSession, listSessions, resumeSession, deleteSession, renameSession, refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, setModel, fetchMemory, remember, forget, saveDoc, updateFact, changeFactType };
 }
 
 // useItems 订阅 items 数组，与 useController 分离。

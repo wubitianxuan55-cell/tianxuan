@@ -4,31 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync/atomic"
 )
+
+// EditObserver is notified when a file-editing tool succeeds. Implementations
 
 // EditObserver is notified when a file-editing tool succeeds. Implementations
 // (e.g. ContextManager) use it to track session workspace state.
 type EditObserver interface {
 	OnFileEdited(path string)
 }
-
-// ToolDispatcher centralizes the pre-execution checks (plan mode, permission
-// gate, hooks) that every tool call must pass through. It sits between the
-// agent's run loop and individual tool execution.
+// ToolDispatcher centralizes the pre-execution checks that every tool call must
+// pass through. It sits between the agent's run loop and individual tool execution.
 type ToolDispatcher struct {
-	planMode *atomic.Bool
 	gate     Gate
 	hooks    ToolHooks
 	observer EditObserver // V3.0: workspace state observer
 }
 
 // NewToolDispatcher creates a dispatcher.
-func NewToolDispatcher(planMode *atomic.Bool, gate Gate, hooks ToolHooks) *ToolDispatcher {
+func NewToolDispatcher(gate Gate, hooks ToolHooks) *ToolDispatcher {
 	return &ToolDispatcher{
-		planMode: planMode,
-		gate:     gate,
-		hooks:    hooks,
+		gate:  gate,
+		hooks: hooks,
 	}
 }
 
@@ -68,22 +65,7 @@ func (d *ToolDispatcher) Check(ctx context.Context, name string, args json.RawMe
 		}
 	}
 
-	// 1. Plan mode (read-only gate)
-	if d.planMode != nil && d.planMode.Load() && !readOnly {
-		// V8.0.3: plan-mode bash safety — allow safe commands through.
-		if name == "bash" {
-			if reason := planBashCheck(args); reason == "" {
-				goto planBashAllowed
-			} else {
-				return CheckResult{Allowed: false, Blocked: true, Reason: "blocked: " + reason}
-			}
-		}
-		return CheckResult{
-			Blocked: true,
-			Reason:  fmt.Sprintf("blocked: %q is a writer tool — currently read-only. Keep exploring with read-only tools, then write your plan as your reply. The user will be asked to approve it before any changes are made.", name),
-	}
-}
-planBashAllowed:
+	// 2. Permission gate
 
 	// 2. Permission gate
 	if d.gate != nil {

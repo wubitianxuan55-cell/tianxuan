@@ -3,6 +3,7 @@ package builtin
 import (
 	"path/filepath"
 
+	"tianxuan/internal/netclient"
 	"tianxuan/internal/sandbox"
 	"tianxuan/internal/tool"
 )
@@ -22,6 +23,7 @@ type Workspace struct {
 	Dir        string
 	WriteRoots []string
 	Bash       sandbox.Spec
+	ProxySpec  netclient.ProxySpec
 }
 
 // Tools returns the built-in tools bound to the workspace, ready to Add to a
@@ -47,7 +49,7 @@ func (w Workspace) Tools(enabled ...string) []tool.Tool {
 		listDir{workDir: w.Dir},
 		globTool{workDir: w.Dir},
 		grepTool{workDir: w.Dir},
-		webFetch{},
+		webFetch{proxySpec: w.ProxySpec},
 		gitWorktree{},
 	}
 	if len(enabled) == 0 {

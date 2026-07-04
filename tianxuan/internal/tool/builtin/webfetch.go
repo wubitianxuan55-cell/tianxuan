@@ -1,7 +1,9 @@
 package builtin
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	stdhtml "html"
@@ -17,11 +19,16 @@ import (
 	nethtml "golang.org/x/net/html"
 
 	"tianxuan/internal/tool"
+
+	"tianxuan/internal/netclient"
+	"golang.org/x/net/proxy"
 )
 
 func init() { tool.RegisterBuiltin(webFetch{}) }
 
-type webFetch struct{}
+type webFetch struct {
+	proxySpec netclient.ProxySpec
+}
 
 const (
 	webFetchTimeout       = 15 * time.Second
@@ -57,30 +64,10 @@ func (webFetch) CompactSchema() json.RawMessage   { return compactSchema["web_fe
 // Loopback is allowed: the agent can already reach localhost via bash, so a local
 // dev server stays fetchable. The check runs at dial time on the resolved IP, so a
 // public host that redirects or DNS-rebinds to an internal address is caught too.
-func ssrfGuardedClient() *http.Client {
-	dialer := &net.Dialer{Timeout: webFetchTimeout}
+func ssrfGuardedClient(proxyURLFor func(*http.Request) (string, error)) *http.Client {
 	return &http.Client{
-		Timeout: webFetchTimeout,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, err := net.SplitHostPort(addr)
-				if err != nil {
-					return nil, err
-				}
-				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-				if err != nil {
-					return nil, err
-				}
-				for _, ip := range ips {
-					if blockedFetchIP(ip.IP) {
-						return nil, fmt.Errorf("refusing to fetch internal address %s (resolves to %s)", host, ip.IP)
-					}
-				}
-				// Dial the IP we just vetted, not the hostname, so the connection
-				// can't re-resolve to a different (internal) address (DNS rebinding).
-				return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
-			},
-		},
+		Timeout:   webFetchTimeout,
+		Transport: webFetchRoundTripper{proxyURLFor: proxyURLFor},
 	}
 }
 
@@ -104,6 +91,131 @@ func blockedFetchIP(ip net.IP) bool {
 		ip.IsLinkLocalMulticast() ||
 		ip.IsUnspecified() || // 0.0.0.0 / ::
 		cgnatRange.Contains(ip) // 100.64.0.0/10 (incl. Alibaba Cloud metadata)
+}
+
+type webFetchRoundTripper struct {
+	proxyURLFor func(*http.Request) (string, error)
+}
+
+func (rt webFetchRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	proxyURL, err := rt.proxyURLFor(req)
+	if err != nil {
+		return nil, fmt.Errorf("resolve proxy: %w", err)
+	}
+	return ssrfGuardedTransport(proxyURL).RoundTrip(req)
+}
+
+func (wf webFetch) proxyURLFor(req *http.Request) (string, error) {
+	pf, err := netclient.ProxyFunc(wf.proxySpec)
+	if err != nil {
+		return "", err
+	}
+	if pf == nil {
+		return "", nil
+	}
+	u, err := pf(req)
+	if err != nil || u == nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
+// ssrfGuardedTransport builds a transport with SSRF protection and optional
+// proxy tunnelling (HTTP CONNECT / SOCKS5).
+func ssrfGuardedTransport(proxyURL string) *http.Transport {
+	dialer := &net.Dialer{Timeout: webFetchTimeout}
+
+	directDialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		for _, ip := range ips {
+			if blockedFetchIP(ip.IP) {
+				return nil, fmt.Errorf("refusing to fetch internal address %s (resolves to %s)", host, ip.IP)
+			}
+		}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+	}
+
+	tr := &http.Transport{DialContext: directDialContext}
+
+	if proxyURL != "" {
+		pu, err := url.Parse(proxyURL)
+		if err == nil && pu.Host != "" {
+			switch pu.Scheme {
+			case "http", "https":
+				tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+					host, port, err := net.SplitHostPort(addr)
+					if err != nil {
+						return nil, err
+					}
+					if ip := net.ParseIP(host); ip != nil && blockedFetchIP(ip) {
+						return nil, fmt.Errorf("refusing to fetch internal address %s", host)
+					}
+					proxyConn, err := dialer.DialContext(ctx, "tcp", pu.Host)
+					if err != nil {
+						return nil, fmt.Errorf("connect to proxy %s: %w", pu.Host, err)
+					}
+					targetAddr := net.JoinHostPort(host, port)
+					connectReq := &http.Request{
+						Method: http.MethodConnect,
+						URL:    &url.URL{Host: targetAddr},
+						Host:   targetAddr,
+						Header: make(http.Header),
+					}
+					if pu.User != nil {
+						user := pu.User.Username()
+						pass, _ := pu.User.Password()
+						auth := base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
+						connectReq.Header.Set("Proxy-Authorization", "Basic "+auth)
+					}
+					if err := connectReq.Write(proxyConn); err != nil {
+						proxyConn.Close()
+						return nil, fmt.Errorf("write CONNECT to proxy: %w", err)
+					}
+					br := bufio.NewReader(proxyConn)
+					resp, err := http.ReadResponse(br, connectReq)
+					if err != nil {
+						proxyConn.Close()
+						return nil, fmt.Errorf("read CONNECT response: %w", err)
+					}
+					if resp.StatusCode != http.StatusOK {
+						proxyConn.Close()
+						return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+					}
+					return proxyConn, nil
+				}
+
+			case "socks5", "socks5h":
+				var auth *proxy.Auth
+				if pu.User != nil {
+					pass, _ := pu.User.Password()
+					auth = &proxy.Auth{User: pu.User.Username(), Password: pass}
+				}
+				if sd, err := proxy.SOCKS5("tcp", pu.Host, auth, dialer); err == nil {
+					if cd, ok := sd.(proxy.ContextDialer); ok {
+						tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+							host, _, err := net.SplitHostPort(addr)
+							if err != nil {
+								return nil, err
+							}
+							if ip := net.ParseIP(host); ip != nil && blockedFetchIP(ip) {
+								return nil, fmt.Errorf("refusing to fetch internal address %s", host)
+							}
+							return cd.DialContext(ctx, network, addr)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return tr
 }
 
 // isTransientError reports whether err represents a transient network issue
@@ -142,7 +254,7 @@ func isTransientError(err error) bool {
 
 // doFetch performs a single HTTP fetch and returns the cleaned result.
 // Extracted so the retry loop can call it without duplicating logic.
-func doFetch(ctx context.Context, rawURL string) (string, error) {
+func doFetch(ctx context.Context, rawURL string, client *http.Client) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return "", fmt.Errorf("url must be an absolute http(s) address")
@@ -162,7 +274,7 @@ func doFetch(ctx context.Context, rawURL string) (string, error) {
 	req.Header.Set("User-Agent", "tianxuan-web-fetch/1.0")
 	req.Header.Set("Accept", "text/html,text/plain,text/markdown,application/json,*/*;q=0.5")
 
-	resp, err := ssrfGuardedClient().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("fetch %s: %w", rawURL, err)
 	}
@@ -186,7 +298,7 @@ func doFetch(ctx context.Context, rawURL string) (string, error) {
 	return header + out, nil
 }
 
-func (webFetch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+func (wf webFetch) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
 		URL     string `json:"url"`
 		Retries *int   `json:"retries,omitempty"`
@@ -214,7 +326,7 @@ func (webFetch) Execute(ctx context.Context, args json.RawMessage) (string, erro
 			case <-time.After(backoff):
 			}
 		}
-		result, err := doFetch(ctx, p.URL)
+		result, err := doFetch(ctx, p.URL, ssrfGuardedClient(wf.proxyURLFor))
 		if err == nil {
 			return result, nil
 		}

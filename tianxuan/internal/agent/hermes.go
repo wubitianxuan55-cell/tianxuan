@@ -77,6 +77,7 @@ type Hermes struct {
 
 	readonlyTools *tool.Registry // V10.32: if set, planner runs as AgentRunner
 	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
+	asker        Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
 }
 
 // NewHermes creates a Hermes orchestrator. hermesProvider is the planning model,
@@ -128,6 +129,10 @@ func (h *Hermes) ResetSession() {
 	h.hermesSess = NewSession(system)
 }
 
+// SetAsker installs the interactive asker for plan confirmation (V10.34).
+// nil means headless mode — plans auto-confirm without user approval.
+func (h *Hermes) SetAsker(a Asker) { h.asker = a }
+
 // Run plans with the planner model, then hands the plan to the executor.
 func (h *Hermes) Run(ctx context.Context, input string) error {
 	h.sink.Emit(event.Event{Kind: event.TurnStarted})
@@ -143,17 +148,47 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 	if err != nil {
 		return fmt.Errorf("hermes: %w", err)
 	}
-	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
 	if isAnswerNotAction(plan) {
 		// Hermes answered directly — no Hephaestus needed.
 		h.persistAnswer(input, plan)
 		h.sink.Emit(event.Event{Kind: event.Text, Text: plan})
 		return nil
 	}
+	// V10.34: 交互式计划确认 — Hermes 展示计划，等待用户同意后再执行。
+	// Headless 模式（无 asker）自动通过，不阻塞。
+	if err := h.confirmPlan(ctx, input, plan); err != nil {
+		return err
+	}
+	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
 	return h.hephaestus.Run(ctx, formatHandoff(input, plan))
 }
+
+// confirmPlan asks the user to approve the planner's output before handing off to
+// the executor. In headless mode (asker == nil) it auto-confirms without blocking.
+func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) error {
+	if h.asker == nil {
+		return nil // headless: auto-confirm
+	}
+	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
+		ID:     "confirm",
+		Header: "计划确认",
+		Prompt: fmt.Sprintf("Hermes 已制定执行计划，是否同意？\n\n--- 任务 ---\n%s\n\n--- 计划 ---\n%s",
+			task, plan),
+		Options: []event.AskOption{
+			{Label: "同意，开始执行", Description: "按计划立即交由 Hephaestus 执行"},
+			{Label: "取消，不执行", Description: "放弃本次任务，不做任何更改"},
+		},
+	}})
+	if err != nil {
+		return fmt.Errorf("plan confirmation cancelled: %w", err)
+	}
+	if len(answers) == 0 || len(answers[0].Selected) == 0 || answers[0].Selected[0] != "同意，开始执行" {
+		return fmt.Errorf("计划被用户取消")
+	}
+	return nil
+}
+
 // plan runs Hermes as an AgentRunner with read-only tools so it can investigate
-// the codebase before proposing a plan. Falls back to planStream (zero-tool stream)
 // when readonlyTools is nil — e.g. in tests or when no read-only registry is wired.
 func (h *Hermes) plan(ctx context.Context, input string) (string, error) {
 	// V10.32+: AgentRunner mode — planner can call read-only tools.

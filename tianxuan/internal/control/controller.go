@@ -434,6 +434,10 @@ func (c *Controller) EnableInteractiveApproval() {
 		c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
 		c.executor.SetAsker(c)
 	}
+	// V10.34: wire Hermes plan confirmation — planner asks user before executing.
+	if hermes, ok := c.runner.(*agent.Hermes); ok {
+		hermes.SetAsker(c)
+	}
 }
 
 // Ask implements agent.Asker: it emits an AskRequest and blocks until

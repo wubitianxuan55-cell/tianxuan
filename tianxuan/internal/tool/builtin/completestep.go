@@ -49,6 +49,7 @@ func (completeStep) Schema() json.RawMessage {
 "type":"object",
 "properties":{
   "step":{"type":"string","description":"Which plan step this completes — its title or number, matching the task list."},
+  "step_index":{"type":"integer","minimum":1,"description":"Optional 1-based task-list item number. Prefer this when the step title is long or easy to mistype."},
   "result":{"type":"string","description":"What is now true or changed as a result of finishing this step."},
   "evidence":{
     "type":"array",
@@ -80,16 +81,17 @@ func (completeStep) CompactSchema() json.RawMessage   { return compactSchema["co
 
 func (completeStep) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		Step     string         `json:"step"`
-		Result   string         `json:"result"`
-		Evidence []stepEvidence `json:"evidence"`
-		Notes    string         `json:"notes"`
+		Step      string         `json:"step"`
+		StepIndex *int           `json:"step_index,omitempty"`
+		Result    string         `json:"result"`
+		Evidence  []stepEvidence `json:"evidence"`
+		Notes     string         `json:"notes"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
-	if strings.TrimSpace(p.Step) == "" {
-		return "", fmt.Errorf("step is required — name the plan step you are completing")
+	if strings.TrimSpace(p.Step) == "" && p.StepIndex == nil {
+		return "", fmt.Errorf("step or step_index is required — name the plan step you are completing")
 	}
 	if strings.TrimSpace(p.Result) == "" {
 		return "", fmt.Errorf("result is required — state what is now true after finishing this step")
@@ -145,7 +147,8 @@ func verifyStepEvidence(ctx context.Context, items []stepEvidence) (hostVerified
 				return 0, 0, fmt.Errorf("evidence %d: verification command is required for host verification", i+1)
 			}
 			if !ledger.HasSuccessfulCommand(command) {
-				return 0, 0, fmt.Errorf("evidence %d: verification command %q has no matching successful bash receipt in this turn", i+1, command)
+				hint := commandHints(ledger)
+				return 0, 0, fmt.Errorf("evidence %d: verification command %q has no matching successful bash receipt in this turn%s", i+1, command, hint)
 			}
 			hostVerified++
 		case "diff":
@@ -191,4 +194,17 @@ func verifyTodoStep(ctx context.Context, step string) (evidence.TodoStepMatch, b
 	default:
 		return evidence.TodoStepMatch{}, true, fmt.Errorf("step %q matches todo %d (%q) but its status is %q; complete_step requires in_progress or completed", step, match.Index, match.Content, match.Status)
 	}
+}
+
+func commandHints(ledger *evidence.Ledger) string {
+	cmds := ledger.SuccessfulCommands(5)
+	if len(cmds) == 0 {
+		return ""
+	}
+	for i, c := range cmds {
+		if len(c) > 80 {
+			cmds[i] = c[:80] + "…"
+		}
+	}
+	return fmt.Sprintf("; successful commands this turn: %s — cite one exactly as it ran", strings.Join(cmds, ", "))
 }

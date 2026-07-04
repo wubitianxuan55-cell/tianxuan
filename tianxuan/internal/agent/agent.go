@@ -172,6 +172,18 @@ type AgentRunner struct {
 	steerCount   int    // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
 	dedupHashes  map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
 
+	// V10.27: 后台任务启停循环检测 — 防止模型反复 start-bash → kill_shell
+	// 而不读取输出。跨轮次累计，仅 bash_output/wait/前台 bash 重置计数。
+	bgStartKillStreak    int  // 连续启停循环计数（跨轮次累计）
+	bgJobStartedThisTurn bool // 本轮启动了后台 bash 任务
+	bgOutputReadThisTurn bool // 本轮读取了后台任务输出（bash_output / wait）
+	bgJobKilledThisTurn  bool // 本轮杀掉了后台任务（kill_shell）
+
+	// V10.28: stale anchor 编辑守卫 — 同一轮内编辑文件后必须重新 read_file，
+	// 防止 old_string 锚点过时。追踪每轮写入和读取的文件路径。
+	staleWrittenFiles map[string]bool // 本轮已写入的文件路径
+	staleReadFiles    map[string]bool // 本轮已读取的文件路径
+
 	// V10.13: 成功循环检测 — 移植自 Reasonix repeatedSuccessBlock。
 	// 检测写工具在同一用户轮次中重复成功调用，阈值 2 次后阻止。
 	repeatSuccessCounts map[string]int
@@ -750,6 +762,46 @@ func (a *AgentRunner) shouldMidTurnSteer(calls []provider.ToolCall, results []st
 	return false
 }
 
+// checkBgStartKillCycle detects repeated start→kill patterns on background bash
+// jobs without reading output in between. When the model starts a background job
+// and immediately kills it (same turn, no bash_output/wait), it wastes a full API
+// round per cycle. After 3 such cycles without recovery, a corrective nudge is
+// injected to break the loop. Resets on any foreground bash or output-read.
+// Returns true if a nudge was injected (caller should continue the loop).
+func (a *AgentRunner) checkBgStartKillCycle() bool {
+	// Only track when the pattern appears: started AND killed in the same turn
+	// without reading output.
+	if !a.bgJobStartedThisTurn || !a.bgJobKilledThisTurn {
+		return false
+	}
+	// If output was read this turn too, this is normal usage — not a cycle.
+	if a.bgOutputReadThisTurn {
+		return false
+	}
+	// Same-turn start→kill without reading output.
+	a.bgStartKillStreak++
+
+	const threshold = 3
+	if a.bgStartKillStreak < threshold {
+		return false
+	}
+
+	// Inject corrective nudge.
+	a.session.Add(provider.Message{Role: provider.RoleUser,
+		Content: "[System note: you have started background bash jobs and immediately " +
+			"killed them without reading their output for " + fmt.Sprintf("%d", a.bgStartKillStreak) +
+			" consecutive cycles. This wastes API turns. For short commands like 'go test', " +
+			"use foreground bash (omit run_in_background) so you can see the result " +
+			"directly. If you must use a background job, call bash_output or wait to " +
+			"read its output before deciding to kill it. Do NOT start another background " +
+			"job then immediately kill it again.]"})
+	a.bgStartKillStreak = 0 // reset after nudge
+	return true
+}
+
+
+// ProvName returns the provider model name for diagnostic display.
+func (a *AgentRunner) ProvName() string { return a.prov.Name() }
 
 // SetCtxMgr wires the TCCA context kernel (V3.0 Phase 5).
 

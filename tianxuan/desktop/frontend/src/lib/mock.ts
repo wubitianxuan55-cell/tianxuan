@@ -494,6 +494,9 @@ export function makeMockApp(): AppBindings {
       if (!settings.subagentModels) settings.subagentModels = {};
       settings.subagentModels[_skill] = ref;
     },
+    async SetPlannerModel(ref: string) {
+      settings.plannerModel = ref;
+    },
     async SetPermLevel(level: string) {
       settings.permLevel = level;
     },

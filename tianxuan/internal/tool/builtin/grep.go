@@ -2,11 +2,13 @@ package builtin
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -19,9 +21,14 @@ const grepMaxMatches = 500
 
 func init() { tool.RegisterBuiltin(grepTool{}) }
 
-// grepTool searches files by regex. workDir, when non-empty, is the directory a
-// relative path resolves against (see resolveIn).
-type grepTool struct{ workDir string }
+// grepTool searches files by regex. When ripgrep (rg) is available on PATH,
+// delegates to it for 10-100x speedup and native .gitignore support.
+// workDir, when non-empty, is the directory a relative path resolves against.
+type grepTool struct {
+	workDir string
+}
+
+var grepRgPath string // resolved ripgrep path, set at boot
 
 func (grepTool) Name() string { return "grep" }
 
@@ -90,6 +97,12 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 	}
 
 	p.Path = resolveIn(g.workDir, p.Path)
+
+	// V10.29: delegate to ripgrep when available — 10-100x faster, honors .gitignore.
+	if grepRgPath != "" && ctxLines == 0 && !highlight && p.SortBy != "relevance" {
+		return g.runRipgrep(ctx, p.Pattern, p.Path, maxMatches)
+	}
+
 	re, err := regexp.Compile(p.Pattern)
 	if err != nil {
 		return "", fmt.Errorf("invalid pattern: %w", err)
@@ -298,4 +311,68 @@ func sortByRelevance(matches []grepMatch) {
 		}
 		return matches[i].line < matches[j].line
 	})
+}
+
+// ── Ripgrep delegation (V10.29) ───────────────────────────────────────
+
+// SetRgPath configures the absolute path to a ripgrep binary for delegation.
+// Pass "" to disable. Call once at boot after PATH resolution.
+func ResolveRgPath() string {
+	if p, err := exec.LookPath("rg"); err == nil {
+		grepRgPath = p
+		return p
+	}
+	return ""
+}
+
+func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, maxMatches int) (string, error) {
+	argv := []string{
+		grepRgPath,
+		"--no-heading", "--line-number", "--with-filename", "--color", "never",
+		"--regexp", pattern,
+		"--", path,
+	}
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	hideBashWindow(cmd)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("ripgrep pipe: %w", err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("ripgrep: %w", err)
+	}
+
+	var out []string
+	truncated := false
+	sc := bufio.NewScanner(stdout)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		out = append(out, sc.Text())
+		if len(out) >= maxMatches {
+			truncated = true
+			break
+		}
+	}
+	if truncated {
+		_ = cmd.Process.Kill()
+	}
+	_, _ = io.Copy(io.Discard, stdout)
+	_ = cmd.Wait()
+
+	if len(out) == 0 && ctx.Err() != context.DeadlineExceeded {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return "", fmt.Errorf("ripgrep: %s", msg)
+		}
+	}
+	if len(out) == 0 {
+		return "(no matches)", nil
+	}
+	res := strings.Join(out, "\n")
+	if truncated {
+		res += fmt.Sprintf("\n... (truncated at %d matches)", maxMatches)
+	}
+	return res, nil
 }

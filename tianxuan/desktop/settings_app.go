@@ -350,6 +350,13 @@ func (a *App) SetSubagentModelForSkill(skill, ref string) error {
 	})
 }
 
+// SetPlannerModel sets (or, with "", clears) the two-model planner.
+func (a *App) SetPlannerModel(ref string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetPlannerModel(ref)
+	})
+}
+
 // trimList drops blank entries from a string slice (and returns a non-nil slice).
 func trimList(in []string) []string {
 	out := []string{}

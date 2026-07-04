@@ -87,62 +87,26 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", err
 	}
 
-	b, err := os.ReadFile(p.Path)
+	content, enc, err := readFileEncoded(p.Path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	content := string(b)
 
-	// V10.5: 自动行尾适配 — 将 old_string/new_string 的 \n 适配为文件的行尾格式，
-	// 消除 CRLF/LF 混用导致的最高频编辑失败。
-	fileLE := detectLineEnding(content)
-	oldAdapted := adaptLineEndings(p.OldString, fileLE)
-	newAdapted := adaptLineEndings(p.NewString, fileLE)
-
-	// Try with adapted line endings first; fall back to original if adaptation
-	// changed nothing or made it worse (e.g. the file has no newlines).
-	oldStr := oldAdapted
-	newStr := newAdapted
-	if oldAdapted == p.OldString {
-		// No adaptation needed — file already uses LF or has no newlines.
-	} else if strings.Count(content, oldAdapted) == 0 && strings.Count(content, p.OldString) > 0 {
-		// Adaptation broke the match — the LLM may have intentionally used LF
-		// in a CRLF file (e.g. for a specific single-line replacement).
-		oldStr = p.OldString
-		newStr = p.NewString
-	}
-
-	switch strings.Count(content, oldStr) {
-	case 0:
-		leLabel := "LF"
-		if fileLE == "\r\n" {
-			leLabel = "CRLF"
-		} else if fileLE == "" {
-			leLabel = "no-newlines"
-		}
-		oldPreview := p.OldString
-		if len(oldPreview) > 80 {
-			oldPreview = oldPreview[:80] + "..."
-		}
-		filePreview := content
-		if len(filePreview) > 120 {
-			filePreview = filePreview[:120] + "..."
-		}
-		return "", fmt.Errorf("old_string not found in %s (line endings: %s).\n  old_string: %q\n  file head: %q\n  Check whitespace, indentation, line endings (CRLF vs LF).", p.Path, leLabel, oldPreview, filePreview)
-	case 1:
-		// ok
-	default:
-		return "", fmt.Errorf("old_string is not unique in %s; add more surrounding context", p.Path)
+	result := applyOldStringEdit(content, p.OldString, p.NewString, false)
+	switch {
+	case result.matches == 0:
+		return "", oldStringNotFoundError(p.Path, p.OldString, content)
+	case result.matches > 1:
+		return "", oldStringNotUniqueError(p.Path, p.OldString, content, result.matches, false)
 	}
 
 	// Preserve the original file permission bits (e.g. executable scripts).
-	fi, err := os.Stat(p.Path)
+	fi, statErr := os.Stat(p.Path)
 	mode := os.FileMode(0o644)
-	if err == nil {
+	if statErr == nil {
 		mode = fi.Mode().Perm()
 	}
-	updated := strings.Replace(content, oldStr, newStr, 1)
-	if err := os.WriteFile(p.Path, []byte(updated), mode); err != nil {
+	if err := writeFileEncoded(p.Path, result.updated, enc, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("edited %s", p.Path), nil

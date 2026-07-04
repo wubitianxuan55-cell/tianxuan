@@ -42,7 +42,7 @@ type searchEngine interface {
 func (webSearch) Name() string { return "web_search" }
 
 func (webSearch) Description() string {
-	return "搜索公开网页（通过 SearXNG / Tavily / Brave Search）。返回带标题、URL 和摘要的结果。当答案的正确性依赖于当前状态时使用——任何随时间变化的内容（事件、价格、发布版本、现实世界的状态）。先搜索再回答；常青问题不需要此工具。"
+	return "搜索公开网页（通过 SearXNG / Tavily / Brave Search）。返回结构化 JSON 数组，每项含 title/url/snippet/source 字段，支持引用追踪。当答案的正确性依赖于当前状态时使用——任何随时间变化的内容（事件、价格、发布版本、现实世界的状态）。先搜索再回答；常青问题不需要此工具。"
 }
 
 func (webSearch) Schema() json.RawMessage {
@@ -313,6 +313,7 @@ func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]s
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
+// Tavily
 	results := make([]searchResult, 0, limit)
 	for _, r := range tr.Results {
 		if len(results) >= limit {
@@ -322,6 +323,7 @@ func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]s
 			Title:   strings.TrimSpace(r.Title),
 			URL:     strings.TrimSpace(r.URL),
 			Snippet: truncate(r.Content, 300),
+			Source:  "tavily",
 		})
 	}
 	return results, nil
@@ -377,6 +379,7 @@ func (e *braveEngine) Search(ctx context.Context, query string, limit int) ([]se
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
+// Brave
 	results := make([]searchResult, 0, limit)
 	for _, r := range br.Web.Results {
 		if len(results) >= limit {
@@ -386,6 +389,7 @@ func (e *braveEngine) Search(ctx context.Context, query string, limit int) ([]se
 			Title:   strings.TrimSpace(r.Title),
 			URL:     strings.TrimSpace(r.URL),
 			Snippet: truncate(r.Description, 300),
+			Source:  "brave",
 		})
 	}
 	return results, nil
@@ -408,6 +412,7 @@ func trySearXNG(ctx context.Context, baseURL, query string, limit int) ([]search
 		return nil, fmt.Errorf("parse SearXNG response: %w", err)
 	}
 
+// SearXNG
 	results := make([]searchResult, 0, limit)
 	for _, r := range resp.Results {
 		if len(results) >= limit {
@@ -417,6 +422,7 @@ func trySearXNG(ctx context.Context, baseURL, query string, limit int) ([]search
 			Title:   strings.TrimSpace(r.Title),
 			URL:     strings.TrimSpace(r.URL),
 			Snippet: truncate(r.Content, 300),
+			Source:  "searxng",
 		})
 	}
 	return results, nil
@@ -480,17 +486,11 @@ func doSearchRequest(ctx context.Context, client *http.Client, urlStr string, ma
 
 func formatResults(results []searchResult) string {
 	var out strings.Builder
-	for i, r := range results {
-		if i > 0 {
-			out.WriteString("\n\n")
-		}
-		fmt.Fprintf(&out, "%d. %s\n   %s", i+1, r.Title, r.URL)
-		if r.Snippet != "" {
-			out.WriteString("\n   ")
-			out.WriteString(r.Snippet)
-		}
-	}
-	return out.String()
+	enc := json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(results)
+	return strings.TrimSpace(out.String())
 }
 
 // --- helpers ---
@@ -504,7 +504,8 @@ func truncate(s string, maxLen int) string {
 }
 
 type searchResult struct {
-	Title   string
-	URL     string
-	Snippet string
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Snippet string `json:"snippet"`
+	Source  string `json:"source"`
 }

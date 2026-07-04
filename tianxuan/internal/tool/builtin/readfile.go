@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf16"
 
+	"golang.org/x/text/transform"
+
+	fileenc "tianxuan/internal/fileutil/encoding"
 	"tianxuan/internal/tool"
 )
 
@@ -28,8 +29,9 @@ func init() { tool.RegisterBuiltin(readFile{}) }
 type readFile struct{ workDir string }
 
 const (
-	readFileDefaultLimit = 2000     // lines returned when limit is unset
-	readFileBinaryPeek   = 8 * 1024 // bytes scanned for a NUL to flag binary
+	readFileDefaultLimit  = 2000      // lines returned when limit is unset
+	readFileBinaryPeek    = 8 * 1024  // bytes scanned for a NUL to flag binary
+	readFileDetectSample  = 256 << 10 // bytes sampled for encoding detection
 )
 
 func (readFile) Name() string { return "read_file" }
@@ -100,24 +102,30 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	defer f.Close()
 
 	peek := make([]byte, readFileBinaryPeek)
-	n, _ := io.ReadFull(f, peek)
-	peek = peek[:n]
+	pn, perr := io.ReadFull(f, peek)
+	peek = peek[:pn]
+	peekEOF := perr != nil // whole file fit in the peek (EOF / ErrUnexpectedEOF)
 
-	// A leading BOM marks encoded text whose bytes the NUL check below would
-	// otherwise misread: UTF-16 encodes ASCII as paired bytes with a 0x00 half,
-	// so a NUL is normal, not a binary signal. Decode such files to UTF-8 and
-	// scan that; only the BOM-less common case stays on the streaming path.
-	var src io.Reader = f
-	if enc := bomEncoding(peek); enc != encUTF8Plain {
-		rest, err := io.ReadAll(f)
-		if err != nil {
-			return "", fmt.Errorf("read %s: %w", p.Path, err)
+	var src io.Reader
+
+	// BOM check first: UTF-16 files contain 0x00 for every ASCII character, so a
+	// naive NUL check would misidentify them as binary.
+	if k := fileenc.DetectQuick(peek); k != fileenc.UTF8 {
+		// UTF-16 is not self-synchronising — buffer it fully.
+		rest, rerr := io.ReadAll(f)
+		if rerr != nil {
+			return "", fmt.Errorf("read %s: %w", p.Path, rerr)
 		}
-		src = bytes.NewReader(decodeBOM(append(peek, rest...), enc))
+		src = bytes.NewReader(fileenc.Decode(append(peek, rest...), fileenc.DetectQuick(append(peek, rest...))))
+	} else if k, ok := fileenc.DetectUTF16NoBOM(peek); ok {
+		// BOM-less UTF-16 (Windows source files) — recognise by NUL pattern.
+		rest, rerr := io.ReadAll(f)
+		if rerr != nil {
+			return "", fmt.Errorf("read %s: %w", p.Path, rerr)
+		}
+		src = bytes.NewReader(fileenc.Decode(append(peek, rest...), k))
 	} else {
 		// V5.9: 二进制文件 → 尝试用 markitdown 转为 Markdown
-		// 支持 PDF/DOCX/XLSX/PPTX/EPUB/HTML 等文档格式。
-		// markitdown 不在 PATH 则回退到原有错误提示。
 		if bytes.IndexByte(peek, 0) >= 0 {
 			if markdown, ok := tryMarkItDown(p.Path); ok {
 				return markdown, nil
@@ -127,8 +135,30 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 				p.Path,
 			)
 		}
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return "", fmt.Errorf("seek %s: %w", p.Path, err)
+
+		// Read up to a bounded sample for encoding detection (GB18030/GBK).
+		head := peek
+		if !peekEOF {
+			more := make([]byte, readFileDetectSample-len(peek))
+			mn, _ := io.ReadFull(f, more)
+			head = append(peek, more[:mn]...)
+		}
+		sample := head
+		enc, _ := fileenc.Detect(sample)
+		switch enc {
+		case fileenc.UTF8, fileenc.LossyUTF8:
+			// Plain UTF-8 — stream directly.
+			src = io.MultiReader(bytes.NewReader(head), f)
+		case fileenc.GB18030:
+			// GB18030/GBK — decode on the fly via streaming decoder.
+			src = transform.NewReader(io.MultiReader(bytes.NewReader(head), f),
+				fileenc.Decoder(enc))
+		default:
+			// Other encodings — full decode via Decoder.
+			src = io.MultiReader(bytes.NewReader(head), f)
+			if dec := fileenc.Decoder(enc); dec != nil {
+				src = transform.NewReader(src, dec)
+			}
 		}
 	}
 
@@ -202,26 +232,6 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	return b.String(), nil
 }
 
-type bomKind int
-
-const (
-	encUTF8Plain bomKind = iota // no BOM (or none we special-case)
-	encUTF8BOM
-	encUTF16LE
-	encUTF16BE
-)
-
-func bomEncoding(b []byte) bomKind {
-	switch {
-	case len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF:
-		return encUTF8BOM
-	case len(b) >= 2 && b[0] == 0xFF && b[1] == 0xFE:
-		return encUTF16LE
-	case len(b) >= 2 && b[0] == 0xFE && b[1] == 0xFF:
-		return encUTF16BE
-	}
-	return encUTF8Plain
-}
 
 // V5.9: markitdown 集成 —— 将二进制文档自动转为 Markdown
 
@@ -272,23 +282,3 @@ func tryMarkItDown(path string) (string, bool) {
 	return result, true
 }
 
-// decodeBOM strips a UTF-8 BOM or decodes UTF-16 to UTF-8, given the kind
-// bomEncoding already identified from the same leading bytes.
-func decodeBOM(b []byte, enc bomKind) []byte {
-	switch enc {
-	case encUTF8BOM:
-		return b[3:]
-	case encUTF16LE, encUTF16BE:
-		order := binary.ByteOrder(binary.LittleEndian)
-		if enc == encUTF16BE {
-			order = binary.BigEndian
-		}
-		b = b[2:]
-		u := make([]uint16, 0, len(b)/2)
-		for i := 0; i+1 < len(b); i += 2 {
-			u = append(u, order.Uint16(b[i:i+2]))
-		}
-		return []byte(string(utf16.Decode(u)))
-	}
-	return b
-}

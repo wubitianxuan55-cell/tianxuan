@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"tianxuan/internal/tool"
+
+	fileenc "tianxuan/internal/fileutil/encoding"
 )
 
 func init() { tool.RegisterBuiltin(writeFile{}) }
@@ -58,10 +60,15 @@ func (w writeFile) Execute(ctx context.Context, args json.RawMessage) (string, e
 	}
 	// Preserve original file permissions.
 	mode := os.FileMode(0o644)
+	enc := fileenc.UTF8 // new files default to UTF-8
 	if fi, err := os.Stat(p.Path); err == nil {
 		mode = fi.Mode().Perm()
+		// Preserve the original encoding when overwriting an existing file.
+		if _, existingEnc, err := readFileEncoded(p.Path); err == nil {
+			enc = existingEnc
+		}
 	}
-	if err := os.WriteFile(p.Path, []byte(p.Content), mode); err != nil {
+	if err := writeFileEncoded(p.Path, p.Content, enc, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("wrote %d bytes to %s", len(p.Content), p.Path), nil

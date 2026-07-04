@@ -46,6 +46,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.preOutcomes = make(map[string]toolOutcome)
 		a.dedupHashes = nil // V8.0 P0-2: reset dedup hashes each turn
 		a.steerCount = 0 // V8.0 P0-3: reset steer counter each turn
+		a.bgJobStartedThisTurn = false // V10.27: 每轮重置启停标志
+		a.bgOutputReadThisTurn = false
+		a.bgJobKilledThisTurn = false
+		a.bgStartKillStreak = 0  // V10.27: 新用户轮次重置循环计数
+		a.staleWrittenFiles = nil   // V10.28: 每轮重置 stale anchor 追踪
+		a.staleReadFiles = nil
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // V10.13: 每轮重置成功循环计数
@@ -287,6 +293,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			continue // steer injected, skip compaction and continue loop
 		}
 
+		// V10.27: bg start-kill cycle — detect repeated background job start→kill
+		// without reading output, inject corrective nudge after 3 cycles.
+		if a.checkBgStartKillCycle() {
+			continue
+		}
 
 		// V6.0 P2: �ظ������⡪������ 3 ����ͬ���ߵ���ʱע�� nudge
 		if a.detectRepeatedSteps(calls) {

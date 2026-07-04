@@ -102,6 +102,17 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			errMsg:  msg,
 		}
 	}
+	// V10.28: stale anchor 守卫 — 同一轮内已编辑的文件必须先 read_file 才能再编辑
+	if !t.ReadOnly() && isFileWriter(call.Name) {
+		if path := extractFilePath(call.Name, call.Arguments); path != "" {
+			if a.staleWrittenFiles != nil && a.staleWrittenFiles[path] {
+				if a.staleReadFiles == nil || !a.staleReadFiles[path] {
+					msg := fmt.Sprintf("blocked: [stale content] %q was already modified this turn. Re-read it with read_file first so your edit anchors (old_string/anchors) match the current file content.", path)
+					return toolOutcome{output: msg, blocked: true, errMsg: msg}
+				}
+			}
+		}
+	}
 	// Checkpoint the file this writer is about to change, so the turn can be
 	// rewound. Fires after all gating (the edit is cleared to run) and only for
 	// tools that can describe their change; a Preview error means the edit will
@@ -231,6 +242,41 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	}
 	// V10.13: 记录成功签名用于循环检测
 	a.recordRepeatSuccess(call, t)
+	// V10.27: 追踪后台任务启停模式，用于检测 start-kill 循环
+	switch call.Name {
+	case "bash":
+		var bp struct {
+			RunInBackground bool `json:"run_in_background"`
+		}
+		if json.Unmarshal([]byte(call.Arguments), &bp) == nil && bp.RunInBackground {
+			a.bgJobStartedThisTurn = true
+		} else {
+			// 前台 bash — 证明模型愿意等结果，重置循环计数
+			a.bgStartKillStreak = 0
+		}
+	case "bash_output", "wait":
+		a.bgOutputReadThisTurn = true
+		a.bgStartKillStreak = 0 // 读取了输出 — 正常使用模式
+	case "kill_shell":
+		a.bgJobKilledThisTurn = true
+	}
+	// V10.28: 追踪 stale anchor — 记录本轮成功的读写操作
+	if path := extractFilePath(call.Name, call.Arguments); path != "" {
+		if t.ReadOnly() && call.Name == "read_file" {
+			if a.staleReadFiles == nil {
+				a.staleReadFiles = make(map[string]bool)
+			}
+			a.staleReadFiles[path] = true
+			if a.staleWrittenFiles != nil {
+				delete(a.staleWrittenFiles, path) // 刷新后重置
+			}
+		} else if !t.ReadOnly() && isFileWriter(call.Name) {
+			if a.staleWrittenFiles == nil {
+				a.staleWrittenFiles = make(map[string]bool)
+			}
+			a.staleWrittenFiles[path] = true
+		}
+	}
 	// A foreground `task` sub-agent just finished — its result is the final answer.
 	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
 		a.hooks.SubagentStop(ctx, result)
@@ -396,6 +442,15 @@ func hasShellWriteRedirect(command string) bool {
 			return true
 		}
 		prev = r
+	}
+	return false
+}
+
+// isFileWriter reports whether the tool name targets a specific file for writing.
+func isFileWriter(name string) bool {
+	switch name {
+	case "edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol":
+		return true
 	}
 	return false
 }

@@ -11,6 +11,8 @@ import (
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
+
+	"tianxuan/internal/agent/session"
 )
 
 // DefaultTaskSystemPrompt steers a sub-agent toward focused, terse delivery —
@@ -31,6 +33,15 @@ const (
 // parent model can reliably identify and parse it.
 func wrapTaskResult(text string) string {
 	return taskResultTagOpen + "\n" + strings.TrimSpace(text) + "\n" + taskResultTagClose
+}
+
+// RetryUntilConfig enables automatic retry loop for a task sub-agent.
+// After the sub-agent returns, the check command is executed. If it fails
+// (non-zero exit), the failure output is injected as context and the sub-agent
+// is re-invoked. Repeats until the check passes or max_retries is exhausted.
+type RetryUntilConfig struct {
+	Check      string `json:"check"`       // Shell command to verify success, e.g. "go test ./..."
+	MaxRetries int    `json:"max_retries"` // Maximum retry attempts (default 3, max 10)
 }
 
 var subagentMetaTools = []string{
@@ -101,6 +112,8 @@ type TaskTool struct {
 	subagentProv provider.Provider // V10.22: optional subagent model provider (nil → use prov)
 	subagentPricing *provider.Pricing
 	subagentCtxWin  int
+
+	transcripts *SubagentStore // V10.29: subagent transcript persistence (continue_from)
 }
 
 // NewTaskTool wires a task tool to the parent agent's environment so its
@@ -142,7 +155,9 @@ func (t *TaskTool) Schema() json.RawMessage {
   "tools":{"type":"array","items":{"type":"string"},"description":"Optional tool whitelist. Subagent/skill meta-tools are still excluded so delegation stays one layer deep."},
   "max_steps":{"type":"integer","description":"Optional cap on tool-call rounds. Defaults to half the parent's cap (min 5).","minimum":1},
   "run_in_background":{"type":"boolean","description":"Run the sub-agent asynchronously: returns a job id immediately and keeps working across turns. Collect its final answer with wait, and you'll be notified when it finishes. Use for long, independent sub-tasks you don't need to block on right now."},
-  "output_schema":{"type":"object","description":"Optional JSON Schema the sub-agent MUST return its result in. If set, the parent will attempt to parse the final answer as JSON. If the result is valid JSON matching the expected shape, it is returned verbatim; otherwise a diagnostic note is prefixed. Use when the parent needs structured data from the sub-agent."}
+  "output_schema":{"type":"object","description":"Optional JSON Schema the sub-agent MUST return its result in. If set, the parent will attempt to parse the final answer as JSON. If the result is valid JSON matching the expected shape, it is returned verbatim; otherwise a diagnostic note is prefixed. Use when the parent needs structured data from the sub-agent."},
+  "retry_until":{"type":"object","properties":{"check":{"type":"string","description":"Shell command to verify success, e.g. 'go test ./...'. Non-zero exit = retry."},"max_retries":{"type":"integer","description":"Maximum retry attempts (default 3, max 10).","minimum":1,"maximum":10}},"required":["check"]},
+  "continue_from":{"type":"string","description":"Continue a prior compatible subagent transcript in the current conversation context. Pass only the 'sa_...' value from the prior result's 'Subagent reference: ...' line."}
 },
 "required":["prompt"]
 }`)
@@ -158,17 +173,19 @@ func (t *TaskTool) CompactDescription() string {
 	return "派发隔离子代理执行子任务(可设置output_schema获取结构化JSON)"
 }
 func (t *TaskTool) CompactSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"description":{"type":"string"},"tools":{"type":"array","items":{"type":"string"}},"max_steps":{"type":"integer"},"run_in_background":{"type":"boolean"},"output_schema":{"type":"object"}},"required":["prompt"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"description":{"type":"string"},"tools":{"type":"array","items":{"type":"string"}},"max_steps":{"type":"integer"},"run_in_background":{"type":"boolean"},"output_schema":{"type":"object"},"retry_until":{"type":"object","properties":{"check":{"type":"string"},"max_retries":{"type":"integer"}},"required":["check"]},"continue_from":{"type":"string"}},"required":["prompt"]}`)
 }
 
 func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		Prompt          string   `json:"prompt"`
-		Description     string   `json:"description"`
-		Tools           []string `json:"tools"`
-		MaxSteps        int      `json:"max_steps"`
-		RunInBackground bool     `json:"run_in_background"`
-	OutputSchema    json.RawMessage `json:"output_schema,omitempty"`
+		Prompt          string          `json:"prompt"`
+		Description     string          `json:"description"`
+		Tools           []string        `json:"tools"`
+		MaxSteps        int             `json:"max_steps"`
+		RunInBackground bool            `json:"run_in_background"`
+		OutputSchema    json.RawMessage `json:"output_schema,omitempty"`
+		RetryUntil      *RetryUntilConfig `json:"retry_until,omitempty"`
+		ContinueFrom    string          `json:"continue_from,omitempty"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -189,7 +206,25 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 
 	subReg := t.buildSubReg(p.Tools)
 
+	// V10.29: prepare transcript — continue_from loads existing, otherwise fresh.
+	run, prepErr := t.prepareRun(p.ContinueFrom, p.RunInBackground)
+	if prepErr != nil {
+		return "", prepErr
+	}
+	if run != nil {
+		defer run.Release()
+	}
+
+	// retry_until: foreground only (background retry doesn't make sense across turns).
+	if p.RetryUntil != nil && !p.RunInBackground {
+		result, err := t.runSubWithRetrySession(ctx, p.Prompt, p.RetryUntil, subReg, run, maxSteps, p.OutputSchema)
+		return t.finalizeRun(result, err, run)
+	}
+
 	if p.RunInBackground {
+		if p.ContinueFrom != "" {
+			return "", fmt.Errorf("continue_from cannot be used with run_in_background")
+		}
 		jm, ok := jobs.FromContext(ctx)
 		if !ok {
 			return "", fmt.Errorf("background execution is not available in this context")
@@ -201,12 +236,13 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 			label = "task"
 		}
 		job := jm.Start("task", label, func(jobCtx context.Context, _ io.Writer) (string, error) {
-			return t.runSub(jobCtx, p.Prompt, subReg, nested, maxSteps, p.OutputSchema)
+			return t.runSubSession(jobCtx, p.Prompt, subReg, nested, run, maxSteps, p.OutputSchema)
 		})
 		return fmt.Sprintf("Started background task %q (%s). It runs across turns; collect its final answer with wait (or wait will return it once done), and you'll be notified when it finishes.", job.ID, label), nil
 	}
 
-	return t.runSub(ctx, p.Prompt, subReg, subSink(ctx), maxSteps, p.OutputSchema)
+	result, err := t.runSubSession(ctx, p.Prompt, subReg, subSink(ctx), run, maxSteps, p.OutputSchema)
+	return t.finalizeRun(result, err, run)
 }
 
 func (t *TaskTool) buildSubReg(names []string) *tool.Registry {
@@ -248,7 +284,17 @@ func (t *TaskTool) SetSubagentProvider(p provider.Provider, pricing *provider.Pr
 	t.subagentCtxWin = ctxWin
 }
 
-func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, maxSteps int, outputSchema json.RawMessage) (string, error) {
+// WithTranscripts wires the subagent transcript store for continue_from support.
+// When nil, sub-agents are ephemeral and cannot be continued across turns.
+func (t *TaskTool) WithTranscripts(store *SubagentStore) *TaskTool {
+	t.transcripts = store
+	return t
+}
+
+// runSubSession executes the sub-agent with the given session (from a SubagentRun if
+// non-nil, otherwise creates an ephemeral session). When run is non-nil the session
+// from the store is used directly (supporting continue_from).
+func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, run *SubagentRun, maxSteps int, outputSchema json.RawMessage) (string, error) {
 	// V6.0: sub-agent does NOT inherit parent L1+L2 — uses DefaultTaskSystemPrompt independently.
 	// This saves ~50K tokens per sub-agent call (97% reduction) and keeps cache stats separate.
 	sysPrompt := t.sysPrompt
@@ -270,15 +316,28 @@ func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Regis
 		subCtxWin = t.subagentCtxWin
 	}
 
-var subUsage provider.Usage
-	result, err := RunSubAgent(ctx, subProv, subReg, sysPrompt, promptContent, Options{
-		MaxSteps:       maxSteps,
-		Temperature:    t.temperature,
-		Pricing:        subPrice,
-		Gate:           t.gate,
-		ContextWindow:  subCtxWin,
-		ArchiveDir:     t.archiveDir,
-	}, sink, &subUsage)
+	var subUsage provider.Usage
+	var result string
+	var err error
+	if run != nil && run.Session != nil {
+		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, promptContent, Options{
+			MaxSteps:       maxSteps,
+			Temperature:    t.temperature,
+			Pricing:        subPrice,
+			Gate:           t.gate,
+			ContextWindow:  subCtxWin,
+			ArchiveDir:     t.archiveDir,
+		}, sink, &subUsage)
+	} else {
+		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, promptContent, Options{
+			MaxSteps:       maxSteps,
+			Temperature:    t.temperature,
+			Pricing:        subPrice,
+			Gate:           t.gate,
+			ContextWindow:  subCtxWin,
+			ArchiveDir:     t.archiveDir,
+		}, sink, &subUsage)
+	}
 	if err == nil && len(outputSchema) > 0 {
 		// output_schema set: verify the result is parseable JSON.
 		// We don't validate every field (full JSON Schema needs a lib),
@@ -301,8 +360,130 @@ var subUsage provider.Usage
 	return result, err
 }
 
+// runSubWithRetrySession executes the sub-agent in a retry loop with a check command.
+// The run parameter provides the session for continue_from; if nil a fresh session
+// is created per RunSubAgent default. After each retry the same session accumulates
+// messages so the sub-agent sees the full failure history.
+func (t *TaskTool) runSubWithRetrySession(ctx context.Context, prompt string, cfg *RetryUntilConfig, subReg *tool.Registry, run *SubagentRun, maxSteps int, outputSchema json.RawMessage) (string, error) {
+	maxRetries := cfg.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	if maxRetries > 10 {
+		maxRetries = 10
+	}
+
+	currentPrompt := prompt
+	var finalResult string
+	var subSession *session.Session
+	if run != nil {
+		subSession = run.Session
+	}
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		result, err := t.runSubSession(ctx, currentPrompt, subReg, subSink(ctx), run, maxSteps, outputSchema)
+		if err != nil {
+			return result, err
+		}
+		finalResult = result
+		// After first attempt with a persisted session, keep using it.
+		if run == nil && subSession != nil {
+			run = &SubagentRun{Session: subSession} // ephemeral wrapper for retries
+		}
+
+		checkOutput, checkErr := t.runCheckCommand(ctx, cfg.Check)
+		if checkErr == nil {
+			// Check passed — return the sub-agent's result.
+			return result, nil
+		}
+
+		if attempt == maxRetries {
+			return result, fmt.Errorf("retry_until: check command %q failed after %d retries.\nLast check output:\n%s\n\nSub-agent's final result:\n%s",
+				cfg.Check, maxRetries+1, checkOutput, result)
+		}
+
+		// Check failed — inject failure context and retry.
+		currentPrompt = fmt.Sprintf(
+			"Previous attempt failed the verification. The check command `%s` produced:\n\n%s\n\nFix the issues above and try again.\n\nOriginal task: %s",
+			cfg.Check, checkOutput, prompt)
+	}
+	return finalResult, fmt.Errorf("retry_until: unreachable")
+}
+
+// runCheckCommand executes a shell command using the parent registry's bash tool.
+func (t *TaskTool) runCheckCommand(ctx context.Context, command string) (string, error) {
+	bashTool, ok := t.parentReg.Get("bash")
+	if !ok {
+		return "", fmt.Errorf("bash tool not available for retry check")
+	}
+	args, _ := json.Marshal(map[string]string{"command": command})
+	return bashTool.Execute(ctx, args)
+}
+
+// ── Transcript lifecycle (V10.29) ────────────────────────────────────
+
+// prepareRun returns a SubagentRun for the given continue_from ref or creates
+// a fresh one. Returns (nil, nil) when no transcript store is available
+// (ephemeral mode). Rejects continue_from + run_in_background.
+func (t *TaskTool) prepareRun(continueFrom string, runInBackground bool) (*SubagentRun, error) {
+	continueFrom = strings.TrimSpace(continueFrom)
+	if t.transcripts == nil {
+		if continueFrom != "" {
+			return nil, fmt.Errorf("subagent transcript store is not available; continue_from requires a persisted session")
+		}
+		return nil, nil // ephemeral mode
+	}
+
+	if continueFrom != "" {
+		if runInBackground {
+			return nil, fmt.Errorf("continue_from cannot be used with run_in_background")
+		}
+		return t.transcripts.PrepareContinue(continueFrom)
+	}
+	return t.transcripts.PrepareFresh(t.sysPrompt)
+}
+
+// finalizeRun persists the run result and appends the reference to the output.
+func (t *TaskTool) finalizeRun(result string, err error, run *SubagentRun) (string, error) {
+	if run == nil || run.Ref == "" {
+		return result, err
+	}
+	if err != nil {
+		_ = t.transcripts.SaveFailed(run)
+		return result, err
+	}
+	if saveErr := t.transcripts.SaveCompleted(run); saveErr != nil {
+		return "", fmt.Errorf("save subagent transcript: %w", saveErr)
+	}
+	result += FormatSubagentReference(run)
+	return result, nil
+}
+
 func RunSubAgent(ctx context.Context, prov provider.Provider, reg *tool.Registry, sysPrompt, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
 	sess := NewSession(sysPrompt)
+	// V10.22: sub-agents don't need orchestrate verify — they execute a single task
+	opts.DisableVerify = true
+	sub := New(prov, reg, sess, opts, sink)
+	// V5.30: 继承父代理工具集，使 tools JSON 段缓存命中
+	runErr := sub.Run(ctx, prompt)
+	// V10.5: 即使 Run 出错（如超时），也尝试提取最后一条助手消息作为部分结果
+	lastMsg := extractLastAssistantMessage(sess.Messages)
+	if runErr != nil {
+		if lastMsg != "" {
+			return lastMsg, fmt.Errorf("sub-agent terminated with error (partial result returned): %w", runErr)
+		}
+		return "", fmt.Errorf("sub-agent: %w", runErr)
+	}
+	if lastMsg != "" {
+		return lastMsg, nil
+	}
+	return "", fmt.Errorf("sub-agent finished without producing a final answer")
+}
+
+// RunSubAgentWithSession runs a sub-agent with an existing session (used for
+// continue_from). Unlike RunSubAgent which creates a new session, this uses the
+// provided session directly so the sub-agent continues from where it left off.
+func RunSubAgentWithSession(ctx context.Context, prov provider.Provider, reg *tool.Registry, sess *session.Session, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
+	
 	// V10.22: sub-agents don't need orchestrate verify — they execute a single task
 	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)

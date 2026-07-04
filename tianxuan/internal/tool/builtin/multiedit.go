@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"tianxuan/internal/tool"
 )
@@ -84,49 +83,26 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 		return "", err
 	}
 
-	b, err := os.ReadFile(p.Path)
+	content, enc, err := readFileEncoded(p.Path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	content := string(b)
 
-	// V10.5: 自动行尾适配 — multip_edit 复用 edit_file 的适配逻辑
-	fileLE := detectLineEnding(content)
-
-	// Apply edits in order against the running in-memory buffer. Any failure
-	// returns before the write, leaving the file untouched — that's the
-	// safety guarantee that makes multi_edit preferable to chained
-	// edit_file calls.
+	// Apply edits in order against the running in-memory buffer.
 	applied := 0
 	for i, step := range p.Edits {
 		if step.OldString == "" {
 			return "", fmt.Errorf("edit %d: old_string is required", i+1)
 		}
-		oldStr := adaptLineEndings(step.OldString, fileLE)
-		newStr := adaptLineEndings(step.NewString, fileLE)
-		// Fall back to original if adaptation broke the match
-		if oldStr != step.OldString && strings.Count(content, oldStr) == 0 && strings.Count(content, step.OldString) > 0 {
-			oldStr = step.OldString
-			newStr = step.NewString
+		result := applyOldStringEdit(content, step.OldString, step.NewString, step.ReplaceAll)
+		if result.matches == 0 {
+			return "", fmt.Errorf("edit %d: %w", i+1, oldStringNotFoundError(p.Path, step.OldString, content))
 		}
-		if step.ReplaceAll {
-			count := strings.Count(content, oldStr)
-			if count == 0 {
-				return "", fmt.Errorf("edit %d: old_string not found -- check whitespace/indentation/line endings", i+1)
-			}
-			content = strings.ReplaceAll(content, oldStr, newStr)
-			applied += count
-			continue
+		if !step.ReplaceAll && result.matches > 1 {
+			return "", fmt.Errorf("edit %d: %w", i+1, oldStringNotUniqueError(p.Path, step.OldString, content, result.matches, false))
 		}
-		switch strings.Count(content, oldStr) {
-		case 0:
-			return "", fmt.Errorf("edit %d: old_string not found -- check whitespace/indentation/line endings", i+1)
-		case 1:
-			content = strings.Replace(content, oldStr, newStr, 1)
-			applied++
-		default:
-			return "", fmt.Errorf("edit %d: old_string is not unique; add more surrounding context or set replace_all", i+1)
-		}
+		content = result.updated
+		applied += result.applied
 	}
 
 	// Preserve original file permissions (e.g. executable scripts).
@@ -135,7 +111,7 @@ func (m multiEdit) Execute(ctx context.Context, args json.RawMessage) (string, e
 	if err == nil {
 		mode = fi.Mode().Perm()
 	}
-	if err := os.WriteFile(p.Path, []byte(content), mode); err != nil {
+	if err := writeFileEncoded(p.Path, content, enc, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("multi_edit %s: %d edits applied (%d total replacements)", p.Path, len(p.Edits), applied), nil

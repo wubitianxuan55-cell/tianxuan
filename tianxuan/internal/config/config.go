@@ -15,6 +15,7 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"tianxuan/internal/provider"
+	"tianxuan/internal/netclient"
 )
 
 // Config is Tianxuan's runtime configuration.
@@ -33,6 +34,7 @@ type Config struct {
 	Notify       NotifyConfig      `toml:"notifications"`
 	LSP          LSPConfig         `toml:"lsp"`
 	Search       SearchConfig      `toml:"search"`
+	Network      NetworkConfig     `toml:"network"`
 }
 
 // SearchConfig configures web search engines. Resolution order: local SearXNG
@@ -50,6 +52,12 @@ type SearchConfig struct {
 	BraveAPIKeyEnv string `toml:"brave_api_key_env"`
 	// TimeoutSeconds is the per-engine HTTP timeout in seconds (default 10).
 	TimeoutSeconds int `toml:"timeout_seconds"`
+	// AllowDomains restricts web_fetch to only these domains (supports *.example.com wildcards).
+	// Empty means all non-blocked domains are allowed. Takes precedence after deny.
+	AllowDomains []string `toml:"allow_domains"`
+	// DenyDomains blocks web_fetch from accessing these domains (supports *.example.com wildcards).
+	// Deny always takes precedence over allow.
+	DenyDomains []string `toml:"deny_domains"`
 }
 
 // TavilyKey resolves the Tavily API key from the configured environment variable.
@@ -74,6 +82,44 @@ func (c *SearchConfig) SearchTimeout() time.Duration {
 		return 10 * time.Second
 	}
 	return time.Duration(c.TimeoutSeconds) * time.Second
+}
+
+// ── Network proxy (V10.31) ──────────────────────────────────────────
+
+// NetworkConfig controls how outgoing HTTP requests reach the internet.
+// ProxyMode selects the strategy: "auto" (system proxy), "env" (HTTP_PROXY/
+// HTTPS_PROXY/all_proxy env vars), "custom" (ProxyURL), or "off" (direct).
+// Proxy is the structured alternative; when both ProxyURL and Proxy are set,
+// Proxy takes precedence.
+type NetworkConfig struct {
+	ProxyMode string             `toml:"proxy_mode"` // auto | env | custom | off
+	ProxyURL  string             `toml:"proxy_url"`   // http://host:port or socks5://host:port
+	NoProxy   string             `toml:"no_proxy"`    // comma-separated host suffixes excluded from proxying
+	Proxy     NetworkProxyConfig `toml:"proxy"`       // structured alternative to ProxyURL
+}
+
+// NetworkProxyConfig is the structured form of proxy configuration.
+type NetworkProxyConfig struct {
+	Type     string `toml:"type"`     // http | https | socks5 | socks5h
+	Server   string `toml:"server"`
+	Port     int    `toml:"port"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
+}
+
+// NetworkProxySpec returns a netclient.ProxySpec suitable for configuring
+// HTTP clients throughout tianxuan. An empty spec means no proxy.
+func (c *Config) NetworkProxySpec() netclient.ProxySpec {
+	return netclient.ProxySpec{
+		Mode:     c.Network.ProxyMode,
+		URL:      c.Network.ProxyURL,
+		NoProxy:  c.Network.NoProxy,
+		Type:     c.Network.Proxy.Type,
+		Server:   c.Network.Proxy.Server,
+		Port:     c.Network.Proxy.Port,
+		Username: c.Network.Proxy.Username,
+		Password: c.Network.Proxy.Password,
+	}
 }
 
 // LSPConfig governs the optional Language Server Protocol tools (lsp_definition,
@@ -402,7 +448,7 @@ func Default() *Config {
 		LSP: LSPConfig{Enabled: true},
 		Notify: NotifyConfig{Enabled: true, MinDuration: 5},
 		Tools: ToolsConfig{Enabled: []string{
-			"read_file", "write_file", "edit_file", "edit_lines",
+			"read_file", "write_file", "edit_file", "edit_lines", "move_file",
 			"ls", "grep", "bash",
 			"web_fetch", "web_search",
 			"todo_write", "complete_step",

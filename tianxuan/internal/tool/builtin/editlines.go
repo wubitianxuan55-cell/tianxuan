@@ -59,11 +59,10 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 		return "", err
 	}
 
-	b, err := os.ReadFile(p.Path)
+	content, enc, err := readFileEncoded(p.Path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	content := string(b)
 
 	// Detect and preserve the file's line ending style.
 	fileLE := detectLineEnding(content)
@@ -111,7 +110,7 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 	if fi, err := os.Stat(p.Path); err == nil {
 		mode = fi.Mode().Perm()
 	}
-	if err := os.WriteFile(p.Path, []byte(result), mode); err != nil {
+	if err := writeFileEncoded(p.Path, result, enc, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 	return fmt.Sprintf("edit_lines %s: replaced lines %d-%d (%d lines) → %d lines", p.Path, p.StartLine, p.EndLine, p.EndLine-p.StartLine+1, len(out)-len(lines)+(p.EndLine-p.StartLine+1)), nil

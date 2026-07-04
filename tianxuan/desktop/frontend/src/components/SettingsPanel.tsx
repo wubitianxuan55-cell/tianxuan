@@ -203,6 +203,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
   const [skillsOpen, setSkillsOpen] = useState(false);
   const subagentLabel = s.subagentModel || t("settings.subagentInherit");
   const subagentModels = s.subagentModels || {};
+  const plannerLabel = s.plannerModel || t("settings.plannerNone");
 
   return (
     <section className="mb-3">
@@ -270,6 +271,18 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
           )}
         </div>
       )}
+
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.plannerModel")}</label>
+        <div className="flex-1">
+          <ModelSwitcher
+            label={plannerLabel}
+            allowInherit
+            inheritLabel={t("settings.plannerNone")}
+            onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
+          />
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg mb-3">
         <span className="text-fg-faint text-[11px] shrink-0">{t("settings.activeProvider")}</span>
@@ -685,6 +698,7 @@ function AgentSection({ s, busy, apply }: SectionProps) {
 
   const subagentLabel = s.subagentModel || t("settings.subagentInherit");
   const subagentModels = s.subagentModels || {};
+  const plannerLabel = s.plannerModel || t("settings.plannerNone");
 
   return (
     <section className="mb-3">
@@ -738,6 +752,18 @@ function AgentSection({ s, busy, apply }: SectionProps) {
           )}
         </div>
       )}
+
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.plannerModel")}</label>
+        <div className="flex-1">
+          <ModelSwitcher
+            label={plannerLabel}
+            allowInherit
+            inheritLabel={t("settings.plannerNone")}
+            onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
+          />
+        </div>
+      </div>
 
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.temperature")}</label>

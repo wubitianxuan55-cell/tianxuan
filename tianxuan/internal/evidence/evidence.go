@@ -124,6 +124,29 @@ func (l *Ledger) HasSuccessfulCommand(command string) bool {
 	return false
 }
 
+// SuccessfulCommands returns up to limit distinct successful bash commands
+// recorded this turn, for use in diagnostic hints.
+func (l *Ledger) SuccessfulCommands(limit int) []string {
+	if l == nil {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	seen := map[string]bool{}
+	var cmds []string
+	for _, r := range l.receipts {
+		if !r.Success || r.Command == "" || r.ToolName != "bash" || seen[r.Command] {
+			continue
+		}
+		seen[r.Command] = true
+		cmds = append(cmds, r.Command)
+		if len(cmds) >= limit {
+			break
+		}
+	}
+	return cmds
+}
+
 func (l *Ledger) HasSuccessfulWrite(paths []string) bool {
 	return l.hasSuccessfulPaths(paths, func(r Receipt) bool { return r.Write })
 }

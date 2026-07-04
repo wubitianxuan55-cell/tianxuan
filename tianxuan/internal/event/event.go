@@ -82,6 +82,8 @@ const (
 const (
 	UsageSourceMain     = "main"
 	UsageSourceSubagent = "subagent"
+	UsageSourcePlanner  = "planner"  // V10.30: dual-model planner phase
+	UsageSourceExecutor = "executor" // V10.30: dual-model executor phase
 )
 
 // Tool describes a tool call for ToolDispatch / ToolResult events. On dispatch

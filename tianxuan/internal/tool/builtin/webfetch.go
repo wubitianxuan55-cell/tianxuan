@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	stdhtml "html"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +12,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
+
+	nethtml "golang.org/x/net/html"
 
 	"tianxuan/internal/tool"
 )
@@ -144,6 +148,11 @@ func doFetch(ctx context.Context, rawURL string) (string, error) {
 		return "", fmt.Errorf("url must be an absolute http(s) address")
 	}
 
+	// Domain allow/deny policy check.
+	if err := checkDomainPolicy(u.Hostname()); err != nil {
+		return "", err
+	}
+
 	reqCtx, cancel := context.WithTimeout(ctx, webFetchTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
@@ -230,36 +239,265 @@ func looksLikeHTML(s string) bool {
 }
 
 var (
-	scriptStyle = regexp.MustCompile(`(?is)<(script|style)[^>]*>.*?</(?:script|style)>`)
-	htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
-	anyTag      = regexp.MustCompile(`(?s)<[^>]+>`)
-	multiBlank  = regexp.MustCompile(`\n[\t ]*\n([\t ]*\n)+`)
-	trailingWS  = regexp.MustCompile(`[\t ]+\n`)
+	multiBlank = regexp.MustCompile(`\n[\t ]*\n([\t ]*\n)+`)
+	trailingWS = regexp.MustCompile(`[\t ]+\n`)
 )
 
-// htmlToText strips <script>/<style> blocks, HTML comments, and every other
-// tag, then unescapes the common entities and collapses runs of blank lines.
-// It is intentionally lossy — we want to give the model readable text rather
-// than preserve structure for re-rendering.
+// ── HTML tokenizer (V10.29) ───────────────────────────────────────────
+// Ported from Reasonix V1.15 (MIT). Uses golang.org/x/net/html tokenizer
+// to produce structured Markdown-like output with headings, lists, code
+// blocks, links, and tables — replacing the old regex-based flattener.
+
+// htmlToText converts HTML to readable Markdown-like text.
 func htmlToText(s string) string {
-	s = scriptStyle.ReplaceAllString(s, "")
-	s = htmlComment.ReplaceAllString(s, "")
-	s = anyTag.ReplaceAllString(s, "")
+	w := &htmlTextWriter{}
+	tokenizer := nethtml.NewTokenizer(strings.NewReader(s))
+	skipDepth := 0
+	preDepth := 0
+	for {
+		tt := tokenizer.Next()
+		switch tt {
+		case nethtml.ErrorToken:
+			return normalizeHTMLText(w.String())
+		case nethtml.TextToken:
+			if skipDepth == 0 {
+				w.Text(string(tokenizer.Text()), preDepth > 0)
+			}
+		case nethtml.StartTagToken:
+			name, hasAttr := tokenizer.TagName()
+			tag := strings.ToLower(string(name))
+			if tag == "script" || tag == "style" {
+				skipDepth++
+				continue
+			}
+			if skipDepth > 0 {
+				continue
+			}
+			if tag == "a" {
+				w.StartLink(htmlAttr(tokenizer, hasAttr, "href"))
+				continue
+			}
+			w.StartTag(tag)
+			if tag == "pre" {
+				preDepth++
+			}
+		case nethtml.SelfClosingTagToken:
+			name, _ := tokenizer.TagName()
+			w.SelfClosingTag(strings.ToLower(string(name)))
+		case nethtml.EndTagToken:
+			name, _ := tokenizer.TagName()
+			tag := strings.ToLower(string(name))
+			if skipDepth > 0 {
+				if tag == "script" || tag == "style" {
+					skipDepth--
+				}
+				continue
+			}
+			if tag == "pre" && preDepth > 0 {
+				preDepth--
+			}
+			w.EndTag(tag)
+		}
+	}
+}
 
-	repl := strings.NewReplacer(
-		"&amp;", "&",
-		"&lt;", "<",
-		"&gt;", ">",
-		"&quot;", `"`,
-		"&#39;", "'",
-		"&apos;", "'",
-		"&nbsp;", " ",
-	)
-	s = repl.Replace(s)
+type htmlTextWriter struct {
+	b     strings.Builder
+	links []string
+}
 
+func (w *htmlTextWriter) String() string { return w.b.String() }
+
+func (w *htmlTextWriter) StartTag(tag string) {
+	switch tag {
+	case "title":
+		w.ensureBlankLine()
+		w.b.WriteString("# ")
+	case "h1":
+		w.ensureBlankLine()
+		w.b.WriteString("# ")
+	case "h2":
+		w.ensureBlankLine()
+		w.b.WriteString("## ")
+	case "h3":
+		w.ensureBlankLine()
+		w.b.WriteString("### ")
+	case "h4", "h5", "h6":
+		w.ensureBlankLine()
+		w.b.WriteString("#### ")
+	case "li":
+		w.ensureNewline()
+		w.b.WriteString("- ")
+	case "pre":
+		w.ensureBlankLine()
+		w.b.WriteString("```\n")
+	case "blockquote":
+		w.ensureBlankLine()
+		w.b.WriteString("> ")
+	case "tr":
+		w.ensureNewline()
+	case "td", "th":
+		w.ensureCellBoundary()
+	default:
+		if htmlBreakTag(tag) || htmlBlockTag(tag) {
+			w.ensureNewline()
+		}
+	}
+}
+
+func (w *htmlTextWriter) SelfClosingTag(tag string) {
+	if htmlBreakTag(tag) || htmlBlockTag(tag) {
+		w.ensureNewline()
+	}
+}
+
+func (w *htmlTextWriter) EndTag(tag string) {
+	switch tag {
+	case "a":
+		w.EndLink()
+	case "title", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote":
+		w.ensureBlankLine()
+	case "pre":
+		w.ensureNewline()
+		w.b.WriteString("```\n")
+		w.ensureBlankLine()
+	case "li", "p", "tr":
+		w.ensureNewline()
+	default:
+		if htmlBlockTag(tag) {
+			w.ensureNewline()
+		}
+	}
+}
+
+func (w *htmlTextWriter) StartLink(href string) {
+	w.links = append(w.links, strings.TrimSpace(href))
+}
+
+func (w *htmlTextWriter) EndLink() {
+	if len(w.links) == 0 {
+		return
+	}
+	href := w.links[len(w.links)-1]
+	w.links = w.links[:len(w.links)-1]
+	if href != "" {
+		w.b.WriteString(" (" + href + ")")
+	}
+}
+
+func (w *htmlTextWriter) Text(text string, pre bool) {
+	text = stdhtml.UnescapeString(text)
+	text = strings.ReplaceAll(text, "\u00a0", " ")
+	if !pre {
+		text = collapseHTMLInlineText(text)
+	}
+	if strings.TrimSpace(text) == "" {
+		if !w.lastIsSpace() {
+			w.b.WriteByte(' ')
+		}
+		return
+	}
+	if !pre && w.b.Len() > 0 && !w.lastIsSpace() && !startsWithSpaceOrPunct(text) {
+		w.b.WriteByte(' ')
+	}
+	w.b.WriteString(text)
+}
+
+func (w *htmlTextWriter) ensureNewline() {
+	if w.b.Len() == 0 || w.lastByte() == '\n' {
+		return
+	}
+	w.b.WriteByte('\n')
+}
+
+func (w *htmlTextWriter) ensureBlankLine() {
+	if w.b.Len() == 0 || strings.HasSuffix(w.b.String(), "\n\n") {
+		return
+	}
+	w.ensureNewline()
+	w.b.WriteByte('\n')
+}
+
+func (w *htmlTextWriter) ensureCellBoundary() {
+	if w.b.Len() == 0 || w.lastByte() == '\n' {
+		return
+	}
+	if !strings.HasSuffix(w.b.String(), " | ") {
+		w.b.WriteString(" | ")
+	}
+}
+
+func (w *htmlTextWriter) lastByte() byte {
+	s := w.b.String()
+	if len(s) == 0 {
+		return 0
+	}
+	return s[len(s)-1]
+}
+
+func (w *htmlTextWriter) lastIsSpace() bool {
+	if w.b.Len() == 0 {
+		return false
+	}
+	return unicode.IsSpace(rune(w.lastByte()))
+}
+
+func normalizeHTMLText(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = trailingWS.ReplaceAllString(s, "\n")
 	s = multiBlank.ReplaceAllString(s, "\n\n")
-	return s
+	return strings.TrimSpace(s)
+}
+
+func collapseHTMLInlineText(s string) string {
+	if s == "" {
+		return ""
+	}
+	leading := unicode.IsSpace([]rune(s)[0])
+	fields := strings.Fields(s)
+	if len(fields) == 0 {
+		return " "
+	}
+	out := strings.Join(fields, " ")
+	if leading {
+		out = " " + out
+	}
+	return out
+}
+
+func startsWithSpaceOrPunct(s string) bool {
+	for _, r := range s {
+		return unicode.IsSpace(r) || strings.ContainsRune(".,;:!?)]}", r)
+	}
+	return false
+}
+
+func htmlAttr(tokenizer *nethtml.Tokenizer, hasAttr bool, name string) string {
+	for hasAttr {
+		key, val, more := tokenizer.TagAttr()
+		if strings.EqualFold(string(key), name) {
+			return string(val)
+		}
+		hasAttr = more
+	}
+	return ""
+}
+
+func htmlBreakTag(tag string) bool {
+	switch tag {
+	case "br", "hr", "img", "input":
+		return true
+	}
+	return false
+}
+
+func htmlBlockTag(tag string) bool {
+	switch tag {
+	case "div", "section", "article", "header", "footer", "nav", "aside",
+		"main", "figure", "figcaption", "details", "summary", "form", "fieldset":
+		return true
+	}
+	return false
 }
 
 func contentTypeShort(ct string) string {
@@ -267,4 +505,42 @@ func contentTypeShort(ct string) string {
 		ct = ct[:i]
 	}
 	return strings.TrimSpace(ct)
+}
+
+// domainMatches
+// Supports wildcards: "*.example.com" matches "sub.example.com" but not
+// "example.com" itself; "example.com" matches exactly.
+func domainMatches(host, pattern string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	pattern = strings.ToLower(strings.TrimSpace(pattern))
+	if strings.HasPrefix(pattern, "*.") {
+		suffix := pattern[1:] // ".example.com"
+		return strings.HasSuffix(host, suffix) && host != suffix[1:]
+	}
+	return host == pattern
+}
+
+// checkDomainPolicy applies configured domain allow/deny rules. Returns an error
+// if the host is denied or not in the allowed list.
+func checkDomainPolicy(host string) error {
+	if searchCfg == nil {
+		return nil
+	}
+	host = strings.ToLower(host)
+	// Deny takes precedence.
+	for _, d := range searchCfg.DenyDomains {
+		if domainMatches(host, d) {
+			return fmt.Errorf("domain %q is denied by fetch policy (matches deny rule %q)", host, d)
+		}
+	}
+	// If allow list is non-empty, host must match one.
+	if len(searchCfg.AllowDomains) > 0 {
+		for _, a := range searchCfg.AllowDomains {
+			if domainMatches(host, a) {
+				return nil
+			}
+		}
+		return fmt.Errorf("domain %q is not in the fetch allow list; configure [search].allow_domains to include it", host)
+	}
+	return nil
 }

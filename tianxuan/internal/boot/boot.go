@@ -128,6 +128,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		bashWarnOnce.Do(func() { fmt.Fprintln(stderr, "warning: bash not found on PATH; the shell tool will run commands under Windows PowerShell. Install Git for Windows or WSL to use bash.") })
 	}
 	addBuiltins(reg, cfg.Tools.Enabled, cfg.WriteRoots(), bashSpec, stderr)
+	builtin.ResolveRgPath() // V10.29: enable ripgrep delegation when rg is on PATH
 	// Always construct a host, even with no plugins configured, so the controller's
 	// host pointer is stable for the session and `/mcp add` can hot-add into it.
 	// V10.22: plugins + LSP assembled in plugins.go
@@ -339,6 +340,24 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 
 	label := entry.Model
 
+	// V10.30: two-model collaboration — when planner_model names a provider
+	// different from the executor, wrap the executor in a Coordinator with its
+	// own planner session for cache stability.
+	var runner agent.Runner = executor
+	if pm := cfg.Agent.PlannerModel; pm != "" {
+		if pe, ok := cfg.ResolveModel(pm); ok {
+			plannerProv, err := NewProvider(pe)
+			if err != nil {
+				return nil, fmt.Errorf("planner %q: %w", pm, err)
+			}
+			plannerSess := agent.NewSession(agent.PlannerPromptWithContext(compiler.IdentityLayer().Identity()))
+			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink)
+			label = entry.Model + " + planner " + pe.Model
+		} else {
+			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
+		}
+	}
+
 	skillLayer := cache.NewSkillLayer()
 
 	// V3.0 Phase 5: ContextManager wraps the four-layer cache kernel.
@@ -364,7 +383,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	compiler.IdentityLayer().SaveHash(cacheDir) // best-effort
 
 	ctrlOpts := control.Options{
-		Runner:            executor,
+		Runner:            runner,
 		Executor:          executor,
 		Sink:              sink,
 		Policy:            policy,

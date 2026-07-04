@@ -88,11 +88,10 @@ func (d deleteSymbol) Execute(ctx context.Context, args json.RawMessage) (string
 		return "", err
 	}
 
-	src, err := os.ReadFile(p.Path)
+	original, enc, err := readFileEncoded(p.Path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	original := string(src)
 
 	newContent := deleteLines(original, fset, m)
 	// Preserve original file permissions.
@@ -100,7 +99,7 @@ func (d deleteSymbol) Execute(ctx context.Context, args json.RawMessage) (string
 	if fi, err := os.Stat(p.Path); err == nil {
 		mode = fi.Mode().Perm()
 	}
-	if err := os.WriteFile(p.Path, []byte(newContent), mode); err != nil {
+	if err := writeFileEncoded(p.Path, newContent, enc, mode); err != nil {
 		return "", fmt.Errorf("write %s: %w", p.Path, err)
 	}
 
@@ -139,11 +138,10 @@ func (d deleteSymbol) Preview(args json.RawMessage) (diff.Change, error) {
 		return diff.Change{}, err
 	}
 
-	src, err := os.ReadFile(p.Path)
+	original, _, err := readFileEncoded(p.Path)
 	if err != nil {
 		return diff.Change{}, fmt.Errorf("read %s: %w", p.Path, err)
 	}
-	original := string(src)
 
 	newContent := deleteLines(original, fset, m)
 	return diff.Build(p.Path, original, newContent, diff.Modify), nil

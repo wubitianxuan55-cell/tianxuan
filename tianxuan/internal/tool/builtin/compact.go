@@ -22,7 +22,7 @@ var compactDesc = map[string]string{
 	"kill_shell":     "终止后台任务",
 	"wait":           "阻塞等待后台任务结束",
 	"web_fetch":      "抓取URL纯文本(去标签,SSRF安全,支持重试)",
-	"web_search":     "搜索公开网页(通过Tavily/Brave/SearXNG)，返回标题/URL/摘要",
+	"web_search":     "搜索公开网页，返回结构化JSON(title/url/snippet/source)，支持引用追踪",
 	"todo_write":     "更新任务清单(全量替换,最多一个进行中)",
 	"complete_step":  "完成计划步骤(须可验证证据,禁止纯manual)",
 	"notebook_edit":  "编辑Jupyter Notebook单元格(.ipynb)",
@@ -33,6 +33,8 @@ var compactDesc = map[string]string{
 	"git_worktree":   "管理git工作树(添加/删除/列出)",
 	"memory_search":  "搜索记忆(关键词+kind过滤,BM25排序)",
 	"read_skill":     "读取指定技能(skill)的完整内容",
+	"move_file":      "移动/重命名文件(自动建目录,工作区限制)",
+	"code_index":     "轻量符号索引(outline/search,Go AST+多语言regex)",
 }
 
 // compactSchema maps tool names to stripped JSON Schema (properties without
@@ -52,6 +54,8 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"path":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"inclusive":{"type":"boolean"}},"required":["path","start_anchor","end_anchor"]}`),
 	"delete_symbol": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string"},"parent":{"type":"string"}},"required":["path","name"]}`),
+	"move_file": json.RawMessage(
+		`{"type":"object","properties":{"source_path":{"type":"string"},"destination_path":{"type":"string"}},"required":["source_path","destination_path"]}`),
 	"glob": json.RawMessage(
 		`{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]}`),
 	"grep": json.RawMessage(
@@ -73,7 +77,7 @@ var compactSchema = map[string]json.RawMessage{
 	"todo_write": json.RawMessage(
 		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string"},"activeForm":{"type":"string"},"level":{"type":"integer"}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(
-		`{"type":"object","properties":{"step":{"type":"string"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
+		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["result","evidence"]}`),
 	"notebook_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string"},"edit_mode":{"type":"string"}},"required":["path"]}`),
 	"git_status": json.RawMessage(
@@ -90,4 +94,6 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"query":{"type":"string"},"kind":{"type":"string"}},"required":["query"]}`),
 	"read_skill": json.RawMessage(
 		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
+	"code_index": json.RawMessage(
+		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer"}},"required":["action"]}`),
 }

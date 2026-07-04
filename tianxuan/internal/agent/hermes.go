@@ -22,7 +22,10 @@ investigate the codebase when the task needs context. Keep research targeted —
 once you have enough evidence. Output executor-ready instructions: what to do, which
 files or commands are relevant, and key decisions. Do not implement or execute.
 If the task is a read-only query, answer directly — do not produce a plan.
-If you need to clarify scope or ask the user a question, use the ask tool.`
+If you need to clarify scope or ask the user a question, use the ask tool —
+do NOT put <!--plan--> in your output until you have a concrete executable plan.
+When you have a concrete executable plan ready, start it with <!--plan--> on its own line.
+Never include <!--plan--> in a question, clarification, or direct answer.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 
@@ -323,6 +326,9 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 
 	// Extract the plan from the planner's persistent session (last assistant message).
+	// If the plan is marked with <!--plan-->, only use the text after the marker —
+	// the research/analysis before it stays in the planner's session for context
+	// but doesn't clutter the PlanCard or executor handoff.
 	var plan string
 	msgs := h.hermesSess.Messages
 	for i := len(msgs) - 1; i >= 0; i-- {
@@ -333,6 +339,9 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 	if plan == "" {
 		plan = "(hermes produced no output)"
+	}
+	if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
+		plan = strings.TrimSpace(plan[idx+len("<!--plan-->"):])
 	}
 
 	return plan, nil
@@ -368,11 +377,14 @@ func shouldSkipPlanner(input string) (string, bool) {
 }
 
 // isAnswerNotAction checks whether the planner's output is a direct answer
-// that needs no executor. A planner is a planner — its output is naturally
-// long when it's a plan and short when it's a question or direct answer.
-// No marker needed, just check length.
+// that needs no executor. The planner self-marks executable plans with
+// <!--plan--> — if absent, Hermes answered directly. Short outputs (<100 chars)
+// are always treated as direct answers to avoid false plan detection.
 func isAnswerNotAction(plan string) bool {
-	return len(strings.TrimSpace(plan)) < 300
+	if len(strings.TrimSpace(plan)) < 100 {
+		return true
+	}
+	return !strings.Contains(plan, "<!--plan-->")
 }
 
 func formatHandoff(task, plan, userNote string) string {

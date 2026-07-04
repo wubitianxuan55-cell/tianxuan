@@ -354,7 +354,10 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
 			}
 			plannerSess := agent.NewSession(agent.PlannerPromptWithContext(compiler.IdentityLayer().Identity()))
-			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink)
+			// TODO(V10.33): build read-only tool subset (read_file, grep, glob, web_search,
+			// web_fetch, codegraph_*, gitnexus_*) and pass as 3rd-to-last arg so the planner
+			// can investigate code before proposing a plan. planMaxSteps=5 is a good default.
+			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, nil, 0)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

@@ -54,8 +54,8 @@
 ### 其他优化（优先级低）
 | 特性 | 说明 |
 |------|------|
-| web_fetch 代理支持 (HTTP CONNECT + SOCKS5) | 对 GFW 用户重要 |
-| grep .gitignore 精确行走（纯 Go 扫描器用） | ripgrep 委托已覆盖大部分场景 |
+| web_fetch 代理支持 (HTTP CONNECT + SOCKS5) | ✅ 已完成（2026-07-04 第五部分）。`ssrfGuardedTransport` + `webFetchRoundTripper` + Workspace.ProxySpec 注入。 |
+| grep .gitignore 精确行走（纯 Go 扫描器用） | ✅ 已完成（2026-07-04 第五部分）。`gitignoreWalker` — 多层 .gitignore 解析 + WalkDir 集成。 |
 | delete_range 编码保存 | ✅ 已完成 (2026-07-04 第二部分) |
 | delete_symbol 编码保存 | ✅ 已完成 (2026-07-04 第二部分) |
 

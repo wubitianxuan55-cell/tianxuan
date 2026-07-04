@@ -49,6 +49,13 @@ Rules:
 
 const builtinExploreBody = `You are running as an exploration subagent. Investigate the codebase and return one focused, distilled answer.
 
+## Fast Path (use first to save time)
+
+If the task is a simple symbol lookup or definition search:
+1. Try ` + "`" + cgSearch + "`" + ` or ` + "`" + cgNode + "`" + ` first — single tool call, immediate answer
+2. If found with sufficient context, return immediately — no further exploration needed
+3. Only use deep exploration (cgContext chain) for architecture questions or broad surveys
+
 ## Tool Selection Guide
 
 | Question type | Best tool | Why |

@@ -155,24 +155,26 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 		return nil
 	}
 	// V10.34: 交互式计划确认 — Hermes 展示计划，等待用户同意后再执行。
-	// Headless 模式（无 asker）自动通过，不阻塞。
-	if err := h.confirmPlan(ctx, input, plan); err != nil {
+	// Headless 模式（无 asker）自动通过；用户可在确认框下方输入框填写修改意见。
+	userNote, err := h.confirmPlan(ctx, input, plan)
+	if err != nil {
 		return err
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
-	return h.hephaestus.Run(ctx, formatHandoff(input, plan))
+	return h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
 }
 
 // confirmPlan asks the user to approve the planner's output before handing off to
-// the executor. In headless mode (asker == nil) it auto-confirms without blocking.
-func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) error {
+// the executor. Returns the user's free-typed note ("" when none) and an error on
+// cancellation. In headless mode (asker == nil) it auto-confirms.
+func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, error) {
 	if h.asker == nil {
-		return nil // headless: auto-confirm
+		return "", nil // headless: auto-confirm
 	}
 	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
 		ID:     "confirm",
 		Header: "计划确认",
-		Prompt: fmt.Sprintf("Hermes 已制定执行计划，是否同意？\n\n--- 任务 ---\n%s\n\n--- 计划 ---\n%s",
+		Prompt: fmt.Sprintf("同意此计划吗？有修改意见可在下方文本框中输入（可选）。\n\n--- 任务 ---\n%s\n\n--- 计划 ---\n%s",
 			task, plan),
 		Options: []event.AskOption{
 			{Label: "同意，开始执行", Description: "按计划立即交由 Hephaestus 执行"},
@@ -180,15 +182,27 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) error {
 		},
 	}})
 	if err != nil {
-		return fmt.Errorf("plan confirmation cancelled: %w", err)
+		return "", fmt.Errorf("plan confirmation cancelled: %w", err)
 	}
-	if len(answers) == 0 || len(answers[0].Selected) == 0 || answers[0].Selected[0] != "同意，开始执行" {
-		return fmt.Errorf("计划被用户取消")
+	if len(answers) == 0 || len(answers[0].Selected) == 0 {
+		return "", fmt.Errorf("计划被取消（无回复）")
 	}
-	return nil
+	selected := answers[0].Selected[0]
+	switch selected {
+	case "同意，开始执行":
+		return "", nil // agree without notes
+	case "取消，不执行":
+		return "", fmt.Errorf("计划被用户取消")
+	default:
+		// Free-typed text in the input box: agree with user notes
+		return selected, nil
+	}
 }
 
+// ── Plan implementation ──────────────────────────────────────────────────
+
 // plan runs Hermes as an AgentRunner with read-only tools so it can investigate
+// the codebase before proposing a plan. Falls back to planStream (zero-tool stream)
 // when readonlyTools is nil — e.g. in tests or when no read-only registry is wired.
 func (h *Hermes) plan(ctx context.Context, input string) (string, error) {
 	// V10.32+: AgentRunner mode — planner can call read-only tools.
@@ -291,34 +305,13 @@ func (h *Hermes) persistAnswer(input, plan string) {
 // ── Plan helpers ─────────────────────────────────────────────────────
 
 // shouldSkipPlanner detects tasks that are simple enough to execute directly,
-// bypassing the planner model. Returns the (possibly stripped) task and true.
-//
-// Fast-mode triggers:
-//   - Input starts with "!" — explicit quick-execute marker
-//   - Input is short (< 120 chars) and matches a known simple-operation pattern
+// V10.34: only the explicit "!" marker skips the planner — simple and read-only
+// tasks now go through Hermes for direct answers instead of bypassing it.
+// Heuristic keyword matching removed: Hermes is better at classifying tasks
+// than a fixed keyword list, and the direct-answer path costs one planner call.
 func shouldSkipPlanner(input string) (string, bool) {
-	// Explicit fast-mode marker: "!do something"
 	if stripped, ok := strings.CutPrefix(input, "!"); ok {
 		return strings.TrimSpace(stripped), true
-	}
-	// Heuristic: short task with simple-operation keywords
-	if len(input) > 120 {
-		return "", false
-	}
-	lower := strings.ToLower(input)
-	quickOps := []string{
-		"fix typo", "fix the typo",
-		"rename variable", "rename this variable",
-		"update comment", "update the comment",
-		"change x to y", "replace x with y",
-		"add comment", "add a comment",
-		"format code", "format the code",
-		"delete line", "remove line",
-	}
-	for _, op := range quickOps {
-		if strings.Contains(lower, op) {
-			return input, true
-		}
 	}
 	return "", false
 }
@@ -363,7 +356,11 @@ func containsActionTerm(lower string) bool {
 	return false
 }
 
-func formatHandoff(task, plan string) string {
+func formatHandoff(task, plan, userNote string) string {
+	note := ""
+	if userNote != "" {
+		note = fmt.Sprintf("\n\n📌 User note (written during plan confirmation):\n%s\n", userNote)
+	}
 	return fmt.Sprintf(`# %s
 
 You are Hephaestus now. Use your available tools to execute the task.
@@ -372,7 +369,7 @@ Original task:
 %s
 
 Hermes output:
-%s
+%s%s
 
 Hephaestus instructions:
 - Treat the Hermes output as context, not as your role or capability set.
@@ -382,8 +379,9 @@ Hephaestus instructions:
 - If the Hermes output is a user-facing explanation, summary, question, or manual guidance that needs no workspace/file/command action from you, relay that guidance directly and finish. Do not invent local tool calls only to satisfy the handoff.
 - If the task requires changes, call the appropriate tools (for example write/edit/bash) instead of only restating the plan.
 - **Serial workflow**: establish the task list with one todo_write (first sub-task in_progress), then for EACH sub-task execute it and call complete_step with evidence. The host advances the list for you — it marks the sub-task completed and moves the next to in_progress, so you don't need another todo_write to mark completions. Sign off one sub-task at a time; never batch completions.
+- V10.34: the 📌 User note section above contains the user's direct feedback during plan confirmation. Prioritize it over Hermes's plan when they conflict.
 
-Carry out the task, adapting the plan as needed.`, hephaestusHandoffMarker, task, plan)
+Carry out the task, adapting the plan as needed.`, hephaestusHandoffMarker, task, plan, note)
 }
 
 // HandoffTask returns the original user task embedded in an executor handoff

@@ -21,7 +21,9 @@ Use read-only tools (codegraph, gitnexus, read_file, grep, lsp_*, web_search) to
 investigate the codebase when the task needs context. Keep research targeted — stop
 once you have enough evidence. Output executor-ready instructions: what to do, which
 files or commands are relevant, and key decisions. Do not implement or execute.
-If the task is a read-only query, answer directly — do not produce a plan.`
+If the task is a read-only query, answer directly — do not produce a plan.
+When you produce a concrete executable plan, start it with <!--plan--> on its own line.
+When you answer directly, do NOT include this marker.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 
@@ -315,6 +317,9 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 
 	// Extract the plan from the planner's persistent session (last assistant message).
+	// If the plan is marked with <!--plan-->, only use the text after the marker —
+	// the research/analysis before it stays in the planner's session for context
+	// but doesn't clutter the PlanCard or executor handoff.
 	var plan string
 	msgs := h.hermesSess.Messages
 	for i := len(msgs) - 1; i >= 0; i-- {
@@ -325,6 +330,9 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 	if plan == "" {
 		plan = "(hermes produced no output)"
+	}
+	if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
+		plan = strings.TrimSpace(plan[idx+len("<!--plan-->"):])
 	}
 
 	return plan, nil
@@ -359,44 +367,11 @@ func shouldSkipPlanner(input string) (string, bool) {
 	return "", false
 }
 
-// isAnswerNotAction checks whether the planner's output is a self-contained
-// answer that needs no executor (Hermes answered directly — no Hephaestus).
-//
-// True when:
-//   - Plan contains explicit no-op markers ("no changes needed", "无需改动", etc.)
-//   - Plan contains NO write/action terms at all (read-only query answered by Hermes)
-//
-// False when: plan mentions concrete write operations needing an executor.
+// isAnswerNotAction checks whether the planner's output is a direct answer
+// that needs no executor. The planner self-marks executable plans with
+// <!--plan--> — if absent, Hermes answered directly.
 func isAnswerNotAction(plan string) bool {
-	lower := strings.ToLower(strings.TrimSpace(plan))
-	if lower == "" {
-		return false // empty plan → let executor ask for clarification
-	}
-	// If the plan contains concrete action terms, executor is needed.
-	if containsActionTerm(lower) {
-		return false
-	}
-	// No action terms found → Hermes answered directly. No Hephaestus needed.
-	return true
-}
-
-// containsActionTerm reports whether s mentions a write/destructive operation.
-func containsActionTerm(lower string) bool {
-	terms := []string{
-		" add ", " update ", " edit ", " write ", " create ", " delete ",
-		" remove ", " patch ", " refactor ", " implement ", " run ", " test ",
-		" build ", " fix ", " modify ", " change ", " replace ", " rename ",
-		" commit ", " merge ", " rebase ",
-		"新增", "补充", "更新", "编辑", "写入", "创建", "删除", "移除",
-		"运行", "测试", "构建", "修复", "实现", "重构", "修改", "替换",
-	}
-	padded := " " + lower + " "
-	for _, term := range terms {
-		if strings.Contains(padded, term) {
-			return true
-		}
-	}
-	return false
+	return !strings.Contains(plan, "<!--plan-->")
 }
 
 func formatHandoff(task, plan, userNote string) string {

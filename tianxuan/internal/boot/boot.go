@@ -687,7 +687,6 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	exclude := map[string]bool{
 		"task": true, "run_skill": true, "parallel_skills": true,
 		"explore": true, "research": true, "review": true, "security_review": true,
-		"ask": true, // planner must not interrupt itself with user questions
 	}
 	for _, name := range full.Names() {
 		if exclude[name] {

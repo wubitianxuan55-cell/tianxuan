@@ -129,7 +129,14 @@ func (h *Hermes) ResetSession() {
 
 // SetAsker installs the interactive asker for plan confirmation (V10.34).
 // nil means headless mode — plans auto-confirm without user approval.
-func (h *Hermes) SetAsker(a Asker) { h.asker = a }
+// Also wires the asker into the plannerAgent so it can ask clarifying questions
+// during planning (scope negotiation, detail gathering).
+func (h *Hermes) SetAsker(a Asker) {
+	h.asker = a
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetAsker(a)
+	}
+}
 
 // Run plans with the planner model, then hands the plan to the executor.
 // Returns a merged TurnResult combining the planner's and executor's outcomes.

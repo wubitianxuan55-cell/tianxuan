@@ -431,16 +431,6 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
           planner={sessPlanner} executor={sessExecutor} sub={sessSub} total={sessTotal}
         />
 
-        {sessTotal.cacheHit + sessTotal.cacheMiss > 0 && (() => {
-          const rate = (sessTotal.cacheHit / (sessTotal.cacheHit + sessTotal.cacheMiss)) * 100;
-          return (
-            <div className="flex items-baseline gap-2 pb-3 border-b border-border-soft">
-              <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
-              <span className="text-[10px] text-fg-faint tabular-nums">{tk(sessTotal.cacheHit)} 命中 / {tk(sessTotal.cacheMiss)} 未命中</span>
-            </div>
-          );
-        })()}
-
         {/* ── 本轮级统计表格 ── */}
 
         {(perTurnPlannerUsage || perTurnExecutorUsage || perTurnSubUsage) && (
@@ -482,7 +472,6 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
         <HitRateTrend steps={executorSteps} title={`命中率趋势 · ${model || "执行模型"}`} color="#3b82f6" />
 
         {/* ── 命中率趋势（子代理）── */}
-        <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" />
         <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" />
 
         {/* ── Token 趋势 ── */}

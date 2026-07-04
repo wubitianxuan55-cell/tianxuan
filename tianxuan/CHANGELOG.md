@@ -1,3 +1,25 @@
+## [10.30.0] — 2026-07-04
+
+### 🔍 grep .gitignore 精确行走
+- 纯 Go 回退路径新增 `gitignoreWalker` (~260行)：多层 .gitignore 解析 + `**` 递归匹配
+- 支持 `.git/info/exclude` + `!` 否定规则（last-match-wins）
+- WalkDir 集成：规则栈 enter/leave，对齐 ripgrep 忽略行为
+
+### 🌐 web_fetch HTTP CONNECT + SOCKS5 代理
+- `ssrfGuardedTransport`：自动选择 HTTP CONNECT 或 SOCKS5 隧道
+- SSRF 保护保持生效：IP 字面量本地检查，域名由代理远程解析（GFW 场景）
+- Workspace.ProxySpec 注入：支持 auto/env/custom/off 四种模式
+
+### 📦 桌面端构建
+- 前端 TypeScript + Vite 构建通过（1975 modules）
+- wails build 生成 `tianxuan-desktop.exe`（17MB, SHA256: `f61c4382...`）
+
+### 🎯 蒸馏计划收尾
+- **24/24 特性全部完成**，~3,400 行新增代码
+- Reasonix V1.15 全部核心特性已移植到 tianxuan
+
+---
+
 ## [10.26.0] — 2026-07-04
 
 ### 🧬 Reasonix V1.15 蒸馏完成（22 特性，~3000 行新增）

@@ -141,6 +141,7 @@ export interface ContextInfo {
 export interface Meta {
   label: string;
   subagentLabel?: string;
+  plannerLabel?: string;
   ready: boolean;
   startupErr?: string;
   eventChannel: string;

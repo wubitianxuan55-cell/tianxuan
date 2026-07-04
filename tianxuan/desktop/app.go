@@ -53,8 +53,9 @@ type App struct {
 	startupErr  string
 	label       string
 	model       string // active provider name (for the bottom model switcher)
-	subagentLabel string // subagent model label (from config, or empty)
-	ready       bool   // true once boot.Build completes (success or failure)
+	subagentLabel  string // subagent model label (from config, or empty)
+	plannerLabel   string // planner model label (from config, or empty; V10.31)
+	ready          bool   // true once boot.Build completes (success or failure)
 	disabledMCP map[string]ServerView
 	mcpOrder    []string
 }
@@ -148,6 +149,12 @@ func (a *App) buildController() {
 		if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
 			if subEntry, ok := cfg.ResolveModel(subRef); ok {
 				a.subagentLabel = subEntry.Model
+			}
+		}
+		// Resolve planner model from config (V10.31: separate planner label for stats).
+		if plannerRef := strings.TrimSpace(cfg.Agent.PlannerModel); plannerRef != "" {
+			if plannerEntry, ok := cfg.ResolveModel(plannerRef); ok {
+				a.plannerLabel = plannerEntry.Model
 			}
 		}
 	}

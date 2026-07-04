@@ -43,6 +43,7 @@ type JobView struct {
 type Meta struct {
 	Label          string `json:"label"`
 	SubagentLabel  string `json:"subagentLabel,omitempty"`
+	PlannerLabel   string `json:"plannerLabel,omitempty"`   // V10.31: planner model label for stats
 	Ready          bool   `json:"ready"`
 	StartupErr   string `json:"startupErr,omitempty"`
 	EventChannel string `json:"eventChannel"`
@@ -50,7 +51,6 @@ type Meta struct {
 	Bypass       bool   `json:"bypass"`     // YOLO mode on (auto-approve every tool call)
 	PermLevel    string `json:"permLevel"`  // "ask"|"auto"|"yolo"
 }
-
 // CommandInfo describes one available slash command for the composer's "/" menu.
 type CommandInfo struct {
 	Name        string `json:"name"` // without the leading slash
@@ -193,6 +193,7 @@ func (a *App) Meta() Meta {
 	a.mu.RLock()
 	label := a.label
 	subagentLabel := a.subagentLabel
+	plannerLabel := a.plannerLabel
 	startupErr := a.startupErr
 	ready := a.ready
 	ctrl := a.ctrl
@@ -205,6 +206,7 @@ func (a *App) Meta() Meta {
 	return Meta{
 		Label:         label,
 		SubagentLabel: subagentLabel,
+		PlannerLabel:  plannerLabel,
 		Ready:        ready,
 		StartupErr:   startupErr,
 		EventChannel: eventChannel,

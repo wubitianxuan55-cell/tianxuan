@@ -43,7 +43,7 @@ func (c *Config) SetPlannerModel(name string) error {
 		c.Agent.PlannerModel = ""
 		return nil
 	}
-	if _, ok := c.Provider(name); !ok {
+	if _, ok := c.ResolveModel(name); !ok {
 		return fmt.Errorf("set planner: no provider %q (configured: %s)", name, c.providerNames())
 	}
 	c.Agent.PlannerModel = name
@@ -122,7 +122,7 @@ func (c *Config) RemoveProvider(name string) error {
 		return fmt.Errorf("remove provider: %q is the default model — set a different default_model first", name)
 	}
 	c.Providers = append(c.Providers[:idx], c.Providers[idx+1:]...)
-	if c.Agent.PlannerModel == name {
+	if c.Agent.PlannerModel == name || strings.HasPrefix(c.Agent.PlannerModel, name+"/") {
 		c.Agent.PlannerModel = ""
 	}
 	return nil

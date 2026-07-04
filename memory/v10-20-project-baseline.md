@@ -1,7 +1,7 @@
 ---
 name: v10-20-project-baseline
 title: V10.20.0 项目基准
-description: V10.20.0 项目基准 — 当前版本、构建命令、核心变更
+description: V10.20.0 项目基准 — 旧版本（已归档，当前 V10.30.0）
 metadata:
   type: project
 ---

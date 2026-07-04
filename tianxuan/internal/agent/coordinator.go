@@ -91,6 +91,13 @@ func (c *Coordinator) ResetPlannerSession() {
 // Run plans with the planner model, then hands the plan to the executor.
 func (c *Coordinator) Run(ctx context.Context, input string) error {
 	c.sink.Emit(event.Event{Kind: event.TurnStarted})
+
+	// V10.31: fast path — skip planner for simple/quick tasks
+	if task, ok := shouldSkipPlanner(input); ok {
+		c.sink.Emit(event.Event{Kind: event.Phase, Text: c.executor.ProvName() + " · 快速执行"})
+		return c.executor.Run(ctx, task)
+	}
+
 	c.sink.Emit(event.Event{Kind: event.Phase, Text: c.planner.Name() + " · planning"})
 	plan, err := c.plan(ctx, input)
 	if err != nil {
@@ -104,7 +111,6 @@ func (c *Coordinator) Run(ctx context.Context, input string) error {
 	}
 	return c.executor.Run(ctx, formatHandoff(input, plan))
 }
-
 // plan streams a plan from the planner and appends it to the planner session, so
 // that session grows prepend-only and stays cache-friendly.
 func (c *Coordinator) plan(ctx context.Context, input string) (string, error) {
@@ -147,6 +153,39 @@ func (c *Coordinator) persistExecutorNoOp(input, plan string) {
 }
 
 // ── Plan helpers ─────────────────────────────────────────────────────
+
+// shouldSkipPlanner detects tasks that are simple enough to execute directly,
+// bypassing the planner model. Returns the (possibly stripped) task and true.
+//
+// Fast-mode triggers:
+//   - Input starts with "!" — explicit quick-execute marker
+//   - Input is short (< 120 chars) and matches a known simple-operation pattern
+func shouldSkipPlanner(input string) (string, bool) {
+	// Explicit fast-mode marker: "!do something"
+	if stripped, ok := strings.CutPrefix(input, "!"); ok {
+		return strings.TrimSpace(stripped), true
+	}
+	// Heuristic: short task with simple-operation keywords
+	if len(input) > 120 {
+		return "", false
+	}
+	lower := strings.ToLower(input)
+	quickOps := []string{
+		"fix typo", "fix the typo",
+		"rename variable", "rename this variable",
+		"update comment", "update the comment",
+		"change x to y", "replace x with y",
+		"add comment", "add a comment",
+		"format code", "format the code",
+		"delete line", "remove line",
+	}
+	for _, op := range quickOps {
+		if strings.Contains(lower, op) {
+			return input, true
+		}
+	}
+	return "", false
+}
 
 func isNoOpPlan(plan string) bool {
 	lower := strings.ToLower(strings.TrimSpace(plan))

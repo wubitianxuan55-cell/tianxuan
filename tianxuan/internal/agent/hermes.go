@@ -378,8 +378,12 @@ func shouldSkipPlanner(input string) (string, bool) {
 
 // isAnswerNotAction checks whether the planner's output is a direct answer
 // that needs no executor. The planner self-marks executable plans with
-// <!--plan--> — if absent, Hermes answered directly.
+// <!--plan--> — if absent, Hermes answered directly. Short outputs (<100 chars)
+// are always treated as direct answers to avoid false plan detection.
 func isAnswerNotAction(plan string) bool {
+	if len(strings.TrimSpace(plan)) < 100 {
+		return true
+	}
 	return !strings.Contains(plan, "<!--plan-->")
 }
 

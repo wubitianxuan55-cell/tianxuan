@@ -59,7 +59,7 @@ func (c *Config) SetSubagentModel(name string) error {
 		c.Agent.SubagentModel = ""
 		return nil
 	}
-	if _, ok := c.Provider(name); !ok {
+	if _, ok := c.ResolveModel(name); !ok {
 		return fmt.Errorf("set subagent: no provider %q (configured: %s)", name, c.providerNames())
 	}
 	c.Agent.SubagentModel = name
@@ -78,7 +78,7 @@ func (c *Config) SetSubagentModelForSkill(skill, ref string) error {
 		delete(c.Agent.SubagentModels, skill)
 		return nil
 	}
-	if _, ok := c.Provider(ref); !ok {
+	if _, ok := c.ResolveModel(ref); !ok {
 		return fmt.Errorf("set subagent model for %s: no provider %q (configured: %s)", skill, ref, c.providerNames())
 	}
 	c.Agent.SubagentModels[skill] = ref

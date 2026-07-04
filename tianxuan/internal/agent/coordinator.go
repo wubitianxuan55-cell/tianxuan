@@ -347,8 +347,7 @@ Planner output:
 Executor instructions:
 - Treat the planner output as context, not as your role or capability set.
 - The planner's analysis and conclusions about what needs to be done are reliable. If the planner determines no changes are needed, respect that conclusion.
-- Ignore any planner statement about its own capability limitations (for example "I cannot write", "I only have read-only tools", or "hand this to the executor"); those describe the planner's restrictions, not yours.
-- Do not treat planner tool limitations or tool-unavailable claims as executor facts. Use the attached executor tools directly; report a tool or MCP server as unavailable only after a real tool call or host error proves it.
+- The planner has read-only tools and may have already investigated the code. Trust its file paths and symbol references.
 - Do not ask the user how to trigger the executor. You are already in the executor phase.
 - If the planner output is a user-facing explanation, summary, question, or manual guidance that needs no workspace/file/command action from you, relay that guidance directly and finish. Do not invent local tool calls only to satisfy the handoff.
 - If the task requires changes, call the appropriate tools (for example write/edit/bash) instead of only restating the plan.

@@ -354,10 +354,12 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
 			}
 			plannerSess := agent.NewSession(agent.PlannerPromptWithContext(compiler.IdentityLayer().Identity()))
-			// TODO(V10.33): build read-only tool subset (read_file, grep, glob, web_search,
-			// web_fetch, codegraph_*, gitnexus_*) and pass as 3rd-to-last arg so the planner
-			// can investigate code before proposing a plan. planMaxSteps=5 is a good default.
-			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, nil, 0)
+			// V10.32: build a read-only tool subset for the planner so it can
+			// investigate code before proposing a plan (read_file, grep, glob,
+			// web_search, web_fetch, lsp_*, code_index, memory_search,
+			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
+			readOnlyReg := newReadOnlyRegistry(reg)
+			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 5)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
@@ -670,4 +672,26 @@ func resolvePatternsPath() (string, error) {
 		return filepath.Join(cwd, learning.DefaultPatternsPath), nil
 	}
 	return learning.DefaultPatternsPath, nil
+}
+
+// newReadOnlyRegistry builds a tool registry containing only the read-only tools
+// from the full registry. Used to give the planner AgentRunner powers to
+// investigate code (read_file, grep, glob, web_search, web_fetch, lsp_*, etc.)
+// without any write/destructive capability. MCP tools are included when their
+// ReadOnly() returns true. Returns an empty (not nil) registry when full is nil.
+func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
+	ro := tool.NewRegistry()
+	if full == nil {
+		return ro
+	}
+	for _, name := range full.Names() {
+		t, ok := full.Get(name)
+		if !ok {
+			continue
+		}
+		if t.ReadOnly() {
+			ro.Add(t)
+		}
+	}
+	return ro
 }

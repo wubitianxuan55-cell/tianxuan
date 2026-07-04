@@ -101,8 +101,6 @@ function StatsTable({ title, planner, executor, sub, total }: {
     }},
     { label: "成本", render: c => cash(c.cost) },
   ];
-  const totalHit = total.cacheHit + total.cacheMiss;
-  const totalRate = totalHit > 0 ? (total.cacheHit / totalHit * 100) : 0;
   return (
     <div className="py-3 border-b border-border-soft">
       <table className="w-full text-[11px] border-collapse">
@@ -158,12 +156,6 @@ function StatsTable({ title, planner, executor, sub, total }: {
           <span className="text-border select-none">·</span>
           <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
         </div>
-        {totalHit > 0 && (
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className={`text-xl font-bold tabular-nums ${hitRateColor(totalRate)}`}>{totalRate.toFixed(2)}%</span>
-            <span className="text-[10px] text-fg-faint tabular-nums">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
-          </div>
-        )}
       </div>
     </div>
   );

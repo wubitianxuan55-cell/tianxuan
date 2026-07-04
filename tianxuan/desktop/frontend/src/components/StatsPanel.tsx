@@ -103,11 +103,10 @@ function StatsTable({ title, main, sub, total }: {
   ];
   return (
     <div className="py-3 border-b border-border-soft">
-      <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">{title}</div>
       <table className="w-full text-[11px] border-collapse">
         <thead>
           <tr className="text-fg-faint border-b border-border-soft">
-            <th className="text-left font-normal pb-1 w-[34%]" />
+            <th className="text-left font-semibold pb-1 w-[34%] text-[10px] uppercase tracking-wider text-fg-faint">{title}</th>
             <th className="text-right font-normal pb-1 w-[22%]">主模型</th>
             <th className="text-right font-normal pb-1 w-[22%]">子代理</th>
             <th className="text-right font-normal pb-1 w-[22%]">汇总</th>

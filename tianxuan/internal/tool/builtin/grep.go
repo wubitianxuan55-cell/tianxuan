@@ -222,6 +222,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 	}
 
 	if info.IsDir() {
+		walker := newGitignoreWalker(p.Path)
 		_ = filepath.WalkDir(p.Path, func(path string, d os.DirEntry, err error) error {
 			// V8.2: 周期性检查 context 取消，防止大目录遍历永久阻塞
 			select {
@@ -232,10 +233,17 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 			if err != nil {
 				return nil
 			}
-			if d.IsDir() {
-				if skipWalkDir(p.Path, path, d.Name()) {
+			walker.leave(path)
+			name := d.Name()
+			isDir := d.IsDir()
+			if walker.skip(path, name, isDir) {
+				if isDir {
 					return filepath.SkipDir
 				}
+				return nil
+			}
+			if isDir {
+				walker.enter(path)
 				return nil
 			}
 			if searchFile(path) == io.EOF {
@@ -375,4 +383,270 @@ func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, maxMatch
 		res += fmt.Sprintf("\n... (truncated at %d matches)", maxMatches)
 	}
 	return res, nil
+}
+
+// ── Gitignore-aware walk (V10.30) ────────────────────────────────────
+// Ported from Reasonix V1.15 (MIT). When ripgrep is unavailable the pure-Go
+// fallback now honours .gitignore rules so results match what rg would return.
+
+// gitignoreFrame holds the cumulative ignore rules for one directory.
+type gitignoreFrame struct {
+	dir      string
+	patterns []string
+}
+
+// gitignoreWalker prunes a recursive walk to mirror ripgrep: skips hidden
+// entries, vendorDirs, and anything matched by the repository's ignore rules.
+type gitignoreWalker struct {
+	root     string
+	repoRoot string
+	disabled bool
+	frames   []gitignoreFrame
+}
+
+func newGitignoreWalker(root string) *gitignoreWalker {
+	w := &gitignoreWalker{root: absClean(root)}
+	rr := findGitRoot(w.root)
+	if rr == "" {
+		return w
+	}
+	w.repoRoot = rr
+
+	var rootLines []string
+	rootLines = append(rootLines, readIgnoreLines(filepath.Join(rr, ".git", "info", "exclude"))...)
+	rootLines = append(rootLines, readIgnoreLines(filepath.Join(rr, ".gitignore"))...)
+	w.frames = append(w.frames, gitignoreFrame{dir: rr, patterns: rootLines})
+
+	for _, dir := range dirsBetween(rr, w.root) {
+		lines := readIgnoreLines(filepath.Join(dir, ".gitignore"))
+		if len(lines) == 0 {
+			continue
+		}
+		parent := w.frames[len(w.frames)-1].patterns
+		combined := append(append([]string{}, parent...), lines...)
+		w.frames = append(w.frames, gitignoreFrame{dir: dir, patterns: combined})
+	}
+
+	if isHidden(filepath.Base(w.root)) || w.ignored(w.root, true) {
+		w.disabled = true
+	}
+	return w
+}
+
+func (w *gitignoreWalker) enter(path string) {
+	if w.disabled || w.repoRoot == "" {
+		return
+	}
+	abs := absClean(path)
+	if abs == w.root {
+		return
+	}
+	lines := readIgnoreLines(filepath.Join(abs, ".gitignore"))
+	if len(lines) == 0 {
+		return
+	}
+	parent := w.frames[len(w.frames)-1].patterns
+	combined := append(append([]string{}, parent...), lines...)
+	w.frames = append(w.frames, gitignoreFrame{dir: abs, patterns: combined})
+}
+
+func (w *gitignoreWalker) leave(path string) {
+	abs := absClean(path)
+	for len(w.frames) > 1 && !underDir(w.frames[len(w.frames)-1].dir, abs) {
+		w.frames = w.frames[:len(w.frames)-1]
+	}
+}
+
+func (w *gitignoreWalker) skip(path, name string, isDir bool) bool {
+	abs := absClean(path)
+	if abs == w.root || w.disabled {
+		return false
+	}
+	if isHidden(name) {
+		return true
+	}
+	if isDir && vendorDirs[name] {
+		return true
+	}
+	return w.ignored(abs, isDir)
+}
+
+func (w *gitignoreWalker) ignored(abs string, isDir bool) bool {
+	if w.repoRoot == "" || len(w.frames) == 0 {
+		return false
+	}
+	rel, err := filepath.Rel(w.repoRoot, abs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return false
+	}
+	relSlash := filepath.ToSlash(rel)
+	f := w.frames[len(w.frames)-1]
+	matched := false
+	for _, p := range f.patterns {
+		negate := false
+		pat := p
+		if strings.HasPrefix(pat, "!") {
+			negate = true
+			pat = pat[1:]
+		}
+		dirOnly := strings.HasSuffix(pat, "/")
+		if dirOnly {
+			pat = strings.TrimSuffix(pat, "/")
+		}
+		anchor := filepath.ToSlash(strings.TrimPrefix(absClean(f.dir), absClean(w.repoRoot)))
+		anchor = strings.TrimPrefix(anchor, "/")
+		reanchored := reanchorPattern(pat, anchor, dirOnly)
+		if matchGitignorePattern(relSlash, reanchored, isDir) {
+			matched = !negate
+		}
+	}
+	return matched
+}
+
+func matchGitignorePattern(rel, pattern string, isDir bool) bool {
+	pattern = strings.TrimPrefix(pattern, "/")
+	testDir := strings.HasSuffix(pattern, "/")
+	pattern = strings.TrimSuffix(pattern, "/")
+	if testDir && !isDir {
+		return false
+	}
+	target := rel
+	if isDir {
+		target += "/"
+	}
+	if strings.Contains(pattern, "/") {
+		return matchGlobStar(pattern, target)
+	}
+	if matchBasename(target, pattern) {
+		return true
+	}
+	parts := strings.Split(target, "/")
+	for i := 0; i < len(parts)-1; i++ {
+		if matchBasename(parts[i], pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchGlobStar(pattern, target string) bool {
+	if pattern == "**" || pattern == "**/" {
+		return true
+	}
+	patParts := strings.Split(pattern, "/")
+	tgtParts := strings.Split(strings.TrimSuffix(target, "/"), "/")
+	return matchGlobSegments(patParts, tgtParts)
+}
+
+func matchGlobSegments(pat, tgt []string) bool {
+	if len(pat) == 0 {
+		return len(tgt) == 0
+	}
+	if pat[0] == "**" {
+		for i := 0; i <= len(tgt); i++ {
+			if matchGlobSegments(pat[1:], tgt[i:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(tgt) == 0 {
+		return false
+	}
+	if matchFilepathGlob(pat[0], tgt[0]) {
+		return matchGlobSegments(pat[1:], tgt[1:])
+	}
+	return false
+}
+
+func matchFilepathGlob(pattern, name string) bool {
+	ok, _ := filepath.Match(pattern, name)
+	return ok
+}
+
+func matchBasename(path, pattern string) bool {
+	idx := strings.LastIndex(path, "/")
+	if idx >= 0 {
+		return matchFilepathGlob(pattern, path[idx+1:])
+	}
+	return matchFilepathGlob(pattern, path)
+}
+
+func reanchorPattern(line, dirAnchor string, dirOnly bool) string {
+	if dirAnchor == "" || dirAnchor == "." {
+		return line
+	}
+	anchored := strings.HasPrefix(line, "/") || strings.Contains(strings.TrimSuffix(line, "/"), "/")
+	line = strings.TrimPrefix(line, "/")
+	if anchored {
+		line = dirAnchor + "/" + line
+	} else {
+		line = dirAnchor + "/**/" + line
+	}
+	if dirOnly {
+		line += "/"
+	}
+	return line
+}
+
+func findGitRoot(start string) string {
+	abs, err := filepath.Abs(start)
+	if err != nil {
+		return ""
+	}
+	if fi, err := os.Stat(abs); err == nil && !fi.IsDir() {
+		abs = filepath.Dir(abs)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(abs, ".git")); err == nil {
+			return abs
+		}
+		parent := filepath.Dir(abs)
+		if parent == abs {
+			return ""
+		}
+		abs = parent
+	}
+}
+
+func readIgnoreLines(path string) []string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, raw := range strings.Split(string(b), "\n") {
+		line := strings.TrimRight(raw, " \t\r")
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+func dirsBetween(repoRoot, root string) []string {
+	var dirs []string
+	for d := root; d != repoRoot && d != filepath.Dir(d); d = filepath.Dir(d) {
+		dirs = append(dirs, d)
+	}
+	for i, j := 0, len(dirs)-1; i < j; i, j = i+1, j-1 {
+		dirs[i], dirs[j] = dirs[j], dirs[i]
+	}
+	return dirs
+}
+
+func isHidden(name string) bool {
+	return len(name) > 1 && name[0] == '.' && name != ".."
+}
+
+func underDir(dir, path string) bool {
+	return path == dir || strings.HasPrefix(path, dir+string(os.PathSeparator))
+}
+
+func absClean(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return filepath.Clean(p)
 }

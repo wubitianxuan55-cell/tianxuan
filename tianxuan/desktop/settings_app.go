@@ -54,10 +54,12 @@ type AgentView struct {
 
 // SettingsView is the whole Settings panel payload.
 type SettingsView struct {
-	DefaultModel  string          `json:"defaultModel"`
-	PlannerModel  string          `json:"plannerModel"`
-	SubagentModel string          `json:"subagentModel"`
-	Providers     []ProviderView  `json:"providers"`
+	DefaultModel     string            `json:"defaultModel"`
+	PlannerModel     string            `json:"plannerModel"`
+	SubagentModel    string            `json:"subagentModel"`
+	SubagentModels   map[string]string `json:"subagentModels"`
+	SubagentSkills   []string          `json:"subagentSkills"`
+	Providers        []ProviderView    `json:"providers"`
 	Permissions  PermissionsView `json:"permissions"`
 	Sandbox      SandboxView     `json:"sandbox"`
 	Agent        AgentView       `json:"agent"`
@@ -91,7 +93,9 @@ func (a *App) Settings() SettingsView {
 	v := SettingsView{
 		DefaultModel:  cfg.DefaultModel,
 		PlannerModel:  cfg.Agent.PlannerModel,
-		SubagentModel: cfg.Agent.SubagentModel,
+		SubagentModel:  cfg.Agent.SubagentModel,
+		SubagentModels: copyMap(cfg.Agent.SubagentModels),
+		SubagentSkills: subagentSkillNames(),
 		Providers:     []ProviderView{},
 		Permissions: PermissionsView{
 			Mode:  orDefault(cfg.Permissions.Mode, "ask"),
@@ -337,6 +341,15 @@ func (a *App) SetSubagentModel(ref string) error {
 	})
 }
 
+// SetSubagentModelForSkill sets a per-skill sub-agent model override.
+// skill is one of the builtin subagent skill names (explore, research, review,
+// security-review). An empty ref clears the override.
+func (a *App) SetSubagentModelForSkill(skill, ref string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetSubagentModelForSkill(skill, ref)
+	})
+}
+
 // trimList drops blank entries from a string slice (and returns a non-nil slice).
 func trimList(in []string) []string {
 	out := []string{}
@@ -346,4 +359,21 @@ func trimList(in []string) []string {
 		}
 	}
 	return out
+}
+
+// copyMap returns a shallow copy of m, or nil when m is nil.
+func copyMap(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// subagentSkillNames returns the builtin sub-agent skill identifiers.
+func subagentSkillNames() []string {
+	return []string{"explore", "research", "review", "security-review"}
 }

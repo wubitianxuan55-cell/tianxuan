@@ -127,6 +127,8 @@ export function makeMockApp(): AppBindings {
     agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent." },
     plannerModel: "",
     subagentModel: "",
+    subagentModels: {},
+    subagentSkills: ["explore", "research", "review", "security-review"],
     configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
@@ -487,6 +489,10 @@ export function makeMockApp(): AppBindings {
     },
     async SetSubagentModel(ref: string) {
       settings.subagentModel = ref;
+    },
+    async SetSubagentModelForSkill(_skill: string, ref: string) {
+      if (!settings.subagentModels) settings.subagentModels = {};
+      settings.subagentModels[_skill] = ref;
     },
     async SetPermLevel(level: string) {
       settings.permLevel = level;

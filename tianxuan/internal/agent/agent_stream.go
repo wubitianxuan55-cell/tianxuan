@@ -54,13 +54,13 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				signature = chunk.Signature
 			}
 			if chunk.Text != "" && !transformReasoning {
-				batcher.addReasoning(chunk.Text)
+				batcher.AddReasoning(chunk.Text)
 			}
 		case provider.ChunkText:
 			text.WriteString(chunk.Text)
-			batcher.addText(chunk.Text)
+			batcher.AddText(chunk.Text)
 		case provider.ChunkToolCallStart:
-			batcher.flushNow()
+			batcher.FlushNow()
 			// Surface the tool card as soon as the call begins �� before its
 			// (possibly large) arguments finish streaming �� so the user sees it
 			// working instead of a stall. executeBatch emits the full dispatch
@@ -92,7 +92,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 			a.lastUsage.Store(chunk.Usage)
 			a.sessCacheHit.Add(int64(chunk.Usage.CacheHitTokens)); chunk.Usage.SessionCacheHitTokens = int(a.sessCacheHit.Load())
 			a.sessCacheMiss.Add(int64(chunk.Usage.CacheMissTokens)); chunk.Usage.SessionCacheMissTokens = int(a.sessCacheMiss.Load())
-			batcher.flushNow()
+			batcher.FlushNow()
 			// Phase 3: CompareShape diagnostics — explain cache behaviour
 			if chunk.Usage != nil {
 				postShape := a.CaptureShape()
@@ -104,14 +104,14 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				a.lastPrefixShape = postShape
 			}
 		case provider.ChunkError:
-			batcher.flushNow()
+			batcher.FlushNow()
 			if provider.IsStreamInterrupted(chunk.Err) {
 				return text.String(), reasoning.String(), signature, calls, usage, true, chunk.Err
 			}
 			return "", "", "", nil, nil, false, chunk.Err
 		}
 	}
-	batcher.flushAll()
+	batcher.FlushAll()
 	// With a PostLLMCall hook, the live stream was suppressed above; transform the
 	// full reasoning now and emit it once so the sink never sees the untranslated
 	// text. Without a hook this is skipped �� the chunk-by-chunk events already fired.

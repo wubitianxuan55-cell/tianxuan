@@ -143,7 +143,7 @@ func (a *AgentRunner) precheckDeleteRange(raw json.RawMessage) string {
 func (a *AgentRunner) readFileForPrecheck(path string) (string, bool) {
 	// Try the tool cache first (cached read_file results from this turn).
 	if a.tc != nil {
-		if content, hit := a.tc.get(path, 0); hit {
+		if content, hit := a.tc.Get(path, 0); hit {
 			return content, true
 		}
 	}
@@ -157,7 +157,7 @@ func (a *AgentRunner) readFileForPrecheck(path string) (string, bool) {
 	// multi_edit, etc.) reuses this read instead of hitting the disk again.
 	// V10.13: 消除 precheck→execute 的重复文件 I/O，对大文件效果显著。
 	if a.tc != nil {
-		a.tc.set(path, 0, content)
+		a.tc.Set(path, 0, content)
 	}
 	return content, true
 }

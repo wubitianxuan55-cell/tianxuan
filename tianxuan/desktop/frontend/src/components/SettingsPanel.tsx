@@ -6,7 +6,8 @@ import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
 import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
-import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug } from "lucide-react";
+import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, ChevronDown, ChevronRight } from "lucide-react";
+import { ModelSwitcher } from "./ModelSwitcher";
 
 type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
 
@@ -626,32 +627,65 @@ function SandboxSection({ s, busy, apply }: SectionProps) {
 
 function AgentSection({ s, busy, apply }: SectionProps) {
   const t = useT();
-  const refs = allRefs(s);
   const [temp, setTemp] = useState(String(s.agent.temperature));
   const [steps, setSteps] = useState(String(s.agent.maxSteps));
   const [prompt, setPrompt] = useState(s.agent.systemPrompt);
   const dirty = temp !== String(s.agent.temperature) || steps !== String(s.agent.maxSteps) || prompt !== s.agent.systemPrompt;
+  const [skillsOpen, setSkillsOpen] = useState(false);
+
+  const subagentLabel = s.subagentModel || t("settings.subagentInherit");
+  const subagentModels = s.subagentModels || {};
 
   return (
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold">{t("settings.agent")}</div>
 
+      {/* 全局子代理模型 */}
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.subagentModel")}</label>
-        <select
-          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0"
-          value={toRef(s.subagentModel, s)}
-          disabled={busy}
-          onChange={(e) => void apply(() => app.SetSubagentModel(e.target.value))}
-        >
-          <option value="">{t("settings.subagentInherit")}</option>
-          {refs.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        <div className="flex-1">
+          <ModelSwitcher
+            label={subagentLabel}
+            allowInherit
+            inheritLabel={t("settings.subagentInherit")}
+            onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
+          />
+        </div>
       </div>
+
+      {/* 按技能单独配置（可折叠） */}
+      {(s.subagentSkills || []).length > 0 && (
+        <div className="mb-2.5">
+          <button
+            className="flex items-center gap-1 text-fg-dim text-[13px] font-medium hover:text-fg cursor-pointer bg-transparent border-0 p-0"
+            onClick={() => setSkillsOpen((v) => !v)}
+          >
+            {skillsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {t("settings.subagentPerSkill") || "按技能单独配置"}
+          </button>
+          {skillsOpen && (
+            <div className="mt-2 space-y-2 pl-4 border-l-2 border-border-soft">
+              {s.subagentSkills.map((skill: string) => {
+                const skillRef = subagentModels[skill] || "";
+                const skillLabel = skillRef || `${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`;
+                return (
+                  <div key={skill} className="flex items-center gap-3">
+                    <label className="text-fg-dim text-[12px] w-[100px] shrink-0 font-mono">{skill}</label>
+                    <div className="flex-1">
+                      <ModelSwitcher
+                        label={skillLabel}
+                        allowInherit
+                        inheritLabel={`${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`}
+                        onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.temperature")}</label>

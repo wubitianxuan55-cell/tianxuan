@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
-  BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FolderGit2, FolderTree,
+  BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FolderGit2, FolderTree, GitBranch,
   Settings as SettingsIcon, MessageSquare,
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
@@ -414,6 +414,18 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              <ToolbarButton onClick={() => {
+                setPendingViewMode("changed");
+                if (workspacePanelOpen && rightTab === "files") {
+                  setWorkspacePanel(false);
+                  const id = setTimeout(() => setWorkspacePanel(true), 50);
+                  if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
+                  reopenTimerRef.current = id;
+                } else {
+                  setRightTab("files");
+                  setWorkspacePanel(true);
+                }
+              }} title="查看文件变更"><GitBranch size={13} /></ToolbarButton>
               <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
               <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
               <ToolbarButton onClick={() => void newSessionAndReset()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
@@ -468,19 +480,6 @@ export default function App() {
               model={state.meta?.label}
               subagentModel={state.meta?.subagentLabel}
               permLevel={permLevel}
-              onOpenChanges={useCallback(() => {
-                setPendingViewMode("changed");
-                if (workspacePanelOpen && rightTab === "files") {
-                  setWorkspacePanel(false);
-                  const id = setTimeout(() => setWorkspacePanel(true), 50);
-                  // 防止快速双击堆积多个 timer
-                  if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
-                  reopenTimerRef.current = id;
-                } else {
-                  setRightTab("files");
-                  setWorkspacePanel(true);
-                }
-              }, [workspacePanelOpen, rightTab])}
             />
             </CompactContext.Provider>
           </footer>
@@ -567,7 +566,7 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} perTurnMainUsage={state.perTurnMainUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} perTurnMainUsage={state.perTurnMainUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} subagentModel={state.meta?.subagentLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
             {rightTab === "messages" && (
               <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />

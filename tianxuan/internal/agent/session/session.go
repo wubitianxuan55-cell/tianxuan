@@ -1,6 +1,6 @@
-// Package agent wires a Provider, a tool Registry, and a Session into the
-// harness loop that drives a coding task to completion.
-package agent
+// Package session holds the conversation history for one task — the Session
+// type, its serialization helpers, and branch metadata for conversation trees.
+package session
 
 import (
 	"sync"
@@ -19,8 +19,8 @@ type Session struct {
 	rewriteVersion int // bumped each time the log is rewritten (compact/fold)
 }
 
-// NewSession initializes a session with an optional system prompt.
-func NewSession(system string) *Session {
+// New initializes a session with an optional system prompt.
+func New(system string) *Session {
 	s := &Session{}
 	if system != "" {
 		s.Messages = append(s.Messages, provider.Message{Role: provider.RoleSystem, Content: system})

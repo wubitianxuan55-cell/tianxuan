@@ -1,4 +1,4 @@
-package agent
+package toolguard
 
 import (
 	"encoding/json"

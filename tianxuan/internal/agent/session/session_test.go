@@ -1,4 +1,4 @@
-package agent
+package session
 
 import (
 	"os"
@@ -9,17 +9,17 @@ import (
 	"tianxuan/internal/provider"
 )
 
-// --- NewSession ---
+// --- New ---
 
-func TestNewSessionEmpty(t *testing.T) {
-	s := NewSession("")
+func TestNewEmpty(t *testing.T) {
+	s := New("")
 	if len(s.Messages) != 0 {
 		t.Errorf("empty session should have 0 messages, got %d", len(s.Messages))
 	}
 }
 
-func TestNewSessionWithSystem(t *testing.T) {
-	s := NewSession("You are a helpful assistant.")
+func TestNewWithSystem(t *testing.T) {
+	s := New("You are a helpful assistant.")
 	if len(s.Messages) != 1 {
 		t.Fatalf("want 1 message, got %d", len(s.Messages))
 	}
@@ -33,8 +33,8 @@ func TestNewSessionWithSystem(t *testing.T) {
 
 // --- Session.Add ---
 
-func TestSessionAdd(t *testing.T) {
-	s := NewSession("")
+func TestAdd(t *testing.T) {
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "hello"})
 	s.Add(provider.Message{Role: provider.RoleAssistant, Content: "hi there"})
 	if len(s.Messages) != 2 {
@@ -51,21 +51,21 @@ func TestSessionAdd(t *testing.T) {
 // --- Session.HasContent ---
 
 func TestHasContentEmpty(t *testing.T) {
-	s := NewSession("")
+	s := New("")
 	if s.HasContent() {
 		t.Error("empty session should not have content")
 	}
 }
 
 func TestHasContentSystemOnly(t *testing.T) {
-	s := NewSession("system prompt")
+	s := New("system prompt")
 	if s.HasContent() {
 		t.Error("system-only session should not have content")
 	}
 }
 
 func TestHasContentWithUser(t *testing.T) {
-	s := NewSession("system")
+	s := New("system")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "hello"})
 	if !s.HasContent() {
 		t.Error("session with user message should have content")
@@ -73,7 +73,7 @@ func TestHasContentWithUser(t *testing.T) {
 }
 
 func TestHasContentWithAssistant(t *testing.T) {
-	s := NewSession("")
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleAssistant, Content: "response"})
 	if !s.HasContent() {
 		t.Error("session with assistant message should have content")
@@ -81,27 +81,27 @@ func TestHasContentWithAssistant(t *testing.T) {
 }
 
 func TestHasContentWithTool(t *testing.T) {
-	s := NewSession("")
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleTool, Content: "result", ToolCallID: "tc1"})
 	if !s.HasContent() {
 		t.Error("session with tool message should have content")
 	}
 }
 
-// --- Save / LoadSession round-trip ---
+// --- Save / Load round-trip ---
 
-func TestSaveLoadSessionRoundTrip(t *testing.T) {
+func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.jsonl")
 
-	s := NewSession("system prompt")
+	s := New("system prompt")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "hello"})
 	s.Add(provider.Message{Role: provider.RoleAssistant, Content: "world"})
 	if err := s.Save(path); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 
-	loaded, err := LoadSession(path)
+	loaded, err := Load(path)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestSaveLoadSessionRoundTrip(t *testing.T) {
 }
 
 func TestSaveEmptyPath(t *testing.T) {
-	s := NewSession("")
+	s := New("")
 	if err := s.Save(""); err == nil {
 		t.Fatal("expected error for empty path")
 	}
@@ -129,7 +129,7 @@ func TestSaveEmptyPath(t *testing.T) {
 func TestSaveCreatesDir(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "deep", "nested", "session.jsonl")
-	s := NewSession("")
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "test"})
 	if err := s.Save(path); err != nil {
 		t.Fatalf("save: %v", err)
@@ -139,8 +139,8 @@ func TestSaveCreatesDir(t *testing.T) {
 	}
 }
 
-func TestLoadSessionMissing(t *testing.T) {
-	_, err := LoadSession("/nonexistent/session.jsonl")
+func TestLoadMissing(t *testing.T) {
+	_, err := Load("/nonexistent/session.jsonl")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -149,11 +149,11 @@ func TestLoadSessionMissing(t *testing.T) {
 	}
 }
 
-func TestLoadSessionMalformed(t *testing.T) {
+func TestLoadMalformed(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.jsonl")
 	os.WriteFile(path, []byte("not valid json\n"), 0o644)
-	_, err := LoadSession(path)
+	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected error for malformed JSONL")
 	}
@@ -162,10 +162,10 @@ func TestLoadSessionMalformed(t *testing.T) {
 	}
 }
 
-// --- ListSessions ---
+// --- List ---
 
-func TestListSessionsMissingDirReturnsNil(t *testing.T) {
-	sessions, err := ListSessions("/nonexistent/dir")
+func TestListMissingDirReturnsNil(t *testing.T) {
+	sessions, err := List("/nonexistent/dir")
 	if err != nil {
 		t.Fatalf("expected nil error for missing dir, got %v", err)
 	}
@@ -174,9 +174,9 @@ func TestListSessionsMissingDirReturnsNil(t *testing.T) {
 	}
 }
 
-func TestListSessionsEmptyDir(t *testing.T) {
+func TestListEmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	sessions, err := ListSessions(dir)
+	sessions, err := List(dir)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -185,37 +185,34 @@ func TestListSessionsEmptyDir(t *testing.T) {
 	}
 }
 
-func TestListSessionsSorted(t *testing.T) {
+func TestListSorted(t *testing.T) {
 	dir := t.TempDir()
-	// Create two sessions with different content.
-	s1 := NewSession("")
+	s1 := New("")
 	s1.Add(provider.Message{Role: provider.RoleUser, Content: "first"})
 	s1.Save(filepath.Join(dir, "a.jsonl"))
 
-	s2 := NewSession("")
+	s2 := New("")
 	s2.Add(provider.Message{Role: provider.RoleUser, Content: "second"})
 	s2.Save(filepath.Join(dir, "b.jsonl"))
 
-	sessions, err := ListSessions(dir)
+	sessions, err := List(dir)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	if len(sessions) != 2 {
 		t.Fatalf("want 2 sessions, got %d", len(sessions))
 	}
-	// Newest first.
 	if sessions[0].ModTime.Before(sessions[1].ModTime) {
 		t.Error("sessions should be sorted newest first")
 	}
 }
 
-func TestListSessionsSkipsEmpty(t *testing.T) {
+func TestListSkipsEmpty(t *testing.T) {
 	dir := t.TempDir()
-	// A session with only a system prompt (no user interaction) should be skipped.
-	s := NewSession("system only")
+	s := New("system only")
 	s.Save(filepath.Join(dir, "empty.jsonl"))
 
-	sessions, err := ListSessions(dir)
+	sessions, err := List(dir)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -224,14 +221,14 @@ func TestListSessionsSkipsEmpty(t *testing.T) {
 	}
 }
 
-func TestListSessionsSkipsNonJSONL(t *testing.T) {
+func TestListSkipsNonJSONL(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("not a session"), 0o644)
-	s := NewSession("")
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "real"})
 	s.Save(filepath.Join(dir, "real.jsonl"))
 
-	sessions, err := ListSessions(dir)
+	sessions, err := List(dir)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -245,7 +242,7 @@ func TestListSessionsSkipsNonJSONL(t *testing.T) {
 func TestPreviewSession(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.jsonl")
-	s := NewSession("system")
+	s := New("system")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "Help me debug the auth module"})
 	s.Add(provider.Message{Role: provider.RoleAssistant, Content: "Sure, let me look..."})
 	s.Save(path)
@@ -262,7 +259,7 @@ func TestPreviewSession(t *testing.T) {
 func TestPreviewSessionLongMessage(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.jsonl")
-	s := NewSession("")
+	s := New("")
 	s.Add(provider.Message{Role: provider.RoleUser, Content: strings.Repeat("a", 200)})
 	s.Save(path)
 
@@ -288,11 +285,11 @@ func TestPreviewSessionMalformed(t *testing.T) {
 	}
 }
 
-// --- NewSessionPath ---
+// --- NewPath ---
 
-func TestNewSessionPath(t *testing.T) {
+func TestNewPath(t *testing.T) {
 	dir := t.TempDir()
-	path := NewSessionPath(dir, "deepseek-chat")
+	path := NewPath(dir, "deepseek-chat")
 	if !strings.HasSuffix(path, ".jsonl") {
 		t.Errorf("should end with .jsonl: %s", path)
 	}
@@ -304,8 +301,8 @@ func TestNewSessionPath(t *testing.T) {
 	}
 }
 
-func TestNewSessionPathSanitizesSlashes(t *testing.T) {
-	path := NewSessionPath("/dir", "provider/model")
+func TestNewPathSanitizesSlashes(t *testing.T) {
+	path := NewPath("/dir", "provider/model")
 	base := filepath.Base(path)
 	if strings.Contains(base, "/") {
 		t.Errorf("filename should not contain /: %s", base)
@@ -315,8 +312,8 @@ func TestNewSessionPathSanitizesSlashes(t *testing.T) {
 	}
 }
 
-func TestNewSessionPathEmptyModel(t *testing.T) {
-	path := NewSessionPath("/dir", "")
+func TestNewPathEmptyModel(t *testing.T) {
+	path := NewPath("/dir", "")
 	if !strings.Contains(path, "session") {
 		t.Errorf("empty model should use 'session' fallback: %s", path)
 	}

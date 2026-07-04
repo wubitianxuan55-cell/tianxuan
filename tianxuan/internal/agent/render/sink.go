@@ -1,4 +1,6 @@
-package agent
+// Package render provides the ANSI terminal text sink, stream batcher, and
+// usage-line formatting used by the agent package.
+package render
 
 import (
 	"fmt"
@@ -6,20 +8,25 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/agent/textutils"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 )
 
-// Pre-computed ANSI dim SGR sequences — avoid per-chunk string allocation
-// in the hot reasoning-rendering path.
+// Pre-computed ANSI dim SGR sequences.
 var (
 	dimPrefix = []byte("\x1b[2m")
 	dimSuffix = []byte("\x1b[0m")
 	newline   = []byte("\n")
 )
 
-// TextSink renders a turn's event stream to ANSI text on an io.Writer.
-type TextSink struct {
+// Renderer redraws the assistant's final-answer text as styled output.
+type Renderer interface {
+	Render(text string) string
+}
+
+// Sink renders a turn's event stream to ANSI text on an io.Writer.
+type Sink struct {
 	out       io.Writer
 	renderer  Renderer
 	termWidth int
@@ -30,25 +37,24 @@ type TextSink struct {
 	showReasoning        bool
 	wroteAnything        bool
 
-	// R3.1: reasoning throttle — show progress indicator instead of full text
 	reasoningChars     int
 	reasoningLastFlush time.Time
-	reasoningActive    bool // true while \r-overwritable progress line is live
+	reasoningActive    bool
 
-	// R3.2: tool batch — merge rapid tool dispatches into a summary line
-	pendingTools []string
-
-	// R3.3: error aggregation — merge consecutive errors into one line
+	pendingTools  []string
 	pendingErrors []string
 }
 
-func NewTextSink(out io.Writer, renderer Renderer, termWidth int) *TextSink {
-	return &TextSink{out: out, renderer: renderer, termWidth: termWidth}
+// NewSink creates a terminal text sink.
+func NewSink(out io.Writer, renderer Renderer, termWidth int) *Sink {
+	return &Sink{out: out, renderer: renderer, termWidth: termWidth}
 }
 
-func (s *TextSink) SetShowReasoning(show bool) { s.showReasoning = show }
+// SetShowReasoning toggles reasoning display.
+func (s *Sink) SetShowReasoning(show bool) { s.showReasoning = show }
 
-func (s *TextSink) Emit(e event.Event) {
+// Emit handles a single event, writing ANSI text to the underlying writer.
+func (s *Sink) Emit(e event.Event) {
 	switch e.Kind {
 	case event.TurnStarted:
 		s.wroteReasoningHeader = false
@@ -70,7 +76,6 @@ func (s *TextSink) Emit(e event.Event) {
 		if s.showReasoning && e.Text != "" {
 			s.reasoningChars += len(e.Text)
 			s.wroteReasoningBody = true
-			// Throttle: update progress every 500ms (overwrite current line with \r)
 			if now := time.Now(); now.Sub(s.reasoningLastFlush) >= 500*time.Millisecond {
 				s.flushReasoningProgress()
 				s.reasoningLastFlush = now
@@ -103,7 +108,6 @@ func (s *TextSink) Emit(e event.Event) {
 		}
 		s.pendingTools = append(s.pendingTools,
 			fmt.Sprintf("%s %s", e.Tool.Name, CompactArgs(e.Tool.Args)))
-		// Flush immediately if 3+ tools accumulated (batch already big enough to summarise)
 		if len(s.pendingTools) >= 3 {
 			s.flushBatchedTools()
 		}
@@ -175,28 +179,22 @@ func (s *TextSink) Emit(e event.Event) {
 	}
 }
 
-// finalizeReasoning ends the \r-overwritable reasoning progress line with a
-// newline and the final character count.
-func (s *TextSink) finalizeReasoning() {
+func (s *Sink) finalizeReasoning() {
 	if !s.reasoningActive {
 		return
 	}
-	// Overwrite the current \r progress line with the final count + newline
 	fmt.Fprintf(s.out, "\r  ▎ thinking ··· %d chars\n", s.reasoningChars)
 	s.reasoningActive = false
 }
 
-// flushReasoningProgress writes (or overwrites) the reasoning progress line.
-func (s *TextSink) flushReasoningProgress() {
+func (s *Sink) flushReasoningProgress() {
 	if !s.reasoningActive {
 		return
 	}
 	fmt.Fprintf(s.out, "\r  ▎ thinking ··· %d chars", s.reasoningChars)
 }
 
-// flushBatchedTools emits pending tool dispatches. When 3+, shows a summary
-// line; otherwise shows one line per tool (the standard industry pattern).
-func (s *TextSink) flushBatchedTools() {
+func (s *Sink) flushBatchedTools() {
 	n := len(s.pendingTools)
 	if n == 0 {
 		return
@@ -211,9 +209,7 @@ func (s *TextSink) flushBatchedTools() {
 	s.pendingTools = nil
 }
 
-// flushAggregatedErrors emits pending tool errors. When 2+, aggregates into
-// a single summary line; otherwise shows the individual error.
-func (s *TextSink) flushAggregatedErrors() {
+func (s *Sink) flushAggregatedErrors() {
 	n := len(s.pendingErrors)
 	if n == 0 {
 		return
@@ -226,7 +222,7 @@ func (s *TextSink) flushAggregatedErrors() {
 	s.pendingErrors = nil
 }
 
-func (s *TextSink) closeTextStream(text, reasoning string) {
+func (s *Sink) closeTextStream(text, reasoning string) {
 	defer func() {
 		s.wroteReasoningHeader = false
 		s.wroteReasoningBody = false
@@ -236,7 +232,7 @@ func (s *TextSink) closeTextStream(text, reasoning string) {
 		s.wroteAnything = true
 	}
 	if len(text) > 0 && s.renderer != nil {
-		if moved := streamedRows(text, s.termWidth); moved < 200 {
+		if moved := textutils.StreamedRows(text, s.termWidth); moved < 200 {
 			if moved == 0 {
 				fmt.Fprint(s.out, "\r\033[0J")
 			} else {
@@ -251,13 +247,14 @@ func (s *TextSink) closeTextStream(text, reasoning string) {
 	}
 }
 
-func (s *TextSink) usageLine(u *provider.Usage, p *provider.Pricing) {
+func (s *Sink) usageLine(u *provider.Usage, p *provider.Pricing) {
 	if line := FormatUsageLine(u, p); line != "" {
 		fmt.Fprintln(s.out, line)
 		s.wroteAnything = true
 	}
 }
 
+// FormatUsageLine returns a one-line token/cost summary, or "" when usage is nil/zero.
 func FormatUsageLine(u *provider.Usage, p *provider.Pricing) string {
 	if u == nil || u.TotalTokens == 0 {
 		return ""
@@ -285,17 +282,16 @@ func FormatUsageLine(u *provider.Usage, p *provider.Pricing) string {
 		u.TotalTokens, u.PromptTokens, cacheCol, u.CompletionTokens, reasoning, cost)
 }
 
-// dimText wraps s in the ANSI dim SGR sequence. Kept for FormatUsageLine etc.
-func dimText(s string) string { return "\x1b[2m" + s + "\x1b[0m" }
+// DimText wraps s in the ANSI dim SGR sequence.
+func DimText(s string) string { return "\x1b[2m" + s + "\x1b[0m" }
 
-// writeDim writes s with ANSI dim SGR to w in three Write calls — prefix,
-// content, suffix — without allocating an intermediate string.
 func writeDim(w io.Writer, s string) {
 	w.Write(dimPrefix)
 	w.Write([]byte(s))
 	w.Write(dimSuffix)
 }
 
+// CompactArgs truncates tool args for display.
 func CompactArgs(s string) string {
 	s = strings.TrimSpace(s)
 	r := []rune(s)

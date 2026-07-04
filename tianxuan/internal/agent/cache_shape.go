@@ -54,7 +54,7 @@ func (a *AgentRunner) CaptureShape() PrefixShape {
 }
 
 func captureShape(systemPrompt string, schemas []provider.ToolSchema, rewriteVersion int) PrefixShape {
-	normalized := normalizeToolSchemas(schemas)
+	normalized := NormalizeToolSchemas(schemas)
 	toolsJSON, _ := json.Marshal(normalized)
 	return PrefixShape{
 		SystemHash:        shortHash(systemPrompt),

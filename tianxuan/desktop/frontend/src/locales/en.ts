@@ -289,6 +289,8 @@ export const en = {
   "settings.plannerModel": "Planner model",
   "settings.subagentModel": "Subagent model",
   "settings.subagentInherit": "(inherit from parent)",
+  "settings.subagentPerSkill": "Per-skill overrides",
+  "settings.subagentGlobal": "global",
   "settings.plannerNone": "(none — single model)",
   "settings.keySet": "key set",
   "settings.noKey": "no key",

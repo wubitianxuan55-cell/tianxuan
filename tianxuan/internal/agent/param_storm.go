@@ -143,7 +143,7 @@ func canonicalizeArgs(raw string) string {
 	if err := json.Unmarshal([]byte(raw), &val); err != nil {
 		return raw // 解析失败，保留原样
 	}
-	canonical := canonicalizeValue(val)
+	canonical := CanonicalizeValue(val)
 	out, err := json.Marshal(canonical)
 	if err != nil {
 		return raw

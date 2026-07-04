@@ -1,4 +1,4 @@
-package agent
+package cache
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// toolCache caches read-only tool results (file reads) to avoid redundant disk IO
+// Cache caches read-only tool results (file reads) to avoid redundant disk IO
 // within a turn. Write operations invalidate related entries. Thread-safe.
 // Cache keys include path + offset so different read ranges have separate entries.
-type toolCache struct {
+type Cache struct {
 	mu       sync.RWMutex
 	items    map[string]*cacheItem
 	pathKeys map[string]map[string]struct{} // path → set of cache keys (O(1) invalidate)
@@ -33,8 +33,8 @@ type cacheItem struct {
 // newToolCache creates a cache with the given TTL. Zero or negative TTL means
 // no expiry (entries live until invalidated by a write or clear).
 // grace sets the Stat-bypass window; 0 disables the optimisation.
-func newToolCache(ttl time.Duration) *toolCache {
-	return &toolCache{
+func New(ttl time.Duration) *Cache {
+	return &Cache{
 		items:    make(map[string]*cacheItem),
 		pathKeys: make(map[string]map[string]struct{}),
 		ttl:      ttl,
@@ -52,7 +52,7 @@ func readKey(path string, offset int) string {
 
 // get returns the cached content for a read_file(path, offset). Returns
 // ("", false) on miss or stale entry.
-func (c *toolCache) get(path string, offset int) (string, bool) {
+func (c *Cache) Get(path string, offset int) (string, bool) {
 	key := readKey(path, offset)
 	c.mu.RLock()
 	ci, ok := c.items[key]
@@ -70,7 +70,7 @@ func (c *toolCache) get(path string, offset int) (string, bool) {
 	if c.ttl <= 0 || time.Since(ci.cached) <= c.ttl {
 		fi, err := os.Stat(path)
 		if err != nil || !fi.ModTime().Equal(ci.mtime) {
-			c.invalidatePath(path)
+			c.InvalidatePath(path)
 			return "", false
 		}
 		return ci.content, true
@@ -88,7 +88,7 @@ func (c *toolCache) get(path string, offset int) (string, bool) {
 }
 
 // set caches content for a read_file(path, offset).
-func (c *toolCache) set(path string, offset int, content string) {
+func (c *Cache) Set(path string, offset int, content string) {
 	key := readKey(path, offset)
 	// Read mtime immediately for accurate invalidation
 	var mtime time.Time
@@ -109,7 +109,7 @@ func (c *toolCache) set(path string, offset int, content string) {
 }
 
 // invalidatePath removes all cache entries for a given file path. O(keys-per-path).
-func (c *toolCache) invalidatePath(path string) {
+func (c *Cache) InvalidatePath(path string) {
 	c.mu.Lock()
 	for k := range c.pathKeys[path] {
 		delete(c.items, k)
@@ -119,7 +119,7 @@ func (c *toolCache) invalidatePath(path string) {
 }
 
 // clear removes all cache entries. Called at the start of each turn.
-func (c *toolCache) clear() {
+func (c *Cache) Clear() {
 	c.mu.Lock()
 	clear(c.items)
 	clear(c.pathKeys)

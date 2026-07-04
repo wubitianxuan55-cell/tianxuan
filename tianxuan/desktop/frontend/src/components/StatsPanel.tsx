@@ -97,7 +97,7 @@ function StatsTable({ title, main, sub, total }: {
     { label: "缓存命中", render: c => {
       const t = c.cacheHit + c.cacheMiss;
       const rate = t > 0 ? (c.cacheHit / t * 100) : 0;
-      return `${rate.toFixed(1)}%`;
+      return `${rate.toFixed(2)}%`;
     }},
     { label: "成本", render: c => cash(c.cost) },
   ];
@@ -107,7 +107,7 @@ function StatsTable({ title, main, sub, total }: {
       <table className="w-full text-[11px] border-collapse">
         <thead>
           <tr className="text-fg-faint border-b border-border-soft">
-            <th className="text-left font-normal pb-1" />
+            <th className="text-left font-normal pb-1 w-[34%]" />
             <th className="text-right font-normal pb-1 w-[22%]">主模型</th>
             <th className="text-right font-normal pb-1 w-[22%]">子代理</th>
             <th className="text-right font-normal pb-1 w-[22%]">汇总</th>
@@ -126,13 +126,13 @@ function StatsTable({ title, main, sub, total }: {
                 {isHitRow ? (
                   <>
                     <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(mRate)}`}>
-                      {main.cacheHit + main.cacheMiss > 0 ? `${mRate.toFixed(1)}%` : "—"}
+                      {main.cacheHit + main.cacheMiss > 0 ? `${mRate.toFixed(2)}%` : "—"}
                     </td>
                     <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(sRate)}`}>
-                      {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(1)}%` : "—"}
+                      {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(2)}%` : "—"}
                     </td>
                     <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(tRate)}`}>
-                      {t > 0 ? `${tRate.toFixed(1)}%` : "—"}
+                      {t > 0 ? `${tRate.toFixed(2)}%` : "—"}
                     </td>
                   </>
                 ) : (
@@ -228,8 +228,8 @@ function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: str
   return <MiniAreaChart title={title} W={W} H={H} padL={padL} padR={padR} padT={padT} padB={padB} points={points} yTicks={yLabels} color={color} xLabels={xLabels} />;
 }
 
-export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, resetKey, toolCounts, skillCounts, perTurnMainUsage, perTurnSubUsage }: {
-  usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string;
+export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, subagentModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnMainUsage, perTurnSubUsage }: {
+  usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string; subagentModel?: string;
   sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
   perTurnMainUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {
@@ -407,9 +407,20 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
           main={sessMain} sub={sessSub} total={sessTotal}
         />
 
+        {sessTotal.cacheHit + sessTotal.cacheMiss > 0 && (() => {
+          const rate = (sessTotal.cacheHit / (sessTotal.cacheHit + sessTotal.cacheMiss)) * 100;
+          return (
+            <div className="flex items-baseline gap-2 pb-3 border-b border-border-soft">
+              <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
+              <span className="text-[10px] text-fg-faint tabular-nums">{tk(sessTotal.cacheHit)} 命中 / {tk(sessTotal.cacheMiss)} 未命中</span>
+            </div>
+          );
+        })()}
+
         {/* ── 本轮级统计表格 ── */}
+
         {(perTurnMainUsage || perTurnSubUsage) && (
-          <StatsTable title="本轮" main={turnMain} sub={turnSub} total={turnTotal} />
+          <StatsTable title={`本轮 (${turnSteps?.length || 0}步)`} main={turnMain} sub={turnSub} total={turnTotal} />
         )}
 
         {/* ── 当前步 ── */}
@@ -441,10 +452,10 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         )}
 
         {/* ── 命中率趋势（主模型）── */}
-        <HitRateTrend steps={mainSteps} title="命中率趋势 · 主模型" color="var(--accent)" />
+        <HitRateTrend steps={mainSteps} title={`命中率趋势 · ${model || "主模型"}`} color="var(--accent)" />
 
         {/* ── 命中率趋势（子代理）── */}
-        <HitRateTrend steps={subSteps} title="命中率趋势 · 子代理" color="var(--warn)" />
+        <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" />
 
         {/* ── Token 趋势 ── */}
         {history.length > 1 && (() => {

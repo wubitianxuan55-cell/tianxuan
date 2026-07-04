@@ -1,4 +1,4 @@
-package agent
+package session
 
 import (
 	"encoding/json"
@@ -48,10 +48,10 @@ func (s *Session) Save(path string) error {
 	return os.Rename(tmpPath, path)
 }
 
-// LoadSession reads a JSONL file written by Save into a fresh Session value.
+// Load reads a JSONL file written by Save into a fresh Session value.
 // Missing files surface as os.IsNotExist so callers can fall through to a
 // new session.
-func LoadSession(path string) (*Session, error) {
+func Load(path string) (*Session, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -77,21 +77,21 @@ func LoadSession(path string) (*Session, error) {
 	return s, nil
 }
 
-// SessionInfo summarises a saved session for the --resume picker: where it
+// Info summarises a saved session for the --resume picker: where it
 // is on disk, when it was last touched, the first user message as a preview,
 // and a rough turn count.
-type SessionInfo struct {
+type Info struct {
 	Path    string
 	ModTime time.Time
 	Preview string
 	Turns   int
 }
 
-// ListSessions returns every *.jsonl session under dir, newest first, each
+// List returns every *.jsonl session under dir, newest first, each
 // with a preview line so the picker can show something the user recognises.
 // A missing directory is not an error — it just means there's nothing to
 // resume yet.
-func ListSessions(dir string) ([]SessionInfo, error) {
+func List(dir string) ([]Info, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -99,7 +99,7 @@ func ListSessions(dir string) ([]SessionInfo, error) {
 		}
 		return nil, err
 	}
-	var out []SessionInfo
+	var out []Info
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
 			continue
@@ -116,7 +116,7 @@ func ListSessions(dir string) ([]SessionInfo, error) {
 			// or the resume picker.
 			continue
 		}
-		out = append(out, SessionInfo{
+		out = append(out, Info{
 			Path:    full,
 			ModTime: info.ModTime(),
 			Preview: preview,
@@ -162,9 +162,9 @@ func previewSession(path string) (string, int) {
 
 // ─── V5.21: Session archive ──────────────────────────────────────────────
 
-// ArchiveSession moves a session file (and its .meta sidecar) to an archive/
+// Archive moves a session file (and its .meta sidecar) to an archive/
 // subdirectory. Returns nil on success.
-func ArchiveSession(sessionPath string) error {
+func Archive(sessionPath string) error {
 	dir := filepath.Dir(sessionPath)
 	archiveDir := filepath.Join(dir, "archive")
 	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
@@ -183,8 +183,8 @@ func ArchiveSession(sessionPath string) error {
 	return nil
 }
 
-// UnarchiveSession moves a session back from archive/ to its parent dir.
-func UnarchiveSession(archivePath string) error {
+// Unarchive moves a session back from archive/ to its parent dir.
+func Unarchive(archivePath string) error {
 	parent := filepath.Dir(filepath.Dir(archivePath)) // up from archive/
 	base := filepath.Base(archivePath)
 	dest := filepath.Join(parent, base)
@@ -198,10 +198,10 @@ func UnarchiveSession(archivePath string) error {
 	return nil
 }
 
-// NewSessionPath returns the path to use for a fresh session, namespaced by
+// NewPath returns the path to use for a fresh session, namespaced by
 // the model so the filename hints at what the conversation was with. dir is
 // typically config.SessionDir().
-func NewSessionPath(dir, model string) string {
+func NewPath(dir, model string) string {
 	safe := strings.NewReplacer("/", "-", "\\", "-").Replace(model)
 	if safe == "" {
 		safe = "session"

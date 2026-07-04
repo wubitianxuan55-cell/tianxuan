@@ -314,6 +314,8 @@ export interface SettingsView {
   defaultModel: string;
   plannerModel: string;
   subagentModel: string;
+  subagentModels: Record<string, string>; // per-skill overrides
+  subagentSkills: string[]; // builtin subagent skill names
   providers: ProviderView[];
   permissions: PermissionsView;
   sandbox: SandboxView;

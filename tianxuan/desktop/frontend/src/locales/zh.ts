@@ -290,6 +290,8 @@ export const zh: Record<DictKey, string> = {
   "settings.plannerModel": "规划模型",
   "settings.subagentModel": "子代理模型",
   "settings.subagentInherit": "（继承主模型）",
+  "settings.subagentPerSkill": "按技能单独配置",
+  "settings.subagentGlobal": "全局",
   "settings.plannerNone": "（无 —— 单模型）",
   "settings.keySet": "已设密钥",
   "settings.noKey": "无密钥",

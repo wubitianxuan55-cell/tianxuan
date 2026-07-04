@@ -1,4 +1,4 @@
-package agent
+package session
 
 import (
 	"encoding/json"
@@ -33,6 +33,7 @@ type BranchInfo struct {
 	Turns   int
 }
 
+// BranchID extracts a stable identifier from a session file path.
 func BranchID(path string) string {
 	if path == "" {
 		return ""
@@ -44,6 +45,7 @@ func BranchID(path string) string {
 	return base
 }
 
+// BranchMetaPath returns the .meta sidecar path for a session file.
 func BranchMetaPath(sessionPath string) string {
 	if sessionPath == "" {
 		return ""
@@ -51,6 +53,7 @@ func BranchMetaPath(sessionPath string) string {
 	return sessionPath + ".meta"
 }
 
+// LoadBranchMeta reads a branch metadata sidecar file.
 func LoadBranchMeta(sessionPath string) (BranchMeta, bool, error) {
 	metaPath := BranchMetaPath(sessionPath)
 	if metaPath == "" {
@@ -73,6 +76,7 @@ func LoadBranchMeta(sessionPath string) (BranchMeta, bool, error) {
 	return m, true, nil
 }
 
+// SaveBranchMeta persists branch metadata to a sidecar file.
 func SaveBranchMeta(sessionPath string, m BranchMeta) error {
 	metaPath := BranchMetaPath(sessionPath)
 	if metaPath == "" {
@@ -111,6 +115,7 @@ func SaveBranchMeta(sessionPath string, m BranchMeta) error {
 	return os.Rename(tmpPath, metaPath)
 }
 
+// EnsureBranchMeta loads existing branch metadata or creates a fresh record.
 func EnsureBranchMeta(sessionPath string) (BranchMeta, error) {
 	if sessionPath == "" {
 		return BranchMeta{}, fmt.Errorf("empty session path")
@@ -127,6 +132,7 @@ func EnsureBranchMeta(sessionPath string) (BranchMeta, error) {
 	return m, SaveBranchMeta(sessionPath, m)
 }
 
+// TouchBranchMeta updates the branch metadata's UpdatedAt timestamp.
 func TouchBranchMeta(sessionPath string) error {
 	m, err := EnsureBranchMeta(sessionPath)
 	if err != nil {
@@ -135,6 +141,7 @@ func TouchBranchMeta(sessionPath string) error {
 	return SaveBranchMeta(sessionPath, m)
 }
 
+// ListBranches returns all branchable sessions under dir.
 func ListBranches(dir string) ([]BranchInfo, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

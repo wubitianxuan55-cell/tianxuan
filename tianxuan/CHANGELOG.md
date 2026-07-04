@@ -1,4 +1,43 @@
-## [10.11.0] — 2026-06-29
+## [10.24.0] — 2026-07-04
+
+### 🏗️ Agent 包架构拆分
+
+> agent 包从单层 44 文件拆分为 1 核心 + 6 子包
+
+- `session/` — Session 结构体 + Save/Load/Branch（16 测试迁移）
+- `budget/` — BudgetGate + ModelProfile（6 测试迁移）
+- `textutils/` — 工具输出截断/规范化/终端宽度
+- `render/` — TextSink ANSI 渲染 + StreamBatcher（6 测试迁移）
+- `toolguard/` — 工具参数修复 `RepairDispatchToolArguments`
+- `cache/` — 工具目录指纹 + 只读文件缓存（7 测试迁移）
+- agent 核心 170/171 测试通过，全项目编译通过
+
+### ⚙️ 设置面板：子代理模型选择增强
+
+- 全局子代理模型：原生 `<select>` → 搜索式 `ModelSwitcher` 下拉
+- Per-skill 独立配置：可折叠分组，为 explore/research/review/security-review 分别选择模型
+- ModelSwitcher 支持 `allowInherit`/"继承主模型"选项
+- 后端新增 `SetSubagentModelForSkill` 配置 API
+
+### 📊 统计面板优化
+
+- 标题栏列宽对齐（标签 `w-[34%]` + 数据 `w-[22%]`×3）
+- 所有命中缓存率统一 `.toFixed(2)` (0.01% 精度)
+- 会话级/本轮级命中率加大加亮显示（`text-xl font-bold`，模仿"当前步"样式）
+- 趋势图标题动态显示实际模型名（替代硬编码"主模型/子代理"）
+
+### 🎛️ 布局调整
+
+- 变更按钮从底栏移至顶栏右侧（GitBranch 图标）
+- 底栏上下文进度条升级为弹性宽度横道图（`flex-1` × `8px`，带 `used/window` 数字）
+
+### ⚡ 流式渲染性能修复
+
+- MemoMarkdown 流式预览从 O(n²) 全量重处理改为增量渲染（仅处理新增行）
+- 新增 `requestAnimationFrame` 节流，限制每帧一次 DOM 更新
+- 修复中文长文本流式输出时"等全部输出完才渲染"的问题
+
+## [10.23.0] — 2026-07-04
 
 ### 🎨 体验优化迭代
 

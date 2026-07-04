@@ -18,18 +18,9 @@ import (
 	"tianxuan/internal/memory"
 	"tianxuan/internal/nilutil"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/agent/cache"
 	"tianxuan/internal/tool"
 )
-
-
-// Renderer redraws the assistant's final-answer text as styled output. It is
-// applied only after a turn's text stream completes, so the user sees raw
-// markdown stream live, then a single redraw replaces it with formatted
-// output. The renderer is intentionally interface-shaped so the agent stays
-// independent of the cli's markdown library choice. Consumed by TextSink.
-type Renderer interface {
-	Render(text string) string
-}
 
 // Asker puts structured multiple-choice questions to the user and blocks for the
 // answers. The agent consults it for the `ask` tool. It is interface-shaped so
@@ -307,7 +298,7 @@ type AgentRunner struct {
 
 	// tc caches read-only tool results (file reads) to avoid redundant disk IO
 	// within a turn. Write operations auto-invalidate. Thread-safe.
-	tc *toolCache
+	tc *cache.Cache
 
 
 	// steerQueue holds mid-turn user messages queued while the agent is
@@ -627,7 +618,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		dispatcher: opts.Dispatcher,
 		ctxMgr:     opts.CtxMgr,
 		auditFunc:  opts.AuditFunc,
-		tc:         newToolCache(-1), // V5.8: session �����棬mtime У�������
+		tc:         cache.New(-1), // V5.8: session �����棬mtime У�������
 		goal:       opts.Goal,        // V6.0 P7: �ỰĿ��
 		disableVerify: opts.DisableVerify,
 	}

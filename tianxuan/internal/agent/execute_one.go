@@ -121,7 +121,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			Offset int    `json:"offset"`
 		}
 		if err := json.Unmarshal(json.RawMessage(call.Arguments), &ra); err == nil && ra.Path != "" {
-			if cached, ok := a.tc.get(ra.Path, ra.Offset); ok {
+			if cached, ok := a.tc.Get(ra.Path, ra.Offset); ok {
 				return toolOutcome{output: cached}
 			}
 		}
@@ -171,13 +171,13 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 					Offset int    `json:"offset"`
 				}
 				if json.Unmarshal(json.RawMessage(call.Arguments), &ra) == nil && ra.Path != "" {
-					a.tc.set(ra.Path, ra.Offset, result)
+					a.tc.Set(ra.Path, ra.Offset, result)
 				}
 			}
 		case "edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol":
 			var wa struct{ Path string `json:"path"` }
 			if json.Unmarshal(json.RawMessage(call.Arguments), &wa) == nil && wa.Path != "" {
-				a.tc.invalidatePath(wa.Path)
+				a.tc.InvalidatePath(wa.Path)
 			}
 		}
 	}

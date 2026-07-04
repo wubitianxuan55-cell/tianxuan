@@ -54,7 +54,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel, onOpenChanges,
+  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -69,7 +69,6 @@ export const StatusBar = memo(function StatusBar({
   model?: string;
   subagentModel?: string;
   onOpenStats?: () => void;
-  onOpenChanges?: () => void;
 }) {
   const compact = useCompact();
   const now = useTick(running);
@@ -174,20 +173,21 @@ export const StatusBar = memo(function StatusBar({
                 </Tooltip>
               </>
             )}
-            {/* 上下文用量 — 加宽带标签 */}
+            {/* 上下文用量横道图 */}
             {context.window > 0 && (
               <>
                 <span className="text-border/40 select-none">·</span>
                 <Tooltip label={`上下文: ${fmtTokens(context.used)} / ${fmtTokens(context.window)}`}>
-                  <div className="flex items-center gap-1">
-                    <span className="text-fg-faint">上下文</span>
-                    <div className="w-[60px] h-[5px] bg-border rounded-full overflow-hidden">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
+                    <span className="text-fg-faint shrink-0">上下文</span>
+                    <div className="flex-1 h-2 bg-border/40 rounded-full overflow-hidden min-w-[80px]">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${contextColor}`}
+                        className={`h-full rounded-full transition-all duration-500 ${contextColor}`}
                         style={{ width: `${Math.min(contextPct, 100)}%` } as React.CSSProperties}
                       />
                     </div>
-                    <span className="text-fg-faint font-mono tabular-nums text-[9px]">{contextPct}%</span>
+                    <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0">{contextPct}%</span>
+                    <span className="text-fg-faint font-mono tabular-nums text-[9px] shrink-0">{fmtTokens(context.used)}/{fmtTokens(context.window)}</span>
                   </div>
                 </Tooltip>
               </>
@@ -242,17 +242,6 @@ export const StatusBar = memo(function StatusBar({
 
         {/* 后台任务 — 文字标注 */}
         {jobs && jobs.length > 0 && <JobsChip jobs={jobs} compact={compact} />}
-
-        {/* 变更 — 单击打开变更面板 */}
-        {onOpenChanges && (
-          <button
-            className={`inline-flex items-center gap-1 ${fontSize} px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors`}
-            onClick={onOpenChanges}
-            title="查看文件变更"
-          >
-            <GitBranch size={compact ? 11 : 12} />
-          </button>
-        )}
 
         {/* 余额 — 文字标注 */}
         {balance?.available && balance.display && (

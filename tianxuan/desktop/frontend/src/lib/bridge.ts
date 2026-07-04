@@ -133,6 +133,9 @@ export interface AppBindings {
   // SetSubagentModel sets the default model for spawned sub-agents. An empty string
   // clears it so sub-agents inherit the parent's provider.
   SetSubagentModel(ref: string): Promise<void>;
+  // SetSubagentModelForSkill sets a per-skill sub-agent model override.
+  // skill is one of explore|research|review|security-review. Empty ref = inherit.
+  SetSubagentModelForSkill(skill: string, ref: string): Promise<void>;
   // SetPermLevel controls permission strictness: "ask" (default, prompt before writes),
   // "auto" (allow writes without asking), or "yolo" (skip all prompts).
   SetPermLevel(level: string): Promise<void>;

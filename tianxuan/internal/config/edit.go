@@ -66,6 +66,25 @@ func (c *Config) SetSubagentModel(name string) error {
 	return nil
 }
 
+// SetSubagentModelForSkill sets (or, with "", clears) agent.subagent_models[skill]
+// — a per-skill override for sub-agent model selection. An empty ref clears the
+// override so the skill falls back to the global subagent_model. A non-empty ref
+// must be a configured provider.
+func (c *Config) SetSubagentModelForSkill(skill, ref string) error {
+	if c.Agent.SubagentModels == nil {
+		c.Agent.SubagentModels = make(map[string]string)
+	}
+	if ref == "" {
+		delete(c.Agent.SubagentModels, skill)
+		return nil
+	}
+	if _, ok := c.Provider(ref); !ok {
+		return fmt.Errorf("set subagent model for %s: no provider %q (configured: %s)", skill, ref, c.providerNames())
+	}
+	c.Agent.SubagentModels[skill] = ref
+	return nil
+}
+
 // UpsertProvider adds e, or replaces an existing provider with the same name
 // (preserving its position). Required fields (name, kind, base_url, model) are
 // validated; whether the kind is actually registered and the key resolves is

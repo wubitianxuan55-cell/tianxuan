@@ -1,20 +1,24 @@
-package agent
+// Package textutils provides tool output truncation, normalization, and
+// terminal-width helpers used by the agent package.
+package textutils
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
-// maxToolOutputBytes caps a single tool result before it goes into the model's
+// MaxToolOutputBytes caps a single tool result before it goes into the model's
 // context window. 48 KiB keeps the overhead per call bounded while leaving room
 // for meaningful output.
-const maxToolOutputBytes = 48 * 1024
-const tailScanChars = 2048 // scan last N chars for error patterns when truncation needed
+const MaxToolOutputBytes = 48 * 1024
 
-const (
-	maxToolResultLines = 320
-)
+const tailScanChars = 2048
+
+const MaxToolResultLines = 320
 
 var signalKeywords = []string{
 	"error", "Error", "ERROR",
@@ -27,25 +31,23 @@ var signalKeywords = []string{
 	"cannot", "invalid",
 }
 
-// firstLine returns the first line of s (up to, but not including, the first
+// FirstLine returns the first line of s (up to, but not including, the first
 // newline).
-func firstLine(s string) string {
+func FirstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return s[:i]
 	}
 	return s
 }
 
-// truncateToolOutput is the convenience wrapper that uses the default limits.
-func truncateToolOutput(s string) (string, string) {
-	return truncateToolOutputWith(s, maxToolResultLines, maxToolOutputBytes)
+// TruncateToolOutput is the convenience wrapper that uses the default limits.
+func TruncateToolOutput(s string) (string, string) {
+	return TruncateToolOutputWith(s, MaxToolResultLines, MaxToolOutputBytes)
 }
 
-// truncateToolOutputWith keeps the most important lines up to the limits.
-// It strips ANSI escapes, compresses repeated lines, keeps head+tail+signal
-// lines, and appends a truncation notice to the output.
-func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
-	s = normalizeText(s)
+// TruncateToolOutputWith keeps the most important lines up to the limits.
+func TruncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
+	s = Normalize(s)
 
 	lines := strings.Split(s, "\n")
 	originalLines := len(lines)
@@ -55,8 +57,6 @@ func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
 		return s, ""
 	}
 
-	// If the tail contains error patterns, bias toward tail (diagnostics
-	// are more valuable than startup noise); otherwise keep head+tail.
 	direction := "head+tail"
 	if hasErrorInTail(s, tailScanChars) {
 		direction = "tail"
@@ -67,7 +67,7 @@ func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
 	used := 0
 	kept := 0
 	for _, line := range selected {
-		lineBytes := len(line) + 1 // +1 for \n
+		lineBytes := len(line) + 1
 		if used+lineBytes > maxBytes {
 			if kept > 0 {
 				break
@@ -96,9 +96,9 @@ func truncateToolOutputWith(s string, maxLines, maxBytes int) (string, string) {
 	return out.String(), notice
 }
 
-// normalizeText strips ANSI escape sequences, normalises line endings, compresses
+// Normalize strips ANSI escape sequences, normalises line endings, compresses
 // blank-line runs and repeated consecutive lines.
-func normalizeText(s string) string {
+func Normalize(s string) string {
 	var out strings.Builder
 	out.Grow(len(s))
 	i := 0
@@ -159,8 +159,8 @@ func normalizeText(s string) string {
 	return strings.Join(result, "\n")
 }
 
-// hasSignalKeyword reports whether the line contains a signal keyword.
-func hasSignalKeyword(line string) bool {
+// HasSignalKeyword reports whether the line contains a signal keyword.
+func HasSignalKeyword(line string) bool {
 	lower := strings.ToLower(line)
 	for _, kw := range signalKeywords {
 		if strings.Contains(lower, kw) {
@@ -170,9 +170,6 @@ func hasSignalKeyword(line string) bool {
 	return false
 }
 
-
-
-// hasErrorInTail scans the last n characters for error patterns.
 func hasErrorInTail(s string, n int) bool {
 	start := len(s) - n
 	if start < 0 {
@@ -186,7 +183,7 @@ func hasErrorInTail(s string, n int) bool {
 	}
 	return false
 }
-// selectHygieneLines picks head + tail + signal-bearing lines for truncation.
+
 func selectHygieneLines(lines []string, maxLines int, direction string) []string {
 	if len(lines) <= maxLines {
 		return lines
@@ -202,8 +199,12 @@ func selectHygieneLines(lines []string, maxLines int, direction string) []string
 		tailCount = 1
 	}
 
-	for i := 0; i < headCount && i < len(lines); i++ {
-		indexes[i] = true
+	if direction == "tail" {
+		// Error detected in tail: skip head, keep only tail + signal.
+	} else {
+		for i := 0; i < headCount && i < len(lines); i++ {
+			indexes[i] = true
+		}
 	}
 	for i := len(lines) - tailCount; i < len(lines); i++ {
 		if i >= 0 {
@@ -212,16 +213,8 @@ func selectHygieneLines(lines []string, maxLines int, direction string) []string
 	}
 
 	signalCount := 0
-	if direction == "tail" {
-		// Error detected in tail: drop head lines, keep only tail + signal.
-		// headCount stays 0 (already set above).
-	} else {
-		for i := 0; i < headCount && i < len(lines); i++ {
-			indexes[i] = true
-		}
-	}
 	for i := 0; i < len(lines) && len(indexes) < maxLines; i++ {
-		if hasSignalKeyword(lines[i]) && !indexes[i] {
+		if HasSignalKeyword(lines[i]) && !indexes[i] {
 			indexes[i] = true
 			signalCount++
 			if signalCount >= 48 {
@@ -242,8 +235,6 @@ func selectHygieneLines(lines []string, maxLines int, direction string) []string
 	return result
 }
 
-// snapToRuneBoundary returns s[lo:hi] with the bounds nudged outward until
-// both land on rune-start positions.
 func snapToRuneBoundary(s string, lo, hi int) string {
 	for lo > 0 && !utf8.RuneStart(s[lo]) {
 		lo--
@@ -252,4 +243,30 @@ func snapToRuneBoundary(s string, lo, hi int) string {
 		hi++
 	}
 	return s[lo:hi]
+}
+
+// === Width helpers ===
+
+// ansiSGR matches ANSI Select-Graphic-Rendition sequences.
+var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// VisibleWidth returns the column count of s after stripping ANSI SGR codes.
+func VisibleWidth(s string) int {
+	return runewidth.StringWidth(ansiSGR.ReplaceAllString(s, ""))
+}
+
+// StreamedRows counts how many rows the cursor has descended after raw text
+// of length s was printed at the given terminal width.
+func StreamedRows(s string, width int) int {
+	if width <= 0 {
+		width = 80
+	}
+	rows := 0
+	for _, line := range strings.Split(s, "\n") {
+		if w := VisibleWidth(line); w > 0 {
+			rows += (w - 1) / width
+		}
+	}
+	rows += strings.Count(s, "\n")
+	return rows
 }

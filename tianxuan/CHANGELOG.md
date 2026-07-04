@@ -1,3 +1,35 @@
+## [10.26.0] — 2026-07-04
+
+### 🧬 Reasonix V1.15 蒸馏完成（22 特性，~3000 行新增）
+
+> 跨四个模块系统性移植 Reasonix V1.15 全部核心特性到 tianxuan
+
+#### 编码管线遗留
+- `delete_range` / `delete_symbol` / `editlines`: 编码感知读写，`writeFileEncoded` 保留原编码（GB18030/UTF-16 等）
+- `writefile`: 覆盖已有文件时保留原编码，新文件默认 UTF-8
+- 已有基础设施：8种编码检测 (`fileutil/encoding/`)、模糊编辑匹配、大括号完整性校验
+
+#### 子代理 transcript 持久化
+- 新建 `internal/agent/subagent_store.go` (240行)：`SubagentStore`/`SubagentRun`/`SubagentMeta`
+- `task.go` 新增 `continue_from` 参数：子代理跨轮次续跑，输出 `Subagent reference: sa_xxx`
+
+#### 双模型协调器（planner + executor）
+- 新建 `internal/agent/coordinator.go` (260行)：`Coordinator` 实现 `Runner` 接口
+- `boot.go` 集成：`planner_model` 配置时自动启用，planner 独立会话保证缓存稳定
+- `event` 包新增 `UsageSourcePlanner`/`UsageSourceExecutor`
+- `agent.go` 新增 `ProvName()` 方法
+
+#### 桌面端双模型适配
+- `settings_app.go`: `SetPlannerModel` Go 后端
+- `bridge.ts` / `mock.ts`: TypeScript 绑定
+- `SettingsPanel.tsx`: ModelsSection + AgentSection 双视图 Planner 模型选择器（ModelSwitcher）
+
+### 🔧 其他改进
+- `bg_startkill_test.go`: 后台启停循环检测单元测试
+- `docs/specs/2026-07-04-reasonix-distillation-plan.md`: 完整蒸馏实施记录
+
+---
+
 ## [10.24.0] — 2026-07-04
 
 ### 🏗️ Agent 包架构拆分

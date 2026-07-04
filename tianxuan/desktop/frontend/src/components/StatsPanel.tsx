@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Gauge, TrendingUp, Zap } from "lucide-react";
-import type { WireUsage, ContextInfo } from "../lib/types";
+import { BarChart3, TrendingUp, Zap } from "lucide-react";
+import type { WireUsage } from "../lib/types";
 
 interface Point { x: number; y: number; label: string; }
 
@@ -245,8 +245,8 @@ function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: str
 }
 
 
-export function StatsPanel({ perTurnUsage, turnSteps, context, model, subagentModel, plannerModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
-  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string; subagentModel?: string; plannerModel?: string;
+export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plannerModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
+  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; model?: string; subagentModel?: string; plannerModel?: string;
   sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
   perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {
@@ -364,8 +364,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, context, model, subagentMo
     cacheMiss: sessPlanner.cacheMiss + sessExecutor.cacheMiss + sessSub.cacheMiss,
     cost: sessPlanner.cost + sessExecutor.cost + sessSub.cost,
   }), [sessPlanner, sessExecutor, sessSub]);
-  const totalCost = sessPlanner.cost + sessExecutor.cost + sessSub.cost;
-
+  
   // turn-level: from store accumulators
   const turnPlanner = useMemo(() => colFromUsage(perTurnPlannerUsage, plannerPrice), [perTurnPlannerUsage, plannerPrice]);
   const turnExecutor = useMemo(() => colFromUsage(perTurnExecutorUsage, price), [perTurnExecutorUsage, price]);
@@ -383,25 +382,6 @@ export function StatsPanel({ perTurnUsage, turnSteps, context, model, subagentMo
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      {/* ── 顶栏摘要 ── */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-bg-soft border-b border-border-soft shrink-0">
-        {context.window > 0 && (
-          <>
-            <Gauge size={11} className="text-fg-faint" />
-            <span className="text-[10px] text-fg-faint font-mono tabular-nums">{tk(context.used)}/{tk(context.window)}</span>
-          </>
-        )}
-        {(context.window > 0) && <span className="text-border select-none">·</span>}
-        <span className="text-[10px] text-fg-faint font-mono tabular-nums">
-          {history.length}轮·{stepHistory.length}步
-        </span>
-        {totalCost > 0 && (
-          <>
-            <span className="text-border select-none">·</span>
-            <span className="text-[10px] text-fg-faint font-mono tabular-nums">{cash(totalCost)}</span>
-          </>
-        )}
-      </div>
 
       {!hasAnyData ? (
         <div className="flex flex-col items-center justify-center gap-2 flex-1 text-fg-faint">

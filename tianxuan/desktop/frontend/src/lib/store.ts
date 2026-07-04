@@ -152,17 +152,17 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
       const isSub = u?.source === "subagent";
       const isExecutor = u && !isPlanner && !isSub; // "main" or legacy without source
       const prevPlanner = s.perTurnPlannerUsage, prevExecutor = s.perTurnExecutorUsage, prevSub = s.perTurnSubUsage;
-      const accBySource = (prev?: WireUsage) => prev && u ? {
-        promptTokens: prev.promptTokens + (u.promptTokens ?? 0),
-        completionTokens: prev.completionTokens + (u.completionTokens ?? 0),
-        totalTokens: prev.totalTokens + (u.totalTokens ?? 0),
-        cacheHitTokens: prev.cacheHitTokens + (u.cacheHitTokens ?? 0),
-        cacheMissTokens: prev.cacheMissTokens + (u.cacheMissTokens ?? 0),
-        sessionCacheHitTokens: u.sessionCacheHitTokens > 0 ? u.sessionCacheHitTokens : (prev.sessionCacheHitTokens ?? 0),
-        sessionCacheMissTokens: u.sessionCacheMissTokens > 0 ? u.sessionCacheMissTokens : (prev.sessionCacheMissTokens ?? 0),
-      } : u;
+      const accSrc = (prev?: WireUsage, cur?: WireUsage) => !cur ? prev : !prev ? cur : {
+        promptTokens: prev.promptTokens + cur.promptTokens,
+        completionTokens: prev.completionTokens + cur.completionTokens,
+        totalTokens: prev.totalTokens + cur.totalTokens,
+        cacheHitTokens: prev.cacheHitTokens + cur.cacheHitTokens,
+        cacheMissTokens: prev.cacheMissTokens + cur.cacheMissTokens,
+        sessionCacheHitTokens: cur.sessionCacheHitTokens > 0 ? cur.sessionCacheHitTokens : prev.sessionCacheHitTokens,
+        sessionCacheMissTokens: cur.sessionCacheMissTokens > 0 ? cur.sessionCacheMissTokens : prev.sessionCacheMissTokens,
+      };
       const tagged = u ? { ...u } : undefined; const steps = tagged ? [...s.turnSteps, tagged] : s.turnSteps;
-      return { ...s, usage: tagged, perTurnUsage: acc, perTurnPlannerUsage: accBySource(isPlanner ? (u || prevPlanner) : prevPlanner), perTurnExecutorUsage: accBySource(isExecutor ? (u || prevExecutor) : prevExecutor), perTurnSubUsage: accBySource(isSub ? (u || prevSub) : prevSub), turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };
+      return { ...s, usage: tagged, perTurnUsage: acc, perTurnPlannerUsage: accSrc(prevPlanner, isPlanner ? u : undefined), perTurnExecutorUsage: accSrc(prevExecutor, isExecutor ? u : undefined), perTurnSubUsage: accSrc(prevSub, isSub ? u : undefined), turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };
     }
     case "notice": return { ...s, running: s.turnActive ? s.running : false, seq: s.seq + 1, items: [...s.items, { kind: "notice", id: `n${s.seq}`, level: e.level ?? "info", text: e.text ?? "" }] };
     case "phase": return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "phase", id: `p${s.seq}`, text: e.text ?? "" }] };

@@ -167,18 +167,29 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 // confirmPlan asks the user to approve the planner's output before handing off to
 // the executor. Returns the user's free-typed note ("" when none) and an error on
 // cancellation. In headless mode (asker == nil) it auto-confirms.
+//
+// The confirmation dialog shows:
+//   ○ 提交执行 — 同意计划，直接交由 Hephaestus 执行
+//   ○ 取消 — 放弃本次任务
+//   📝 文本框 — 输入修改意见（选填），提交后转发给 Hephaestus
+//
+// If the user types a note in the text box, that note becomes the return value
+// and is injected into the handoff as "📌 User note". Clicking "取消" or
+// dismissing returns an error.
 func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, error) {
 	if h.asker == nil {
 		return "", nil // headless: auto-confirm
 	}
+	// Show first 3 non-empty lines of the plan as a compact preview.
+	planPreview := firstLines(plan, 3)
 	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
 		ID:     "confirm",
 		Header: "计划确认",
-		Prompt: fmt.Sprintf("同意此计划吗？有修改意见可在下方文本框中输入（可选）。\n\n--- 任务 ---\n%s\n\n--- 计划 ---\n%s",
-			task, plan),
+		Prompt: fmt.Sprintf("Hermes 完成了代码调查，制定了执行计划。\n\n任务：%s\n\n计划概要：\n%s\n\n如需修改，在下方文本框中输入意见后提交。",
+			truncateStr(task, 200), planPreview),
 		Options: []event.AskOption{
-			{Label: "同意，开始执行", Description: "按计划立即交由 Hephaestus 执行"},
-			{Label: "取消，不执行", Description: "放弃本次任务，不做任何更改"},
+			{Label: "提交执行", Description: "按计划交由 Hephaestus 立即执行"},
+			{Label: "取消", Description: "放弃本次任务，不做任何更改"},
 		},
 	}})
 	if err != nil {
@@ -189,14 +200,43 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, er
 	}
 	selected := answers[0].Selected[0]
 	switch selected {
-	case "同意，开始执行":
+	case "提交执行":
 		return "", nil // agree without notes
-	case "取消，不执行":
+	case "取消":
 		return "", fmt.Errorf("计划被用户取消")
 	default:
 		// Free-typed text in the input box: agree with user notes
 		return selected, nil
 	}
+}
+
+// firstLines returns the first n non-empty lines from s.
+func firstLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	for _, l := range lines {
+		if strings.TrimSpace(l) != "" {
+			out = append(out, l)
+			if len(out) >= n {
+				break
+			}
+		}
+	}
+	result := strings.Join(out, "\n")
+	if len(lines) > len(out)+countEmpty(lines) {
+		result += "\n…"
+	}
+	return result
+}
+
+func countEmpty(lines []string) int {
+	n := 0
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" {
+			n++
+		}
+	}
+	return n
 }
 
 // ── Plan implementation ──────────────────────────────────────────────────
@@ -259,13 +299,21 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 		}
 	}
 
+	// V10.34: wrap sink to tag planner usage events — without this, the
+	// planner's usage would be attributed to "main" and missed by StatsPanel.
+	plannerSink := event.FuncSink(func(e event.Event) {
+		if e.Kind == event.Usage {
+			e.UsageSource = event.UsageSourcePlanner
+		}
+		h.sink.Emit(e)
+	})
 	hermesRunner := New(h.hermesProvider, h.readonlyTools, hermesSess, Options{
 		MaxSteps:       h.planMaxSteps,
 		Temperature:    h.temperature,
 		Pricing:        h.hermesPricing,
 		Gate:           &autoGate{},
 		DisableVerify:  true, // planner only investigates, never executes
-	}, h.sink)
+	}, plannerSink)
 
 	if err := hermesRunner.Run(ctx, input); err != nil {
 		return "", fmt.Errorf("hermes: %w", err)

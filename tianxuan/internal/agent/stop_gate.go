@@ -26,6 +26,10 @@ func (a *AgentRunner) taskGate() bool {
 	incomplete := countIncompleteTodos(a.session.Messages)
 	if incomplete == 0 {
 		a.taskGateReentry = 0
+		// V10.22: sub-agents skip orchestrate verify entirely
+		if a.disableVerify {
+			return false
+		}
 		// Tasks done — fire verify once
 		if !a.verifyGateFired {
 			a.verifyGateFired = true

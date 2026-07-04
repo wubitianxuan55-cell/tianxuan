@@ -154,6 +154,7 @@ func TestToolCache_GraceSkipsStat(t *testing.T) {
 	c.set(f, 0, "v1")
 
 	// Modify file behind the cache's back — should still hit because within grace.
+	time.Sleep(10 * time.Millisecond) // ensure mtime differs on low-precision FS
 	os.WriteFile(f, []byte("v2"), 0644)
 
 	val, ok := c.get(f, 0)

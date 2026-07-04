@@ -1,0 +1,5 @@
+# Serve-webui assets are built by the frontend toolchain (pnpm build)
+# and checked in so `go build` produces a working serve binary without
+# a Node.js toolchain. Only the current version's hashed files are kept;
+# stale files from previous builds are removed by `make clean-webui`.
+# To regenerate: run `make webui` from the repository root.

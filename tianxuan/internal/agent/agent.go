@@ -192,6 +192,7 @@ type AgentRunner struct {
 	taskGateReentry  int  // Gate 1: unfinished task reentries
 	goalGateReentry  int  // Gate 2: goal-judge reentries
 	verifyGateFired  bool // Gate 3: orchestrate verify fired
+		disableVerify    bool // V10.22: suppress verify nudge (for sub-agents)
 
 	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string
@@ -562,6 +563,10 @@ type Options struct {
 	// Goal is the session-level stopping condition (V6.0 P7). When non-empty,
 	// the stop gate checks whether the model's final answer satisfies the goal.
 	Goal string
+	// DisableVerify suppresses the orchestrate verify nudge (V10.22).
+	// Sub-agents set this to true so the verify gate doesn't inject
+	// "[system] All tasks complete" into their fresh session.
+	DisableVerify bool
 }
 
 // New constructs an AgentRunner. MaxSteps <= 0 means no cap �� the run loop
@@ -624,6 +629,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		auditFunc:  opts.AuditFunc,
 		tc:         newToolCache(-1), // V5.8: session �����棬mtime У�������
 		goal:       opts.Goal,        // V6.0 P7: �ỰĿ��
+		disableVerify: opts.DisableVerify,
 	}
 	// V5.13: �������籩��·��
 	if opts.ParamStorm != nil {

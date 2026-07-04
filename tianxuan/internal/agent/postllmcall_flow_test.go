@@ -42,7 +42,7 @@ func assistantReasoning(msgs []provider.Message) string {
 func TestPostLLMCallAbsentStreamsReasoningLive(t *testing.T) {
 	prov := &scriptedProvider{name: "p", turns: reasoningTurn()}
 	var reasoningEvents []string
-	a := New(prov, tool.NewRegistry(), NewSession(""), Options{}, recordReasoning(&reasoningEvents))
+	a := New(prov, tool.NewRegistry(), NewSession(""), Options{DisableVerify: true}, recordReasoning(&reasoningEvents))
 
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -68,7 +68,7 @@ func TestPostLLMCallTransformsReasoningOnce(t *testing.T) {
 	prov := &scriptedProvider{name: "p", turns: reasoningTurn()}
 	var reasoningEvents []string
 	h := &stubHooks{hasPostLLM: true, postLLMOut: "TRANSLATED"}
-	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h}, recordReasoning(&reasoningEvents))
+	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h, DisableVerify: true}, recordReasoning(&reasoningEvents))
 
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -97,7 +97,7 @@ func TestPostLLMCallConfiguredButNoReasoning(t *testing.T) {
 	}}}
 	var reasoningEvents []string
 	h := &stubHooks{hasPostLLM: true, postLLMOut: "should not be used"}
-	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h}, recordReasoning(&reasoningEvents))
+	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h, DisableVerify: true}, recordReasoning(&reasoningEvents))
 
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -125,7 +125,7 @@ func TestPostLLMCallKeepsSignedReasoningOriginal(t *testing.T) {
 	}}}
 	var reasoningEvents []string
 	h := &stubHooks{hasPostLLM: true, postLLMOut: "TRANSLATED"}
-	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h}, recordReasoning(&reasoningEvents))
+	a := New(prov, tool.NewRegistry(), NewSession(""), Options{Hooks: h, DisableVerify: true}, recordReasoning(&reasoningEvents))
 
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)

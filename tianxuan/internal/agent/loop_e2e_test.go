@@ -46,7 +46,7 @@ func TestRunMultiToolRoundEmptyIDsSurvivePairing(t *testing.T) {
 		}},
 		testutil.Turn{Text: "done"},
 	)
-	a := New(mp, echoRegistry(), NewSession(""), Options{}, event.Discard)
+	a := New(mp, echoRegistry(), NewSession(""), Options{DisableVerify: true}, event.Discard)
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestRunMultiToolRoundEmptyIDsSurvivePairing(t *testing.T) {
 // nothing dangling, and the repaired history is sendable as-is on resume.
 func TestRunCancelledMidStreamLeavesResumableSession(t *testing.T) {
 	mp := testutil.NewMock("m", testutil.ErrorTurn(context.Canceled))
-	a := New(mp, echoRegistry(), NewSession("sys"), Options{}, event.Discard)
+	a := New(mp, echoRegistry(), NewSession("sys"), Options{DisableVerify: true}, event.Discard)
 
 	err := a.Run(context.Background(), "do the thing")
 	if !errors.Is(err, context.Canceled) {
@@ -101,7 +101,7 @@ func TestRunWellFormedToolLoopRoundTrips(t *testing.T) {
 		testutil.Turn{ToolCalls: []provider.ToolCall{{ID: "c1", Name: "echo", Arguments: `{"text":"hi"}`}}},
 		testutil.Turn{Text: "all set"},
 	)
-	a := New(mp, echoRegistry(), NewSession(""), Options{}, event.Discard)
+	a := New(mp, echoRegistry(), NewSession(""), Options{DisableVerify: true}, event.Discard)
 	if err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}

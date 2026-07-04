@@ -303,6 +303,8 @@ var subUsage provider.Usage
 
 func RunSubAgent(ctx context.Context, prov provider.Provider, reg *tool.Registry, sysPrompt, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
 	sess := NewSession(sysPrompt)
+	// V10.22: sub-agents don't need orchestrate verify — they execute a single task
+	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)
 	// V5.30: 继承父代理工具集，使 tools JSON 段缓存命中
 	runErr := sub.Run(ctx, prompt)

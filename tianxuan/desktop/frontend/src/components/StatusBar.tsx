@@ -4,46 +4,7 @@ import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import type { BalanceInfo, ContextInfo, JobView, WireUsage } from "../lib/types";
-
-// ─── 模型价格表（与 StatsPanel 共用逻辑）─────────────────────────
-
-const MODEL_PRICES: Record<string, { cacheHit: number; input: number; output: number }> = {
-  "deepseek-v4-flash": { cacheHit: 0.0203, input: 1.015, output: 2.03 },
-  "deepseek-v4-pro":   { cacheHit: 0.0263, input: 3.154, output: 6.308 },
-};
-const DEFAULT_PRICE = MODEL_PRICES["deepseek-v4-flash"];
-
-function priceFor(label?: string) {
-  if (!label) return DEFAULT_PRICE;
-  for (const [key, p] of Object.entries(MODEL_PRICES)) {
-    if (label.includes(key)) return p;
-  }
-  return DEFAULT_PRICE;
-}
-
-function calcCost(tokens: number, pricePerM: number): number {
-  return (tokens / 1_000_000) * pricePerM;
-}
-
-// ─── 格式化 ───────────────────────────────────────────────────────
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
-}
-
-function fmtCost(v: number): string {
-  if (v >= 0.01) return "¥" + v.toFixed(2);
-  if (v > 0) return "¥" + v.toFixed(4);
-  return "¥0";
-}
-
-function fmtElapsed(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m${s % 60}s`;
-}
+import { priceFor, calcCost, fmtTokens, fmtCost, fmtElapsed } from "../lib/stats";
 
 function useTick(on: boolean): number {
   const [, setN] = useState(0);

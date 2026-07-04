@@ -20,7 +20,6 @@ import (
 	"tianxuan/internal/agent"
 	"tianxuan/internal/archive"
 	"tianxuan/internal/cache"
-	"tianxuan/internal/codegraph"
 	"tianxuan/internal/command"
 	"tianxuan/internal/config"
 	tiancontext "tianxuan/internal/context"
@@ -31,7 +30,6 @@ import (
 	"tianxuan/internal/lsp"
 	"tianxuan/internal/learning"
 	"tianxuan/internal/memory"
-	"tianxuan/internal/outputstyle"
 	"tianxuan/internal/permission"
 	"tianxuan/internal/plugin"
 	"tianxuan/internal/provider"
@@ -108,70 +106,19 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		return nil, err
 	}
 
-	sysPrompt, err := cfg.ResolveSystemPrompt()
+	// V10.22: system prompt + memory + skills assembled in sysprompt.go
+	sp, err := buildSystemPrompt(cfg, opts.Stderr)
 	if err != nil {
 		return nil, err
 	}
-	// Output style: fold the selected persona/tone block into the base prompt
-	// before language/memory/skills append, so a "replace" style (keep-coding
-	// false) still keeps those. Applied once, into the cache-stable prefix.
-	if st, ok := outputstyle.Resolve(cfg.Agent.OutputStyle, outputstyle.Dirs()); ok {
-		sysPrompt = outputstyle.Apply(sysPrompt, st)
-	}
-	sysPrompt += "\n\n" + config.LanguagePolicy
+	sysPrompt := sp.prompt
+	mem := sp.mem
+	skills := sp.skills
+	compiler := sp.compiler
+	runtimeCtx := sp.runtimeCtx
+	skillStore := sp.store
 
-	// Persistent memory (TIANXUAN.md / AGENTS.md hierarchy + auto-memory index)
-	// folds into the system prompt exactly here, once: it becomes part of the
-	// durable, cache-stable prefix every turn reuses, so memory costs nothing per
-	// turn. Mid-session changes never touch this prefix — they ride the
-	// controller's transient turn-injection and fold in on the next session.
-	mem := memory.Load(memory.Options{CWD: ".", UserDir: config.MemoryUserDir()})
-	sysPrompt = memory.Compose(sysPrompt, mem)
-	builtin.SetMemorySearchIndex(mem.Search) // V5.31: wire search index to memory_search tool
-	builtin.SetSearchConfig(cfg.Search)     // V10.19: wire search config to web_search tool
-	// 新项目自动初始化：创建默认 AGENTS.md 记忆文件
-	if mem.Empty() {
-		memory.InitDefaults(mem)
-	}
-
-	// Skills: discover playbooks (built-in + project/custom/global) and fold their
-	// one-liner index into the same cache-stable prefix — names + descriptions
-	// only; bodies load on demand via run_skill or "/<name>". Bodies never enter
-	// the prefix, so the index costs a fixed, small amount per turn.
 	cwd, _ := os.Getwd()
-	skillStore := skill.New(skill.Options{ProjectRoot: cwd, CustomPaths: cfg.SkillCustomPaths(), Stderr: opts.Stderr})
-	skills := skillStore.List()
-	sysPrompt = skill.ApplyIndex(sysPrompt, skills)
-
-	// V8.0 P1-5: wire read_skill resolver so the agent can read skill bodies.
-	builtin.WireReadSkillResolver(func(name string) (string, error) {
-		sk, ok := skillStore.Read(name)
-		if !ok {
-			return "", fmt.Errorf("skill %q not found", name)
-		}
-		return sk.Body, nil
-	})
-
-	// Phase 2: scan project structure once for Gather mode and Context domain.
-	projectProfile := &cache.Profile{}
-	projectProfile.Scan(cwd)
-	compiler := cache.New(sysPrompt, nil)
-
-	// L2 runtime context: carries goal-route results (contextFocus, taskKind).
-	// Profile is injected as a turn-tail prefix on the first user message so
-	// the first API call has only L1 — fully cacheable across sessions.
-	runtimeCtx := cache.NewRuntimeLayer()
-	// V3.0: inject project state into L2 so ProcessFirstTurn has it.
-	runtimeCtx.SetProject(cache.ProjectState{
-		Language:     projectProfile.Language,
-		Module:       projectProfile.Module,
-		EntryPoints:  projectProfile.EntryPoints,
-		TopDirs:      projectProfile.TopDirs,
-		TotalFiles:   projectProfile.TotalFiles,
-		Dependencies: projectProfile.Dependencies,
-		RootPath:     filepath.Base(cwd),
-	})
-	runtimeCtx.SetCompactL2(true)  // V5.30: L2 紧凑格式，token 减少 ~60%
 	reg := tool.NewRegistry()
 	bashSpec := sandbox.Spec{Mode: cfg.BashMode(), WriteRoots: cfg.WriteRoots(), Network: cfg.Sandbox.Network}
 	if bashSpec.Mode == "enforce" && !sandbox.Available() {
@@ -183,83 +130,11 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	addBuiltins(reg, cfg.Tools.Enabled, cfg.WriteRoots(), bashSpec, stderr)
 	// Always construct a host, even with no plugins configured, so the controller's
 	// host pointer is stable for the session and `/mcp add` can hot-add into it.
-	pluginHost := plugin.NewHost()
-	specs := PluginSpecs(cfg.AutoStartPlugins())
-	// CodeGraph is a built-in MCP server fetched on first use. When it resolves,
-	// inject it as one more stdio plugin pinned to the project root (it is
-	// cwd-aware); EnsureInit only creates .codegraph/ (fast, size-independent),
-	// serve's daemon then indexes in the background, so startup never blocks even
-	// on a large repo. When it is not yet installed, fetch it in the background
-	// (one-time, ~45MB) if auto_install is on — startup still never blocks, the
-	// tools come online next session — otherwise point the user at the explicit
-	// install command. A failed init or fetch is a notice, not fatal.
-	if cfg.Codegraph.Enabled {
-		bin, ok := codegraph.Resolve(cfg.Codegraph.Path)
-		switch {
-		case ok:
-			if err := codegraph.EnsureInit(ctx, bin, cwd); err != nil {
-				sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-					Text: "codegraph: init failed (" + err.Error() + ") — symbol-graph tools disabled this session"})
-			}
-			specs = append(specs, plugin.Spec{Name: "codegraph", Command: bin, Args: []string{"serve", "--mcp"}, Dir: cwd})
-		case cfg.Codegraph.AutoInstall:
-			notify := func(msg string) { sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: msg}) }
-			notify("codegraph: fetching code-intelligence runtime in the background (one-time) — symbol-graph tools available next session")
-			go func() {
-				if _, err := codegraph.Install(context.WithoutCancel(ctx), nil); err != nil {
-					notify("codegraph: install failed (" + err.Error() + ") — using grep/glob; retries next session")
-				} else {
-					notify("codegraph: installed — symbol-graph tools available next session")
-				}
-			}()
-		default:
-			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-				Text: "codegraph: not installed — run `tianxuan codegraph install` to enable symbol-graph tools"})
-		}
-	}
-
-	// V8.0 P2-8: Context7 MCP for library documentation.
-	if key := os.Getenv("CONTEXT7_API_KEY"); key != "" {
-		specs = append(specs, plugin.Spec{
-			Name:    "context7",
-			Type:    "http",
-			URL:     "https://mcp.context7.com/mcp",
-			Headers: map[string]string{"Authorization": "Bearer " + key},
-		})
-	}
-	if len(specs) > 0 {
-		// Apply caller-supplied stderr override to all plugin specs.
-		if opts.Stderr != nil {
-			for i := range specs {
-				specs[i].Stderr = opts.Stderr
-			}
-		}
-		host, ptools := plugin.StartAvailable(ctx, specs)
-		pluginHost = host
-		for _, t := range ptools {
-			reg.Add(t)
-		}
-		if text, ok := MCPStartupNotice(host.Failures()); ok {
-			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: text})
-		}
-	}
-	cleanup := pluginHost.Close
-
-	// LSP tools resolve their servers on PATH and spawn lazily on first query, so
-	// registering them is cheap even when no server is installed (a query then
-	// returns an install hint). The manager is session-scoped; chain its shutdown
-	// into the controller's cleanup so servers stop with the session, not the turn.
-	var lspMgr *lsp.Manager
-	if cfg.LSP.Enabled {
-		lspMgr = lsp.NewManager(cwd, LSPSpecs(cfg.LSP))
-		for _, t := range lsp.Tools(lspMgr) {
-			reg.Add(t)
-		}
-		prev := cleanup
-		cleanup = func() { prev(); lspMgr.Close() }
-	}
-
-
+	// V10.22: plugins + LSP assembled in plugins.go
+	po := startPlugins(ctx, cfg, reg, sink, opts.Stderr)
+	pluginHost := po.host
+	lspMgr := po.lspMgr
+	cleanup := po.cleanup
 	maxSteps := cfg.Agent.MaxSteps
 	if opts.MaxSteps > 0 {
 		maxSteps = opts.MaxSteps

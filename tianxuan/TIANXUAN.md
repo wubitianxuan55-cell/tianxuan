@@ -1,6 +1,32 @@
 # tianxuan project memory
 
-> V10.22.0 — 自动路由删除 + 子代理模型自由选择 + 统计面板重设计 + 权限修复 · 2026-07-04
+> V10.23.0 — 测试修复 + boot 拆分 + 前端测试 + 缓存安全工具 · 2026-07-04
+
+## V10.23.0 (2026-07-04)
+
+### P0: 修复 6 个已知失败测试
+- verify gate 在无 todo 的 session 中误触发 → `DisableVerify` 选项
+- `stop_gate.go`: taskGate 检查 disableVerify 跳过 verify nudge
+- `task.go`: RunSubAgent 自动设 DisableVerify=true
+- `toolcache_test.go`: Windows mtime 精度修复
+
+### P1: 拆分 boot.go
+- `sysprompt.go` (85行): 系统提示词/记忆/技能/Profile 组装
+- `plugins.go` (93行): CodeGraph/Context7/MCP/LSP 启动
+
+### P3: 前端测试
+- `lib/stats.ts`: 纯函数模块 (13 functions)
+- 32 Vitest tests (27 stats + 5 store)
+- StatusBar 消除重复代码
+
+### P4: 构建产物管理
+- `Makefile`: webui / clean-webui 目标
+
+### P5: 缓存安全工具
+- `cmd/cacheguard`: 三规则静态分析器 (零外部依赖)
+- `make lint-cache`
+
+### ⏳ 未完成: agent 包拆分 (P2, 跳过)
 
 ## V10.22.0 (2026-07-04)
 

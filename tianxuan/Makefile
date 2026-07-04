@@ -5,11 +5,25 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # with any change to the integration in internal/codegraph.
 CODEGRAPH_VERSION := v0.9.7
 
-.PHONY: build vet fmt test hooks cross clean e2e-codegraph
+.PHONY: build vet fmt test hooks cross clean e2e-codegraph webui clean-webui lint-cache
 
 build:
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan ./cmd/tianxuan
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan-plugin-example ./cmd/tianxuan-plugin-example
+
+# webui builds the serve-frontend and copies assets into internal/serve/webui.
+# Requires pnpm (install via `npm i -g pnpm` or `corepack enable`).
+webui:
+	cd desktop/frontend && pnpm install && pnpm run build
+	rm -rf internal/serve/webui/assets/*
+	cp desktop/frontend/dist/index.html internal/serve/webui/
+	cp -r desktop/frontend/dist/assets internal/serve/webui/assets/
+	@echo "serve webui updated — run 'go build' to embed the new assets"
+
+# clean-webui removes stale build artifacts from the serve webui directory.
+clean-webui:
+	rm -rf internal/serve/webui/assets/*
+	@echo "serve webui assets cleaned"
 
 vet:
 	go vet ./...
@@ -49,3 +63,8 @@ e2e-codegraph:
 	tar -xzf /tmp/$$asset -C $$dest --strip-components=1; \
 	TIANXUAN_CODEGRAPH_E2E=1 TIANXUAN_CODEGRAPH_BIN=$$PWD/$$dest/bin/codegraph \
 		go test ./internal/codegraph/ -run E2E -v -count=1
+
+# lint-cache runs the cacheguard static checker to detect patterns that would
+# break the DeepSeek prefix cache (L1 identity / L2 runtime / L3 tools).
+lint-cache:
+	go run ./cmd/cacheguard

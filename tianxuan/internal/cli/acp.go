@@ -139,7 +139,7 @@ func (f *acpFactory) NewSession(ctx context.Context, p acp.SessionParams) (*cont
 		Pricing:       entry.Price,
 		Gate:          headlessGate,
 		ContextWindow: entry.ContextWindow,
-		ArchiveDir:    config.ArchiveDir(),
+		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 	}, p.Sink)
 
 	cmds, _ := command.Load(config.CommandDirs()...)

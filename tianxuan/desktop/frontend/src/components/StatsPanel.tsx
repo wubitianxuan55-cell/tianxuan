@@ -68,9 +68,6 @@ function calcCost(tokens: number, pricePerM: number): number {
 function hitRateColor(rate: number): string {
   return rate >= 80 ? "text-ok" : rate >= 50 ? "text-warning" : "text-err";
 }
-function hitRateRing(rate: number): string {
-  return rate >= 80 ? "border-ok" : rate >= 50 ? "border-warning" : "border-err";
-}
 
 // ─── aggregated step stats ──────────────────────────────
 interface ColStats { prompt: number; completion: number; cacheHit: number; cacheMiss: number; cost: number; }
@@ -156,6 +153,15 @@ function StatsTable({ title, planner, executor, sub, total }: {
           <span className="text-border select-none">·</span>
           <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
         </div>
+        {total.cacheHit + total.cacheMiss > 0 && (() => {
+          const rate = (total.cacheHit / (total.cacheHit + total.cacheMiss)) * 100;
+          return (
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
+              <span className="text-[10px] text-fg-faint tabular-nums">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -239,8 +245,8 @@ function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: str
 }
 
 
-export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, subagentModel, plannerModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
-  usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string; subagentModel?: string; plannerModel?: string;
+export function StatsPanel({ perTurnUsage, turnSteps, context, model, subagentModel, plannerModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
+  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string; subagentModel?: string; plannerModel?: string;
   sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
   perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {
@@ -343,10 +349,6 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
   const price = modelPrice(model);           // executor model price
   const plannerPrice = modelPrice(plannerModel); // planner model price
   const subPrice = modelPrice(subagentModel); // subagent model price (V10.31: use subagent's own price)
-  const sessionHit = usage?.sessionCacheHitTokens ?? 0;
-  const sessionMiss = usage?.sessionCacheMissTokens ?? 0;
-  const sessionPrompt = sessionHit + sessionMiss;
-  const sessionRate = sessionPrompt > 0 ? (sessionHit / sessionPrompt * 100) : 0;
 
   // session-level: aggregate from localStorage stepHistory, split by source
   const plannerSteps = stepHistory.filter(s => s.source === "planner");
@@ -383,20 +385,13 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
     <div className="flex flex-col h-full overflow-y-auto">
       {/* ── 顶栏摘要 ── */}
       <div className="flex items-center gap-2 px-3 py-2 bg-bg-soft border-b border-border-soft shrink-0">
-        <span className={`inline-block w-3 h-3 rounded-full border-2 ${hitRateRing(sessionRate)}`} />
-        {sessionPrompt > 0 ? (
-          <span className={`text-[11px] font-bold tabular-nums ${hitRateColor(sessionRate)}`}>{sessionRate.toFixed(2)}%</span>
-        ) : (
-          <span className="text-[11px] text-fg-faint">—</span>
-        )}
         {context.window > 0 && (
           <>
-            <span className="text-border select-none">·</span>
             <Gauge size={11} className="text-fg-faint" />
             <span className="text-[10px] text-fg-faint font-mono tabular-nums">{tk(context.used)}/{tk(context.window)}</span>
           </>
         )}
-        <span className="text-border select-none">·</span>
+        {(context.window > 0) && <span className="text-border select-none">·</span>}
         <span className="text-[10px] text-fg-faint font-mono tabular-nums">
           {history.length}轮·{stepHistory.length}步
         </span>

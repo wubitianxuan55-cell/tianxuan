@@ -234,7 +234,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		Pricing:       price,
 		Gate:          headlessGate,
 		ContextWindow: ctxWin,
-		ArchiveDir:    config.ArchiveDir(),
+		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		RuntimePrompt: runtimeCtx.SystemPrompt(),
 		// V5.30: 根据技能名查找子代理模板
 		TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
@@ -276,11 +276,9 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		Gate:          headlessGate,
 		Hooks:         hookRunner,
 		Jobs:          jm,
-		ArchiveDir:    config.ArchiveDir(),
+		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		Dispatcher: toolDispatcher,
 	}, sink)
-
-	// V7.0: session archive for cross-session Dream/Distill
 
 	// V7.0: session archive for cross-session Dream/Distill
 	archiveDir := filepath.Join(cwd, ".tianxuan", "archive")
@@ -291,9 +289,6 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		}
 		executor.SetArchive(ar, sid)
 	}
-
-	// V3.0 Phase 5: ContextManager will be wired below.
-	_ = executor // ctxMgr injected later
 
 	// Custom slash commands (.tianxuan/commands + user dir). Best-effort: a malformed
 	// file is skipped, and a load error never blocks the session.
@@ -359,7 +354,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			// web_search, web_fetch, lsp_*, code_index, memory_search,
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 5)
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 0)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

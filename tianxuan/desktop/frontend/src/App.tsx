@@ -566,7 +566,7 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel usage={state.usage} perTurnUsage={state.perTurnUsage} perTurnPlannerUsage={state.perTurnPlannerUsage} perTurnExecutorUsage={state.perTurnExecutorUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} subagentModel={state.meta?.subagentLabel} plannerModel={state.meta?.plannerLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel perTurnUsage={state.perTurnUsage} perTurnPlannerUsage={state.perTurnPlannerUsage} perTurnExecutorUsage={state.perTurnExecutorUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} context={state.context} model={state.meta?.label} subagentModel={state.meta?.subagentLabel} plannerModel={state.meta?.plannerLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
             {rightTab === "messages" && (
               <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />

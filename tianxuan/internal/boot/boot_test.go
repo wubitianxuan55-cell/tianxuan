@@ -22,6 +22,7 @@ import (
 // tool is registered. It builds a real Controller from a throwaway project dir.
 func TestBuildFoldsProjectMemoryIntoSystemPrompt(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("APPDATA", dir) // isolate from user-global config (~/.config/tianxuan/)
 	t.Chdir(dir)
 
 	writeFile(t, dir, "tianxuan.toml", `
@@ -72,6 +73,7 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 // into the cache-stable system prompt's "# Skills" index alongside a built-in.
 func TestBuildDiscoversSkills(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
 	t.Chdir(dir)
 	writeFile(t, dir, "tianxuan.toml", `
 default_model = "test-model"
@@ -121,6 +123,7 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 
 func TestBuildRecordsMCPStartupFailure(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
 	t.Chdir(dir)
 	writeFile(t, dir, "tianxuan.toml", `
 default_model = "test-model"
@@ -175,6 +178,7 @@ command = "tianxuan-missing-mcp-binary"
 // prefix is untouched by the memory feature.
 func TestBuildWithoutMemoryLeavesPromptUnchanged(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
 	t.Chdir(dir)
 	writeFile(t, dir, "tianxuan.toml", `
 default_model = "test-model"
@@ -212,6 +216,7 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 
 func TestBuildLanguagePolicyIsAppended(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
 	t.Chdir(dir)
 	writeFile(t, dir, "tianxuan.toml", `
 default_model = "test-model"

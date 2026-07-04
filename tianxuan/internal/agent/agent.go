@@ -521,16 +521,9 @@ type Options struct {
 	// Jobs is the session's background-job manager (nil disables background tools).
 	Jobs *jobs.Manager
 
-	// Context management. ContextWindow <= 0 disables compaction. CompactRatio
-	// is the trigger fraction; RecentKeep is the minimum recent messages kept
-	// verbatim (the tail is otherwise token-bounded). Both fall back to defaults.
+	// Context management. ContextWindow <= 0 disables compaction.
 	ContextWindow int
-	CompactRatio  float64  // deprecated: use Compaction.Ratio
-	RecentKeep    int      // deprecated: use Compaction.RecentKeep
-	ArchiveDir    string   // deprecated: use Compaction.ArchiveDir
-	// Compaction groups compaction settings (V3.0). When set, overrides the
-	// Compaction groups compaction settings (V3.0). When set, overrides the
-	// deprecated individual fields above.
+	// Compaction groups compaction settings (V3.0).
 	Compaction CompactionConfig
 	// Dispatcher is the centralized pre-execution check pipeline (V2.4).
 	// nil means the agent uses inline checks (backward compatible).
@@ -577,30 +570,21 @@ type Options struct {
 // the provider errors (compaction keeps the context bounded). A nil sink is
 // replaced with event.Discard so the agent can always emit unconditionally.
 func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Options, sink event.Sink) *AgentRunner {
-	// Build CompactionConfig from individual fields (backward compat) or from opts.Compaction.
+	// Build CompactionConfig from opts.Compaction.
 	comp := opts.Compaction
 	if comp.Window == 0 {
 		comp.Window = opts.ContextWindow
 	}
 	if comp.Ratio <= 0 {
-		comp.Ratio = opts.CompactRatio
-		if comp.Ratio <= 0 {
-			comp.Ratio = defaultCompactRatio
-		}
+		comp.Ratio = defaultCompactRatio
 	}
 	if comp.RecentKeep <= 0 {
-		comp.RecentKeep = opts.RecentKeep
-		if comp.RecentKeep <= 0 {
-			comp.RecentKeep = minRecentKeep
-		}
+		comp.RecentKeep = minRecentKeep
 	}
 	// V10.11: KeepProtected is enabled by default so foundational context from
 	// read_skill, memory_search, and remember tools survives compaction.
 	if comp.KeepPolicy == 0 {
 		comp.KeepPolicy = KeepProtected
-	}
-	if comp.ArchiveDir == "" {
-		comp.ArchiveDir = opts.ArchiveDir
 	}
 	if nilutil.IsNil(sink) {
 		sink = event.Discard

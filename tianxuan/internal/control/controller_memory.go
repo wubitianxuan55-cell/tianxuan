@@ -88,7 +88,6 @@ func (c *Controller) UpdateFact(name, body string) (string, error) {
 		"Memory fact \""+name+"\" was edited. Its current body:\n"+strings.TrimSpace(body))
 	c.refreshMemoryLocked()
 	return path, nil
-	return path, nil
 }
 
 // ChangeFactType changes the Type of a saved fact by name (e.g. promote to

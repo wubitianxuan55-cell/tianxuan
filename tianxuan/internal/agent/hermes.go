@@ -12,12 +12,9 @@ import (
 )
 
 // HermesPrompt steers the planner toward research-backed plans.
-// V10.32: planner now knows it should investigate code before planning.
-// TODO(V10.33): upgrade plan() from raw Stream to AgentRunner with a read-only
-// tool set (read_file, grep, glob, lsp_*, web_search, web_fetch, codegraph_*,
-// gitnexus_*) so the planner can do real code investigation before proposing
-// a plan. Currently the planner relies on prior knowledge and the user's task
-// description alone.
+// V10.32: planner investigates code with read-only tools before planning.
+// V10.33: planWithTools is now the sole plan path — planStream is the
+// backward-compatible fallback when readonlyTools is nil (e.g. test harness).
 const HermesPrompt = `You are Hermes — the planner in a two-model coding agent.
 
 You have two modes:
@@ -79,7 +76,7 @@ type Hermes struct {
 	sink           event.Sink
 
 	readonlyTools *tool.Registry // V10.32: if set, planner runs as AgentRunner
-	planMaxSteps  int            // max planner tool-call turns (0 = stream-only)
+	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
 }
 
 // NewHermes creates a Hermes orchestrator. hermesProvider is the planning model,
@@ -155,18 +152,20 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 	}
 	return h.hephaestus.Run(ctx, formatHandoff(input, plan))
 }
-// plan runs the planner. When readonlyTools is set, the planner uses AgentRunner
-// with read-only tool access so it can investigate the codebase before proposing
-// a plan. Otherwise it falls back to a plain text stream (no tools, zero overhead).
+// plan runs Hermes as an AgentRunner with read-only tools so it can investigate
+// the codebase before proposing a plan. Falls back to planStream (zero-tool stream)
+// when readonlyTools is nil — e.g. in tests or when no read-only registry is wired.
 func (h *Hermes) plan(ctx context.Context, input string) (string, error) {
-	// V10.32: AgentRunner mode — planner can call read-only tools
-	if h.readonlyTools != nil && h.planMaxSteps > 0 {
+	// V10.32+: AgentRunner mode — planner can call read-only tools.
+	// planMaxSteps <= 0 means unlimited (rely on model to stop itself).
+	if h.readonlyTools != nil && h.planMaxSteps >= 0 {
 		return h.planWithTools(ctx, input)
 	}
 	return h.planStream(ctx, input)
 }
 
-// planStream is the legacy zero-tool stream path.
+// planStream is the backward-compatible zero-tool stream fallback, used when
+// Hermes is constructed without a read-only tool registry (e.g. in tests).
 func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 	h.hermesSess.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
@@ -212,10 +211,11 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 
 	hermesRunner := New(h.hermesProvider, h.readonlyTools, hermesSess, Options{
-		MaxSteps:    h.planMaxSteps,
-		Temperature: h.temperature,
-		Pricing:     h.hermesPricing,
-		Gate:        &autoGate{},
+		MaxSteps:       h.planMaxSteps,
+		Temperature:    h.temperature,
+		Pricing:        h.hermesPricing,
+		Gate:           &autoGate{},
+		DisableVerify:  true, // planner only investigates, never executes
 	}, h.sink)
 
 	if err := hermesRunner.Run(ctx, input); err != nil {

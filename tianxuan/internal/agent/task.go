@@ -326,7 +326,7 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 			Pricing:        subPrice,
 			Gate:           t.gate,
 			ContextWindow:  subCtxWin,
-			ArchiveDir:     t.archiveDir,
+			Compaction: CompactionConfig{ArchiveDir: t.archiveDir},
 		}, sink, &subUsage)
 	} else {
 		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, promptContent, Options{
@@ -335,7 +335,7 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 			Pricing:        subPrice,
 			Gate:           t.gate,
 			ContextWindow:  subCtxWin,
-			ArchiveDir:     t.archiveDir,
+			Compaction: CompactionConfig{ArchiveDir: t.archiveDir},
 		}, sink, &subUsage)
 	}
 	if err == nil && len(outputSchema) > 0 {
@@ -459,37 +459,24 @@ func (t *TaskTool) finalizeRun(result string, err error, run *SubagentRun) (stri
 }
 
 func RunSubAgent(ctx context.Context, prov provider.Provider, reg *tool.Registry, sysPrompt, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
-	sess := NewSession(sysPrompt)
-	// V10.22: sub-agents don't need orchestrate verify — they execute a single task
-	opts.DisableVerify = true
-	sub := New(prov, reg, sess, opts, sink)
-	// V5.30: 继承父代理工具集，使 tools JSON 段缓存命中
-	runErr := sub.Run(ctx, prompt)
-	// V10.5: 即使 Run 出错（如超时），也尝试提取最后一条助手消息作为部分结果
-	lastMsg := extractLastAssistantMessage(sess.Messages)
-	if runErr != nil {
-		if lastMsg != "" {
-			return lastMsg, fmt.Errorf("sub-agent terminated with error (partial result returned): %w", runErr)
-		}
-		return "", fmt.Errorf("sub-agent: %w", runErr)
-	}
-	if lastMsg != "" {
-		return lastMsg, nil
-	}
-	return "", fmt.Errorf("sub-agent finished without producing a final answer")
+	return runSubAgentInternal(ctx, prov, reg, NewSession(sysPrompt), prompt, opts, sink, subUsage)
 }
 
 // RunSubAgentWithSession runs a sub-agent with an existing session (used for
 // continue_from). Unlike RunSubAgent which creates a new session, this uses the
 // provided session directly so the sub-agent continues from where it left off.
 func RunSubAgentWithSession(ctx context.Context, prov provider.Provider, reg *tool.Registry, sess *session.Session, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
-	
-	// V10.22: sub-agents don't need orchestrate verify — they execute a single task
+	return runSubAgentInternal(ctx, prov, reg, sess, prompt, opts, sink, subUsage)
+}
+
+// runSubAgentInternal is the shared sub-agent execution path: wire up an
+// AgentRunner, run the prompt, and extract the final assistant message.
+func runSubAgentInternal(ctx context.Context, prov provider.Provider, reg *tool.Registry, sess *Session, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
+	// sub-agents don't need orchestrate verify — they execute a single task
 	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)
-	// V5.30: 继承父代理工具集，使 tools JSON 段缓存命中
 	runErr := sub.Run(ctx, prompt)
-	// V10.5: 即使 Run 出错（如超时），也尝试提取最后一条助手消息作为部分结果
+	// V10.5: even on error, extract partial result from last assistant message
 	lastMsg := extractLastAssistantMessage(sess.Messages)
 	if runErr != nil {
 		if lastMsg != "" {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"tianxuan/internal/agent"
 	"tianxuan/internal/control"
 	"tianxuan/internal/event"
 )
@@ -21,8 +22,8 @@ type fakeRunner struct {
 	behavior func(ctx context.Context, sink event.Sink, input string) error
 }
 
-func (r *fakeRunner) Run(ctx context.Context, input string) error {
-	return r.behavior(ctx, r.sink, input)
+func (r *fakeRunner) Run(ctx context.Context, input string) (*agent.TurnResult, error) {
+	return nil, r.behavior(ctx, r.sink, input)
 }
 
 // fakeFactory builds a real control.Controller around the fake runner, so the

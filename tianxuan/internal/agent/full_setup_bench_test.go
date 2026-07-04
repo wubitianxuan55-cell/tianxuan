@@ -111,7 +111,7 @@ Answer coding questions about Go concepts concisely in Chinese.`
 
 	for i, q := range questions {
 		start := time.Now()
-		err := runner.Run(context.Background(), q)
+		_, err := runner.Run(context.Background(), q)
 		elapsed := time.Since(start).Milliseconds()
 		if err != nil {
 			t.Errorf("turn %d: %v", i+1, err)

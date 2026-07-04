@@ -470,7 +470,7 @@ func runSubAgentInternal(ctx context.Context, prov provider.Provider, reg *tool.
 	// sub-agents don't need orchestrate verify — they execute a single task
 	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)
-	runErr := sub.Run(ctx, prompt)
+	_, runErr := sub.Run(ctx, prompt)
 	// V10.5: even on error, extract partial result from last assistant message
 	lastMsg := extractLastAssistantMessage(sess.Messages)
 	if runErr != nil {

@@ -83,7 +83,7 @@ func TestEvidenceFlowEndToEnd(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "run the suite and sign the step off"); err != nil {
+	if _, err := a.Run(context.Background(), "run the suite and sign the step off"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -117,7 +117,7 @@ func TestEvidenceFlowRejectsUncitedCommand(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "vet the tree and sign off"); err != nil {
+	if _, err := a.Run(context.Background(), "vet the tree and sign off"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -157,7 +157,7 @@ func TestEvidenceFlowRejectsStepMissingFromTodoWrite(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "update todos then sign off the wrong step"); err != nil {
+	if _, err := a.Run(context.Background(), "update todos then sign off the wrong step"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -195,7 +195,7 @@ func TestEvidenceFlowAcceptsTodoCompletionAfterCompleteStep(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "complete the todo with a sign-off first"); err != nil {
+	if _, err := a.Run(context.Background(), "complete the todo with a sign-off first"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -222,7 +222,7 @@ func TestEvidenceFlowRejectsTodoCompletionWithoutCompleteStep(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "complete the todo without a sign-off"); err != nil {
+	if _, err := a.Run(context.Background(), "complete the todo without a sign-off"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -264,7 +264,7 @@ func TestEvidenceFlowFailedCompleteStepDoesNotAuthorizeTodoCompletion(t *testing
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "attempt completion after a failed sign-off"); err != nil {
+	if _, err := a.Run(context.Background(), "attempt completion after a failed sign-off"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -303,7 +303,7 @@ func TestEvidenceFlowRejectsReplacedTodoAfterNumericCompleteStep(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "try to reuse a numeric sign-off for another todo"); err != nil {
+	if _, err := a.Run(context.Background(), "try to reuse a numeric sign-off for another todo"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -348,7 +348,7 @@ func TestEvidenceFlowAcceptsReorderedTodoAfterNumericCompleteStep(t *testing.T) 
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
-	if err := a.Run(context.Background(), "complete the signed todo after reordering it"); err != nil {
+	if _, err := a.Run(context.Background(), "complete the signed todo after reordering it"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"tianxuan/internal/agent"
 	"tianxuan/internal/control"
 )
 
@@ -17,7 +18,7 @@ import (
 // observable signal.
 type fakeRunner struct{ got chan string }
 
-func (f fakeRunner) Run(_ context.Context, input string) error { f.got <- input; return nil }
+func (f fakeRunner) Run(_ context.Context, input string) (*agent.TurnResult, error) { f.got <- input; return nil, nil }
 
 func TestServeSubmitRunsAndBroadcastsTurnDone(t *testing.T) {
 	bc := NewBroadcaster()

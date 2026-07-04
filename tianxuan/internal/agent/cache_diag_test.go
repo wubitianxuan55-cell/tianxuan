@@ -67,7 +67,7 @@ func TestCachePrefixStabilityDiagnostic(t *testing.T) {
 
 	for i, q := range questions {
 		sink.lastUsage = nil
-		err := runner.Run(context.Background(), q)
+		_, err := runner.Run(context.Background(), q)
 		if err != nil {
 			t.Fatalf("turn %d: %v", i+1, err)
 		}

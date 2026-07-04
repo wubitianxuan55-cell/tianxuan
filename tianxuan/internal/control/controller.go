@@ -330,7 +330,7 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 		}
 		defer func() { c.hooks.Stop(ctx, lastAssistantText(c.History()), turn) }()
 	}
-	if err := c.runner.Run(ctx, input); err != nil {
+	if _, err := c.runner.Run(ctx, input); err != nil {
 		return err
 	}
 	// 每轮对话后自动快照保存，确保崩溃/重启不丢上下文
@@ -390,7 +390,8 @@ func (c *Controller) Run(ctx context.Context, input string) error {
 		}
 		defer func() { c.hooks.Stop(ctx, lastAssistantText(c.History()), turn) }()
 	}
-	return c.runner.Run(ctx, input)
+	_, err := c.runner.Run(ctx, input)
+	return err
 }
 
 // Cancel aborts the in-flight turn. A goroutine blocked awaiting approval

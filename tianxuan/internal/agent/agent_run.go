@@ -10,12 +10,12 @@ import (
 	"tianxuan/internal/provider"
 )
 
-func (a *AgentRunner) Run(ctx context.Context, input string) error {
+func (a *AgentRunner) Run(ctx context.Context, input string) (*TurnResult, error) {
 	return a.runDirect(ctx, input)
 }
 
 // runDirect is the original single-model execution path.
-func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
+func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult, error) {
 	// V3.3: generate trace ID for this turn
 	traceID := NewTraceID()
 	ctx = WithTraceID(ctx, traceID)
@@ -55,6 +55,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // V10.13: 每轮重置成功循环计数
+	// V10.37: per-turn TurnResult tracking — accumulated here and returned by Run().
+	var turnFilesModified []string
+	var turnToolErrors []string
+	var turnLastSummary string
 	// V5.13: 重置参数风暴断路器——每个 turn 独立统计
 	if a.paramStorm != nil {
 		a.paramStorm.Reset()
@@ -101,7 +105,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				continue
 			}
 			a.preWG.Wait() // drain any in-flight pre-execution goroutines before returning
-			return err
+			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), err
 		}
 		streamRecoveries = 0
 
@@ -117,7 +121,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		if usage != nil && usage.TotalTokens > 0 {
 			a.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: a.pricing,
 				SessionHit: int(a.sessCacheHit.Load()), SessionMiss: int(a.sessCacheMiss.Load()),
-				UsageSource: event.UsageSourceMain})
+				UsageSource: event.UsageSourceExecutor})
 			// V5.15: Ԥ���ſء�������ۼƷ���
 			if a.budgetGate != nil {
 				status := a.budgetGate.Check(a.pricing, usage)
@@ -129,7 +133,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 						Text: a.budgetGate.StatusMessage()})
 					a.preWG.Wait()
-					return fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
+					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
 				}
 			}
 		}
@@ -160,6 +164,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			ReasoningSignature: signature,
 			ToolCalls:          calls,
 		})
+		// V10.37: capture last assistant text for TurnResult
+		turnLastSummary = text
 
 		// V7.0: archive the assistant turn for cross-session analysis
 		if a.archive != nil {
@@ -180,7 +186,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 				if len(a.session.Messages) > 0 {
 					a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 				}
-				return nil
+				return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), nil
 			}
 
 			// V10.0: empty final detection — model returned no tool calls
@@ -188,7 +194,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			if strings.TrimSpace(text) == "" {
 				emptyFinalBlocks++
 				if emptyFinalBlocks >= maxEmptyFinalBlocks {
-					return fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
+					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
 				}
 				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 					Text: fmt.Sprintf("empty final answer blocked: retrying (%d/%d)", emptyFinalBlocks, maxEmptyFinalBlocks)})
@@ -211,7 +217,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			if blocked, reason := a.finalReadinessCheck(); blocked {
 				finalReadinessBlocks++
 				if finalReadinessBlocks >= maxFinalReadinessBlocks {
-					return fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
+					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
 				}
 				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 					Text: "final-answer readiness blocked: " + reason})
@@ -222,7 +228,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			if a.steerQueueLen() > 0 {
 				continue // V10.0: more steers pending — another pass
 			}
-			return nil // all gates passed
+			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), nil // all gates passed
 		}
 
 		// V4.2: wait for stream() pre-execution goroutines to finish before
@@ -236,7 +242,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 			if len(a.session.Messages) > 0 {
 				a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 			}
-			return fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
+			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
 		}
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
@@ -244,6 +250,17 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 		// V10.8: only dedup ReadOnly tools — bash/git_commit etc. may produce
 		// different results on repeated calls (state changed between calls).
 		for i, call := range calls {
+			// V10.37: track writer tool paths for TurnResult
+			switch call.Name {
+			case "write_file", "edit_file", "move_file", "delete_range", "delete_symbol":
+				if p := extractFilePath(call.Name, call.Arguments); p != "" {
+					turnFilesModified = append(turnFilesModified, p)
+				}
+			}
+			// V10.37: collect tool errors for TurnResult (max 5)
+			if strings.HasPrefix(results[i], "error:") && len(turnToolErrors) < 5 {
+				turnToolErrors = append(turnToolErrors, results[i])
+			}
 			// Skip suppressed calls (already have placeholder result).
 			if strings.HasPrefix(results[i], "suppressed:") {
 				a.session.Add(provider.Message{
@@ -321,5 +338,25 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 	// Only reached when a positive maxSteps guard is configured. The work so far
 	// is already in the session, so the user can just send another message to pick
 	// up where it left off.
-	return fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) �� the work so far is saved; send another message to continue, or set max_steps higher or to 0 for no limit", a.maxSteps)
+	return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps)", a.maxSteps)
+}
+
+// buildTurnResult assembles a TurnResult from per-turn tracking variables.
+// Used by runDirect at every return point so callers get partial results
+// even when the turn ends with an error.
+func buildTurnResult(files []string, errors []string, summary string) *TurnResult {
+	seen := make(map[string]bool, len(files))
+	uniq := make([]string, 0, len(files))
+	for _, f := range files {
+		if !seen[f] {
+			seen[f] = true
+			uniq = append(uniq, f)
+		}
+	}
+	return &TurnResult{
+		FilesModified: uniq,
+		Summary:       summary,
+		Success:       len(errors) == 0,
+		Errors:        errors,
+	}
 }

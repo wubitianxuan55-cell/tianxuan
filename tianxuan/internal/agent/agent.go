@@ -61,9 +61,20 @@ func CallContext(ctx context.Context) (parentID string, sink event.Sink, asker A
 	return cc.parentID, cc.sink, cc.asker, true
 }
 
+// TurnResult is a structured result produced by an AgentRunner after one turn.
+// It lets upstream callers (e.g. Hermes) consume execution outcomes without
+// having to extract them post-hoc from the agent's session.
+type TurnResult struct {
+	FilesModified []string // paths of files written/edited/moved/deleted this turn
+	Summary       string   // agent's final conclusion (last assistant message)
+	Success       bool     // true = no tool errors encountered this turn
+	Errors        []string // tool error messages collected during execution (max 5)
+}
+
 // Runner carries out one task turn. AgentRunner satisfies it.
+// Returns a structured TurnResult even on error so callers can inspect partial results.
 type Runner interface {
-	Run(ctx context.Context, input string) error
+	Run(ctx context.Context, input string) (*TurnResult, error)
 }
 
 // Gate decides, per tool call, whether it may run. The agent consults it at

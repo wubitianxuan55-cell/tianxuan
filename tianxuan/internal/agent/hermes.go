@@ -80,7 +80,7 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 	if readonlyTools != nil {
 		plannerSink := event.FuncSink(func(e event.Event) {
 			if e.Kind == event.Usage {
-				if e.UsageSource == "" || e.UsageSource == event.UsageSourceMain {
+				if e.UsageSource == "" || e.UsageSource == event.UsageSourceExecutor {
 					e.UsageSource = event.UsageSourcePlanner
 				}
 			}
@@ -130,7 +130,8 @@ func (h *Hermes) ResetSession() {
 func (h *Hermes) SetAsker(a Asker) { h.asker = a }
 
 // Run plans with the planner model, then hands the plan to the executor.
-func (h *Hermes) Run(ctx context.Context, input string) error {
+// Returns a merged TurnResult combining the planner's and executor's outcomes.
+func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	h.sink.Emit(event.Event{Kind: event.TurnStarted})
 
 	// V10.31: fast path — skip planner for simple/quick tasks
@@ -140,101 +141,71 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 	}
 
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · planning"})
-	// Save message count before planning — if the user later cancels, roll back
-	// so the unapproved plan doesn't pollute the planner's L4 context.
 	prePlanLen := len(h.hermesSess.Messages)
 	plan, err := h.plan(ctx, input)
 	if err != nil {
-		return fmt.Errorf("hermes: %w", err)
+		return nil, fmt.Errorf("hermes: %w", err)
 	}
 	if isAnswerNotAction(plan) {
 		// Hermes answered directly — no Hephaestus needed.
 		h.persistAnswer(input, plan)
 		h.sink.Emit(event.Event{Kind: event.Text, Text: plan})
-		return nil
+		return &TurnResult{Summary: plan, Success: true}, nil
 	}
-	// V10.34: 交互式计划确认 — Hermes 展示计划，等待用户同意后再执行。
-	// Headless 模式（无 asker）自动通过；用户可在确认框下方输入框填写修改意见。
 	userNote, err := h.confirmPlan(ctx, input, plan)
 	if err != nil {
 		// User cancelled — roll back planner session to pre-plan state.
 		h.hermesSess.Truncate(prePlanLen)
-		return err
+		return nil, err
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
-	execErr := h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
+	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
 
-	// V10.36: flow execution result back to the planner's session so it has
-	// context for the next turn. The planner accumulates [task → plan → execution
-	// result] across turns; compaction keeps the history bounded.
-	if summary := h.lastExecutorResult(); summary != "" {
+	// V10.37: executor returns structured TurnResult — no more post-hoc extraction.
+	// Flow the structured result back into the planner's session so it has context
+	// for the next turn.
+	if execResult != nil && execResult.Summary != "" {
 		h.hermesSess.Add(provider.Message{
 			Role:    provider.RoleUser,
-			Content: "[system] 上一轮执行完成:\n" + summary,
+			Content: formatExecutionFeedback(execResult),
 		})
 	}
-	return execErr
+	return execResult, execErr
 }
 
-// lastExecutorResult returns a structured summary of the executor's last turn
-// for the planner's context. Extracts modified files and the conclusion gist
-// without dumping raw output. The summary ends at a sentence boundary.
-func (h *Hermes) lastExecutorResult() string {
-	if h.hephaestus == nil || h.hephaestus.session == nil {
-		return ""
-	}
-	msgs := h.hephaestus.session.Messages
-
-	// Find the last assistant message (the executor's conclusion).
-	var lastAssistant string
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i].Role == provider.RoleAssistant && msgs[i].Content != "" {
-			lastAssistant = msgs[i].Content
-			break
-		}
-	}
-	if lastAssistant == "" {
-		return ""
-	}
-
-	// Find files modified in this turn (from tool result names).
-	files := make(map[string]bool)
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		if m.Role == provider.RoleUser && strings.Contains(m.Content, hephaestusHandoffMarker) {
-			break // crossed into previous turn's handoff
-		}
-		if m.Role == provider.RoleTool {
-			switch m.Name {
-			case "write_file", "edit_file", "move_file", "delete_range", "delete_symbol":
-				if path := extractFilePath(m.Name, m.Content); path != "" {
-					files[path] = true
-				}
-			}
-		}
-	}
-
+// formatExecutionFeedback converts a TurnResult into a short structured summary
+// for injection into the planner's session.
+func formatExecutionFeedback(r *TurnResult) string {
 	var b strings.Builder
-	if len(files) > 0 {
+	b.WriteString("[system] 上一轮执行完成")
+	if r.Success {
+		b.WriteString(" (success)")
+	} else {
+		b.WriteString(" (errors)")
+	}
+	b.WriteString(":\n")
+	if len(r.FilesModified) > 0 {
 		b.WriteString("Modified: ")
-		first := true
-		for f := range files {
-			if !first { b.WriteString(", ") }
-			b.WriteString(f)
-			first = false
-		}
+		b.WriteString(strings.Join(r.FilesModified, ", "))
 		b.WriteString("\n")
 	}
-	// Truncate conclusion at last sentence boundary within 400 chars.
-	conclusion := lastAssistant
-	if len(conclusion) > 400 {
-		conclusion = conclusion[:400]
-		if idx := strings.LastIndexAny(conclusion, ".。!！?？\n"); idx > 200 {
-			conclusion = conclusion[:idx+1]
-		}
+	if len(r.Errors) > 0 {
+		b.WriteString("Errors: ")
+		b.WriteString(strings.Join(r.Errors, "; "))
+		b.WriteString("\n")
 	}
-	b.WriteString("Result: ")
-	b.WriteString(conclusion)
+	if r.Summary != "" {
+		b.WriteString("Result: ")
+		// Keep summary concise — cap at 500 chars at sentence boundary
+		s := r.Summary
+		if len(s) > 500 {
+			s = s[:500]
+			if idx := strings.LastIndexAny(s, ".。!！?？\n"); idx > 200 {
+				s = s[:idx+1]
+			}
+		}
+		b.WriteString(s)
+	}
 	return b.String()
 }
 
@@ -339,7 +310,7 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if h.plannerAgent == nil {
 		return "", fmt.Errorf("hermes: planner agent not initialized (no read-only tools)")
 	}
-	if err := h.plannerAgent.Run(ctx, input); err != nil {
+	if _, err := h.plannerAgent.Run(ctx, input); err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}
 

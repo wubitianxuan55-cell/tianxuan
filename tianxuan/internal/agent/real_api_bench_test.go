@@ -73,7 +73,7 @@ func TestRealAPICache10Rounds(t *testing.T) {
 	for i, q := range questions {
 		ctx := context.Background()
 		start := time.Now()
-		err := runner.Run(ctx, q)
+		_, err := runner.Run(ctx, q)
 		elapsed := time.Since(start).Milliseconds()
 		if err != nil {
 			t.Errorf("turn %d failed: %v", i+1, err)

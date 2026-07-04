@@ -47,7 +47,7 @@ func TestRunMultiToolRoundEmptyIDsSurvivePairing(t *testing.T) {
 		testutil.Turn{Text: "done"},
 	)
 	a := New(mp, echoRegistry(), NewSession(""), Options{DisableVerify: true}, event.Discard)
-	if err := a.Run(context.Background(), "go"); err != nil {
+	if _, err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -76,7 +76,7 @@ func TestRunCancelledMidStreamLeavesResumableSession(t *testing.T) {
 	mp := testutil.NewMock("m", testutil.ErrorTurn(context.Canceled))
 	a := New(mp, echoRegistry(), NewSession("sys"), Options{DisableVerify: true}, event.Discard)
 
-	err := a.Run(context.Background(), "do the thing")
+	_, err := a.Run(context.Background(), "do the thing")
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Run should surface the cancellation, got %v", err)
 	}
@@ -102,7 +102,7 @@ func TestRunWellFormedToolLoopRoundTrips(t *testing.T) {
 		testutil.Turn{Text: "all set"},
 	)
 	a := New(mp, echoRegistry(), NewSession(""), Options{DisableVerify: true}, event.Discard)
-	if err := a.Run(context.Background(), "go"); err != nil {
+	if _, err := a.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 

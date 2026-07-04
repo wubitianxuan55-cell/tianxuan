@@ -138,7 +138,7 @@ func TestCacheHitPrefixStable(t *testing.T) {
 	defer srv.Close()
 
 	a, sink := newAgent(t, srv.URL, mock.tools(), 0 /*no compaction*/, 0)
-	if err := a.Run(context.Background(), "echo a couple things then finish"); err != nil {
+	if _, err := a.Run(context.Background(), "echo a couple things then finish"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -182,7 +182,7 @@ func TestCacheHitClimbsWithoutCompaction(t *testing.T) {
 	const turns = 14
 	for i := 0; i < turns; i++ {
 		userMsg := "Turn " + fmt.Sprint(i) + ": " + strings.Repeat("please consider this requirement. ", 6)
-		if err := a.Run(context.Background(), userMsg); err != nil {
+		if _, err := a.Run(context.Background(), userMsg); err != nil {
 			t.Fatalf("Run %d: %v", i, err)
 		}
 	}
@@ -216,7 +216,7 @@ func TestCacheHitSurvivesTooSmallWindow(t *testing.T) {
 
 	a, sink := newAgent(t, srv.URL, mock.tools(), 900 /*window tok*/, 4 /*recentKeep*/)
 
-	if err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
+	if _, err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -270,7 +270,7 @@ func TestReasoningRoundTripCost(t *testing.T) {
 		a, sink := newAgent(t, srv.URL, mock.tools(), 0, 0)
 		const turns = 12
 		for i := 0; i < turns; i++ {
-			if err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
+			if _, err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
 				t.Fatalf("Run %d: %v", i, err)
 			}
 		}
@@ -313,7 +313,7 @@ func TestSessionAggregateCacheRate(t *testing.T) {
 	a, sink := newAgent(t, srv.URL, mock.tools(), 0, 0)
 	const turns = 8
 	for i := 0; i < turns; i++ {
-		if err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
+		if _, err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
 			t.Fatalf("Run %d: %v", i, err)
 		}
 	}
@@ -458,7 +458,7 @@ func cacheCurveWithMessages(t *testing.T, mock *mockDeepSeek, messages []string)
 
 	a, sink := newAgent(t, srv.URL, mock.tools(), 0, 0)
 	for i, userMsg := range messages {
-		if err := a.Run(context.Background(), userMsg); err != nil {
+		if _, err := a.Run(context.Background(), userMsg); err != nil {
 			t.Fatalf("Run %d: %v", i, err)
 		}
 	}
@@ -471,7 +471,7 @@ func toolLoopCurve(t *testing.T, mock *mockDeepSeek) []int {
 	defer srv.Close()
 
 	a, sink := newAgent(t, srv.URL, mock.tools(), 0, 0)
-	if err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
+	if _, err := a.Run(context.Background(), strings.Repeat("please consider this requirement. ", 6)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	return usageRates(sink.usages)

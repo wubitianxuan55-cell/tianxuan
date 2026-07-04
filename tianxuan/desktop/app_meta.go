@@ -41,8 +41,9 @@ type JobView struct {
 
 // Meta describes the session for the frontend's header and status line.
 type Meta struct {
-	Label        string `json:"label"`
-	Ready        bool   `json:"ready"`
+	Label          string `json:"label"`
+	SubagentLabel  string `json:"subagentLabel,omitempty"`
+	Ready          bool   `json:"ready"`
 	StartupErr   string `json:"startupErr,omitempty"`
 	EventChannel string `json:"eventChannel"`
 	Cwd          string `json:"cwd"`
@@ -191,6 +192,7 @@ func (a *App) Jobs() []JobView {
 func (a *App) Meta() Meta {
 	a.mu.RLock()
 	label := a.label
+	subagentLabel := a.subagentLabel
 	startupErr := a.startupErr
 	ready := a.ready
 	ctrl := a.ctrl
@@ -201,7 +203,8 @@ func (a *App) Meta() Meta {
 		permLevel = ctrl.PermLevel()
 	}
 	return Meta{
-		Label:        label,
+		Label:         label,
+		SubagentLabel: subagentLabel,
 		Ready:        ready,
 		StartupErr:   startupErr,
 		EventChannel: eventChannel,
@@ -323,9 +326,11 @@ func (a *App) SetModel(name string) error {
 	}
 
 	var carried []provider.Message
+	var savedPermLevel string
 	if ctrl != nil {
 		_ = ctrl.Snapshot()
 		carried = ctrl.History()
+		savedPermLevel = ctrl.PermLevel()
 		ctrl.Close()
 	}
 
@@ -342,6 +347,9 @@ func (a *App) SetModel(name string) error {
 	a.label = newCtrl.Label()
 	a.mu.Unlock()
 	newCtrl.EnableInteractiveApproval()
+	if savedPermLevel != "" && savedPermLevel != "ask" {
+		newCtrl.SetPermLevel(savedPermLevel)
+	}
 
 	path := ""
 	if dir := newCtrl.SessionDir(); dir != "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -52,6 +53,7 @@ type App struct {
 	startupErr  string
 	label       string
 	model       string // active provider name (for the bottom model switcher)
+	subagentLabel string // subagent model label (from config, or empty)
 	ready       bool   // true once boot.Build completes (success or failure)
 	disabledMCP map[string]ServerView
 	mcpOrder    []string
@@ -141,6 +143,12 @@ func (a *App) buildController() {
 		model = cfg.DefaultModel
 		if e, ok := cfg.ResolveModel(cfg.DefaultModel); ok {
 			model = e.Name + "/" + e.Model
+		}
+		// Resolve subagent model from config (empty when not configured).
+		if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
+			if subEntry, ok := cfg.ResolveModel(subRef); ok {
+				a.subagentLabel = subEntry.Model
+			}
 		}
 	}
 

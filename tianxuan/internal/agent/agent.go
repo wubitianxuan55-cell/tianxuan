@@ -196,11 +196,6 @@ type AgentRunner struct {
 	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string
 
-	// permLevel controls the permission strictness: "ask" (prompt before writes),
-	// "auto" (allow writes without asking), or "yolo" (skip all approval).
-	// Set via SetPermLevel from the controller. Default "ask".
-	permLevel string
-
 	// gate, when non-nil, is the per-call permission gate consulted in
 	// executeOne. nil disables gating entirely.
 	// MUST be set before Run() starts — executeOne is called from concurrent
@@ -288,16 +283,6 @@ type AgentRunner struct {
 	// V5.13: �������籩��·���������ͬ turn ���ظ����ã���ǰԤ����
 	paramStorm *ParamStormBreaker
 
-	// V5.14: �Զ�ģ��·�ɡ���flash ģ�� provider��nil=�����Զ�·�ɣ���
-	flashProv provider.Provider
-	routeHistory *RouteHistory
-	// V5.14: ��ǰ turn ʹ�õ� provider��·�ɺ�ѡ������
-	activeProv provider.Provider
-
-	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ�������
-	// ÿ�� runDirect ���´˱�־������� AutoRouteProvider��
-	autoRouteLocked    bool
-	autoRouteDecision provider.Provider
 
 	// V5.15: Ԥ���ſء���׷�ٻỰ�ۼƷ��ã�80%����/100%��ϡ�
 	budgetGate *BudgetGate
@@ -398,18 +383,8 @@ func (a *AgentRunner) MergeRuntimePrompt(content string) {
 	}
 	a.session.Messages[0].Content += "\n\n" + content
 }
-
-// SetFlashProvider ��װ flash ģ�� provider �����Զ�·�� (V5.14)��
-// �� nil �����Զ�·�ɡ�
-func (a *AgentRunner) SetFlashProvider(p provider.Provider) { a.flashProv = p }
-// SetGoal sets the session-level stopping condition (V6.0 P7).
 func (a *AgentRunner) SetGoal(g string) { a.goal = g }
 
-// SetPermLevel sets the permission strictness level for this session.
-// "ask" = prompt before writes (default), "auto" = allow writes, "yolo" = skip all.
-func (a *AgentRunner) SetPermLevel(level string) {
-	a.permLevel = level
-}
 
 // SetMemoryQueue installs the sink the remember/forget tools use to apply a
 // memory change in the current session. The controller wires itself in.
@@ -566,15 +541,6 @@ type Options struct {
 	// ParamStorm enables parameter-level duplicate tool call detection (V5.13).
 	// nil disables; non-nil provides WindowSize/Threshold/ExemptTools.
 	ParamStorm *ParamStormOptions
-
-	// AutoRoute enables heuristic model routing (V5.14).
-	// When true, simple inputs route to flash, complex ones to pro.
-	// Requires a flash provider to be set via SetFlashProvider().
-	AutoRoute bool
-	// RouterKeywords appends custom keywords that trigger pro routing.
-	// Merged with the built-in complexKeywords list (V10.12).
-	RouterKeywords []string
-
 	// BudgetLimit is the per-session cost budget in yuan (V5.15).
 	// <=0 means unlimited. When set, the agent tracks cumulative cost
 	// and warns at 80%% / blocks at 100%%.
@@ -663,11 +629,6 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	if opts.ParamStorm != nil {
 		r.paramStorm = NewParamStormBreaker(*opts.ParamStorm)
 	}
-	r.routeHistory = NewRouteHistory()
-	if len(opts.RouterKeywords) > 0 {
-		SetRouterKeywords(opts.RouterKeywords)
-	}
-	r.activeProv = prov // 默认使用 pro provider
 	// V5.15: Ԥ���ſ�
 	if opts.BudgetLimit > 0 {
 		r.budgetGate = NewBudgetGate(opts.BudgetLimit)

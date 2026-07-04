@@ -93,7 +93,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, onOpenChanges,
+  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel, onOpenChanges,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -106,6 +106,7 @@ export const StatusBar = memo(function StatusBar({
   sessionTotal?: number;
   bridgeAlive?: boolean;
   model?: string;
+  subagentModel?: string;
   onOpenStats?: () => void;
   onOpenChanges?: () => void;
 }) {
@@ -156,6 +157,26 @@ export const StatusBar = memo(function StatusBar({
       </div>
 
       <span className="text-border/30 select-none">│</span>
+
+      {/* ── 模型标签 ── */}
+      <div className="flex items-center gap-1 shrink-0">
+        {model && (
+          <Tooltip label={`主模型: ${model}`}>
+            <span className="flex items-center gap-1 text-[10px] text-fg-dim font-mono bg-bg-elev border border-border-soft rounded px-1.5 py-px">
+              <Cpu size={10} className="text-accent/70" />
+              {model.replace("deepseek-v4-", "").replace("mimo-v2.5-", "")}
+            </span>
+          </Tooltip>
+        )}
+        {subagentModel && subagentModel !== model && (
+          <Tooltip label={`子代理: ${subagentModel}`}>
+            <span className="flex items-center gap-1 text-[10px] text-fg-dim font-mono bg-bg-elev border border-warn/20 rounded px-1.5 py-px">
+              <GitBranch size={10} className="text-warning/70" />
+              {subagentModel.replace("deepseek-v4-", "").replace("mimo-v2.5-", "")}
+            </span>
+          </Tooltip>
+        )}
+      </div>
 
       {/* ── 中: 运行指标 ── */}
       <div className="flex items-center gap-1.5 flex-1 min-w-0">

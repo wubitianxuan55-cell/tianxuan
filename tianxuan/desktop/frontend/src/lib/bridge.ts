@@ -130,6 +130,9 @@ export interface AppBindings {
   RemovePermissionRule(list: string, rule: string): Promise<void>;
   SetSandbox(bash: string, network: boolean, workspaceRoot: string, allowWrite: string[]): Promise<void>;
   SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string): Promise<void>;
+  // SetSubagentModel sets the default model for spawned sub-agents. An empty string
+  // clears it so sub-agents inherit the parent's provider.
+  SetSubagentModel(ref: string): Promise<void>;
   // SetPermLevel controls permission strictness: "ask" (default, prompt before writes),
   // "auto" (allow writes without asking), or "yolo" (skip all prompts).
   SetPermLevel(level: string): Promise<void>;

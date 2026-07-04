@@ -626,6 +626,7 @@ function SandboxSection({ s, busy, apply }: SectionProps) {
 
 function AgentSection({ s, busy, apply }: SectionProps) {
   const t = useT();
+  const refs = allRefs(s);
   const [temp, setTemp] = useState(String(s.agent.temperature));
   const [steps, setSteps] = useState(String(s.agent.maxSteps));
   const [prompt, setPrompt] = useState(s.agent.systemPrompt);
@@ -634,6 +635,24 @@ function AgentSection({ s, busy, apply }: SectionProps) {
   return (
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold">{t("settings.agent")}</div>
+
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.subagentModel")}</label>
+        <select
+          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0"
+          value={toRef(s.subagentModel, s)}
+          disabled={busy}
+          onChange={(e) => void apply(() => app.SetSubagentModel(e.target.value))}
+        >
+          <option value="">{t("settings.subagentInherit")}</option>
+          {refs.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex items-center gap-3 mb-2.5">
         <label className="text-fg-dim text-[13px] w-[80px] shrink-0">{t("settings.temperature")}</label>
         <input className="w-[70px] bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent text-center" value={temp} onChange={(e) => setTemp(e.target.value)} disabled={busy} inputMode="decimal" />

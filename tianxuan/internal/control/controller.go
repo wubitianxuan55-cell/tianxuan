@@ -485,9 +485,6 @@ func (c *Controller) SetPermLevel(level string) {
 	c.mu.Lock()
 	c.permLevel = level
 	c.mu.Unlock()
-	if c.executor != nil {
-		c.executor.SetPermLevel(level)
-	}
 }
 
 // PermLevel returns the current permission level.

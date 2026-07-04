@@ -125,6 +125,8 @@ export function makeMockApp(): AppBindings {
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
     agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent." },
+    plannerModel: "",
+    subagentModel: "",
     configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
@@ -482,6 +484,9 @@ export function makeMockApp(): AppBindings {
     },
     async SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string) {
       settings.agent = { temperature, maxSteps, systemPrompt };
+    },
+    async SetSubagentModel(ref: string) {
+      settings.subagentModel = ref;
     },
     async SetPermLevel(level: string) {
       settings.permLevel = level;

@@ -286,6 +286,8 @@ export const zhTW: Record<DictKey, string> = {
   "settings.availableModels": "可用模型",
   "settings.defaultModel": "預設模型",
   "settings.plannerModel": "規劃器模型",
+  "settings.subagentModel": "子代理模型",
+  "settings.subagentInherit": "（繼承主模型）",
   "settings.plannerNone": "（無 — 單模型）",
   "settings.keySet": "金鑰已設定",
   "settings.noKey": "無金鑰",

@@ -41,10 +41,7 @@ type judgeVerdict struct {
 // tool list. The judge prompt is a compile-time constant.
 func (a *AgentRunner) judgeGoal(ctx context.Context, goal string) (judgeVerdict, error) {
 	// Use flash provider if available, fall back to main provider
-	prov := a.flashProv
-	if prov == nil {
-		prov = a.prov
-	}
+	prov := a.prov
 	if prov == nil {
 		return judgeVerdict{OK: false, Reason: "no provider available for judge call"}, nil
 	}

@@ -288,6 +288,8 @@ export const zh: Record<DictKey, string> = {
   "settings.availableModels": "可用模型",
   "settings.defaultModel": "默认模型",
   "settings.plannerModel": "规划模型",
+  "settings.subagentModel": "子代理模型",
+  "settings.subagentInherit": "（继承主模型）",
   "settings.plannerNone": "（无 —— 单模型）",
   "settings.keySet": "已设密钥",
   "settings.noKey": "无密钥",

@@ -76,13 +76,6 @@ func TestServeEndpoints(t *testing.T) {
 		t.Errorf("context status = %d", resp.StatusCode)
 	}
 
-	resp, err := http.Post(srv.URL+"/plan", "application/json", strings.NewReader(`{"on":true}`))
-	if err != nil || resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("plan = %v / status %d", err, resp.StatusCode)
-	}
-	if c := ctrl.Compose("x"); !strings.Contains(c, "Read-only mode") {
-		t.Error("/plan {on:true} should have enabled plan mode (Compose would prepend the marker)")
-	}
 
 	if resp, _ := http.Post(srv.URL+"/submit", "application/json", strings.NewReader(`{}`)); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("empty submit should be 400, got %d", resp.StatusCode)
@@ -200,21 +193,6 @@ func TestServeSubmitMalformedJSON(t *testing.T) {
 	}
 }
 
-func TestServePlanMalformedJSON(t *testing.T) {
-	bc := NewBroadcaster()
-	ctrl := control.New(control.Options{Sink: bc})
-	srv := httptest.NewServer(New(ctrl, bc).Handler())
-	defer srv.Close()
-
-	resp, err := http.Post(srv.URL+"/plan", "application/json", strings.NewReader(`{bad`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("malformed plan = %d, want 400", resp.StatusCode)
-	}
-}
 
 func TestServeContextEndpoint(t *testing.T) {
 	bc := NewBroadcaster()

@@ -98,6 +98,9 @@ type TaskTool struct {
 	templatePrefix string       // V5.30: 子代理模板前缀，同类子代理共享缓存
 	accumulatedUsage *provider.Usage // V5.30: 子代理累计 token 用量
 	activeSchemas []provider.ToolSchema // V5.30: 父代理过滤工具集，子代理继承以共享缓存
+	subagentProv provider.Provider // V10.22: optional subagent model provider (nil → use prov)
+	subagentPricing *provider.Pricing
+	subagentCtxWin  int
 }
 
 // NewTaskTool wires a task tool to the parent agent's environment so its
@@ -237,6 +240,14 @@ func (t *TaskTool) SetTemplatePrefix(prefix string) { t.templatePrefix = prefix 
 func (t *TaskTool) SetActiveSchemas(schemas []provider.ToolSchema) { t.activeSchemas = schemas }
 func (t *TaskTool) SubUsage() *provider.Usage { return t.accumulatedUsage }
 
+// SetSubagentProvider installs an optional provider for sub-agents. When nil the
+// sub-agent falls back to the parent's execution provider (prov).
+func (t *TaskTool) SetSubagentProvider(p provider.Provider, pricing *provider.Pricing, ctxWin int) {
+	t.subagentProv = p
+	t.subagentPricing = pricing
+	t.subagentCtxWin = ctxWin
+}
+
 func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, maxSteps int, outputSchema json.RawMessage) (string, error) {
 	// V6.0: sub-agent does NOT inherit parent L1+L2 — uses DefaultTaskSystemPrompt independently.
 	// This saves ~50K tokens per sub-agent call (97% reduction) and keeps cache stats separate.
@@ -251,13 +262,21 @@ func (t *TaskTool) runSub(ctx context.Context, prompt string, subReg *tool.Regis
 	// V5.30: 子代理 API 请求发送父代理完整工具集以保证缓存对齐。
 	// API 请求工具列表与父代理一致（含 meta-tools），DeepSeek 可命中缓存。
 	// 执行层面由 subReg（buildSubReg 过滤后）门控，meta-tools 无法被实际调用。
+	// V10.22: use subagent provider when configured, otherwise fall back to parent's
+	subProv, subPrice, subCtxWin := t.prov, t.pricing, t.contextWindow
+	if t.subagentProv != nil {
+		subProv = t.subagentProv
+		subPrice = t.subagentPricing
+		subCtxWin = t.subagentCtxWin
+	}
+
 var subUsage provider.Usage
-	result, err := RunSubAgent(ctx, t.prov, subReg, sysPrompt, promptContent, Options{
+	result, err := RunSubAgent(ctx, subProv, subReg, sysPrompt, promptContent, Options{
 		MaxSteps:       maxSteps,
 		Temperature:    t.temperature,
-		Pricing:        t.pricing,
+		Pricing:        subPrice,
 		Gate:           t.gate,
-		ContextWindow:  t.contextWindow,
+		ContextWindow:  subCtxWin,
 		ArchiveDir:     t.archiveDir,
 	}, sink, &subUsage)
 	if err == nil && len(outputSchema) > 0 {
@@ -340,7 +359,8 @@ func subSinkFor(parentID string, parent event.Sink) event.Sink {
 			e.Tool.ID = parentID + "/" + e.Tool.ID
 			parent.Emit(e)
 		case event.Usage:
-			// V5.30: forward sub-agent usage so StatsPanel sees sub-agent tokens
+			// Override source so StatsPanel can split main vs subagent.
+			e.UsageSource = event.UsageSourceSubagent
 			parent.Emit(e)
 		}
 	})

@@ -26,7 +26,7 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 	// compare against session baseline; emit Notice on drift (not panic).
 	prevShape := a.verifyPrefixAndShape()
 
-	ch, err := a.activeProv.Stream(ctx, provider.Request{
+	ch, err := a.prov.Stream(ctx, provider.Request{
 		Messages:    msgs,
 		Tools:       tools,
 		Temperature: a.temperature,

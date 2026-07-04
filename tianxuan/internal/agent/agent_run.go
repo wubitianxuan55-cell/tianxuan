@@ -41,41 +41,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 
 
 
-	// V7.5: �Ự��·���Զ�������һ�ξ���·�ɺ����
-	if a.flashProv != nil {
-		if !a.autoRouteLocked {
-					// V7.4: history-aware routing (heuristic + learned)
-			// V10.12 DSpark: session-state-aware routing — complex sessions
-			// always use pro regardless of short follow-up inputs.
-			sessionFeatures := a.collectSessionRouteFeatures()
-			heuristic := AutoRouteProviderWithSession(input, sessionFeatures, a.prov, a.flashProv)
-			useFlash := heuristic == a.flashProv
-			if a.routeHistory != nil {
-				useFlash = a.routeHistory.ShouldRouteToFlash(input, useFlash)
-			}
-			if useFlash && a.flashProv != nil {
-				a.activeProv = a.flashProv
-			} else {
-				a.activeProv = a.prov
-			}
-			modelName := "pro"
-			if a.activeProv == a.flashProv {
-				modelName = "flash"
-			}
-			defer func() {
-				if a.routeHistory != nil {
-					a.routeHistory.Record(input, modelName, false)
-				}
-			}()
-			a.autoRouteLocked = true
-			a.autoRouteDecision = a.activeProv
-		} else {
-			a.activeProv = a.autoRouteDecision
-		}
-	} else {
-		a.activeProv = a.prov
-	}
-
 	// V4.2: reset pre-execution cache and tool result cache for new turn
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
@@ -145,7 +110,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) error {
 
 		if usage != nil && usage.TotalTokens > 0 {
 			a.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: a.pricing,
-				SessionHit: int(a.sessCacheHit.Load()), SessionMiss: int(a.sessCacheMiss.Load())})
+				SessionHit: int(a.sessCacheHit.Load()), SessionMiss: int(a.sessCacheMiss.Load()),
+				UsageSource: event.UsageSourceMain})
 			// V5.15: Ԥ���ſء�������ۼƷ���
 			if a.budgetGate != nil {
 				status := a.budgetGate.Check(a.pricing, usage)

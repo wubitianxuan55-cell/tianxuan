@@ -1,6 +1,36 @@
 # tianxuan project memory
 
-> V10.11.0 — DSpark吸收 + 流式输出全栈重构 · 2026-06-28
+> V10.22.0 — 自动路由删除 + 子代理模型自由选择 + 统计面板重设计 + 权限修复 · 2026-07-04
+
+## V10.22.0 (2026-07-04)
+
+### 自动路由删除
+- 删除 `auto_router.go` / `auto_router_history.go` / `session_route_features.go` (共 401 行)
+- 删除 AgentRunner 中 `flashProv`/`routeHistory`/`activeProv` 等字段和 `AutoRoute`/`RouterKeywords` Options
+
+### 子代理模型自由选择
+- `internal/config/edit.go`: 新增 `SetSubagentModel()` 持久化方法
+- `internal/agent/task.go`: TaskTool 新增 `subagentProv` + `SetSubagentProvider()`
+- `internal/boot/boot.go`: 从 `cfg.Agent.SubagentModel` 解析并注入
+- 桌面设置面板 Agent 页增加子代理模型下拉框
+
+### 统计面板主模型/子代理分开统计
+- `internal/event/event.go`: Event 新增 `UsageSource` 字段
+- `internal/agent/agent_run.go`: 主模型 usage 标记 `"main"`
+- `internal/agent/task.go`: subSinkFor 覆写为 `"subagent"`
+- `desktop/wire.go`: wireUsage 新增 `source` JSON 字段
+- `StatsPanel.tsx`: 三栏表格（主模型/子代理/汇总）+ 分源命中率趋势图
+
+### 底栏模型显示
+- `desktop/app.go`: App 增加 `subagentLabel` 字段
+- `desktop/app_meta.go`: Meta 新增 `SubagentLabel`
+- `StatusBar.tsx`: 连接灯右侧显示主模型 + 子代理 chip
+
+### 权限修复
+- `desktop/settings_app.go`: rebuild() 跨重建携带 permLevel
+- `desktop/app_meta.go`: SetModel() 跨重建携带 permLevel
+- `internal/agent/agent.go`: 删除死字段 permLevel + SetPermLevel
+- `internal/control/controller.go`: 删除对 executor.SetPermLevel 的死调用
 
 ## V10.11.0 (2026-06-28)
 

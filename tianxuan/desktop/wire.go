@@ -79,6 +79,7 @@ type wireUsage struct {
 	SessionCacheMissTokens int     `json:"sessionCacheMissTokens"`
 	Turn                   int     `json:"turn"` // 会话 API 调用轮次，由后端 AgentRunner 维护
 	CostUSD                float64 `json:"costUsd,omitempty"`
+	Source                 string  `json:"source,omitempty"` // "main" | "subagent"
 }
 
 type wireApproval struct {
@@ -143,7 +144,8 @@ func toWire(e event.Event) wireEvent {
 				TotalTokens: u.TotalTokens, CacheHitTokens: u.CacheHitTokens,
 				CacheMissTokens: u.CacheMissTokens, ReasoningTokens: u.ReasoningTokens,
 				SessionCacheHitTokens: e.SessionHit, SessionCacheMissTokens: e.SessionMiss,
-				Turn: e.Turn,
+				Turn:   e.Turn,
+				Source: e.UsageSource,
 			}
 			if e.Pricing != nil {
 				w.Usage.CostUSD = e.Pricing.Cost(u)

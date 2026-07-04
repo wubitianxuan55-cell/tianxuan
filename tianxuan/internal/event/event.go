@@ -77,6 +77,13 @@ const (
 	LevelWarn
 )
 
+// UsageSource constants tag the origin of a Usage event so the frontend can
+// split stats between the main agent and sub-agents.
+const (
+	UsageSourceMain     = "main"
+	UsageSourceSubagent = "subagent"
+)
+
 // Tool describes a tool call for ToolDispatch / ToolResult events. On dispatch
 // only ID/Name/Args/ReadOnly are set; on result Output/Err/Truncated are filled
 // in. Args is the raw JSON arguments — a sink compacts it for display.
@@ -162,6 +169,10 @@ type Event struct {
 	Tool      Tool              // ToolDispatch / ToolResult
 	Usage     *provider.Usage   // Usage
 	Pricing   *provider.Pricing // Usage: for cost display (nil = omit cost)
+	// UsageSource tags the origin of a Usage event so the frontend can
+	// split stats between the main agent and sub-agents. "main" for the
+	// parent agent's own API calls; "subagent" for spawned tasks.
+	UsageSource string
 	// SessionHit/SessionMiss carry cumulative cache tokens across the whole
 	// session (Usage events only), so a frontend can show the aggregate hit-rate
 	// — which doesn't crater on a short turn or after compaction — alongside

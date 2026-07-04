@@ -51,6 +51,7 @@ export interface WireUsage {
   sessionCacheMissTokens: number;
   turn?: number; // 会话 API 调用轮次，由后端 AgentRunner 维护
   costUsd?: number;
+  source?: string; // "main" | "subagent"
 }
 
 export interface WireApproval {
@@ -139,11 +140,13 @@ export interface ContextInfo {
 
 export interface Meta {
   label: string;
+  subagentLabel?: string;
   ready: boolean;
   startupErr?: string;
   eventChannel: string;
   cwd: string;
   bypass?: boolean; // YOLO mode on (auto-approve every tool call)
+  permLevel?: string; // "ask"|"auto"|"yolo"
   agentMode?: string; // "explore"|"develop"|"orchestrate"
 }
 
@@ -309,6 +312,8 @@ export interface AgentView {
 
 export interface SettingsView {
   defaultModel: string;
+  plannerModel: string;
+  subagentModel: string;
   providers: ProviderView[];
   permissions: PermissionsView;
   sandbox: SandboxView;

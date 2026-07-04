@@ -54,9 +54,10 @@ type AgentView struct {
 
 // SettingsView is the whole Settings panel payload.
 type SettingsView struct {
-	DefaultModel string          `json:"defaultModel"`
-	PlannerModel string          `json:"plannerModel"`
-	Providers    []ProviderView  `json:"providers"`
+	DefaultModel  string          `json:"defaultModel"`
+	PlannerModel  string          `json:"plannerModel"`
+	SubagentModel string          `json:"subagentModel"`
+	Providers     []ProviderView  `json:"providers"`
 	Permissions  PermissionsView `json:"permissions"`
 	Sandbox      SandboxView     `json:"sandbox"`
 	Agent        AgentView       `json:"agent"`
@@ -88,9 +89,10 @@ func (a *App) Settings() SettingsView {
 		bash = "enforce"
 	}
 	v := SettingsView{
-		DefaultModel: cfg.DefaultModel,
-		PlannerModel: cfg.Agent.PlannerModel,
-		Providers:    []ProviderView{},
+		DefaultModel:  cfg.DefaultModel,
+		PlannerModel:  cfg.Agent.PlannerModel,
+		SubagentModel: cfg.Agent.SubagentModel,
+		Providers:     []ProviderView{},
 		Permissions: PermissionsView{
 			Mode:  orDefault(cfg.Permissions.Mode, "ask"),
 			Allow: nonNil(cfg.Permissions.Allow),
@@ -157,10 +159,12 @@ func (a *App) rebuild() error {
 	}
 	var carried []provider.Message
 	var sessionDir string
+	var savedPermLevel string
 	if a.ctrl != nil {
 		_ = a.ctrl.Snapshot()
 		carried = a.ctrl.History()
 		sessionDir = a.ctrl.SessionDir()
+		savedPermLevel = a.ctrl.PermLevel()
 		a.ctrl.Close()
 	}
 	model := a.model
@@ -186,6 +190,11 @@ func (a *App) rebuild() error {
 	a.label = ctrl.Label()
 	a.startupErr = ""
 	ctrl.EnableInteractiveApproval()
+	// Carry the permission level across rebuild: YOLO/auto are session-level
+	// choices that config writes silently reset to "ask" (default).
+	if savedPermLevel != "" && savedPermLevel != "ask" {
+		ctrl.SetPermLevel(savedPermLevel)
+	}
 	path := ""
 	if dir := ctrl.SessionDir(); dir != "" {
 		path = agent.NewSessionPath(dir, ctrl.Label())
@@ -317,6 +326,14 @@ func (a *App) SetAgentParams(temperature float64, maxSteps int, systemPrompt str
 		c.Agent.MaxSteps = maxSteps
 		c.Agent.SystemPrompt = systemPrompt
 		return nil
+	})
+}
+
+// SetSubagentModel sets the default model for sub-agents (task tool). An empty
+// string clears it; sub-agents then inherit the parent's execution provider.
+func (a *App) SetSubagentModel(ref string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetSubagentModel(ref)
 	})
 }
 

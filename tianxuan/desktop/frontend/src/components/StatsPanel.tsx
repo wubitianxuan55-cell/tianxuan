@@ -41,6 +41,7 @@ interface StepRecord {
   completion: number;
   cacheHit: number;
   cacheMiss: number;
+  source?: string;
 }
 
 function tk(n: number): string { return n.toLocaleString(); }
@@ -71,8 +72,86 @@ function hitRateRing(rate: number): string {
   return rate >= 80 ? "border-ok" : rate >= 50 ? "border-warning" : "border-err";
 }
 
-// ─── 微型折线图（无面积填充）─────────────────────────────────────
-/** SVG 微型折线图：带半透明面积填充 + 数据点 */
+// ─── aggregated step stats ──────────────────────────────
+interface ColStats { prompt: number; completion: number; cacheHit: number; cacheMiss: number; cost: number; }
+function aggCol(steps: StepRecord[], price: ReturnType<typeof modelPrice>): ColStats {
+  let prompt = 0, completion = 0, cacheHit = 0, cacheMiss = 0;
+  for (const s of steps) { prompt += s.prompt; completion += s.completion; cacheHit += s.cacheHit; cacheMiss += s.cacheMiss; }
+  const cost = calcCost(cacheHit, price.cacheHit) + calcCost(cacheMiss, price.input) + calcCost(completion, price.output);
+  return { prompt, completion, cacheHit, cacheMiss, cost };
+}
+
+function colFromUsage(u: WireUsage | undefined, price: ReturnType<typeof modelPrice>): ColStats {
+  if (!u) return { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
+  const cost = calcCost(u.cacheHitTokens, price.cacheHit) + calcCost(u.cacheMissTokens, price.input) + calcCost(u.completionTokens, price.output);
+  return { prompt: u.promptTokens, completion: u.completionTokens, cacheHit: u.cacheHitTokens, cacheMiss: u.cacheMissTokens, cost };
+}
+
+// ─── 统计表格 ─────────────────────────────────────────────
+function StatsTable({ title, main, sub, total }: {
+  title: string; main: ColStats; sub: ColStats; total: ColStats;
+}) {
+  const rows: { label: string; render: (c: ColStats) => string }[] = [
+    { label: "Prompt", render: c => tk(c.prompt) },
+    { label: "Compl", render: c => tk(c.completion) },
+    { label: "缓存命中", render: c => {
+      const t = c.cacheHit + c.cacheMiss;
+      const rate = t > 0 ? (c.cacheHit / t * 100) : 0;
+      return `${rate.toFixed(1)}%`;
+    }},
+    { label: "成本", render: c => cash(c.cost) },
+  ];
+  return (
+    <div className="py-3 border-b border-border-soft">
+      <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">{title}</div>
+      <table className="w-full text-[11px] border-collapse">
+        <thead>
+          <tr className="text-fg-faint border-b border-border-soft">
+            <th className="text-left font-normal pb-1" />
+            <th className="text-right font-normal pb-1 w-[22%]">主模型</th>
+            <th className="text-right font-normal pb-1 w-[22%]">子代理</th>
+            <th className="text-right font-normal pb-1 w-[22%]">汇总</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const isHitRow = row.label === "缓存命中";
+            const t = isHitRow ? (main.cacheHit + main.cacheMiss + sub.cacheHit + sub.cacheMiss) : 0;
+            const mRate = isHitRow && main.cacheHit + main.cacheMiss > 0 ? (main.cacheHit / (main.cacheHit + main.cacheMiss) * 100) : 0;
+            const sRate = isHitRow && sub.cacheHit + sub.cacheMiss > 0 ? (sub.cacheHit / (sub.cacheHit + sub.cacheMiss) * 100) : 0;
+            const tRate = isHitRow && t > 0 ? ((main.cacheHit + sub.cacheHit) / t * 100) : 0;
+            return (
+              <tr key={row.label} className="border-b border-border-soft/50">
+                <td className="py-1 text-fg-dim">{row.label}</td>
+                {isHitRow ? (
+                  <>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(mRate)}`}>
+                      {main.cacheHit + main.cacheMiss > 0 ? `${mRate.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(sRate)}`}>
+                      {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(tRate)}`}>
+                      {t > 0 ? `${tRate.toFixed(1)}%` : "—"}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(main)}</td>
+                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(sub)}</td>
+                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(total)}</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── 微型面积图 ─────────────────────────────────────────
 function MiniAreaChart({
   title, W, H, padL, padR, padT, padB, points, yTicks, color, xLabels,
 }: {
@@ -113,20 +192,46 @@ function MiniAreaChart({
   );
 }
 
-// ─── 命中率大号展示 ────────────────────────────────────────────
-function HitPct({ hit, total }: { hit: number; total: number }) {
-  const rate = total > 0 ? Math.min(100, (hit / total) * 100) : 0;
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
-      <span className="text-[10px] text-fg-faint tabular-nums">{tk(hit)} 命中 / {tk(total - hit)} 未命中</span>
-    </div>
-  );
+// ─── 命中率趋势图（从 StepRecord[] 生成）─────────────────
+function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: string; color: string }) {
+  const recent = steps.slice(-20);
+  if (recent.length < 2) return null;
+  const rates = recent.map(r => r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0);
+  const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
+  let step: number, padding: number;
+  if (spread <= 0.5)    { step = 0.1; padding = 0.05; }
+  else if (spread <= 1) { step = 0.2; padding = 0.1; }
+  else if (spread <= 2) { step = 1;   padding = 0.5; }
+  else if (spread <= 5) { step = 2;   padding = 1.0; }
+  else                  { step = 5;   padding = Math.max(5, spread * 0.15); }
+  const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
+  const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
+  const range = Math.max(maxRate - minRate || 1, step);
+  const W = 260, H = 80, padL = 30, padR = 8, padT = 8, padB = 16;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const points: Point[] = recent.map((r, i) => {
+    const x = padL + (i / Math.max(1, recent.length - 1)) * plotW;
+    const rate = r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0;
+    const y = padT + plotH - ((rate - minRate) / range) * plotH;
+    return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
+  });
+  const fmt = (v: number) => step < 1 ? v.toFixed(1) + "%" : `${Math.round(v)}%`;
+  const mid = minRate + range * 0.5;
+  const yLabels: [number, string][] = [[minRate, fmt(minRate)]];
+  if (mid !== minRate && mid !== maxRate) yLabels.push([mid, fmt(mid)]);
+  if (maxRate !== minRate) yLabels.push([maxRate, fmt(maxRate)]);
+  const xLabels = [
+    { at: points[0].x, text: `#${recent[0].step}` },
+    ...(recent.length >= 3 ? [{ at: points[Math.floor(points.length / 2)].x, text: `#${recent[Math.floor(recent.length / 2)].step}` }] : []),
+    { at: points[points.length - 1].x, text: `#${recent[recent.length - 1].step}` },
+  ];
+  return <MiniAreaChart title={title} W={W} H={H} padL={padL} padR={padR} padT={padT} padB={padB} points={points} yTicks={yLabels} color={color} xLabels={xLabels} />;
 }
 
-export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, resetKey, toolCounts, skillCounts }: {
+export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sessionKey, resetKey, toolCounts, skillCounts, perTurnMainUsage, perTurnSubUsage }: {
   usage?: WireUsage; perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; context: ContextInfo; model?: string;
   sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
+  perTurnMainUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {
   const turnRef = useRef(0);
   const stepRef = useRef(0);
@@ -144,18 +249,14 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
   const keyChanged = lastKeyRef.current !== sessionKey;
   if (keyChanged) lastKeyRef.current = sessionKey;
 
-
   const lastResetRef = useRef(resetKey);
-  // V10.17.5: 新建会话后首个渲染周期，turnSteps 还带着旧会话的 usage 数据——
-  // 跳过一次写入，防止旧数据覆盖新会话的空白统计。
   const skipWriteRef = useRef(false);
   useEffect(() => {
     if (resetKey === undefined || resetKey === lastResetRef.current) return;
     lastResetRef.current = resetKey;
     skipWriteRef.current = true;
     saveData(sessionKey, { turns: [], steps: [] });
-    turnRef.current = 0;
-    stepRef.current = 0;
+    turnRef.current = 0; stepRef.current = 0;
     turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
     perTurnRef.current = null;
     setData({ turns: [], steps: [] });
@@ -172,11 +273,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
 
   useEffect(() => {
     if (!turnSteps || turnSteps.length === 0) return;
-    // V10.17.5: 跳过旧数据写入
-    if (skipWriteRef.current) {
-      skipWriteRef.current = false;
-      return;
-    }
+    if (skipWriteRef.current) { skipWriteRef.current = false; return; }
     const lastStep = turnSteps[turnSteps.length - 1];
     setData(prev => {
       if (prev.steps.length > 0) {
@@ -193,6 +290,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         completion: lastStep.completionTokens,
         cacheHit: lastStep.cacheHitTokens,
         cacheMiss: lastStep.cacheMissTokens,
+        source: lastStep.source,
       };
       turnAccumRef.current.prompt += lastStep.promptTokens;
       turnAccumRef.current.completion += lastStep.completionTokens;
@@ -230,23 +328,39 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
     perTurnRef.current = null;
   }, [perTurnUsage]);
 
-  const lastTurn = history[history.length - 1];
-  const lastStep = stepHistory[stepHistory.length - 1];
-  const prevTurn = history.length >= 2 ? history[history.length - 2] : null;
+  // ── stats computation ──────────────────────────────────
+  const price = modelPrice(model);
   const sessionHit = usage?.sessionCacheHitTokens ?? 0;
   const sessionMiss = usage?.sessionCacheMissTokens ?? 0;
   const sessionPrompt = sessionHit + sessionMiss;
-  const totalCost = history.reduce((s, r) => s + r.cost, 0);
-  const lastTurnCost = lastTurn ? lastTurn.cost : 0;
   const sessionRate = sessionPrompt > 0 ? (sessionHit / sessionPrompt * 100) : 0;
-  const deltaRate = lastTurn && prevTurn && prevTurn.prompt > 0
-    ? ((lastTurn.cacheHit / Math.max(1, lastTurn.prompt)) * 100 - (prevTurn.cacheHit / prevTurn.prompt) * 100)
-    : null;
+  const totalCost = history.reduce((s, r) => s + r.cost, 0);
 
-  // 会话总 Token — 从 history 累计
-  const sessionPromptTk = useMemo(() => history.reduce((s, r) => s + r.prompt, 0), [history]);
-  const sessionComplTk = useMemo(() => history.reduce((s, r) => s + r.completion, 0), [history]);
-  // 有数据？
+  // session-level: aggregate from localStorage stepHistory
+  const mainSteps = stepHistory.filter(s => s.source === "main" || !s.source);
+  const subSteps = stepHistory.filter(s => s.source === "subagent");
+  const sessMain = useMemo(() => aggCol(mainSteps, price), [mainSteps, price]);
+  const sessSub = useMemo(() => aggCol(subSteps, price), [subSteps, price]);
+  const sessTotal = useMemo(() => ({
+    prompt: sessMain.prompt + sessSub.prompt,
+    completion: sessMain.completion + sessSub.completion,
+    cacheHit: sessMain.cacheHit + sessSub.cacheHit,
+    cacheMiss: sessMain.cacheMiss + sessSub.cacheMiss,
+    cost: sessMain.cost + sessSub.cost,
+  }), [sessMain, sessSub]);
+
+  // turn-level: from store accumulators
+  const turnMain = useMemo(() => colFromUsage(perTurnMainUsage, price), [perTurnMainUsage, price]);
+  const turnSub = useMemo(() => colFromUsage(perTurnSubUsage, price), [perTurnSubUsage, price]);
+  const turnTotal = useMemo(() => ({
+    prompt: turnMain.prompt + turnSub.prompt,
+    completion: turnMain.completion + turnSub.completion,
+    cacheHit: turnMain.cacheHit + turnSub.cacheHit,
+    cacheMiss: turnMain.cacheMiss + turnSub.cacheMiss,
+    cost: turnMain.cost + turnSub.cost,
+  }), [turnMain, turnSub]);
+
+  const lastStep = stepHistory[stepHistory.length - 1];
   const hasAnyData = history.length > 0 || stepHistory.length > 0;
 
   return (
@@ -286,128 +400,69 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
         </div>
       ) : (
       <div className="flex flex-col gap-0 p-3 overflow-y-auto">
-        {/* ── 会话总览 ── */}
-        <div className="py-3 border-b border-border-soft">
-          <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">会话 ({history.length}轮·{stepHistory.length}步)</div>
-          <div className="flex items-center gap-1 text-[11px] text-fg-dim font-mono tabular-nums mb-1.5">
-            <span>Prompt {tk(sessionPromptTk)}</span>
-            <span className="text-border mx-1.5">·</span>
-            <span>Compl {tk(sessionComplTk)}</span>
-            <span className="text-border mx-1.5">·</span>
-            <span>成本 {cash(totalCost)}</span>
-          </div>
-          {sessionPrompt > 0 && <HitPct hit={sessionHit} total={sessionPrompt} />}
-        </div>
-        {/* ── 本轮 ── */}
-        {lastTurn && (
-          <div className="py-3 border-b border-border-soft">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider">本轮 #{lastTurn.turn}</span>
-              {deltaRate !== null && (
-                <span className={`text-[10px] font-bold font-mono tabular-nums ${deltaRate >= 0 ? "text-ok" : "text-err"}`}>
-                  {deltaRate >= 0 ? "↑" : "↓"} {Math.abs(deltaRate).toFixed(2)}%
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-fg-dim font-mono tabular-nums mb-1.5">
-              <span>Prompt {tk(lastTurn.prompt)}</span>
-              <span className="text-border mx-1.5">·</span>
-              <span>Compl {tk(lastTurn.completion)}</span>
-              <span className="text-border mx-1.5">·</span>
-              <span>成本 {cash(lastTurnCost)}</span>
-            </div>
-            {lastTurn.prompt > 0 && <HitPct hit={lastTurn.cacheHit} total={lastTurn.prompt} />}
-          </div>
+
+        {/* ── 会话级统计表格 ── */}
+        <StatsTable
+          title={`会话 (${history.length}轮·${stepHistory.length}步)`}
+          main={sessMain} sub={sessSub} total={sessTotal}
+        />
+
+        {/* ── 本轮级统计表格 ── */}
+        {(perTurnMainUsage || perTurnSubUsage) && (
+          <StatsTable title="本轮" main={turnMain} sub={turnSub} total={turnTotal} />
         )}
 
         {/* ── 当前步 ── */}
         {lastStep && (
           <div className="py-3 border-b border-border-soft">
-            <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">当前步 #{lastStep.step}</div>
+            <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">
+              当前步 #{lastStep.step}
+              {lastStep.source && (
+                <span className={`ml-2 text-[9px] px-1 rounded ${lastStep.source === "subagent" ? "bg-warn-soft text-warning" : "bg-accent-soft text-accent"}`}>
+                  {lastStep.source === "subagent" ? "子代理" : "主模型"}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1 text-[11px] text-fg-dim font-mono tabular-nums mb-1.5">
               <span>Prompt {tk(lastStep.prompt)}</span>
               <span className="text-border mx-1.5">·</span>
               <span>Compl {tk(lastStep.completion)}</span>
             </div>
-            {lastStep.prompt > 0 && <HitPct hit={lastStep.cacheHit} total={lastStep.prompt} />}
+            {lastStep.prompt > 0 && (() => {
+              const rate = (lastStep.cacheHit / lastStep.prompt) * 100;
+              return (
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
+                  <span className="text-[10px] text-fg-faint tabular-nums">{tk(lastStep.cacheHit)} 命中 / {tk(lastStep.cacheMiss)} 未命中</span>
+                </div>
+              );
+            })()}
           </div>
         )}
 
-        {/* ── 命中率趋势（面积图）── */}
-        {stepHistory.length > 1 && (() => {
-          const recent = stepHistory.slice(-20);
-          const rates = recent.map(r => r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0);
-          const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
-          // 自适应步长：窄范围用细粒度。关键：99-100% 区间 spread≈0.15%，
-          // 用 step=1 会把 0.15% 波动压成 8.4px 平坦线——肉眼不可见。
-          // 方案：新增 0.1/0.2 两档，确保窄区间也有 4+ 刻度线。
-          let step: number, padding: number;
-          if (spread <= 0.5)    { step = 0.1; padding = 0.05; }
-          else if (spread <= 1) { step = 0.2; padding = 0.1; }
-          else if (spread <= 2) { step = 1;   padding = 0.5; }
-          else if (spread <= 5) { step = 2;   padding = 1.0; }
-          else                  { step = 5;   padding = Math.max(5, spread * 0.15); }
-          const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
-          const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
-          const rawRange = maxRate - minRate || 1;
-          const range = Math.max(rawRange, step); // 确保至少一个步长的刻度间距
-          const W = 260, H = 80, padL = 30, padR = 8, padT = 8, padB = 16;
-          const plotW = W - padL - padR, plotH = H - padT - padB;
-          const points: Point[] = recent.map((r, i) => {
-            const x = padL + (i / Math.max(1, recent.length - 1)) * plotW;
-            const rate = r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0;
-            const y = padT + plotH - ((rate - minRate) / range) * plotH;
-            return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
-          });
-          const yLabels: [number, string][] = (() => {
-            // 小数步长时（< 1）用 1 位小数显示，避免 "99.6%" 被截成 "99%"
-            const fmt = (v: number) => step < 1 ? v.toFixed(1) + "%" : `${Math.round(v)}%`;
-            const mid = minRate + range * 0.5;
-            const labels: [number, string][] = [[minRate, fmt(minRate)]];
-            if (mid !== minRate && mid !== maxRate) labels.push([mid, fmt(mid)]);
-            if (maxRate !== minRate) labels.push([maxRate, fmt(maxRate)]);
-            return labels;
-          })();
-          const xLabels = [
-            { at: points[0].x, text: `#${recent[0].step}` },
-            { at: points[Math.floor(points.length / 2)].x, text: `#${recent[Math.floor(recent.length / 2)].step}` },
-            { at: points[points.length - 1].x, text: `#${recent[recent.length - 1].step}` },
-          ];
-          return (
-            <MiniAreaChart
-              title={`命中率趋势 (最近 ${recent.length} 步)`}
-              W={W} H={H} padL={padL} padR={padR} padT={padT} padB={padB}
-              points={points} yTicks={yLabels} color="var(--warn)" xLabels={xLabels}
-            />
-          );
-        })()}
+        {/* ── 命中率趋势（主模型）── */}
+        <HitRateTrend steps={mainSteps} title="命中率趋势 · 主模型" color="var(--accent)" />
 
-        {/* ── Token 趋势（Prompt + Completion 双Y轴）── */}
+        {/* ── 命中率趋势（子代理）── */}
+        <HitRateTrend steps={subSteps} title="命中率趋势 · 子代理" color="var(--warn)" />
+
+        {/* ── Token 趋势 ── */}
         {history.length > 1 && (() => {
           const recent = history.slice(-20);
           let cumP = 0, cumC = 0;
-          const pCumulative: number[] = [];
-          const cCumulative: number[] = [];
-          for (const r of recent) {
-            cumP += r.prompt;
-            cumC += r.completion;
-            pCumulative.push(cumP);
-            cCumulative.push(cumC);
-          }
-          const pMax = Math.max(...pCumulative, 1);
-          const cMax = Math.max(...cCumulative, 1);
+          const pCumulative: number[] = []; const cCumulative: number[] = [];
+          for (const r of recent) { cumP += r.prompt; cumC += r.completion; pCumulative.push(cumP); cCumulative.push(cumC); }
+          const pMax = Math.max(...pCumulative, 1); const cMax = Math.max(...cCumulative, 1);
           const W = 260, H = 88, padL = 40, padR = 40, padT = 6, padB = 18;
           const plotW = W - padL - padR, plotH = H - padT - padB;
           const pToY = (v: number) => padT + plotH - (v / pMax) * plotH;
           const cToY = (v: number) => padT + plotH - (v / cMax) * plotH;
           const pPoints: Point[] = pCumulative.map((v, i) => ({
-            x: padL + (i / Math.max(1, pCumulative.length - 1)) * plotW,
-            y: pToY(v),
+            x: padL + (i / Math.max(1, pCumulative.length - 1)) * plotW, y: pToY(v),
             label: `轮#${recent[i].turn}: Prompt ${tk(v)}`,
           }));
           const cPoints: Point[] = cCumulative.map((v, i) => ({
-            x: padL + (i / Math.max(1, cCumulative.length - 1)) * plotW,
-            y: cToY(v),
+            x: padL + (i / Math.max(1, cCumulative.length - 1)) * plotW, y: cToY(v),
             label: `轮#${recent[i].turn}: Compl ${tk(v)}`,
           }));
           const pPath = pPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -415,10 +470,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
           const tkK = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K" : String(n);
           const pYLabels: [number, string][] = [[0, "0"], [Math.round(pMax * 0.5), tkK(Math.round(pMax * 0.5))], [pMax, tkK(pMax)]];
           const cYLabels: [number, string][] = [[0, "0"], [Math.round(cMax * 0.5), tk(Math.round(cMax * 0.5))], [cMax, tk(cMax)]];
-          const xLabels = recent.length >= 3
-            ? [{ at: pPoints[0].x, text: `#${recent[0].turn}` }, { at: pPoints[pPoints.length - 1].x, text: `#${recent[recent.length - 1].turn}` }]
-            : [];
-
+          const xLabels = recent.length >= 3 ? [{ at: pPoints[0].x, text: `#${recent[0].turn}` }, { at: pPoints[pPoints.length - 1].x, text: `#${recent[recent.length - 1].turn}` }] : [];
           return (
             <div className="py-3 border-b border-border-soft">
               <div className="flex items-center justify-between mb-2">
@@ -427,53 +479,24 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
                   Token 趋势 (最近 {recent.length} 轮)
                 </div>
                 <div className="flex items-center gap-3 text-[9px] text-fg-faint">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded" style={{background:"#22d3ee"}} />
-                    输入
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded" style={{background:"#fb923c"}} />
-                    输出
-                  </span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#22d3ee"}} />输入</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#fb923c"}} />输出</span>
                 </div>
               </div>
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-                {/* 左轴：输入 */}
                 {pYLabels.map(([_val, label], i) => {
                   const y = padT + plotH - (i / (pYLabels.length - 1)) * plotH;
-                  return (
-                    <g key={`py${i}`}>
-                      <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} />
-                      <text x={padL - 4} y={y + 3} fontSize={9} fill="#22d3ee" textAnchor="end">{label}</text>
-                    </g>
-                  );
+                  return (<g key={`py${i}`}><line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} /><text x={padL - 4} y={y + 3} fontSize={9} fill="#22d3ee" textAnchor="end">{label}</text></g>);
                 })}
-                {/* 右轴：输出 */}
                 {cYLabels.map(([_val, label], i) => {
                   const y = padT + plotH - (i / (cYLabels.length - 1)) * plotH;
-                  return (
-                    <g key={`cy${i}`}>
-                      <text x={W - padR + 4} y={y + 3} fontSize={9} fill="#fb923c" textAnchor="start">{label}</text>
-                    </g>
-                  );
+                  return (<g key={`cy${i}`}><text x={W - padR + 4} y={y + 3} fontSize={9} fill="#fb923c" textAnchor="start">{label}</text></g>);
                 })}
-                {/* 输入线 */}
                 <path d={pPath} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinejoin="round" />
-                {pPoints.map((p, i) => (
-                  <circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="#22d3ee">
-                    <title>{p.label}</title>
-                  </circle>
-                ))}
-                {/* 输出线 */}
+                {pPoints.map((p, i) => (<circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="#22d3ee"><title>{p.label}</title></circle>))}
                 <path d={cPath} fill="none" stroke="#fb923c" strokeWidth={2} strokeLinejoin="round" />
-                {cPoints.map((p, i) => (
-                  <circle key={"c"+i} cx={p.x} cy={p.y} r={2} fill="#fb923c">
-                    <title>{p.label}</title>
-                  </circle>
-                ))}
-                {xLabels.map((xl, i) => (
-                  <text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>
-                ))}
+                {cPoints.map((p, i) => (<circle key={"c"+i} cx={p.x} cy={p.y} r={2} fill="#fb923c"><title>{p.label}</title></circle>))}
+                {xLabels.map((xl, i) => (<text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>))}
               </svg>
             </div>
           );
@@ -485,8 +508,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             {Object.keys(toolCounts).length > 0 && (
               <>
                 <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">
-                  <Zap size={12} className="inline mr-1 align-middle" />
-                  工具调用
+                  <Zap size={12} className="inline mr-1 align-middle" /> 工具调用
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(toolCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
@@ -501,8 +523,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, ses
             {Object.keys(skillCounts).length > 0 && (
               <>
                 <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2 mt-2.5">
-                  <BarChart3 size={12} className="inline mr-1 align-middle" />
-                  技能调用
+                  <BarChart3 size={12} className="inline mr-1 align-middle" /> 技能调用
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(skillCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => (

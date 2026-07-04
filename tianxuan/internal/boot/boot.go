@@ -297,6 +297,18 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// executor uses, so the model surfaces it like any other tool.
 	taskTool := agent.NewTaskTool(execProv, entry.Price, reg, maxSteps,
 		entry.ContextWindow, cfg.Agent.Temperature, config.ArchiveDir(), "", headlessGate)
+
+	// V10.22: resolve subagent model from config. When SubagentModel names a
+	// configured provider, sub-agents use that provider (typically a cheaper
+	// flash model) while the parent keeps its own provider — independent API
+	// calls mean the parent's prefix cache is unaffected.
+	if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
+		if subEntry, ok := cfg.ResolveModel(subRef); ok {
+			if subProv, err := NewProvider(subEntry); err == nil {
+				taskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
+			}
+		}
+	}
 	reg.Add(taskTool)
 
 	// The `remember` tool lets the model persist durable facts to the project's

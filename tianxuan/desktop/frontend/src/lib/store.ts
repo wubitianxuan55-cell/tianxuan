@@ -28,6 +28,8 @@ interface ControllerState {
   turnStartAt: number; turnTokens: number; seq: number;
   sessionTotal: number;
   perTurnUsage: WireUsage | null | undefined; // V5.30: whole-turn accumulated usage
+  perTurnMainUsage?: WireUsage; // V10.22: main agent usage only
+  perTurnSubUsage?: WireUsage;  // V10.22: subagent usage only
   turnSteps: WireUsage[]; // V5.31: raw per-step usage within current turn
   sessionNonce: number; // V5.25: 每次新建/恢复会话递增，确保统计面板按会话区分
   _dispatch: (a: Action) => void;
@@ -56,7 +58,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
   if (s.discardTurn) { if (e.kind === "turn_done") return { ...s, discardTurn: false, running: false, turnActive: false, currentAssistant: undefined }; return s; }
   if (s.pendingUser !== undefined && e.kind !== "turn_started" && e.kind !== "turn_done") s = flushPendingUser(s);
   switch (e.kind) {
-    case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, lastAssistantIdx: -1, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, turnSteps: [] };
+    case "turn_started": return { ...s, running: true, turnActive: true, currentAssistant: undefined, lastAssistantIdx: -1, turnStartAt: Date.now(), turnTokens: 0, perTurnUsage: null, perTurnMainUsage: undefined, perTurnSubUsage: undefined, turnSteps: [] };
     case "text": case "reasoning": {
       // O(1) 查找最后一个 assistant 项：用 lastAssistantIdx 避免流式时每 chunk O(n) 扫描。
       // 若最后 assistant 已终结（上一轮 turn_done 已将 streaming 置 false）且当前轮活跃，
@@ -133,21 +135,31 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
     }
     case "usage": {
       const used = e.usage && s.context.window ? e.usage.promptTokens : s.context.used;
-      // V5.30: accumulate per-turn usage across all API calls in this turn
       const u = e.usage;
+      // combined accumulator (backwards compat)
       const acc = s.perTurnUsage && u ? {
         promptTokens: s.perTurnUsage.promptTokens + (u.promptTokens ?? 0),
         completionTokens: s.perTurnUsage.completionTokens + (u.completionTokens ?? 0),
         totalTokens: s.perTurnUsage.totalTokens + (u.totalTokens ?? 0),
         cacheHitTokens: s.perTurnUsage.cacheHitTokens + (u.cacheHitTokens ?? 0),
         cacheMissTokens: s.perTurnUsage.cacheMissTokens + (u.cacheMissTokens ?? 0),
-        // Session cumulative: only overwrite when event has valid data (parent events, not sub-agent)
         sessionCacheHitTokens: u.sessionCacheHitTokens > 0 ? u.sessionCacheHitTokens : (s.perTurnUsage?.sessionCacheHitTokens ?? 0),
         sessionCacheMissTokens: u.sessionCacheMissTokens > 0 ? u.sessionCacheMissTokens : (s.perTurnUsage?.sessionCacheMissTokens ?? 0),
       } : u;
-      // V5.31: record each API call as a step for per-step stats
-      // 子代理和主模型合并统计 —— 不再通过 source 字段区分
-      const tagged = u ? { ...u } : undefined; const steps = tagged ? [...s.turnSteps, tagged] : s.turnSteps; return { ...s, usage: tagged, perTurnUsage: acc, turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };
+      // V10.22: split by source — main vs subagent
+      const isSub = u?.source === "subagent";
+      const prevMain = s.perTurnMainUsage, prevSub = s.perTurnSubUsage;
+      const accBySource = (prev?: WireUsage) => prev && u ? {
+        promptTokens: prev.promptTokens + (u.promptTokens ?? 0),
+        completionTokens: prev.completionTokens + (u.completionTokens ?? 0),
+        totalTokens: prev.totalTokens + (u.totalTokens ?? 0),
+        cacheHitTokens: prev.cacheHitTokens + (u.cacheHitTokens ?? 0),
+        cacheMissTokens: prev.cacheMissTokens + (u.cacheMissTokens ?? 0),
+        sessionCacheHitTokens: u.sessionCacheHitTokens > 0 ? u.sessionCacheHitTokens : (prev.sessionCacheHitTokens ?? 0),
+        sessionCacheMissTokens: u.sessionCacheMissTokens > 0 ? u.sessionCacheMissTokens : (prev.sessionCacheMissTokens ?? 0),
+      } : u;
+      const tagged = u ? { ...u } : undefined; const steps = tagged ? [...s.turnSteps, tagged] : s.turnSteps;
+      return { ...s, usage: tagged, perTurnUsage: acc, perTurnMainUsage: accBySource(isSub ? prevMain : u ? (prevMain ?? (u as WireUsage)) : prevMain), perTurnSubUsage: accBySource(isSub ? (u ? (prevSub ?? (u as WireUsage)) : prevSub) : prevSub), turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };
     }
     case "notice": return { ...s, running: s.turnActive ? s.running : false, seq: s.seq + 1, items: [...s.items, { kind: "notice", id: `n${s.seq}`, level: e.level ?? "info", text: e.text ?? "" }] };
     case "phase": return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "phase", id: `p${s.seq}`, text: e.text ?? "" }] };

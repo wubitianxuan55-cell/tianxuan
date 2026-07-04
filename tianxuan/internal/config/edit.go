@@ -50,6 +50,22 @@ func (c *Config) SetPlannerModel(name string) error {
 	return nil
 }
 
+// SetSubagentModel sets (or, with "", clears) agent.subagent_model — the default
+// model for sub-agents (task tool and runAs=subagent skills). An empty string
+// means the sub-agent inherits the parent's execution provider. A non-empty name
+// must be a configured provider.
+func (c *Config) SetSubagentModel(name string) error {
+	if name == "" {
+		c.Agent.SubagentModel = ""
+		return nil
+	}
+	if _, ok := c.Provider(name); !ok {
+		return fmt.Errorf("set subagent: no provider %q (configured: %s)", name, c.providerNames())
+	}
+	c.Agent.SubagentModel = name
+	return nil
+}
+
 // UpsertProvider adds e, or replaces an existing provider with the same name
 // (preserving its position). Required fields (name, kind, base_url, model) are
 // validated; whether the kind is actually registered and the key resolves is

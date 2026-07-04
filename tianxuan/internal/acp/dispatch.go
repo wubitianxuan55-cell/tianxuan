@@ -148,7 +148,9 @@ func (s *updateSink) replay(msgs []provider.Message) {
 	for _, m := range msgs {
 		switch m.Role {
 		case provider.RoleUser:
-			if m.Content != "" {
+			// Skip system-injected nudges (e.g. "[system] All tasks appear complete...")
+			// — they are internal prompts, not visible user messages.
+			if m.Content != "" && !strings.HasPrefix(m.Content, "[system]") {
 				s.send(messageChunk{SessionUpdate: "user_message_chunk", Content: textBlock(m.Content)})
 			}
 		case provider.RoleAssistant:

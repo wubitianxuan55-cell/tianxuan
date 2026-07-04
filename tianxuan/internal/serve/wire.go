@@ -41,6 +41,7 @@ type wireAskQuestion struct {
 	Prompt  string          `json:"prompt"`
 	Options []wireAskOption `json:"options"`
 	Multi   bool            `json:"multi,omitempty"`
+	Plan    string          `json:"plan,omitempty"` // non-empty triggers PlanCard UI
 }
 
 type wireAsk struct {
@@ -107,7 +108,7 @@ func toWireAsk(a event.Ask) *wireAsk {
 		for j, o := range q.Options {
 			opts[j] = wireAskOption{Label: o.Label, Description: o.Description}
 		}
-		qs[i] = wireAskQuestion{ID: q.ID, Header: q.Header, Prompt: q.Prompt, Options: opts, Multi: q.Multi}
+		qs[i] = wireAskQuestion{ID: q.ID, Header: q.Header, Prompt: q.Prompt, Options: opts, Multi: q.Multi, Plan: q.Plan}
 	}
 	return &wireAsk{ID: a.ID, Questions: qs}
 }

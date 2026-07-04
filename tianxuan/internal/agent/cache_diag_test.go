@@ -40,7 +40,7 @@ func TestCachePrefixStabilityDiagnostic(t *testing.T) {
 	sink := &diagSink{}
 	sess := NewSession(systemPrompt)
 	runner := New(prov, reg, sess, Options{
-		MaxSteps:    1,
+		MaxSteps:    5,
 		Temperature: 0.0,
 	}, sink)
 	runner.MergeRuntimePrompt(runtimePrompt)

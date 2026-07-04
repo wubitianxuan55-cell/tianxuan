@@ -36,7 +36,7 @@ func TestRealAPICache10Rounds(t *testing.T) {
 	reg := tool.NewRegistry()
 	sess := NewSession("You are a helpful coding assistant. Reply concisely in Chinese.")
 	runner := New(prov, reg, sess, Options{
-		MaxSteps:    1,
+		MaxSteps:    5,
 		Temperature: 0.0,
 	}, sink)
 

@@ -16,47 +16,14 @@ import (
 // V10.33: planWithTools is now the sole plan path — planStream is the
 // backward-compatible fallback when readonlyTools is nil (e.g. test harness).
 const HermesPrompt = `You are Hermes — the planner in a two-model coding agent.
-
-You have two modes:
-
-1. DIRECT ANSWER: when the task is a read-only query ("how does X work?",
-   "where is Y?", "what does Z do?"), investigate with your read-only tools
-   and answer directly. Do NOT produce a plan — just give the answer.
-   The Hephaestus executor will NOT be invoked for pure answers.
-
-2. PLAN: when the task requires code changes (writing, editing, deleting,
-   refactoring, building, testing, etc.), investigate the codebase with your
-   read-only tools, then output an ordered plan for Hephaestus to carry out.
-
-Available tools: read_file, grep, glob, lsp_definition, web_search, web_fetch,
-codegraph_*, gitnexus_*, memory_search, read_skill, git_status/diff/log.
-
-Guidelines:
-- Research before answering or planning. Base everything on actual code.
-- Prefer codegraph/gitnexus over manual grep+read for broad investigation.
-- If the task is too vague, ask ONE clarifying question before proceeding.
-- Plans: 3-8 steps, each one line with file targets.
-
-Output for PLAN mode:
-## Plan
-1. [step description] -- path/to/file.go
-...
-
-Output for DIRECT ANSWER mode: just the answer, no "## Plan" header.
-
-Then stop and wait for user approval. Do not execute.`
+Given a task, produce a concise, ordered plan for the Hephaestus executor to carry out.
+Use read-only tools (codegraph, gitnexus, read_file, grep, lsp_*, web_search) to
+investigate the codebase when the task needs context. Keep research targeted — stop
+once you have enough evidence. Output executor-ready instructions: what to do, which
+files or commands are relevant, and key decisions. Do not implement or execute.
+If the task is a read-only query, answer directly — do not produce a plan.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
-
-// HermesPromptWithContext appends cache-stable standing context to the planner's
-// smaller system prompt. Pass the L1 identity/memory block.
-func HermesPromptWithContext(context string) string {
-	context = strings.TrimSpace(context)
-	if context == "" {
-		return HermesPrompt
-	}
-	return HermesPrompt + "\n\n# Planning context\n\n" + context
-}
 
 // Hermes runs two models in separate sessions to keep each one's prompt
 // prefix cache-stable: a low-frequency planner proposes an approach, then the
@@ -78,6 +45,12 @@ type Hermes struct {
 	readonlyTools *tool.Registry // V10.32: if set, planner runs as AgentRunner
 	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
 	asker        Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
+
+	// V10.36: persistent planner Agent with compaction — replaces per-turn temp AgentRunner.
+	// The planner accumulates planning history + execution results across turns, with
+	// compaction keeping the context bounded. This gives the planner a proper TCCA-like
+	// architecture (L1 stable prefix + L4 growing flow + compaction).
+	plannerAgent *AgentRunner
 }
 
 // NewHermes creates a Hermes orchestrator. hermesProvider is the planning model,
@@ -85,12 +58,13 @@ type Hermes struct {
 //
 // V10.32: pass readonlyTools (nil for stream-only) and planMaxSteps to let
 // Hermes use read-only tools for code investigation before proposing a plan.
-func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesPricing *provider.Pricing, hephaestus *AgentRunner, temperature float64, sink event.Sink, readonlyTools *tool.Registry, planMaxSteps int) *Hermes {
+// V10.36: contextWindow + archiveDir enable compaction on the planner's persistent session.
+func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesPricing *provider.Pricing, hephaestus *AgentRunner, temperature float64, sink event.Sink, readonlyTools *tool.Registry, planMaxSteps int, contextWindow int, archiveDir string) *Hermes {
 	if hermesSession == nil {
 		hermesSession = NewSession("")
 	}
 	hermesSystem := sessionSystemPrompt(hermesSession)
-	return &Hermes{
+	h := &Hermes{
 		hermesProvider: hermesProvider,
 		hermesSess:     hermesSession,
 		hermesSystem:   hermesSystem,
@@ -101,6 +75,28 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 		readonlyTools:  readonlyTools,
 		planMaxSteps:   planMaxSteps,
 	}
+	// V10.36: create persistent planner Agent with compaction so the planner
+	// accumulates history across turns without unbounded growth.
+	if readonlyTools != nil {
+		plannerSink := event.FuncSink(func(e event.Event) {
+			if e.Kind == event.Usage {
+				if e.UsageSource == "" || e.UsageSource == event.UsageSourceMain {
+					e.UsageSource = event.UsageSourcePlanner
+				}
+			}
+			sink.Emit(e)
+		})
+		h.plannerAgent = New(hermesProvider, readonlyTools, hermesSession, Options{
+			MaxSteps:       planMaxSteps,
+			Temperature:    temperature,
+			Pricing:        hermesPricing,
+			Gate:           &autoGate{},
+			DisableVerify:  true,
+			ContextWindow:  contextWindow,
+			Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: contextWindow},
+		}, plannerSink)
+	}
+	return h
 }
 
 func sessionSystemPrompt(s *Session) string {
@@ -144,6 +140,9 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 	}
 
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · planning"})
+	// Save message count before planning — if the user later cancels, roll back
+	// so the unapproved plan doesn't pollute the planner's L4 context.
+	prePlanLen := len(h.hermesSess.Messages)
 	plan, err := h.plan(ctx, input)
 	if err != nil {
 		return fmt.Errorf("hermes: %w", err)
@@ -158,10 +157,85 @@ func (h *Hermes) Run(ctx context.Context, input string) error {
 	// Headless 模式（无 asker）自动通过；用户可在确认框下方输入框填写修改意见。
 	userNote, err := h.confirmPlan(ctx, input, plan)
 	if err != nil {
+		// User cancelled — roll back planner session to pre-plan state.
+		h.hermesSess.Truncate(prePlanLen)
 		return err
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
-	return h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
+	execErr := h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
+
+	// V10.36: flow execution result back to the planner's session so it has
+	// context for the next turn. The planner accumulates [task → plan → execution
+	// result] across turns; compaction keeps the history bounded.
+	if summary := h.lastExecutorResult(); summary != "" {
+		h.hermesSess.Add(provider.Message{
+			Role:    provider.RoleUser,
+			Content: "[system] 上一轮执行完成:\n" + summary,
+		})
+	}
+	return execErr
+}
+
+// lastExecutorResult returns a structured summary of the executor's last turn
+// for the planner's context. Extracts modified files and the conclusion gist
+// without dumping raw output. The summary ends at a sentence boundary.
+func (h *Hermes) lastExecutorResult() string {
+	if h.hephaestus == nil || h.hephaestus.session == nil {
+		return ""
+	}
+	msgs := h.hephaestus.session.Messages
+
+	// Find the last assistant message (the executor's conclusion).
+	var lastAssistant string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == provider.RoleAssistant && msgs[i].Content != "" {
+			lastAssistant = msgs[i].Content
+			break
+		}
+	}
+	if lastAssistant == "" {
+		return ""
+	}
+
+	// Find files modified in this turn (from tool result names).
+	files := make(map[string]bool)
+	for i := len(msgs) - 1; i >= 0; i-- {
+		m := msgs[i]
+		if m.Role == provider.RoleUser && strings.Contains(m.Content, hephaestusHandoffMarker) {
+			break // crossed into previous turn's handoff
+		}
+		if m.Role == provider.RoleTool {
+			switch m.Name {
+			case "write_file", "edit_file", "move_file", "delete_range", "delete_symbol":
+				if path := extractFilePath(m.Name, m.Content); path != "" {
+					files[path] = true
+				}
+			}
+		}
+	}
+
+	var b strings.Builder
+	if len(files) > 0 {
+		b.WriteString("Modified: ")
+		first := true
+		for f := range files {
+			if !first { b.WriteString(", ") }
+			b.WriteString(f)
+			first = false
+		}
+		b.WriteString("\n")
+	}
+	// Truncate conclusion at last sentence boundary within 400 chars.
+	conclusion := lastAssistant
+	if len(conclusion) > 400 {
+		conclusion = conclusion[:400]
+		if idx := strings.LastIndexAny(conclusion, ".。!！?？\n"); idx > 200 {
+			conclusion = conclusion[:idx+1]
+		}
+	}
+	b.WriteString("Result: ")
+	b.WriteString(conclusion)
+	return b.String()
 }
 
 // confirmPlan asks the user to approve the planner's output before handing off to
@@ -180,13 +254,11 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, er
 	if h.asker == nil {
 		return "", nil // headless: auto-confirm
 	}
-	// Show first 3 non-empty lines of the plan as a compact preview.
-	planPreview := firstLines(plan, 3)
 	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
 		ID:     "confirm",
 		Header: "计划确认",
-		Prompt: fmt.Sprintf("Hermes 完成了代码调查，制定了执行计划。\n\n任务：%s\n\n计划概要：\n%s\n\n如需修改，在下方文本框中输入意见后提交。",
-			truncateStr(task, 200), planPreview),
+		Prompt: fmt.Sprintf("任务：%s", truncateStr(task, 200)),
+		Plan:   plan, // full plan rendered by PlanCard with Markdown
 		Options: []event.AskOption{
 			{Label: "提交执行", Description: "按计划交由 Hephaestus 立即执行"},
 			{Label: "取消", Description: "放弃本次任务，不做任何更改"},
@@ -210,34 +282,6 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, er
 	}
 }
 
-// firstLines returns the first n non-empty lines from s.
-func firstLines(s string, n int) string {
-	lines := strings.Split(s, "\n")
-	var out []string
-	for _, l := range lines {
-		if strings.TrimSpace(l) != "" {
-			out = append(out, l)
-			if len(out) >= n {
-				break
-			}
-		}
-	}
-	result := strings.Join(out, "\n")
-	if len(lines) > len(out)+countEmpty(lines) {
-		result += "\n…"
-	}
-	return result
-}
-
-func countEmpty(lines []string) int {
-	n := 0
-	for _, l := range lines {
-		if strings.TrimSpace(l) == "" {
-			n++
-		}
-	}
-	return n
-}
 
 // ── Plan implementation ──────────────────────────────────────────────────
 
@@ -256,10 +300,12 @@ func (h *Hermes) plan(ctx context.Context, input string) (string, error) {
 // planStream is the backward-compatible zero-tool stream fallback, used when
 // Hermes is constructed without a read-only tool registry (e.g. in tests).
 func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
-	h.hermesSess.Add(provider.Message{Role: provider.RoleUser, Content: input})
+	msgs := make([]provider.Message, len(h.hermesSess.Messages)+1)
+	copy(msgs, h.hermesSess.Messages)
+	msgs[len(msgs)-1] = provider.Message{Role: provider.RoleUser, Content: input}
 
 	ch, err := h.hermesProvider.Stream(ctx, provider.Request{
-		Messages:    h.hermesSess.Messages,
+		Messages:    msgs,
 		Temperature: h.temperature,
 	})
 	if err != nil {
@@ -282,47 +328,27 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 		h.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: h.hermesPricing, UsageSource: event.UsageSourcePlanner})
 
 	plan := text.String()
-	h.hermesSess.Add(provider.Message{Role: provider.RoleAssistant, Content: plan})
 	return plan, nil
 }
 
-// planWithTools runs Hermes as an AgentRunner with read-only tools.
+// planWithTools runs the persistent planner Agent with read-only tools.
+// V10.36: uses the persistent plannerAgent (created in NewHermes) instead of
+// building a temporary AgentRunner each turn. The planner's session accumulates
+// planning history + execution results across turns; compaction keeps it bounded.
 func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error) {
-	sysPrompt := h.hermesSystem
-	if sysPrompt == "" {
-		sysPrompt = sessionSystemPrompt(h.hermesSess)
+	if h.plannerAgent == nil {
+		return "", fmt.Errorf("hermes: planner agent not initialized (no read-only tools)")
 	}
-	hermesSess := NewSession(sysPrompt)
-	for _, m := range h.hermesSess.Messages {
-		if m.Role == provider.RoleUser || m.Role == provider.RoleAssistant {
-			hermesSess.Add(m)
-		}
-	}
-
-	// V10.34: wrap sink to tag planner usage events — without this, the
-	// planner's usage would be attributed to "main" and missed by StatsPanel.
-	plannerSink := event.FuncSink(func(e event.Event) {
-		if e.Kind == event.Usage {
-			e.UsageSource = event.UsageSourcePlanner
-		}
-		h.sink.Emit(e)
-	})
-	hermesRunner := New(h.hermesProvider, h.readonlyTools, hermesSess, Options{
-		MaxSteps:       h.planMaxSteps,
-		Temperature:    h.temperature,
-		Pricing:        h.hermesPricing,
-		Gate:           &autoGate{},
-		DisableVerify:  true, // planner only investigates, never executes
-	}, plannerSink)
-
-	if err := hermesRunner.Run(ctx, input); err != nil {
+	if err := h.plannerAgent.Run(ctx, input); err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}
 
+	// Extract the plan from the planner's persistent session (last assistant message).
 	var plan string
-	for i := len(hermesSess.Messages) - 1; i >= 0; i-- {
-		if hermesSess.Messages[i].Role == provider.RoleAssistant {
-			plan = hermesSess.Messages[i].Content
+	msgs := h.hermesSess.Messages
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == provider.RoleAssistant {
+			plan = msgs[i].Content
 			break
 		}
 	}
@@ -330,8 +356,6 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 		plan = "(hermes produced no output)"
 	}
 
-	h.hermesSess.Add(provider.Message{Role: provider.RoleUser, Content: input})
-	h.hermesSess.Add(provider.Message{Role: provider.RoleAssistant, Content: plan})
 	return plan, nil
 }
 

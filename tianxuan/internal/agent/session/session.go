@@ -35,6 +35,25 @@ func (s *Session) Add(m provider.Message) {
 	s.Messages = append(s.Messages, m)
 }
 
+// PrependSystem inserts a system message at the front of the message log,
+// before any existing messages. Used by sub-agents to inject a cache-stable
+// template prefix that same-kind sub-agents can share.
+func (s *Session) PrependSystem(content string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Messages = append([]provider.Message{{Role: provider.RoleSystem, Content: content}}, s.Messages...)
+}
+
+// Truncate cuts the message log back to n messages. Used to roll back
+// unapproved plan output from the planner's session.
+func (s *Session) Truncate(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if n < len(s.Messages) {
+		s.Messages = s.Messages[:n]
+	}
+}
+
 // Replace swaps the whole message log — used by compaction, which rewrites the
 // middle of the history.
 func (s *Session) Replace(msgs []provider.Message) {

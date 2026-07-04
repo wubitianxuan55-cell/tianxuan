@@ -298,17 +298,10 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 	// V6.0: sub-agent does NOT inherit parent L1+L2 — uses DefaultTaskSystemPrompt independently.
 	// This saves ~50K tokens per sub-agent call (97% reduction) and keeps cache stats separate.
 	sysPrompt := t.sysPrompt
-	promptContent := prompt
 
-	// V5.30: 子代理模板注入
-	if t.templatePrefix != "" {
-		promptContent = t.templatePrefix + "\n\n---\n\n" + promptContent
-	}
-
-	// V5.30: 子代理 API 请求发送父代理完整工具集以保证缓存对齐。
-	// API 请求工具列表与父代理一致（含 meta-tools），DeepSeek 可命中缓存。
-	// 执行层面由 subReg（buildSubReg 过滤后）门控，meta-tools 无法被实际调用。
-	// V10.22: use subagent provider when configured, otherwise fall back to parent's
+	// V5.30 / V10.36: ActiveSchemas sends parent's full tool set to the API so
+	// tools JSON matches — DeepSeek prefix cache hits across parent→sub-agent.
+	// Execution gated by subReg (buildSubReg filtering), meta-tools blocked.
 	subProv, subPrice, subCtxWin := t.prov, t.pricing, t.contextWindow
 	if t.subagentProv != nil {
 		subProv = t.subagentProv
@@ -320,22 +313,24 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 	var result string
 	var err error
 	if run != nil && run.Session != nil {
-		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, promptContent, Options{
+		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, prompt, Options{
 			MaxSteps:       maxSteps,
 			Temperature:    t.temperature,
 			Pricing:        subPrice,
 			Gate:           t.gate,
 			ContextWindow:  subCtxWin,
-			Compaction: CompactionConfig{ArchiveDir: t.archiveDir},
+			Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
+			ActiveSchemas:  t.parentReg.Schemas(), // V10.36: align tools JSON with parent for cache
 		}, sink, &subUsage)
 	} else {
-		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, promptContent, Options{
+		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, prompt, Options{
 			MaxSteps:       maxSteps,
 			Temperature:    t.temperature,
 			Pricing:        subPrice,
 			Gate:           t.gate,
 			ContextWindow:  subCtxWin,
-			Compaction: CompactionConfig{ArchiveDir: t.archiveDir},
+			Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
+			ActiveSchemas:  t.parentReg.Schemas(), // V10.36: align tools JSON with parent for cache
 		}, sink, &subUsage)
 	}
 	if err == nil && len(outputSchema) > 0 {

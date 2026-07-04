@@ -17,6 +17,7 @@ import { Composer } from "./components/Composer";
 import { TodoPanel } from "./components/TodoPanel";
 import { ApprovalModal } from "./components/ApprovalModal";
 import { AskCard } from "./components/AskCard";
+import { PlanCard } from "./components/PlanCard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { ToolbarButton } from "./components/ToolbarButton";
 import { StatusBar } from "./components/StatusBar";
@@ -585,13 +586,19 @@ export default function App() {
           />
         )}
 
-      {state.ask && (
+      {state.ask && (state.ask.questions[0]?.plan ? (
+        <PlanCard
+          ask={state.ask}
+          onAnswer={answerQuestion}
+          onDismiss={() => answerQuestion(state.ask!.id, [])}
+        />
+      ) : (
         <AskCard
           ask={state.ask}
           onAnswer={answerQuestion}
           onDismiss={() => answerQuestion(state.ask!.id, [])}
         />
-      )}
+      ))}
 
       <Suspense fallback={null}>
         {memView !== null && (

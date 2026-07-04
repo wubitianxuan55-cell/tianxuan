@@ -236,8 +236,10 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		ContextWindow: ctxWin,
 		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		RuntimePrompt: runtimeCtx.SystemPrompt(),
-		// V5.30: 根据技能名查找子代理模板
+		// V5.30: 根据技能名查找子代理模板 — 同类子代理共享前缀缓存
 		TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
+		// V10.36: 对齐父代理工具集以保证缓存命中
+		ActiveSchemas:  reg.Schemas(),
 	}, agent.NestedSink(sctx, event.Discard), nil)
 	}
 	reg.Add(skill.NewRunSkillTool(skillStore, skillRunner))
@@ -348,13 +350,13 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			if err != nil {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
 			}
-			plannerSess := agent.NewSession(agent.HermesPromptWithContext(compiler.IdentityLayer().Identity()))
+			plannerSess := agent.NewSession(agent.HermesPrompt + "\n\n# Project context\n\n" + mem.Block())
 			// V10.32: build a read-only tool subset for the planner so it can
 			// investigate code before proposing a plan (read_file, grep, glob,
 			// web_search, web_fetch, lsp_*, code_index, memory_search,
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 0)
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir())
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
@@ -673,13 +675,23 @@ func resolvePatternsPath() (string, error) {
 // from the full registry. Used to give the planner AgentRunner powers to
 // investigate code (read_file, grep, glob, web_search, web_fetch, lsp_*, etc.)
 // without any write/destructive capability. MCP tools are included when their
-// ReadOnly() returns true. Returns an empty (not nil) registry when full is nil.
+// ReadOnly() returns true. Subagent-spawning tools (task, explore, research,
+// review, security_review, run_skill, parallel_skills) are excluded regardless
+// of ReadOnly — the planner must not spawn sub-agents that create independent
+// API calls and evict its cache prefix.
 func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	ro := tool.NewRegistry()
 	if full == nil {
 		return ro
 	}
+	exclude := map[string]bool{
+		"task": true, "run_skill": true, "parallel_skills": true,
+		"explore": true, "research": true, "review": true, "security_review": true,
+	}
 	for _, name := range full.Names() {
+		if exclude[name] {
+			continue
+		}
 		t, ok := full.Get(name)
 		if !ok {
 			continue

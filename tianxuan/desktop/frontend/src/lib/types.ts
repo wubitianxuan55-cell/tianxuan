@@ -71,6 +71,7 @@ export interface WireAskQuestion {
   prompt: string;
   options: WireAskOption[];
   multi?: boolean;
+  plan?: string; // non-empty triggers plan-confirm UI
 }
 
 export interface WireAsk {

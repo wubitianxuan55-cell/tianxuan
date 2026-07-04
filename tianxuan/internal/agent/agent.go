@@ -505,66 +505,6 @@ func (a *AgentRunner) ContextWindow() int { return a.compaction.Window }
 // fires (e.g. 0.8). The status line uses it to show headroom to the next compact.
 func (a *AgentRunner) CompactRatio() float64 { return a.compaction.Ratio }
 
-// Options configures an AgentRunner.
-type Options struct {
-	MaxSteps    int
-	Temperature float64
-	Pricing     *provider.Pricing // optional, for per-turn cost display
-
-	// Gate is the per-call permission gate. nil disables gating.
-	Gate Gate
-
-	// Hooks fires PreToolUse / PostToolUse shell hooks around tool calls. nil
-	// disables hook firing.
-	Hooks ToolHooks
-
-	// Jobs is the session's background-job manager (nil disables background tools).
-	Jobs *jobs.Manager
-
-	// Context management. ContextWindow <= 0 disables compaction.
-	ContextWindow int
-	// Compaction groups compaction settings (V3.0).
-	Compaction CompactionConfig
-	// Dispatcher is the centralized pre-execution check pipeline (V2.4).
-	// nil means the agent uses inline checks (backward compatible).
-	Dispatcher *ToolDispatcher
-	// CtxMgr is the TCCA context kernel (V3.0). When set, the agent uses it
-	// for prompt assembly and tool filtering instead of inline logic.
-	CtxMgr *tiancontext.ContextManager
-	// AuditFunc, when non-nil, is called after every tool execution with a
-	// summary of the call. V3.2: foundational audit trail.
-	AuditFunc func(tool string, taskKind string, readOnly bool, outcome string, errMsg string, outputLen int, durationMs int64)
-
-	// ParamStorm enables parameter-level duplicate tool call detection (V5.13).
-	// nil disables; non-nil provides WindowSize/Threshold/ExemptTools.
-	ParamStorm *ParamStormOptions
-	// BudgetLimit is the per-session cost budget in yuan (V5.15).
-	// <=0 means unlimited. When set, the agent tracks cumulative cost
-	// and warns at 80%% / blocks at 100%%.
-	BudgetLimit float64
-
-	// ModelProfile overrides compaction thresholds for specific models (V5.17).
-	// nil means use defaults from CompactionConfig.
-	ModelProfile *ModelProfile
-
-	// TemplatePrefix is the sub-agent template prefix injected before the
-	// user message in spawned agents. Same-class sub-agents share the same
-	// template bytes �� DeepSeek prefix cache hits across sub-agent invocations.
-	TemplatePrefix string
-	// ActiveSchemas are the filtered tool schemas for sub-agents (V5.30).
-	// When set, RunSubAgent uses these as the tools JSON field so the
-	// prefix cache includes the same tools the parent sends.
-	ActiveSchemas []provider.ToolSchema
-	RuntimePrompt string
-	// Goal is the session-level stopping condition (V6.0 P7). When non-empty,
-	// the stop gate checks whether the model's final answer satisfies the goal.
-	Goal string
-	// DisableVerify suppresses the orchestrate verify nudge (V10.22).
-	// Sub-agents set this to true so the verify gate doesn't inject
-	// "[system] All tasks complete" into their fresh session.
-	DisableVerify bool
-}
-
 // New constructs an AgentRunner. MaxSteps <= 0 means no cap �� the run loop
 // continues until the model gives a final answer, the context is cancelled, or
 // the provider errors (compaction keeps the context bounded). A nil sink is
@@ -629,6 +569,15 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	// V5.17: Ӧ��ģ�����ø���ѹ����ֵ
 	if opts.ModelProfile != nil {
 		ApplyModelProfile(&r.compaction, opts.ModelProfile)
+	}
+	// V10.22: sub-agent cache alignment — when TemplatePrefix is set, prepend
+	// it as a system message so same-kind sub-agents share prefix bytes.
+	if opts.TemplatePrefix != "" {
+		r.session.PrependSystem(opts.TemplatePrefix)
+	}
+	// V5.30: override tools JSON sent to API for cache alignment with parent.
+	if opts.ActiveSchemas != nil {
+		r.activeSchemas = opts.ActiveSchemas
 	}
 	return r
 }
@@ -798,63 +747,6 @@ func (a *AgentRunner) SetCtxMgr(m *tiancontext.ContextManager) {
 }
 
 // StormBreaker tracks repeated failures to detect death spirals (V3.0 Phase 4).
-type StormBreaker struct {
-	Sig   string // per-turn fixation signature
-	Count int    // consecutive identical failures
-}
-
-// extractFilePath extracts a file path from tool call arguments for edit tools.
-// Returns "" if no path can be extracted.
-
-// truncateStr returns s truncated to maxLen chars. Used for dedup key building.
-func truncateStr(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen]
-}
-func extractFilePath(name string, args string) string {
-	// Common keys for file paths in tool arguments.
-	keys := []string{`"path"`, `"file_path"`, `"source"`, `"destination"`}
-	lower := strings.ToLower(args)
-	for _, key := range keys {
-		idx := strings.Index(lower, key)
-		if idx < 0 {
-			continue
-		}
-		// Find the value after the key:  "path": "value"
-		rest := args[idx+len(key):]
-		colon := strings.Index(rest, ":")
-		if colon < 0 {
-			continue
-		}
-		val := strings.TrimSpace(rest[colon+1:])
-		// Strip quotes
-		val = strings.Trim(val, `"`)
-		// Take until comma or closing brace
-		if end := strings.IndexAny(val, `,}`); end >= 0 {
-			val = val[:end]
-		}
-		val = strings.TrimSpace(val)
-		val = strings.Trim(val, `"`)
-		if val != "" {
-			return val
-		}
-	}
-	return ""
-}
-
-// Agent is a backward-compatible alias for AgentRunner.
-type Agent = AgentRunner
-
-// stream runs one completion, emitting reasoning and text deltas as typed
-// events and collecting complete tool calls. A Message event closes the text
-// stream so a sink can re-render the streamed raw text as styled markdown. The
-
-// fallbackTokPerChar is ~4 chars per token �� the middle-of-the-road estimate
-// used before any provider usage data is available to calibrate.
-const fallbackTokPerChar = 0.25
-
 // tokPerChar derives a tokens-per-character ratio from the last turn's real
 // usage so per-message estimates track the provider's tokenizer without a
 // local one. Falls back to ~4 chars/token before any usage is known.
@@ -872,54 +764,6 @@ func (a *AgentRunner) tokPerChar() float64 {
 // msgChars counts the characters sent to the provider for one message ��
 // content plus tool-call names and arguments, but not reasoning (stripped on
 // send).
-func msgChars(m provider.Message) int {
-	n := len(m.Content)
-	for _, tc := range m.ToolCalls {
-		n += len(tc.Name) + len(tc.Arguments)
-	}
-	return n
-}
-
-// charsOfMessages returns the total character count across messages.
-func charsOfMessages(msgs []provider.Message) int {
-	n := 0
-	for _, m := range msgs {
-		n += msgChars(m)
-	}
-	return n
-}
-
-// streamRecoveryMessage generates a recovery prompt for use when a stream
-// is interrupted mid-response. The prompt varies based on whether partial
-// text was already emitted.
-// (Design adopted from DeepSeek-Reasonix-V1.12)
-func streamRecoveryMessage(hasPartialText bool) string {
-	if hasPartialText {
-		return "The previous assistant response was interrupted during streaming. Continue the same task from immediately after the partial assistant message above. Do not repeat text that is already visible."
-	}
-	return "The previous assistant response was interrupted during streaming before visible answer text was completed. Continue the same task now and provide the next useful response."
-}
-
-// emptyFinalRetryMessage generates a retry prompt when the model returns
-// no tool calls and no visible text. It nudges the model to produce a
-// visible answer.
-// (Design adopted from DeepSeek-Reasonix-V1.12)
-func emptyFinalRetryMessage() string {
-	return "The previous assistant response finished without any visible answer text. Continue the same task now and provide a concise visible answer to the user. Do not send reasoning only."
-}
-
-
-// MidTurnSteerPrefix marks user messages that were injected mid-turn as
-// guidance (via Steer). The model sees them as instructions; frontends
-// display them as a notice, not a regular user bubble.
-// (Design adopted from DeepSeek-Reasonix-V1.12)
-const MidTurnSteerPrefix = "[Mid-turn steer queued by the user. Do not treat this as a new task; use it only as additional guidance for the current task after completing the current step.]"
-
-func midTurnSteerMessage(text string) string {
-	return MidTurnSteerPrefix + "\n" + text
-}
-
-// Steer queues a message for mid-turn injection.
 // (Design adopted from DeepSeek-Reasonix-V1.12)
 func (a *AgentRunner) Steer(text string) {
 	a.steerMu.Lock()
@@ -983,6 +827,3 @@ func (a *AgentRunner) finalReadinessCheck() (blocked bool, reason string) {
 // finalReadinessRetryMessage generates a retry prompt when the final-answer
 // readiness check blocks completion.
 // (Design adopted from DeepSeek-Reasonix-V1.12)
-func finalReadinessRetryMessage(reason string) string {
-	return "Host final-answer readiness check failed. Before giving a final answer, address the missing host-observable receipts: " + reason + ". Run the required tool calls, then answer when readiness is satisfied. If the blocked item needs user input, call the ask tool with concrete options and wait for its tool result; do not ask in prose."
-}

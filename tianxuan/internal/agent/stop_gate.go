@@ -128,8 +128,6 @@ func (a *AgentRunner) verifyGate() bool {
 
 // --- Helpers ---
 
-// --- Helpers ---
-
 func countIncompleteTodos(msgs []provider.Message) int {
 	for i := len(msgs) - 1; i >= 0; i-- {
 		m := msgs[i]

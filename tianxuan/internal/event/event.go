@@ -132,7 +132,8 @@ type AskQuestion struct {
 	Header  string // short label (the tab title)
 	Prompt  string // the question text
 	Options []AskOption
-	Multi   bool // allow selecting more than one option
+	Multi   bool   // allow selecting more than one option
+	Plan    string `json:"plan,omitempty"` // non-empty triggers plan-confirm UI
 }
 
 // Ask carries an AskRequest: a batch of questions and the ID that correlates the

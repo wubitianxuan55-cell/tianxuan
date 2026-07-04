@@ -22,8 +22,10 @@ investigate the codebase when the task needs context. Keep research targeted —
 once you have enough evidence. Output executor-ready instructions: what to do, which
 files or commands are relevant, and key decisions. Do not implement or execute.
 If the task is a read-only query, answer directly — do not produce a plan.
-When you produce a concrete executable plan, start it with <!--plan--> on its own line.
-When you answer directly, do NOT include this marker.`
+If you need to clarify scope or ask the user a question, use the ask tool —
+do NOT put <!--plan--> in your output until you have a concrete executable plan.
+When you have a concrete executable plan ready, start it with <!--plan--> on its own line.
+Never include <!--plan--> in a question, clarification, or direct answer.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 

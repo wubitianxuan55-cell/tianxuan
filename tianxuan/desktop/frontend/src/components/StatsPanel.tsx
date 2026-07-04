@@ -336,7 +336,7 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
   const totalCost = history.reduce((s, r) => s + r.cost, 0);
 
   // session-level: aggregate from localStorage stepHistory
-  const mainSteps = stepHistory.filter(s => s.source === "main" || !s.source);
+  const mainSteps = stepHistory.filter(s => s.source !== "subagent");
   const subSteps = stepHistory.filter(s => s.source === "subagent");
   const sessMain = useMemo(() => aggCol(mainSteps, price), [mainSteps, price]);
   const sessSub = useMemo(() => aggCol(subSteps, price), [subSteps, price]);
@@ -428,8 +428,8 @@ export function StatsPanel({ usage, perTurnUsage, turnSteps, context, model, sub
             <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">
               当前步 #{lastStep.step}
               {lastStep.source && (
-                <span className={`ml-2 text-[9px] px-1 rounded ${lastStep.source === "subagent" ? "bg-warn-soft text-warning" : "bg-accent-soft text-accent"}`}>
-                  {lastStep.source === "subagent" ? "子代理" : "主模型"}
+                <span className={`ml-2 text-[9px] px-1 rounded ${lastStep.source === "subagent" ? "bg-warn-soft text-warning" : lastStep.source === "planner" ? "bg-accent-soft/50 text-accent/80" : "bg-accent-soft text-accent"}`}>
+                  {lastStep.source === "subagent" ? "子代理" : lastStep.source === "planner" ? "主模型(规划)" : "主模型"}
                 </span>
               )}
             </div>

@@ -1,7 +1,7 @@
 ---
 name: version-history
 title: 版本历史
-description: 版本历史汇总 — V7.6 到 V10.30 全部主要版本摘要
+description: 版本历史汇总 — V7.6 到 V10.31 全部主要版本摘要
 metadata:
   type: reference
 ---
@@ -10,6 +10,7 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.31.0 | 2026-07-04 | 双模型弹性降级 + 统计面板规划/执行拆分 + 子代理冷启动优化 |
 | V10.30.0 | 2026-07-04 | web_fetch 代理(HTTP CONNECT+SOCKS5) + grep .gitignore 精确行走 + 启动动画重设计 |
 | V10.26.0 | 2026-07-04 | Reasonix V1.15 蒸馏完成 + 双模型协调器(planner+executor) + 桌面端适配 |
 | V10.25.0 | 2026-07-04 | 统计面板标题栏修复 + 构建脚本 |

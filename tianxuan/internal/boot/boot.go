@@ -338,7 +338,10 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	}
 	reg.Add(command.NewSlashCommandTool(slashEntries))
 
-	label := entry.Model
+	// V10.32: use provider name as label so users can distinguish models from
+	// different providers (e.g. "flash" vs "pro") even when they share the same
+	// underlying model name (e.g. both "deepseek-chat").
+	label := entry.Name
 
 	// V10.30: two-model collaboration — when planner_model names a provider
 	// different from the executor, wrap the executor in a Coordinator with its
@@ -352,7 +355,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			}
 			plannerSess := agent.NewSession(agent.PlannerPromptWithContext(compiler.IdentityLayer().Identity()))
 			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink)
-			label = entry.Model + " + planner " + pe.Model
+			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
 		}

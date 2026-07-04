@@ -62,7 +62,7 @@ export function ModelSwitcher({
                 className={`flex items-center gap-2.5 w-full px-2.5 py-2 bg-transparent border-0 rounded-md text-left cursor-pointer text-fg-dim text-[13px] hover:bg-bg-soft hover:text-fg ${m.current ? "text-accent bg-accent-soft font-semibold hover:bg-accent-soft hover:text-accent" : ""}`}
                 onClick={() => pick(m.ref)}
               >
-                <span className="flex-1 min-w-0 text-left font-medium">{allowInherit ? m.ref : m.model}</span>
+                <span className="flex-1 min-w-0 text-left font-medium">{m.ref}</span>
                 {m.current && <Check size={13} className="shrink-0 text-accent" />}
               </button>
             ))}

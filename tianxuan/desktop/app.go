@@ -148,13 +148,13 @@ func (a *App) buildController() {
 		// Resolve subagent model from config (empty when not configured).
 		if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
 			if subEntry, ok := cfg.ResolveModel(subRef); ok {
-				a.subagentLabel = subEntry.Model
+				a.subagentLabel = subEntry.Name
 			}
 		}
 		// Resolve planner model from config (V10.31: separate planner label for stats).
 		if plannerRef := strings.TrimSpace(cfg.Agent.PlannerModel); plannerRef != "" {
 			if plannerEntry, ok := cfg.ResolveModel(plannerRef); ok {
-				a.plannerLabel = plannerEntry.Model
+				a.plannerLabel = plannerEntry.Name
 			}
 		}
 	}

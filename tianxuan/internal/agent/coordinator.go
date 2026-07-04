@@ -18,29 +18,34 @@ import (
 // gitnexus_*) so the planner can do real code investigation before proposing
 // a plan. Currently the planner relies on prior knowledge and the user's task
 // description alone.
-const DefaultPlannerPrompt = `You are the planner in a two-model coding agent.
+const DefaultPlannerPrompt = `You are Hermes — the planner in a two-model coding agent.
 
-Your job: given a task, investigate the codebase using the available tools
-(read_file, grep, glob, lsp_definition, web_search, web_fetch, and the
-codegraph/gitnexus MCP tools) to understand the relevant code, then produce a
-concise, ordered plan for the executor to carry out.
+You have two modes:
+
+1. DIRECT ANSWER: when the task is a read-only query ("how does X work?",
+   "where is Y?", "what does Z do?"), investigate with your read-only tools
+   and answer directly. Do NOT produce a plan — just give the answer.
+   The Hephaestus executor will NOT be invoked for pure answers.
+
+2. PLAN: when the task requires code changes (writing, editing, deleting,
+   refactoring, building, testing, etc.), investigate the codebase with your
+   read-only tools, then output an ordered plan for Hephaestus to carry out.
+
+Available tools: read_file, grep, glob, lsp_definition, web_search, web_fetch,
+codegraph_*, gitnexus_*, memory_search, read_skill, git_status/diff/log.
 
 Guidelines:
-- Research first: search and read relevant files before proposing a plan.
-  Base every step on actual file paths, function names, and code structure
-  you've seen — do not guess.
+- Research before answering or planning. Base everything on actual code.
 - Prefer codegraph/gitnexus over manual grep+read for broad investigation.
-- Plan steps should cite specific files and symbols you found.
-- Do NOT write full implementations, only actionable steps.
-- Do NOT ask the user how to trigger the executor or say you are waiting.
-- If the task is too vague to plan, ask the user ONE clarifying question.
-- Keep the plan short — 3-8 steps, each one line with file targets.
+- If the task is too vague, ask ONE clarifying question before proceeding.
+- Plans: 3-8 steps, each one line with file targets.
 
-Output format:
+Output for PLAN mode:
 ## Plan
-1. [step description] -- in path/to/file.go
-2. [step description] -- in path/to/file.tsx
+1. [step description] -- path/to/file.go
 ...
+
+Output for DIRECT ANSWER mode: just the answer, no "## Plan" header.
 
 Then stop and wait for user approval. Do not execute.`
 
@@ -142,7 +147,8 @@ func (c *Coordinator) Run(ctx context.Context, input string) error {
 		return fmt.Errorf("planner: %w", err)
 	}
 	c.sink.Emit(event.Event{Kind: event.Phase, Text: c.executor.ProvName() + " · executing"})
-	if isNoOpPlan(plan) {
+	if isAnswerNotAction(plan) {
+		// Hermes answered directly — no Hephaestus needed.
 		c.persistExecutorNoOp(input, plan)
 		c.sink.Emit(event.Event{Kind: event.Text, Text: plan})
 		return nil
@@ -282,47 +288,36 @@ func shouldSkipPlanner(input string) (string, bool) {
 	return "", false
 }
 
-func isNoOpPlan(plan string) bool {
+// isAnswerNotAction checks whether the planner's output is a self-contained
+// answer that needs no executor (Hermes answered directly — no Hephaestus).
+//
+// True when:
+//   - Plan contains explicit no-op markers ("no changes needed", "无需改动", etc.)
+//   - Plan contains NO write/action terms at all (read-only query answered by Hermes)
+//
+// False when: plan mentions concrete write operations needing an executor.
+func isAnswerNotAction(plan string) bool {
 	lower := strings.ToLower(strings.TrimSpace(plan))
 	if lower == "" {
+		return false // empty plan → let executor ask for clarification
+	}
+	// If the plan contains concrete action terms, executor is needed.
+	if containsActionTerm(lower) {
 		return false
 	}
-	if containsNoOpActionTerm(lower) {
-		return false // plan mentions concrete actions — not a no-op
-	}
-	noOp := []string{
-		"no changes needed",
-		"no changes are needed",
-		"no changes required",
-		"no changes are required",
-		"no action needed",
-		"no action required",
-		"nothing to change",
-		"nothing to do",
-		"already handled",
-		"already implemented",
-		"already resolved",
-		"[no_changes]",
-		"无需改动", "无需修改", "无需更改",
-		"不需要修改", "不需要改", "不用改", "不用修改", "不必改动",
-		"没有需要修改",
-		"已经正确处理", "已经实现", "已经解决",
-	}
-	for _, phrase := range noOp {
-		if strings.Contains(lower, phrase) && !strings.Contains(lower, "not "+phrase) && !strings.Contains(lower, "不是"+phrase) {
-			return true
-		}
-	}
-	return false
+	// No action terms found → Hermes answered directly. No Hephaestus needed.
+	return true
 }
 
-func containsNoOpActionTerm(lower string) bool {
+// containsActionTerm reports whether s mentions a write/destructive operation.
+func containsActionTerm(lower string) bool {
 	terms := []string{
 		" add ", " update ", " edit ", " write ", " create ", " delete ",
 		" remove ", " patch ", " refactor ", " implement ", " run ", " test ",
-		" build ", " fix ",
+		" build ", " fix ", " modify ", " change ", " replace ", " rename ",
+		" commit ", " merge ", " rebase ",
 		"新增", "补充", "更新", "编辑", "写入", "创建", "删除", "移除",
-		"运行", "测试", "构建", "修复", "实现", "重构",
+		"运行", "测试", "构建", "修复", "实现", "重构", "修改", "替换",
 	}
 	padded := " " + lower + " "
 	for _, term := range terms {

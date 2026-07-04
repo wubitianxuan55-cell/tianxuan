@@ -249,7 +249,9 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
             <div className="mt-1.5 space-y-1.5 pl-4 border-l-2 border-border-soft">
               {s.subagentSkills.map((skill: string) => {
                 const skillRef = subagentModels[skill] || "";
-                const skillLabel = skillRef || `${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`;
+                const globalRef = s.subagentModel;
+                const inheritText = globalRef ? `继承全局: ${globalRef}` : t("settings.subagentInherit");
+                const skillLabel = skillRef || inheritText;
                 return (
                   <div key={skill} className="flex items-center gap-2">
                     <label className="text-fg-dim text-[11px] w-[90px] shrink-0 font-mono">{skill}</label>
@@ -257,7 +259,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
                       <ModelSwitcher
                         label={skillLabel}
                         allowInherit
-                        inheritLabel={`${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`}
+                        inheritLabel={inheritText}
                         onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
                       />
                     </div>
@@ -715,7 +717,9 @@ function AgentSection({ s, busy, apply }: SectionProps) {
             <div className="mt-2 space-y-2 pl-4 border-l-2 border-border-soft">
               {s.subagentSkills.map((skill: string) => {
                 const skillRef = subagentModels[skill] || "";
-                const skillLabel = skillRef || `${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`;
+                const globalRef = s.subagentModel;
+                const inheritText = globalRef ? `继承全局: ${globalRef}` : t("settings.subagentInherit");
+                const skillLabel = skillRef || inheritText;
                 return (
                   <div key={skill} className="flex items-center gap-3">
                     <label className="text-fg-dim text-[12px] w-[100px] shrink-0 font-mono">{skill}</label>
@@ -723,7 +727,7 @@ function AgentSection({ s, busy, apply }: SectionProps) {
                       <ModelSwitcher
                         label={skillLabel}
                         allowInherit
-                        inheritLabel={`${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`}
+                        inheritLabel={inheritText}
                         onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
                       />
                     </div>

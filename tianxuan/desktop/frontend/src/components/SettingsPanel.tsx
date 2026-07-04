@@ -200,6 +200,9 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
   const refs = allRefs(s);
   const defaultRef = toRef(s.defaultModel, s);
   const [defaultProvider, defaultModel] = defaultRef.split("/");
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const subagentLabel = s.subagentModel || t("settings.subagentInherit");
+  const subagentModels = s.subagentModels || {};
 
   return (
     <section className="mb-3">
@@ -220,6 +223,51 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
           ))}
         </select>
       </div>
+
+      <div className="flex items-center gap-3 mb-2.5">
+        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.subagentModel")}</label>
+        <div className="flex-1">
+          <ModelSwitcher
+            label={subagentLabel}
+            allowInherit
+            inheritLabel={t("settings.subagentInherit")}
+            onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
+          />
+        </div>
+      </div>
+
+      {(s.subagentSkills || []).length > 0 && (
+        <div className="mb-2.5">
+          <button
+            className="flex items-center gap-1 text-fg-dim text-[12px] font-medium hover:text-fg cursor-pointer bg-transparent border-0 p-0"
+            onClick={() => setSkillsOpen((v) => !v)}
+          >
+            {skillsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {t("settings.subagentPerSkill") || "按技能单独配置"}
+          </button>
+          {skillsOpen && (
+            <div className="mt-1.5 space-y-1.5 pl-4 border-l-2 border-border-soft">
+              {s.subagentSkills.map((skill: string) => {
+                const skillRef = subagentModels[skill] || "";
+                const skillLabel = skillRef || `${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`;
+                return (
+                  <div key={skill} className="flex items-center gap-2">
+                    <label className="text-fg-dim text-[11px] w-[90px] shrink-0 font-mono">{skill}</label>
+                    <div className="flex-1">
+                      <ModelSwitcher
+                        label={skillLabel}
+                        allowInherit
+                        inheritLabel={`${t("settings.subagentInherit")} (${t("settings.subagentGlobal") || "global"})`}
+                        onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg mb-3">
         <span className="text-fg-faint text-[11px] shrink-0">{t("settings.activeProvider")}</span>

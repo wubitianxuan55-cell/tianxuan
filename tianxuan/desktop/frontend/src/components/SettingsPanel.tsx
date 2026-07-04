@@ -6,7 +6,7 @@ import { applyTheme, getTheme, type Theme } from "../lib/theme";
 import type { ProviderView, SettingsView } from "../lib/types";
 import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
-import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, ChevronDown, ChevronRight } from "lucide-react";
+import { X, Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import { ModelSwitcher } from "./ModelSwitcher";
 
 type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
@@ -195,6 +195,21 @@ function toRef(model: string, s: SettingsView): string {
   return model;
 }
 
+function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-bg-soft border border-border-soft rounded-lg p-3.5 mb-3">
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-accent shrink-0">{icon}</span>
+        <div>
+          <div className="text-fg text-[13px] font-semibold leading-tight">{title}</div>
+          <div className="text-fg-faint text-[11px] leading-tight">{desc}</div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { onManageProviders: () => void }) {
   const t = useT();
   const refs = allRefs(s);
@@ -207,88 +222,75 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
 
   return (
     <section className="mb-3">
-      <div className="text-fg text-sm font-semibold px-1 pb-1.5">{t("settings.tab.models")}</div>
+      <div className="text-fg text-sm font-semibold px-1 pb-3">{t("settings.tab.models")}</div>
 
-      <div className="flex items-center gap-3 mb-2.5">
-        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.defaultModel")}</label>
+      <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作">
         <select
-          className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent flex-1 min-w-0"
+          className="w-full bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
           value={toRef(s.defaultModel, s)}
           disabled={busy}
           onChange={(e) => void apply(() => app.SetDefaultModel(e.target.value))}
         >
           {refs.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
+            <option key={r} value={r}>{r}</option>
           ))}
         </select>
-      </div>
+      </ModelCard>
 
-      <div className="flex items-center gap-3 mb-2.5">
-        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.subagentModel")}</label>
-        <div className="flex-1">
-          <ModelSwitcher
-            label={subagentLabel}
-            allowInherit
-            inheritLabel={t("settings.subagentInherit")}
-            onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
-          />
-        </div>
-      </div>
+      <ModelCard icon={<Brain size={18} />} title="规划模型 (Hermes)" desc="只读研究代码、制定执行计划。留空则使用单模型模式">
+        <ModelSwitcher
+          label={plannerLabel}
+          allowInherit
+          inheritLabel={t("settings.plannerNone")}
+          onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
+        />
+      </ModelCard>
 
-      {(s.subagentSkills || []).length > 0 && (
-        <div className="mb-2.5">
-          <button
-            className="flex items-center gap-1 text-fg-dim text-[12px] font-medium hover:text-fg cursor-pointer bg-transparent border-0 p-0"
-            onClick={() => setSkillsOpen((v) => !v)}
-          >
-            {skillsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            {t("settings.subagentPerSkill") || "按技能单独配置"}
-          </button>
-          {skillsOpen && (
-            <div className="mt-1.5 space-y-1.5 pl-4 border-l-2 border-border-soft">
-              {s.subagentSkills.map((skill: string) => {
-                const skillRef = subagentModels[skill] || "";
-                const globalRef = s.subagentModel;
-                const inheritText = globalRef ? `继承全局: ${globalRef}` : t("settings.subagentInherit");
-                const skillLabel = skillRef || inheritText;
-                return (
-                  <div key={skill} className="flex items-center gap-2">
-                    <label className="text-fg-dim text-[11px] w-[90px] shrink-0 font-mono">{skill}</label>
-                    <div className="flex-1">
-                      <ModelSwitcher
-                        label={skillLabel}
-                        allowInherit
-                        inheritLabel={inheritText}
-                        onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
-                      />
+      <ModelCard icon={<Bot size={18} />} title="子代理模型" desc="task / explore / review 等子任务使用的模型">
+        <ModelSwitcher
+          label={subagentLabel}
+          allowInherit
+          inheritLabel={t("settings.subagentInherit")}
+          onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
+        />
+        {(s.subagentSkills || []).length > 0 && (
+          <div className="mt-2">
+            <button
+              className="flex items-center gap-1 text-fg-dim text-[11px] font-medium hover:text-fg cursor-pointer bg-transparent border-0 p-0"
+              onClick={() => setSkillsOpen((v) => !v)}
+            >
+              {skillsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {t("settings.subagentPerSkill") || "按技能单独配置"}
+            </button>
+            {skillsOpen && (
+              <div className="mt-1.5 space-y-1.5 pl-4 border-l-2 border-border-soft">
+                {s.subagentSkills.map((skill: string) => {
+                  const skillRef = subagentModels[skill] || "";
+                  const globalRef = s.subagentModel;
+                  const inheritText = globalRef ? `继承全局: ${globalRef}` : t("settings.subagentInherit");
+                  const skillLabel = skillRef || inheritText;
+                  return (
+                    <div key={skill} className="flex items-center gap-2">
+                      <label className="text-fg-dim text-[11px] w-[90px] shrink-0 font-mono">{skill}</label>
+                      <div className="flex-1">
+                        <ModelSwitcher
+                          label={skillLabel}
+                          allowInherit
+                          inheritLabel={inheritText}
+                          onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
+                        />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </ModelCard>
 
-      <div className="flex items-center gap-3 mb-2.5">
-        <label className="text-fg-dim text-[13px] shrink-0">{t("settings.plannerModel")}</label>
-        <div className="flex-1">
-          <ModelSwitcher
-            label={plannerLabel}
-            allowInherit
-            inheritLabel={t("settings.plannerNone")}
-            onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg mb-3">
-        <span className="text-fg-faint text-[11px] shrink-0">{t("settings.activeProvider")}</span>
-        <span className="text-[11px] font-semibold text-fg">{defaultProvider || t("common.none")}</span>
-        <span className="text-border mx-0.5">·</span>
-        <span className="text-[11px] font-mono text-fg-dim">{defaultModel || defaultRef || t("common.none")}</span>
+      <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg">
+        <span className="text-fg-faint text-[11px] shrink-0">当前: {defaultProvider || t("common.none")} · {defaultModel || defaultRef || t("common.none")}</span>
         <span className="flex-1" />
         <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={onManageProviders}>
           {t("settings.manageProviders")}
@@ -297,7 +299,6 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
     </section>
   );
 }
-
 function ProvidersSection({ s, busy, apply }: SectionProps) {
   const t = useT();
   // The provider backing the default model — can't be deleted (would dangle the

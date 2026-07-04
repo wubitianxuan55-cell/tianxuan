@@ -480,14 +480,29 @@ func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
 }
 
 
-// SetPermLevel sets the permission strictness: "ask" (default, prompt before writes),
-// "auto" (allow writes without asking), or "yolo" (skip all prompts).
-
-// SetPermLevel sets the permission strictness: "ask" (default, prompt before writes),
-// "auto" (allow writes without asking), or "yolo" (skip all prompts).
+// SetPermLevel sets the permission strictness and immediately updates the gate:
+//   "ask"  — prompt before writes (default), interactive gate active
+//   "auto" — allow writes without asking, deny rules still block
+//   "yolo" — skip all gating (nil gate = every tool auto-approved)
 func (c *Controller) SetPermLevel(level string) {
 	c.mu.Lock()
 	c.permLevel = level
+	switch level {
+	case "auto":
+		c.policy.Mode = permission.Allow
+		if c.executor != nil {
+			c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
+		}
+	case "yolo":
+		if c.executor != nil {
+			c.executor.SetGate(nil)
+		}
+	default: // "ask"
+		c.policy.Mode = permission.Ask
+		if c.executor != nil {
+			c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
+		}
+	}
 	c.mu.Unlock()
 }
 

@@ -148,20 +148,22 @@ function StatsTable({ title, planner, executor, sub, total }: {
         </tbody>
       </table>
       {/* 汇总行 — 表格下方独立展示 */}
-      <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border-soft/70 text-[10px]">
-        <span className="text-fg-faint font-semibold shrink-0">汇总</span>
-        <span className="text-fg-faint select-none">·</span>
-        <span className="font-mono tabular-nums text-fg">Prompt {tk(total.prompt)}</span>
-        <span className="text-border select-none">·</span>
-        <span className="font-mono tabular-nums text-fg">Compl {tk(total.completion)}</span>
+      <div className="mt-1.5 pt-1.5 border-t border-border-soft/70">
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-fg-faint font-semibold shrink-0">汇总</span>
+          <span className="text-fg-faint select-none">·</span>
+          <span className="font-mono tabular-nums text-fg">Prompt {tk(total.prompt)}</span>
+          <span className="text-border select-none">·</span>
+          <span className="font-mono tabular-nums text-fg">Compl {tk(total.completion)}</span>
+          <span className="text-border select-none">·</span>
+          <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
+        </div>
         {totalHit > 0 && (
-          <>
-            <span className="text-border select-none">·</span>
-            <span className={`font-mono tabular-nums font-bold ${hitRateColor(totalRate)}`}>{totalRate.toFixed(2)}%</span>
-          </>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className={`text-xl font-bold tabular-nums ${hitRateColor(totalRate)}`}>{totalRate.toFixed(2)}%</span>
+            <span className="text-[10px] text-fg-faint tabular-nums">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
+          </div>
         )}
-        <span className="text-border select-none">·</span>
-        <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
       </div>
     </div>
   );

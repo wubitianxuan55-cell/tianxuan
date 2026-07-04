@@ -101,26 +101,25 @@ function StatsTable({ title, planner, executor, sub, total }: {
     }},
     { label: "成本", render: c => cash(c.cost) },
   ];
+  const totalHit = total.cacheHit + total.cacheMiss;
+  const totalRate = totalHit > 0 ? (total.cacheHit / totalHit * 100) : 0;
   return (
     <div className="py-3 border-b border-border-soft">
       <table className="w-full text-[11px] border-collapse">
         <thead>
           <tr className="text-fg-faint border-b border-border-soft">
-            <th className="text-left font-semibold pb-1 text-[10px] uppercase tracking-wider text-fg-faint" style={{width:"26%"}}>{title}</th>
-            <th className="text-right font-normal pb-1" style={{width:"18%"}}>规划</th>
-            <th className="text-right font-normal pb-1" style={{width:"18%"}}>执行</th>
-            <th className="text-right font-normal pb-1" style={{width:"18%"}}>子代理</th>
-            <th className="text-right font-normal pb-1" style={{width:"20%"}}>汇总</th>
+            <th className="text-left font-semibold pb-1 text-[10px] uppercase tracking-wider text-fg-faint" style={{width:"28%"}}>{title}</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>规划</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>执行</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>子代理</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const isHitRow = row.label === "缓存命中";
-            const t = isHitRow ? (planner.cacheHit + planner.cacheMiss + executor.cacheHit + executor.cacheMiss + sub.cacheHit + sub.cacheMiss) : 0;
             const pRate = isHitRow && planner.cacheHit + planner.cacheMiss > 0 ? (planner.cacheHit / (planner.cacheHit + planner.cacheMiss) * 100) : 0;
             const eRate = isHitRow && executor.cacheHit + executor.cacheMiss > 0 ? (executor.cacheHit / (executor.cacheHit + executor.cacheMiss) * 100) : 0;
             const sRate = isHitRow && sub.cacheHit + sub.cacheMiss > 0 ? (sub.cacheHit / (sub.cacheHit + sub.cacheMiss) * 100) : 0;
-            const tRate = isHitRow && t > 0 ? ((planner.cacheHit + executor.cacheHit + sub.cacheHit) / t * 100) : 0;
             return (
               <tr key={row.label} className="border-b border-border-soft/50">
                 <td className="py-1 text-fg-dim">{row.label}</td>
@@ -135,16 +134,12 @@ function StatsTable({ title, planner, executor, sub, total }: {
                     <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(sRate)}`}>
                       {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(2)}%` : "—"}
                     </td>
-                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(tRate)}`}>
-                      {t > 0 ? `${tRate.toFixed(2)}%` : "—"}
-                    </td>
                   </>
                 ) : (
                   <>
                     <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(planner)}</td>
                     <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(executor)}</td>
                     <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(sub)}</td>
-                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(total)}</td>
                   </>
                 )}
               </tr>
@@ -152,6 +147,22 @@ function StatsTable({ title, planner, executor, sub, total }: {
           })}
         </tbody>
       </table>
+      {/* 汇总行 — 表格下方独立展示 */}
+      <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border-soft/70 text-[10px]">
+        <span className="text-fg-faint font-semibold shrink-0">汇总</span>
+        <span className="text-fg-faint select-none">·</span>
+        <span className="font-mono tabular-nums text-fg">Prompt {tk(total.prompt)}</span>
+        <span className="text-border select-none">·</span>
+        <span className="font-mono tabular-nums text-fg">Compl {tk(total.completion)}</span>
+        {totalHit > 0 && (
+          <>
+            <span className="text-border select-none">·</span>
+            <span className={`font-mono tabular-nums font-bold ${hitRateColor(totalRate)}`}>{totalRate.toFixed(2)}%</span>
+          </>
+        )}
+        <span className="text-border select-none">·</span>
+        <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
+      </div>
     </div>
   );
 }

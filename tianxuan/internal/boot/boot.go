@@ -1,7 +1,7 @@
 // Package boot assembles a ready-to-drive control.Controller from configuration:
 // it loads config, resolves the model(s), builds the tool registry (built-ins +
 // plugins), wires the permission gate, and constructs the executor — optionally
-// wrapping it in a two-model Coordinator. It is the one place that turns "what the
+// wrapping it in a two-model Hermes. It is the one place that turns "what the
 // user configured" into "a Controller a frontend can drive", so every frontend —
 // the terminal TUI, the HTTP/SSE server, the desktop webview — shares the exact
 // same assembly instead of each re-deriving it. Frontends pass only a sink and a
@@ -63,7 +63,7 @@ type Options struct {
 }
 
 // Build loads config, resolves the model(s), and returns a Controller wrapping a
-// single Agent, or a two-model Coordinator when agent.planner_model is set. The
+// single Agent, or a two-model Hermes when agent.planner_model is set. The
 // returned controller owns plugin subprocesses; call Close (via Controller.Close)
 // to release them.
 var (
@@ -344,7 +344,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	label := entry.Name
 
 	// V10.30: two-model collaboration — when planner_model names a provider
-	// different from the executor, wrap the executor in a Coordinator with its
+	// different from the executor, wrap the executor in a Hermes with its
 	// own planner session for cache stability.
 	var runner agent.Runner = executor
 	if pm := cfg.Agent.PlannerModel; pm != "" {
@@ -353,13 +353,13 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			if err != nil {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
 			}
-			plannerSess := agent.NewSession(agent.PlannerPromptWithContext(compiler.IdentityLayer().Identity()))
+			plannerSess := agent.NewSession(agent.HermesPromptWithContext(compiler.IdentityLayer().Identity()))
 			// V10.32: build a read-only tool subset for the planner so it can
 			// investigate code before proposing a plan (read_file, grep, glob,
 			// web_search, web_fetch, lsp_*, code_index, memory_search,
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
-			runner = agent.NewCoordinator(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 5)
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 5)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

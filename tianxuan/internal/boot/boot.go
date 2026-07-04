@@ -684,14 +684,7 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	if full == nil {
 		return ro
 	}
-	exclude := map[string]bool{
-		"task": true, "run_skill": true, "parallel_skills": true,
-		"explore": true, "research": true, "review": true, "security_review": true,
-	}
 	for _, name := range full.Names() {
-		if exclude[name] {
-			continue
-		}
 		t, ok := full.Get(name)
 		if !ok {
 			continue

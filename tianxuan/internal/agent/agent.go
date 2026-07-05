@@ -419,6 +419,13 @@ func (a *AgentRunner) SetLSPManager(m interface {
 	a.lspManager = m
 }
 
+// Sink returns the current event sink. SetSink replaces it.
+func (a *AgentRunner) Sink() event.Sink { return a.sink }
+
+// SetSink replaces the agent's event sink. Callers must ensure no concurrent
+// Run() — this is intended for one-time setup or between-turn sink wrapping.
+func (a *AgentRunner) SetSink(s event.Sink) { a.sink = s }
+
 func (a *AgentRunner) SetPatternExtractor(e interface {
 	Extract(toolName, result string) *learning.Pattern
 	SaveStore() error

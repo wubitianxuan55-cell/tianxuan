@@ -200,8 +200,8 @@ function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: str
 }
 
 
-export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plannerModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
-  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; model?: string; subagentModel?: string; plannerModel?: string;
+export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
+  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; subagentModel?: string;
   sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
   perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {

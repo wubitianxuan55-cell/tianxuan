@@ -87,6 +87,13 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 	// accumulates history across turns without unbounded growth.
 	if readonlyTools != nil {
 		plannerSink := event.FuncSink(func(e event.Event) {
+			// Suppress TurnStarted from the planner agent — Hermes
+			// already started the turn (line 150). A redundant
+			// TurnStarted would reset perTurnPlannerUsage in the
+			// frontend, zeroing out the planner's cost stats.
+			if e.Kind == event.TurnStarted {
+				return
+			}
 			if e.Kind == event.Usage {
 				if e.UsageSource == "" || e.UsageSource == event.UsageSourceExecutor {
 					e.UsageSource = event.UsageSourcePlanner
@@ -175,6 +182,17 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		return nil, err
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
+	// Suppress the executor's TurnStarted — Hermes already started the turn.
+	// Without this, the redundant TurnStarted resets perTurnPlannerUsage in the
+	// frontend, zeroing out the planner's cost stats.
+	execSink := h.hephaestus.Sink()
+	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
+		if e.Kind == event.TurnStarted {
+			return
+		}
+		execSink.Emit(e)
+	}))
+	defer h.hephaestus.SetSink(execSink)
 	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
 
 	// V10.37: executor returns structured TurnResult — no more post-hoc extraction.

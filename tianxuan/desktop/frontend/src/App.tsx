@@ -52,7 +52,7 @@ import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH,
 } from "./hooks/useLayoutSizes";
 import CompactContext from "./hooks/useCompact";
-import { fmtTokens } from "../lib/stats";
+import { fmtTokens } from "./lib/stats";
 
 function NewSessionToast({ done }: { done: boolean }) {
   const toast = useToast();
@@ -580,7 +580,7 @@ export default function App() {
                 确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
                 否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
             <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel perTurnUsage={state.perTurnUsage} perTurnPlannerUsage={state.perTurnPlannerUsage} perTurnExecutorUsage={state.perTurnExecutorUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} model={state.meta?.label} subagentModel={state.meta?.subagentLabel} plannerModel={state.meta?.plannerLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
+              <StatsPanel perTurnUsage={state.perTurnUsage} perTurnPlannerUsage={state.perTurnPlannerUsage} perTurnExecutorUsage={state.perTurnExecutorUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} subagentModel={state.meta?.subagentLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
             </div>
             {rightTab === "messages" && (
               <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />

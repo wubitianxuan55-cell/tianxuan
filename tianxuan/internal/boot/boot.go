@@ -280,6 +280,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		Gate:          headlessGate,
 		Hooks:         hookRunner,
 		Jobs:          jm,
+		ContextWindow: entry.ContextWindow,
 		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		Dispatcher: toolDispatcher,
 	}, sink)
@@ -349,6 +350,11 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	if pm := cfg.Agent.PlannerModel; pm != "" {
 		if pe, ok := cfg.ResolveModel(pm); ok {
 		if e := cfg.Agent.PlannerEffortVal(); e != "" { pe.Effort = e }
+			// If the planner model has no pricing configured, fall back to
+			// the executor's pricing so cost statistics show real values.
+			if pe.Price == nil && entry.Price != nil {
+				pe.Price = entry.Price
+			}
 			plannerProv, err := NewProvider(pe)
 			if err != nil {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
@@ -359,6 +365,61 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			// web_search, web_fetch, lsp_*, code_index, memory_search,
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
+
+			// V10.42: 为规划者注入只读子代理工具（task/explore/research/
+			// review/security_review）。每个子代理工具的 parentReg =
+			// readOnlyReg，确保子代理也只拿到只读工具 — headlessGate 无害。
+			plannerTaskTool := agent.NewTaskTool(plannerProv, pe.Price, readOnlyReg, maxSteps,
+				pe.ContextWindow, cfg.Agent.SubagentTemp(), config.ArchiveDir(), "", headlessGate)
+			plannerTaskTool.SetCompiler(&taskCompilerAdapter{c: compiler})
+			plannerTaskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
+			if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
+				if subEntry, ok := cfg.ResolveModel(subRef); ok {
+					if e := cfg.Agent.SubagentEffortVal(); e != "" { subEntry.Effort = e }
+					if subProv, err := NewProvider(subEntry); err == nil {
+						plannerTaskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
+					}
+				}
+			}
+			readOnlyReg.Add(plannerTaskTool)
+
+			// 只读 skillRunner — 源 registry 为 readOnlyReg，子代理工具集被限定为只读
+			plannerSkillRunner := func(sctx context.Context, sk skill.Skill, task string) (string, error) {
+				prov, price, ctxWin := plannerProv, pe.Price, pe.ContextWindow
+				if modelRef := subagentModelRef(cfg, sk); modelRef != "" {
+					if me, ok := cfg.ResolveModel(modelRef); ok {
+						if p, err := NewProvider(me); err == nil {
+							prov, price, ctxWin = p, me.Price, me.ContextWindow
+						}
+					}
+				}
+				subReg := agent.FilterRegistry(readOnlyReg, sk.AllowedTools, agent.SubagentMetaTools()...)
+				steps := maxSteps
+				if steps > 0 {
+					if steps /= 2; steps < 5 {
+						steps = 5
+					}
+				}
+				childCompiler := compiler.Fork()
+				sysPrompt := childCompiler.SystemPrompt()
+				return agent.RunSubAgent(sctx, prov, subReg, sysPrompt, sk.Body+"\n\n"+task, agent.Options{
+					MaxSteps:       steps,
+					Temperature:    cfg.Agent.Temperature,
+					Pricing:        price,
+					Gate:           headlessGate,
+					ContextWindow:  ctxWin,
+					Compaction:     agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
+					RuntimePrompt:  runtimeCtx.SystemPrompt(),
+					TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
+					ActiveSchemas:  readOnlyReg.Schemas(),
+				}, agent.NestedSink(sctx, event.Discard), nil)
+			}
+			readOnlyReg.Add(skill.NewRunSkillTool(skillStore, plannerSkillRunner))
+			readOnlyReg.Add(skill.NewParallelSkillsTool(skillStore, plannerSkillRunner))
+			for _, t := range skill.BuiltinSubagentTools(skillStore, plannerSkillRunner) {
+				readOnlyReg.Add(t)
+			}
+
 			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir())
 			label = entry.Name + " + planner " + pe.Name
 		} else {

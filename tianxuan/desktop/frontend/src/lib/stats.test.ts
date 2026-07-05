@@ -139,7 +139,7 @@ describe("filterSteps", () => {
   const steps: StepRecord[] = [
     { step: 1, prompt: 100, completion: 50, cacheHit: 80, cacheMiss: 20, cost: 0.001, source: "main" },
     { step: 2, prompt: 200, completion: 100, cacheHit: 160, cacheMiss: 40, cost: 0.002, source: "subagent" },
-    { step: 3, prompt: 150, completion: 75, cacheHit: 0, cacheMiss: 0 }, // no source → main
+    { step: 3, prompt: 150, completion: 75, cacheHit: 0, cacheMiss: 0, cost: 0 }, // no source → main
   ];
 
   it("returns all for 'all'", () => {

@@ -336,6 +336,11 @@ type ProviderEntry struct {
 	BalanceURL    string            `toml:"balance_url"` // optional; a provider-specific wallet-balance endpoint (DeepSeek: https://api.deepseek.com/user/balance). Empty = no balance readout.
 	ContextWindow int               `toml:"context_window"`
 	Price         *provider.Pricing `toml:"price"`
+	// Prices holds per-model pricing when a single provider exposes multiple
+	// models with different rates. The TOML key "prices" maps model names to
+	// their Pricing. ModelList() includes these keys and ResolveModel picks
+	// the matching Price when resolving "provider/model".
+	Prices   map[string]*provider.Pricing `toml:"prices"`
 	// Thinking / Effort are provider-kind-specific knobs forwarded to the provider
 	// via Config.Extra. The anthropic provider reads Thinking="adaptive" to enable
 	// extended thinking and Effort ("low".."max") to tune depth. The
@@ -346,13 +351,21 @@ type ProviderEntry struct {
 }
 
 // ModelList returns the models this provider exposes: the explicit `models` list,
-// or the single `model` as a one-element list (back-compat). Empty if neither set.
+// the single `model` (back-compat), or the keys from `prices` (per-model pricing
+// map). Empty if none are set.
 func (e *ProviderEntry) ModelList() []string {
 	if len(e.Models) > 0 {
 		return e.Models
 	}
 	if e.Model != "" {
 		return []string{e.Model}
+	}
+	if len(e.Prices) > 0 {
+		out := make([]string, 0, len(e.Prices))
+		for k := range e.Prices {
+			out = append(out, k)
+		}
+		return out
 	}
 	return nil
 }
@@ -711,6 +724,13 @@ func (c *Config) ResolveModel(ref string) (*ProviderEntry, bool) {
 		if e, found := c.Provider(prov); found && e.HasModel(model) {
 			cp := *e
 			cp.Model = model
+			// If the provider uses per-model pricing (prices map), pick the
+			// matching entry. Falls back to cp.Price when no entry or nil.
+			if cp.Prices != nil {
+				if p, ok := cp.Prices[model]; ok {
+					cp.Price = p
+				}
+			}
 			return &cp, true
 		}
 	}

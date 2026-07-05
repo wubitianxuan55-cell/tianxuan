@@ -261,6 +261,21 @@ type AgentConfig struct {
 	PlannerModel     string            `toml:"planner_model"`
 	SubagentModel    string            `toml:"subagent_model"`
 	SubagentModels   map[string]string `toml:"subagent_models"`
+	// PlannerTemperature overrides Temperature for the Hermes planner model.
+	// 0 means "use Temperature" (backward compatible). Negative means "use Temperature".
+	PlannerTemperature float64 `toml:"planner_temperature"`
+	// SubagentTemperature overrides Temperature for task-tool sub-agents.
+	// 0 means "use Temperature". Negative means "use Temperature".
+	SubagentTemperature float64 `toml:"subagent_temperature"`
+	// Effort overrides the reasoning effort for the executor (Hephaestus).
+	// "" means provider default. For DeepSeek: "high" (default) or "max".
+	Effort string `toml:"effort"`
+	// PlannerEffort overrides Effort for the Hermes planner.
+	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
+	PlannerEffort string `toml:"planner_effort"`
+	// SubagentEffort overrides Effort for task-tool sub-agents.
+	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
+	SubagentEffort string `toml:"subagent_effort"`
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
 	OutputStyle string `toml:"output_style"`
@@ -271,6 +286,42 @@ type AgentConfig struct {
 	// borderline auto-plan decisions. Empty keeps the zero-cost heuristic path.
 	AutoPlanClassifier string `toml:"auto_plan_classifier"`
 }
+
+// PlannerTemp returns the effective temperature for the Hermes planner.
+// Falls back to Temperature when PlannerTemperature is zero or negative.
+func (a AgentConfig) PlannerTemp() float64 {
+	if a.PlannerTemperature > 0 {
+		return a.PlannerTemperature
+	}
+	return a.Temperature
+}
+
+// SubagentTemp returns the effective temperature for task-tool sub-agents.
+// Falls back to Temperature when SubagentTemperature is zero or negative.
+func (a AgentConfig) SubagentTemp() float64 {
+	if a.SubagentTemperature > 0 {
+		return a.SubagentTemperature
+	}
+	return a.Temperature
+}
+// PlannerEffortVal returns the effective reasoning effort for Hermes.
+// Falls back to Effort when PlannerEffort is empty.
+func (a AgentConfig) PlannerEffortVal() string {
+	if a.PlannerEffort != "" {
+		return a.PlannerEffort
+	}
+	return a.Effort
+}
+
+// SubagentEffortVal returns the effective reasoning effort for sub-agents.
+// Falls back to Effort when SubagentEffort is empty.
+func (a AgentConfig) SubagentEffortVal() string {
+	if a.SubagentEffort != "" {
+		return a.SubagentEffort
+	}
+	return a.Effort
+}
+
 // ProviderEntry declares a model provider instance. ContextWindow is the model's
 // token budget; the harness compacts older history as a turn's prompt approaches
 // it (see agent compaction). 0 disables compaction for the instance.

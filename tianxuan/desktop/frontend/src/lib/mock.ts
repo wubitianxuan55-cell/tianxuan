@@ -124,7 +124,7 @@ export function makeMockApp(): AppBindings {
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
-    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent." },
+    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "" },
     plannerModel: "",
     subagentModel: "",
     subagentModels: {},
@@ -485,7 +485,7 @@ export function makeMockApp(): AppBindings {
       settings.sandbox = { bash, network, workspaceRoot, allowWrite };
     },
     async SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string) {
-      settings.agent = { temperature, maxSteps, systemPrompt };
+      settings.agent = { ...settings.agent, temperature, maxSteps, systemPrompt };
     },
     async SetSubagentModel(ref: string) {
       settings.subagentModel = ref;
@@ -496,6 +496,21 @@ export function makeMockApp(): AppBindings {
     },
     async SetPlannerModel(ref: string) {
       settings.plannerModel = ref;
+    },
+    async SetPlannerTemperature(temp: number) {
+      settings.agent.plannerTemperature = temp;
+    },
+    async SetSubagentTemperature(temp: number) {
+      settings.agent.subagentTemperature = temp;
+    },
+    async SetEffort(effort: string) {
+      settings.agent.effort = effort;
+    },
+    async SetPlannerEffort(effort: string) {
+      settings.agent.plannerEffort = effort;
+    },
+    async SetSubagentEffort(effort: string) {
+      settings.agent.subagentEffort = effort;
     },
     async SetPermLevel(level: string) {
       settings.permLevel = level;

@@ -50,6 +50,16 @@ type AgentView struct {
 	Temperature  float64 `json:"temperature"`
 	MaxSteps     int     `json:"maxSteps"`
 	SystemPrompt string  `json:"systemPrompt"`
+	// PlannerTemperature overrides Temperature for Hermes (0 = use Temperature).
+	PlannerTemperature float64 `json:"plannerTemperature"`
+	// SubagentTemperature overrides Temperature for task sub-agents (0 = use Temperature).
+	SubagentTemperature float64 `json:"subagentTemperature"`
+	// Effort overrides reasoning effort for the executor ("" = provider default).
+	Effort string `json:"effort"`
+	// PlannerEffort overrides reasoning effort for Hermes ("" = inherit Effort).
+	PlannerEffort string `json:"plannerEffort"`
+	// SubagentEffort overrides reasoning effort for sub-agents ("" = inherit Effort).
+	SubagentEffort string `json:"subagentEffort"`
 }
 
 // SettingsView is the whole Settings panel payload.
@@ -107,7 +117,7 @@ func (a *App) Settings() SettingsView {
 			Bash: bash, Network: cfg.Sandbox.Network,
 			WorkspaceRoot: cfg.Sandbox.WorkspaceRoot, AllowWrite: nonNil(cfg.Sandbox.AllowWrite),
 		},
-		Agent:         AgentView{Temperature: cfg.Agent.Temperature, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt},
+		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt},
 		ConfigPath:    config.SourcePath(),
 		ProviderKinds: provider.Kinds(),
 		Bypass:        a.ctrl != nil && a.ctrl.PermLevel() != "ask",
@@ -329,6 +339,51 @@ func (a *App) SetAgentParams(temperature float64, maxSteps int, systemPrompt str
 		c.Agent.Temperature = temperature
 		c.Agent.MaxSteps = maxSteps
 		c.Agent.SystemPrompt = systemPrompt
+		return nil
+	})
+}
+
+// SetPlannerTemperature sets the planner-specific temperature override.
+// 0 means "use the global temperature" (backward compatible).
+func (a *App) SetPlannerTemperature(temp float64) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Agent.PlannerTemperature = temp
+		return nil
+	})
+}
+
+// SetSubagentTemperature sets the subagent-specific temperature override.
+// 0 means "use the global temperature" (backward compatible).
+func (a *App) SetSubagentTemperature(temp float64) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Agent.SubagentTemperature = temp
+		return nil
+	})
+}
+
+// SetEffort sets the reasoning effort override for the executor.
+// "" means provider default. For DeepSeek: "high" (default) or "max".
+func (a *App) SetEffort(effort string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Agent.Effort = effort
+		return nil
+	})
+}
+
+// SetPlannerEffort sets the planner-specific reasoning effort override.
+// "" means inherit from Effort (or provider default).
+func (a *App) SetPlannerEffort(effort string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Agent.PlannerEffort = effort
+		return nil
+	})
+}
+
+// SetSubagentEffort sets the subagent-specific reasoning effort override.
+// "" means inherit from Effort (or provider default).
+func (a *App) SetSubagentEffort(effort string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Agent.SubagentEffort = effort
 		return nil
 	})
 }

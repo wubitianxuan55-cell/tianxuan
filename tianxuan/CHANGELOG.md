@@ -1,3 +1,26 @@
+## [10.40.0] — 2026-07-05
+
+### 🧠 推理深度分角色控制
+
+- 删除顶栏"快速/标准/深度" temperature 按钮，改为设置面板内按角色控制推理深度
+- `agent.effort`（执行者）/ `agent.planner_effort` / `agent.subagent_effort` 分别控制
+- 空值继承上级：`planner_effort=""` 则使用 `effort`，`effort=""` 则用 provider 默认
+- 设置面板 EffortSelect：关闭(`""`) / 标准(`high`) / 深度(`max`)
+- boot.go 在 NewProvider 前为各角色注入对应 effort 值
+
+### 📐 前端改动
+
+- `MemoMarkdown` 改为渐进式 Markdown：稳定段落实时渲染，未完成尾部简单样式
+- 顶栏双色上下文横道图：紫色=规划者 青色=执行者，显示各自 Token 占比
+- 设置面板 Models 标签三张模型卡片各加推理深度选择器
+
+### 🔧 配置整理
+
+- 保留 `agent.temperature` / `planner_temperature` / `subagent_temperature` 温度控制（独立于 effort）
+- `config/render.go` 同步渲染新字段
+
+---
+
 ## [10.39.0] — 2026-07-05
 
 ### 🐛 双模型 Hermes 修复

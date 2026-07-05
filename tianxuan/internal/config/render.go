@@ -36,6 +36,12 @@ func RenderTOML(c *Config) string {
 	}
 	fmt.Fprintf(&b, "max_steps   = %d\n", c.Agent.MaxSteps)
 	fmt.Fprintf(&b, "temperature = %s\n", formatFloat(c.Agent.Temperature))
+	if c.Agent.PlannerTemperature > 0 {
+		fmt.Fprintf(&b, "planner_temperature = %s   # override for Hermes planner (0 = use temperature)\n", formatFloat(c.Agent.PlannerTemperature))
+	}
+	if c.Agent.SubagentTemperature > 0 {
+		fmt.Fprintf(&b, "subagent_temperature = %s   # override for task sub-agents (0 = use temperature)\n", formatFloat(c.Agent.SubagentTemperature))
+	}
 	if c.Agent.PlannerModel != "" {
 		fmt.Fprintf(&b, "planner_model = %q   # low-frequency planner (two-model collaboration)\n", c.Agent.PlannerModel)
 	} else {

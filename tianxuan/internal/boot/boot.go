@@ -102,6 +102,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	jm := jobs.NewManager(sink)
 
 	execProv, err := NewProvider(entry)
+if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +173,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// nesting out of the picture). It registers into the same reg the
 	// executor uses, so the model surfaces it like any other tool.
 	taskTool := agent.NewTaskTool(execProv, entry.Price, reg, maxSteps,
-		entry.ContextWindow, cfg.Agent.Temperature, config.ArchiveDir(), "", headlessGate)
+		entry.ContextWindow, cfg.Agent.SubagentTemp(), config.ArchiveDir(), "", headlessGate)
 
 	// V10.22: resolve subagent model from config. When SubagentModel names a
 	// configured provider, sub-agents use that provider (typically a cheaper
@@ -180,6 +181,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// calls mean the parent's prefix cache is unaffected.
 	if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
 		if subEntry, ok := cfg.ResolveModel(subRef); ok {
+			if e := cfg.Agent.SubagentEffortVal(); e != "" { subEntry.Effort = e }
 			if subProv, err := NewProvider(subEntry); err == nil {
 				taskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
 			}
@@ -346,6 +348,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	var runner agent.Runner = executor
 	if pm := cfg.Agent.PlannerModel; pm != "" {
 		if pe, ok := cfg.ResolveModel(pm); ok {
+		if e := cfg.Agent.PlannerEffortVal(); e != "" { pe.Effort = e }
 			plannerProv, err := NewProvider(pe)
 			if err != nil {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
@@ -356,7 +359,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			// web_search, web_fetch, lsp_*, code_index, memory_search,
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.Temperature, sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir())
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir())
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

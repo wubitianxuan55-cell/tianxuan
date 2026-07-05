@@ -84,7 +84,7 @@ export default function App() {
     changeFactType,
   } = useController();
   const t = useT();
-  const { permLevel, setPermLevel, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
+  const { permLevel, setPermLevel, themeNow, setTheme, switchingModel, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
@@ -397,21 +397,6 @@ export default function App() {
             </div>
             <div className="flex items-center gap-2 px-3">
               {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
-              <span className="flex items-center gap-0 border border-border-soft rounded-[5px] overflow-hidden no-drag">
-                {(["fast", "normal", "deep"] as const).map(level => (
-                  <button
-                    key={level}
-                    className={`bg-transparent border-0 border-r border-border-soft text-fg-faint text-[11px] px-2 py-0.5 cursor-pointer leading-tight no-drag last:border-r-0 hover:text-fg-dim hover:bg-bg-soft disabled:opacity-40 disabled:cursor-default transition-[color,background] duration-[var(--dur-fast)] ${
-                      thinkLevel === level ? "text-accent font-semibold bg-accent/15 shadow-[inset_0_1px_2px_var(--accent-soft)]" : ""
-                    }`}
-                    onClick={() => handleThinkLevelChange(level)}
-                    disabled={state.running}
-                    title={level === "fast" ? "快速思考" : level === "normal" ? "标准思考" : "深度思考"}
-                  >
-                    {level === "fast" ? "快速" : level === "normal" ? "标准" : "深度"}
-                  </button>
-                ))}
-              </span>
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">

@@ -310,6 +310,11 @@ export interface AgentView {
   temperature: number;
   maxSteps: number;
   systemPrompt: string;
+  plannerTemperature: number;
+  subagentTemperature: number;
+  effort: string;
+  plannerEffort: string;
+  subagentEffort: string;
 }
 
 export interface SettingsView {

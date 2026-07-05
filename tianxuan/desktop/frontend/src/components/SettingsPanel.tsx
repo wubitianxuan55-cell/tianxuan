@@ -210,6 +210,27 @@ function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; tit
   );
 }
 
+const EFFORT_LEVELS = [
+  { key: "", label: "关闭" },
+  { key: "high", label: "标准" },
+  { key: "max", label: "深度" },
+] as const;
+
+function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: string) => void; busy: boolean }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-fg-faint text-[11px] shrink-0 mr-0.5">推理</span>
+      {EFFORT_LEVELS.map((l) => (
+        <button key={l.key}
+          className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${value === l.key ? "text-accent border-accent/40 bg-accent/10 font-medium" : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"}`}
+          disabled={busy}
+          onClick={() => onChange(l.key)}
+        >{l.label}</button>
+      ))}
+    </div>
+  );
+}
+
 function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { onManageProviders: () => void }) {
   const t = useT();
   const refs = allRefs(s);
@@ -235,6 +256,13 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
+        <div className="mt-2">
+          <EffortSelect
+            value={s.agent.effort}
+            busy={busy}
+            onChange={(e: string) => void apply(() => app.SetEffort(e))}
+          />
+        </div>
       </ModelCard>
 
       <ModelCard icon={<Brain size={18} />} title="规划模型 (Hermes)" desc="只读研究代码、制定执行计划。留空则使用单模型模式">
@@ -244,6 +272,13 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
           inheritLabel={t("settings.plannerNone")}
           onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
         />
+        <div className="mt-2">
+          <EffortSelect
+            value={s.agent.plannerEffort || s.agent.effort}
+            busy={busy}
+            onChange={(e: string) => void apply(() => app.SetPlannerEffort(e))}
+          />
+        </div>
       </ModelCard>
 
       <ModelCard icon={<Bot size={18} />} title="子代理模型" desc="task / explore / review 等子任务使用的模型">
@@ -253,6 +288,13 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
           inheritLabel={t("settings.subagentInherit")}
           onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
         />
+        <div className="mt-2">
+          <EffortSelect
+            value={s.agent.subagentEffort || s.agent.effort}
+            busy={busy}
+            onChange={(e: string) => void apply(() => app.SetSubagentEffort(e))}
+          />
+        </div>
         {(s.subagentSkills || []).length > 0 && (
           <div className="mt-2">
             <button

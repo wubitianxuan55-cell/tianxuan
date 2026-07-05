@@ -1,4 +1,4 @@
-import { memo, useRef, useState, useEffect } from "react";
+import { memo, useRef, useState, useEffect, useMemo } from "react";
 import { Markdown } from "./Markdown";
 
 interface MemoMarkdownProps {
@@ -10,116 +10,104 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-const CURSOR = '<span class="inline-block w-[2px] h-[1em] bg-accent align-middle ml-px animate-pulse" />';
+/**
+ * findStableCut — 找到"稳定"切分点。
+ *
+ * 规则（按优先级）：
+ *   1. 如果最后一个 \n\n 之后的区间内包含未闭合的代码围栏（奇数个 ```），
+ *      回退到代码围栏开始前。
+ *   2. 否则在最后一个 \n\n 处切分。
+ *   3. 没有 \n\n 则全部视为不稳定。
+ *
+ * 返回 [stablePrefix, unstableSuffix]。
+ */
+function findStableCut(text: string): [string, string] {
+  const lastGap = text.lastIndexOf("\n\n");
+  if (lastGap < 0) return ["", text];
 
-interface CacheState {
-  html: string;
-  processedLen: number;
-  inFence: boolean;
-}
+  // Check for unclosed code fence in the suffix
+  const suffix = text.slice(lastGap + 2);
+  let fenceCount = 0;
+  let i = 0;
+  while (i < suffix.length) {
+    const idx = suffix.indexOf("```", i);
+    if (idx < 0) break;
+    // A fence is a line that starts with ``` (possibly with a language tag)
+    const lineStart = suffix.lastIndexOf("\n", idx - 1);
+    const before = lineStart >= 0 ? suffix.slice(lineStart + 1, idx) : suffix.slice(0, idx);
+    if (before.trim() === "") {
+      fenceCount++;
+      if (fenceCount % 2 !== 0) {
+        // Found opening fence; roll back to before this block
+        const fenceStart = lastGap + 2 + idx;
+        const preFenceNL = text.lastIndexOf("\n\n", fenceStart - 1);
+        if (preFenceNL >= 0) return [text.slice(0, preFenceNL + 2), text.slice(preFenceNL + 2)];
+        return ["", text];
+      }
+    }
+    i = idx + 3;
+  }
 
-// processLine renders a single line with the current fence state.
-// Returns [html, newInFence].
-function processLine(line: string, inFence: boolean): [string, boolean] {
-  if (line.startsWith("```")) {
-    return [`<span class="text-fg-faint font-mono text-[90%]">${esc(line)}</span>\n`, !inFence];
-  }
-  if (inFence) {
-    return [`<span class="font-mono text-[90%]">${esc(line)}</span>\n`, true];
-  }
-  if (/^#{1,4}\s/.test(line)) {
-    return [`<span class="font-bold">${esc(line)}</span>\n`, false];
-  } else if (/^[-*+]\s/.test(line)) {
-    return [`<span class="text-fg-dim">  · ${esc(line.slice(2))}</span>\n`, false];
-  } else if (/^\d+\.\s/.test(line)) {
-    return [`<span class="text-fg-dim">  ${esc(line)}</span>\n`, false];
-  } else if (/^>\s/.test(line)) {
-    return [`<span class="text-fg-faint">│ ${esc(line.slice(2))}</span>\n`, false];
-  } else if (line.trim() === "") {
-    return ["\n", false];
-  }
-  return [esc(line) + "\n", false];
-}
-
-// processPending renders the incomplete last line (no newline at end).
-function processPending(line: string, inFence: boolean): string {
-  if (inFence) {
-    return `<span class="font-mono text-[90%]">${esc(line)}</span>`;
-  }
-  if (/^#{1,4}\s/.test(line)) {
-    return `<span class="font-bold">${esc(line)}</span>`;
-  } else if (/^[-*+]\s/.test(line)) {
-    return `<span class="text-fg-dim">  · ${esc(line.slice(2))}</span>`;
-  } else if (/^\d+\.\s/.test(line)) {
-    return `<span class="text-fg-dim">  ${esc(line)}</span>`;
-  } else if (/^>\s/.test(line)) {
-    return `<span class="text-fg-faint">│ ${esc(line.slice(2))}</span>`;
-  }
-  return esc(line);
+  return [text.slice(0, lastGap + 2), text.slice(lastGap + 2)];
 }
 
 /**
- * useStreamingPreview — 增量流式预览。
+ * renderPending — 对不稳定尾部做简单 HTML 渲染。
  *
- * 只处理新增的完整行（以 \n 结尾），已处理部分缓存为 HTML。
- * 最后一行（可能不完整）每次都重新渲染，但只有一行，O(1)。
- * 避免 streamingPreview 每次 O(n) 遍历全部文本的问题。
+ * 处理标题、列表、引用、代码块，与旧版类似但只用于最后的不稳定部分。
  */
-function useStreamingPreview(text: string, streaming: boolean): string {
-  const cache = useRef<CacheState>({ html: "", processedLen: 0, inFence: false });
+function renderPending(text: string): string {
+  const lines = text.split("\n");
+  let inFence = false;
+  const out: string[] = [];
 
-  // Reset cache when streaming starts
-  const prevStreaming = useRef(streaming);
-  if (streaming && !prevStreaming.current) {
-    cache.current = { html: "", processedLen: 0, inFence: false };
-  }
-  prevStreaming.current = streaming;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isLast = i === lines.length - 1;
 
-  if (!streaming) return "";
-
-  const delta = text.slice(cache.current.processedLen);
-  if (delta.length === 0) {
-    // No new content; re-render pending line only
-    const pending = text.slice(cache.current.processedLen);
-    if (!pending) return cache.current.html + CURSOR;
-    return cache.current.html + processPending(pending, cache.current.inFence) + CURSOR;
-  }
-
-  // Process up to the last complete line boundary
-  const lastNL = delta.lastIndexOf("\n");
-  const toProcess = lastNL >= 0 ? delta.slice(0, lastNL + 1) : "";
-  const newProcessedLen = cache.current.processedLen + (lastNL >= 0 ? lastNL + 1 : 0);
-
-  let out = "";
-  let fence = cache.current.inFence;
-  if (toProcess) {
-    for (const line of toProcess.split("\n").slice(0, -1)) {
-      const [html, newFence] = processLine(line, fence);
-      out += html;
-      fence = newFence;
+    if (line.startsWith("```")) {
+      inFence = !inFence;
+      out.push(`<span class="text-fg-faint font-mono text-[90%]">${esc(line)}</span>`);
+    } else if (inFence) {
+      out.push(`<span class="font-mono text-[90%]">${esc(line)}</span>`);
+    } else if (/^#{1,4}\s/.test(line)) {
+      out.push(`<span class="font-bold">${esc(line)}</span>`);
+    } else if (/^[-*+]\s/.test(line)) {
+      out.push(`<span class="text-fg-dim">  · ${esc(line.slice(2))}</span>`);
+    } else if (/^\d+\.\s/.test(line)) {
+      out.push(`<span class="text-fg-dim">  ${esc(line)}</span>`);
+    } else if (/^>\s/.test(line)) {
+      out.push(`<span class="text-fg-faint">│ ${esc(line.slice(2))}</span>`);
+    } else if (line.trim() === "" && !isLast) {
+      out.push("");
+    } else {
+      out.push(esc(line));
     }
   }
 
-  cache.current.html += out;
-  cache.current.processedLen = newProcessedLen;
-  cache.current.inFence = fence;
+  return out.join("\n");
+}
 
-  // Render the pending (incomplete) last line
-  const pending = text.slice(newProcessedLen);
-  const pendingHtml = pending ? processPending(pending, fence) : "";
-
-  return cache.current.html + pendingHtml + CURSOR;
+/**
+ * useProgressiveMarkdown — 渐进式 Markdown。
+ *
+ * 找到稳定切分点后，前缀用 Markdown 渲染，后缀用简单 HTML。
+ */
+function useProgressiveMarkdown(text: string): { stable: string; pending: string } {
+  return useMemo(() => {
+    const [s, p] = findStableCut(text);
+    return { stable: s, pending: p };
+  }, [text]);
 }
 
 /**
  * MemoMarkdown — 流式友好的 Markdown 渲染器。
  *
- * 流式期间显示增量轻量结构预览（保留标题、代码块、列表的视觉结构），
- * 只处理新增行，避免每个 text chunk 触发 O(n) 全量重处理。
- * 流式结束后切换为完整 Markdown 渲染。
+ * 流式期间：找到稳定段落边界（\n\n），前缀用完整 Markdown 渲染，
+ * 未完成尾部用简单样式。流式结束后全量 Markdown 渲染。
  */
 export const MemoMarkdown = memo(function MemoMarkdown({ text, streaming }: MemoMarkdownProps) {
-  // RAF 节流：每帧最多更新一次，避免高频 chunk 压垮浏览器
+  // RAF 节流：每帧最多更新一次
   const [visible, setVisible] = useState(text);
   const rafRef = useRef(0);
 
@@ -133,18 +121,35 @@ export const MemoMarkdown = memo(function MemoMarkdown({ text, streaming }: Memo
     return () => cancelAnimationFrame(rafRef.current);
   }, [text, streaming]);
 
-  const previewHtml = useStreamingPreview(visible, streaming);
+  const { stable, pending } = useProgressiveMarkdown(visible);
 
+  // 流式结束：全量 Markdown
+  if (!streaming) {
+    return (
+      <div className="break-words overflow-wrap-break-word">
+        <Markdown text={text || ""} />
+      </div>
+    );
+  }
+
+  // 流式中：稳定部分 Markdown + 不稳定部分简单样式 + 闪烁光标
   return (
     <div className="break-words overflow-wrap-break-word">
-      {streaming ? (
-        <div
-          className="!font-sans whitespace-pre-wrap !bg-transparent !p-0 !m-0 !text-[inherit] !border-0 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: previewHtml }}
-        />
-      ) : (
-        <Markdown text={text || ""} />
+      {stable && (
+        <div className="md text-[14px] leading-relaxed">
+          <Markdown text={stable} />
+        </div>
       )}
+      {pending && (
+        <div
+          className="!font-sans whitespace-pre-wrap !bg-transparent !p-0 !m-0 !text-[inherit] !border-0 leading-relaxed text-[14px]"
+          dangerouslySetInnerHTML={{ __html: renderPending(pending) }}
+        />
+      )}
+      <span
+        className="inline-block w-[2px] h-[1em] bg-accent align-middle ml-px animate-pulse"
+        aria-hidden
+      />
     </div>
   );
 }, (prev, next) => prev.text === next.text && prev.streaming === next.streaming);

@@ -684,7 +684,19 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	if full == nil {
 		return ro
 	}
+	// Subagent-spawning tools are excluded regardless of ReadOnly — the planner
+	// must not spawn sub-agents that create independent API calls and evict its
+	// cache prefix. explore/research/review/security_review report ReadOnly=true
+	// (they are conceptually read-only) but each spawns a full-toolset sub-agent
+	// that can write files through headlessGate.
+	exclude := map[string]bool{
+		"task": true, "run_skill": true, "parallel_skills": true,
+		"explore": true, "research": true, "review": true, "security_review": true,
+	}
 	for _, name := range full.Names() {
+		if exclude[name] {
+			continue
+		}
 		t, ok := full.Get(name)
 		if !ok {
 			continue

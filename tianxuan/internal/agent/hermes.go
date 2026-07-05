@@ -151,7 +151,7 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		return h.hephaestus.Run(ctx, task)
 	}
 
-	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · planning"})
+	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · hermes"})
 	prePlanLen := len(h.hermesSess.Messages)
 	plan, err := h.plan(ctx, input)
 	if err != nil {
@@ -163,13 +163,14 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		h.sink.Emit(event.Event{Kind: event.Text, Text: plan})
 		return &TurnResult{Summary: plan, Success: true}, nil
 	}
+
 	userNote, err := h.confirmPlan(ctx, input, plan)
 	if err != nil {
 		// User cancelled — roll back planner session to pre-plan state.
 		h.hermesSess.Truncate(prePlanLen)
 		return nil, err
 	}
-	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing"})
+	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
 	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, plan, userNote))
 
 	// V10.37: executor returns structured TurnResult — no more post-hoc extraction.
@@ -326,9 +327,6 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	}
 
 	// Extract the plan from the planner's persistent session (last assistant message).
-	// If the plan is marked with <!--plan-->, only use the text after the marker —
-	// the research/analysis before it stays in the planner's session for context
-	// but doesn't clutter the PlanCard or executor handoff.
 	var plan string
 	msgs := h.hermesSess.Messages
 	for i := len(msgs) - 1; i >= 0; i-- {
@@ -340,9 +338,8 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if plan == "" {
 		plan = "(hermes produced no output)"
 	}
-	if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
-		plan = strings.TrimSpace(plan[idx+len("<!--plan-->"):])
-	}
+	// NOTE: <!--plan--> marker is not stripped — it's an HTML comment, invisible
+	// in rendered Markdown (PlanCard) and harmless in executor prompts.
 
 	return plan, nil
 }

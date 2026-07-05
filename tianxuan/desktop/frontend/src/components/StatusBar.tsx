@@ -54,7 +54,8 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel,
+  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel, plannerModel,
+  perTurnPlannerUsage, perTurnExecutorUsage,
 }: {
   context: ContextInfo;
   usage?: WireUsage;
@@ -68,6 +69,9 @@ export const StatusBar = memo(function StatusBar({
   bridgeAlive?: boolean;
   model?: string;
   subagentModel?: string;
+  plannerModel?: string;
+  perTurnPlannerUsage?: WireUsage;
+  perTurnExecutorUsage?: WireUsage;
   onOpenStats?: () => void;
 }) {
   const compact = useCompact();
@@ -99,8 +103,6 @@ export const StatusBar = memo(function StatusBar({
   const barH = compact ? "h-7" : "h-8";
   const barPx = compact ? "px-2" : "px-3";
   const fontSize = compact ? "text-[11px]" : "text-[11.5px]";
-  const contextPct = context.window > 0 ? Math.round((context.used / context.window) * 100) : 0;
-  const contextColor = contextPct > 80 ? "bg-err" : contextPct > 60 ? "bg-warning" : "bg-accent";
 
   const connLabel = !bridgeAlive ? "离线" : running ? "生成中" : "在线";
   const connColor = !bridgeAlive ? "bg-err" : running ? "bg-warning ds-pulse" : "bg-ok";
@@ -173,23 +175,65 @@ export const StatusBar = memo(function StatusBar({
                 </Tooltip>
               </>
             )}
-            {/* 上下文用量横道图 */}
+            {/* 上下文用量 — 双色横道图 (规划者/执行者) */}
             {context.window > 0 && (
               <>
                 <span className="text-border/40 select-none">·</span>
-                <Tooltip label={`上下文: ${fmtTokens(context.used)} / ${fmtTokens(context.window)}`}>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
-                    <span className="text-fg-faint shrink-0">上下文</span>
-                    <div className="flex-1 h-2 bg-border/40 rounded-full overflow-hidden min-w-[80px]">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${contextColor}`}
-                        style={{ width: `${Math.min(contextPct, 100)}%` } as React.CSSProperties}
-                      />
-                    </div>
-                    <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0">{contextPct}%</span>
-                    <span className="text-fg-faint font-mono tabular-nums text-[9px] shrink-0">{fmtTokens(context.used)}/{fmtTokens(context.window)}</span>
-                  </div>
-                </Tooltip>
+                <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+                  {(() => {
+                    const pUsed = perTurnPlannerUsage?.promptTokens ?? 0;
+                    const eUsed = perTurnExecutorUsage?.promptTokens ?? 0;
+                    const totalUsed = pUsed + eUsed;
+
+                    if (totalUsed === 0) {
+                      // 尚无分模型数据 — 回落旧版单色条
+                      const pct = context.window > 0 ? Math.round((context.used / context.window) * 100) : 0;
+                      const color = pct > 80 ? "bg-err" : pct > 60 ? "bg-warning" : "bg-accent";
+                      return (
+                        <>
+                          <span className="text-fg-faint shrink-0 text-[10px]">上下文</span>
+                          <div className="flex-1 h-2 bg-border/40 rounded-full overflow-hidden min-w-[80px]">
+                            <div className={`h-full rounded-full transition-all duration-500 ${color}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }} />
+                          </div>
+                          <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0">{pct}%</span>
+                          <span className="text-fg-faint font-mono tabular-nums text-[9px] shrink-0">{fmtTokens(context.used)}/{fmtTokens(context.window)}</span>
+                        </>
+                      );
+                    }
+
+                    const pctTotal = Math.round((totalUsed / context.window) * 100);
+                    const pctP = Math.round((pUsed / context.window) * 100);
+                    const pctE = Math.round((eUsed / context.window) * 100);
+                    const plannerLabel = plannerModel ? plannerModel.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "规划";
+                    const execLabel = model ? model.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "执行";
+
+                    return (
+                      <>
+                        <span className="text-fg-faint shrink-0 text-[10px]">上下文</span>
+                        <Tooltip label={`${plannerLabel}: ${fmtTokens(pUsed)} · ${execLabel}: ${fmtTokens(eUsed)}`}>
+                          <div className="flex-1 flex gap-px h-2 rounded-full overflow-hidden min-w-[80px]">
+                            {pctP > 0 && (
+                              <div className="h-full bg-purple-500/60 rounded-l-full transition-all duration-500"
+                                style={{ width: `${pctP}%` }} />
+                            )}
+                            {pctE > 0 && (
+                              <div className={`h-full bg-cyan-500/60 ${pctP === 0 ? "rounded-l-full" : ""} rounded-r-full transition-all duration-500`}
+                                style={{ width: `${pctE}%` }} />
+                            )}
+                          </div>
+                        </Tooltip>
+                        <Tooltip label={`${plannerLabel}: ${pctP}% · ${execLabel}: ${pctE}%`}>
+                          <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0">{pctTotal}%</span>
+                        </Tooltip>
+                        <span className="text-fg-faint font-mono tabular-nums text-[9px] shrink-0 flex items-center gap-0.5">
+                          <span className="w-2 h-2 rounded-sm bg-purple-500/60 inline-block" />{fmtTokens(pUsed)}
+                          <span className="w-2 h-2 rounded-sm bg-cyan-500/60 inline-block ml-0.5" />{fmtTokens(eUsed)}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
               </>
             )}
           </>

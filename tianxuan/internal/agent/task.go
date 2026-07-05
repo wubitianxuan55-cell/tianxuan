@@ -309,8 +309,12 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 	subProv, subPrice, subCtxWin := t.prov, t.pricing, t.contextWindow
 	if t.subagentProv != nil {
 		subProv = t.subagentProv
-		subPrice = t.subagentPricing
-		subCtxWin = t.subagentCtxWin
+		if t.subagentPricing != nil {
+			subPrice = t.subagentPricing
+		}
+		if t.subagentCtxWin > 0 {
+			subCtxWin = t.subagentCtxWin
+		}
 	}
 
 	var subUsage provider.Usage
@@ -475,6 +479,13 @@ func runSubAgentInternal(ctx context.Context, prov provider.Provider, reg *tool.
 	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)
 	_, runErr := sub.Run(ctx, prompt)
+	// Populate subUsage from the sub-agent's last usage so SubUsage() reflects
+	// real token counts for cost tracking.
+	if subUsage != nil {
+		if lu := sub.LastUsage(); lu != nil {
+			*subUsage = *lu
+		}
+	}
 	// V10.5: even on error, extract partial result from last assistant message
 	lastMsg := extractLastAssistantMessage(sess.Messages)
 	if runErr != nil {

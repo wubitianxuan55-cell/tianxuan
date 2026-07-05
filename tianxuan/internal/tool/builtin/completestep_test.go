@@ -215,9 +215,31 @@ func TestCompleteStepRejectsTodoMismatchAndPending(t *testing.T) {
 		want string
 	}{
 		{name: "missing", step: "Ship parser", want: "matching todo_write item"},
-		{name: "pending", step: "Document parser", want: "pending"},
-		{name: "pending number", step: "2", want: "pending"},
 	}
+	// pending status is now accepted — complete_step no longer rejects it.
+	// The test below verifies pending completes successfully with valid evidence.
+	t.Run("pending_accepted", func(t *testing.T) {
+		// First, record a successful bash command as evidence
+		ledger2 := evidence.NewLedger()
+		ledger2.Record(evidence.Receipt{
+			ToolName: "bash", Success: true, Command: "echo done",
+		})
+		ledger2.Record(evidence.Receipt{
+			ToolName: "todo_write", Success: true,
+			Todos: []evidence.TodoItem{
+				{Content: "Add parser", Status: "in_progress"},
+				{Content: "Document parser", Status: "pending"},
+			},
+		})
+		ctx2 := evidence.WithLedger(context.Background(), ledger2)
+		_, err := completeStep{}.Execute(ctx2, json.RawMessage(`{
+			"step":"Document parser",
+			"result":"step is complete",
+			"evidence":[{"kind":"verification","summary":"ok","command":"echo done"}]}`))
+		if err != nil {
+			t.Fatalf("pending step should be accepted, got: %v", err)
+		}
+	})
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := completeStep{}.Execute(ctx, json.RawMessage(`{

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
 )
@@ -110,4 +111,125 @@ func TestTaskToolDefaultsToParentToolsWithoutMetaTools(t *testing.T) {
 	if got["task"] || got["run_skill"] || got["explore"] || got["research"] || got["review"] || got["security_review"] {
 		t.Errorf("V6.0: meta-tools should be excluded, got %v", got)
 	}
+}
+
+// TestTaskToolPassesPricingToSubAgent verifies the sub-agent's Usage event
+// carries the parent's Pricing so cost statistics are non-zero.
+func TestTaskToolPassesPricingToSubAgent(t *testing.T) {
+	pricing := &provider.Pricing{CacheHit: 0.025, Input: 3, Output: 6}
+	sub := &mockProvider{
+		name: "sub",
+		chunks: []provider.Chunk{
+			{Type: provider.ChunkText, Text: "ok"},
+			{Type: provider.ChunkUsage, Usage: &provider.Usage{
+				PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150,
+				CacheHitTokens: 80, CacheMissTokens: 20,
+			}},
+			{Type: provider.ChunkDone},
+		},
+	}
+	sink := &testSink{}
+	parentReg := tool.NewRegistry()
+	task := NewTaskTool(sub, pricing, parentReg, 20, 0, 0.0, "", "sys", nil)
+	parentReg.Add(task)
+
+	ctx := withCallContext(context.Background(), "call_1", sink, nil)
+	_, err := task.Execute(ctx, []byte(`{"prompt":"test pricing flow"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	// Find the last Usage event (sub-agent usage tagged as "subagent")
+	var lastUsage *provider.Usage
+	var lastPricing *provider.Pricing
+	for _, e := range sink.events {
+		if e.Kind == event.Usage && e.UsageSource == event.UsageSourceSubagent {
+			lastUsage = e.Usage
+			lastPricing = e.Pricing
+		}
+	}
+	if lastUsage == nil {
+		t.Fatal("sub-agent did not emit a Usage event with UsageSourceSubagent")
+	}
+	if lastPricing == nil {
+		t.Fatal("sub-agent Usage event has nil Pricing — cost will be 0")
+	}
+	if lastPricing != pricing {
+		t.Errorf("sub-agent Pricing = %+v, want parent pricing %+v", lastPricing, pricing)
+	}
+	cost := pricing.Cost(lastUsage)
+	if cost <= 0 {
+		t.Errorf("sub-agent cost = %v, want > 0", cost)
+	}
+	t.Logf("sub-agent cost = %v (tokens: prompt=%d completion=%d)", cost, lastUsage.PromptTokens, lastUsage.CompletionTokens)
+}
+
+// TestTaskToolSubagentPricingFallsBackToParent verifies that when subagent_model
+// pricing is nil, it falls back to the parent's pricing.
+func TestTaskToolSubagentPricingFallsBackToParent(t *testing.T) {
+	parentPricing := &provider.Pricing{CacheHit: 0.025, Input: 3, Output: 6}
+	sub := &mockProvider{
+		name: "sub",
+		chunks: []provider.Chunk{
+			{Type: provider.ChunkText, Text: "ok"},
+			{Type: provider.ChunkUsage, Usage: &provider.Usage{
+				PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150,
+			}},
+			{Type: provider.ChunkDone},
+		},
+	}
+	sub2 := &mockProvider{
+		name: "sub2",
+		chunks: []provider.Chunk{
+			{Type: provider.ChunkText, Text: "ok"},
+			{Type: provider.ChunkUsage, Usage: &provider.Usage{
+				PromptTokens: 200, CompletionTokens: 100, TotalTokens: 300,
+			}},
+			{Type: provider.ChunkDone},
+		},
+	}
+	sink := &testSink{}
+	parentReg := tool.NewRegistry()
+	task := NewTaskTool(sub, parentPricing, parentReg, 20, 0, 0.0, "", "sys", nil)
+	// Set subagent model with nil pricing — should fall back to parentPricing
+	task.SetSubagentProvider(sub2, nil, 0)
+	parentReg.Add(task)
+
+	ctx := withCallContext(context.Background(), "call_1", sink, nil)
+	_, err := task.Execute(ctx, []byte(`{"prompt":"test fallback"}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	var lastUsage *provider.Usage
+	var lastPricing *provider.Pricing
+	for _, e := range sink.events {
+		if e.Kind == event.Usage && e.UsageSource == event.UsageSourceSubagent {
+			lastUsage = e.Usage
+			lastPricing = e.Pricing
+		}
+	}
+	if lastUsage == nil {
+		t.Fatal("sub-agent did not emit a Usage event")
+	}
+	if lastPricing == nil {
+		t.Fatal("sub-agent Pricing is nil — fallback to parent pricing failed")
+	}
+	if lastPricing != parentPricing {
+		t.Errorf("sub-agent Pricing = %+v, want parent pricing %+v", lastPricing, parentPricing)
+	}
+	cost := parentPricing.Cost(lastUsage)
+	if cost <= 0 {
+		t.Errorf("sub-agent cost = %v, want > 0", cost)
+	}
+	t.Logf("fallback sub-agent cost = %v", cost)
+}
+
+// testSink is a simple event sink for tests.
+type testSink struct {
+	events []event.Event
+}
+
+func (s *testSink) Emit(e event.Event) {
+	s.events = append(s.events, e)
 }

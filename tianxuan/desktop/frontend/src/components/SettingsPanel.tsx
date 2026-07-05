@@ -217,12 +217,17 @@ const EFFORT_LEVELS = [
 ] as const;
 
 function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: string) => void; busy: boolean }) {
+  const v = value ?? ""; // normalize undefined → ""
   return (
     <div className="flex items-center gap-1">
       <span className="text-fg-faint text-[11px] shrink-0 mr-0.5">推理</span>
       {EFFORT_LEVELS.map((l) => (
         <button key={l.key}
-          className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${value === l.key ? "text-accent border-accent/40 bg-accent/10 font-medium" : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"}`}
+          className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${
+            v === l.key
+              ? "text-accent border-accent bg-accent/15 font-semibold ring-1 ring-accent/30"
+              : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"
+          }`}
           disabled={busy}
           onClick={() => onChange(l.key)}
         >{l.label}</button>

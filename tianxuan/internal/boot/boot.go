@@ -88,6 +88,11 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown model %q (configured: %s)", modelName, providerNames(cfg))
 	}
+	// Providers without explicit context_window (e.g. user's "deepseek" with
+	// per-model pricing) default to 0, which hides the status-bar gauge.
+	if entry.ContextWindow == 0 {
+		entry.ContextWindow = 1_000_000
+	}
 	if opts.RequireKey {
 		if err := cfg.Validate(modelName); err != nil {
 			return nil, err
@@ -739,10 +744,13 @@ func resolvePatternsPath() (string, error) {
 // from the full registry. Used to give the planner AgentRunner powers to
 // investigate code (read_file, grep, glob, web_search, web_fetch, lsp_*, etc.)
 // without any write/destructive capability. MCP tools are included when their
-// ReadOnly() returns true. Subagent-spawning tools (task, explore, research,
-// review, security_review, run_skill, parallel_skills) are excluded regardless
-// of ReadOnly — the planner must not spawn sub-agents that create independent
-// API calls and evict its cache prefix.
+// ReadOnly() returns true, except for built-in codegraph tools which are always
+// included — CodeGraph is a code-intelligence engine whose graph tools are
+// inherently read-only and essential for efficient planning.
+// Subagent-spawning tools (task, explore, research, review, security_review,
+// run_skill, parallel_skills) are excluded regardless of ReadOnly — the planner
+// must not spawn sub-agents that create independent API calls and evict its
+// cache prefix.
 func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	ro := tool.NewRegistry()
 	if full == nil {
@@ -765,7 +773,11 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 		if !ok {
 			continue
 		}
-		if t.ReadOnly() {
+		// CodeGraph and GitNexus MCP tools (mcp__codegraph__*, mcp__gitnexus__*)
+		// are always included — they are code-intelligence engines whose graph
+		// tools are inherently read-only, even when the MCP server omits the
+		// optional readOnlyHint annotation.
+		if t.ReadOnly() || strings.HasPrefix(name, "mcp__codegraph__") || strings.HasPrefix(name, "mcp__gitnexus__") {
 			ro.Add(t)
 		}
 	}

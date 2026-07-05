@@ -229,7 +229,7 @@ export function makeMockApp(): AppBindings {
       return mockSwitchWorkspace(path);
     },
     async ContextUsage() {
-      return { used: 1280, window: 1_000_000 };
+      return { used: 1280, window: 1_000_000, plannerUsed: 640, plannerWindow: 1_000_000 };
     },
     async TCCAReport() {
       return JSON.stringify({

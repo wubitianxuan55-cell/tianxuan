@@ -137,6 +137,8 @@ export interface WorkspaceView {
 export interface ContextInfo {
   used: number;
   window: number;
+  plannerUsed: number;
+  plannerWindow: number;
 }
 
 export interface Meta {

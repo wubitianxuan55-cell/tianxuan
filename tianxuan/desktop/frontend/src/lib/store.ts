@@ -202,7 +202,7 @@ function reducer(s: ControllerState, a: Action): ControllerState {
 const initialState: ControllerState = {
   items: [], running: false, turnActive: false,
   approval: undefined, ask: undefined, usage: undefined,
-  context: { used: 0, window: 0 }, meta: undefined, balance: undefined,
+  context: { used: 0, window: 0, plannerUsed: 0, plannerWindow: 0 }, meta: undefined, balance: undefined,
   tcca: undefined,
   jobs: [], currentAssistant: undefined, pendingUser: undefined, discardTurn: false, lastAssistantIdx: -1,
   turnStartAt: 0, turnTokens: 0, seq: 0, sessionTotal: 0, sessionNonce: 0, perTurnUsage: null, turnSteps: [],

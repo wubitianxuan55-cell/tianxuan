@@ -227,7 +227,11 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 		}
 		jm, ok := jobs.FromContext(ctx)
 		if !ok {
-			return "", fmt.Errorf("background execution is not available in this context")
+			// No jobs manager in this context (e.g. planner sub-agent).
+			// Fall back to foreground execution — sub-agents inside the
+			// planner are short-lived and don't persist across turns.
+			result, err := t.runSubSession(ctx, p.Prompt, subReg, subSink(ctx), run, maxSteps, p.OutputSchema)
+			return t.finalizeRun(result, err, run)
 		}
 		parentID, parent, _, _ := CallContext(ctx)
 		nested := subSinkFor(parentID, parent)

@@ -490,9 +490,6 @@ export default function App() {
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
               subagentModel={state.meta?.subagentLabel}
-              plannerModel={state.meta?.plannerLabel}
-              perTurnPlannerUsage={state.perTurnPlannerUsage}
-              perTurnExecutorUsage={state.perTurnExecutorUsage}
               permLevel={permLevel}
             />
             </CompactContext.Provider>

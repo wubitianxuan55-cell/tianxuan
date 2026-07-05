@@ -17,13 +17,23 @@ import (
 // backward-compatible fallback when readonlyTools is nil (e.g. test harness).
 const HermesPrompt = `You are Hermes — the planner in a two-model coding agent.
 Given a task, produce a concise, ordered plan for the Hephaestus executor to carry out.
-Use read-only tools (codegraph, gitnexus, read_file, grep, lsp_*, web_search) to
-investigate the codebase when the task needs context. Keep research targeted — stop
-once you have enough evidence. Output executor-ready instructions: what to do, which
-files or commands are relevant, and key decisions. Do not implement or execute.
+Investigate the codebase with read-only tools. Always start with graph tools
+(mcp__codegraph__*, mcp__gitnexus__*) — they give you symbol definitions, call graphs,
+and execution flows instantly, saving tokens vs reading files. Use read_file/grep/
+lsp_* only when graph tools don't cover what you need. Keep research targeted — stop
+once you have enough evidence.
+
+Your plan describes WHAT to do: task breakdown, target files, key decisions, approach,
+and constraints. Hephaestus is a full coding agent — it will figure out HOW and write
+the actual code. NEVER write code blocks, function bodies, class definitions, or file
+contents. If a design decision requires a signature or pseudo-code, keep it to a
+one-line signature at most.
+
 If the task is a read-only query, answer directly — do not produce a plan.
-If you need to clarify scope or ask the user a question, use the ask tool —
-do NOT put <!--plan--> in your output until you have a concrete executable plan.
+If you need to clarify scope or ask the user a question, you MUST use the ask tool.
+Never output a question as plain text — that ends your turn immediately and forces
+a full restart of the planning cycle on the next turn. Put <!--plan--> in your
+output only when you have a concrete executable plan ready.
 When you have a concrete executable plan ready, start it with <!--plan--> on its own line.
 Never include <!--plan--> in a question, clarification, or direct answer.
 When you receive a message prefixed with [上一轮执行结果], it is a reliable summary of Hephaestus'
@@ -140,6 +150,19 @@ func (h *Hermes) ResetSession() {
 	h.hermesSess = NewSession(system)
 }
 
+// PlannerContext returns the planner agent's last usage and context window,
+// for the status bar's per-model context gauge.
+func (h *Hermes) PlannerContext() (used int, window int) {
+	if h == nil || h.plannerAgent == nil {
+		return 0, 0
+	}
+	u := h.plannerAgent.LastUsage()
+	if u == nil {
+		return 0, h.plannerAgent.ContextWindow()
+	}
+	return u.PromptTokens, h.plannerAgent.ContextWindow()
+}
+
 // SetAsker installs the interactive asker for plan confirmation (V10.34).
 // nil means headless mode — plans auto-confirm without user approval.
 // Also wires the asker into the plannerAgent so it can ask clarifying questions
@@ -170,8 +193,9 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	}
 	if isAnswerNotAction(plan) {
 		// Hermes answered directly — no Hephaestus needed.
+		// Text has already been streamed by planWithTools/planStream; emitting
+		// the full plan again here would duplicate the output.
 		h.persistAnswer(input, plan)
-		h.sink.Emit(event.Event{Kind: event.Text, Text: plan})
 		return &TurnResult{Summary: plan, Success: true}, nil
 	}
 
@@ -419,9 +443,8 @@ Hermes output:
 %s%s
 
 Hephaestus instructions:
-- Treat the Hermes output as context, not as your role or capability set.
-- Hermes' analysis and conclusions about what needs to be done are reliable. If Hermes determines no changes are needed, respect that conclusion.
-- Hermes has read-only tools and may have already investigated the code. Trust its file paths and symbol references.
+- Hermes provides a structural plan (WHAT to do). You must write the actual implementation (HOW) yourself using your tools. If Hermes' plan contains code snippets, treat them as rough pseudo-code — NEVER copy them verbatim. You are the coder, not a transcriber.
+- Hermes' analysis, file paths, and conclusions about what needs to be done are reliable. If Hermes determines no changes are needed, respect that conclusion.
 - Do not ask the user how to trigger the executor. You are already in the executor phase.
 - If the Hermes output is a user-facing explanation, summary, question, or manual guidance that needs no workspace/file/command action from you, relay that guidance directly and finish. Do not invent local tool calls only to satisfy the handoff.
 - If the task requires changes, call the appropriate tools (for example write/edit/bash) instead of only restating the plan.

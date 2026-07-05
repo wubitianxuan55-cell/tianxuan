@@ -55,17 +55,11 @@ func (readSkill) CompactDescription() string { return compactDesc["read_skill"] 
 func (readSkill) CompactSchema() json.RawMessage   { return compactSchema["read_skill"] }
 
 func init() {
-	tool.RegisterBuiltin(readSkill{})
+	tool.RegisterBuiltin(&readSkill{})
 }
-
-// readSkillResolver is wired during boot to resolve skill names to content.
-var readSkillResolver func(name string) (string, error)
-
-func (r *readSkill) setResolve(fn func(name string) (string, error)) { r.resolve = fn }
 
 // WireReadSkillResolver injects the skill resolution callback. Call from boot.
 func WireReadSkillResolver(resolve func(name string) (string, error)) {
-	readSkillResolver = resolve
 	// Update all registered readSkill instances.
 	for _, t := range tool.Builtins() {
 		if rs, ok := t.(*readSkill); ok {

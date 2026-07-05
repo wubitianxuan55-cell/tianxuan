@@ -723,6 +723,15 @@ func (c *Controller) ContextSnapshot() (int, int) {
 	return u.PromptTokens, c.executor.ContextWindow()
 }
 
+// PlannerContextSnapshot returns the planner's last usage and window, or zeros
+// when no planner is active (single-model mode).
+func (c *Controller) PlannerContextSnapshot() (int, int) {
+	if h, ok := c.runner.(interface{ PlannerContext() (int, int) }); ok {
+		return h.PlannerContext()
+	}
+	return 0, 0
+}
+
 // CompactRatio returns the auto-compaction threshold as a fraction of the window
 // (0 when the executor is unset). The status line shows headroom against it.
 func (c *Controller) CompactRatio() float64 {

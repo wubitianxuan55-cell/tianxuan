@@ -14,9 +14,12 @@ import (
 )
 
 // ContextInfo is the prompt-vs-window gauge payload. Both zero means no data yet.
+// PlannerUsed/PlannerWindow track the Hermes model independently.
 type ContextInfo struct {
-	Used   int `json:"used"`
-	Window int `json:"window"`
+	Used          int `json:"used"`
+	Window        int `json:"window"`
+	PlannerUsed   int `json:"plannerUsed"`
+	PlannerWindow int `json:"plannerWindow"`
 }
 
 // BalanceInfo is the wallet-balance readout for the status bar. Available is true
@@ -129,7 +132,8 @@ func (a *App) ContextUsage() ContextInfo {
 		return ContextInfo{}
 	}
 	used, window := ctrl.ContextSnapshot()
-	return ContextInfo{Used: used, Window: window}
+	pUsed, pWindow := ctrl.PlannerContextSnapshot()
+	return ContextInfo{Used: used, Window: window, PlannerUsed: pUsed, PlannerWindow: pWindow}
 }
 
 // TCCAReport returns the TCCA cache metrics as a JSON string (V3.0).

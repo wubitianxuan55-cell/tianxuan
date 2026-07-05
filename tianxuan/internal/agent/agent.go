@@ -65,6 +65,7 @@ func CallContext(ctx context.Context) (parentID string, sink event.Sink, asker A
 // It lets upstream callers (e.g. Hermes) consume execution outcomes without
 // having to extract them post-hoc from the agent's session.
 type TurnResult struct {
+	FilesCreated  []string // paths of files newly created this turn (vs. modified)
 	FilesModified []string // paths of files written/edited/moved/deleted this turn
 	Summary       string   // agent's final conclusion (last assistant message)
 	Success       bool     // true = no tool errors encountered this turn

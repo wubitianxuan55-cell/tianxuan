@@ -130,7 +130,7 @@ func (completeStep) Execute(ctx context.Context, args json.RawMessage) (string, 
 	if hasTodo {
 		todoStatus = fmt.Sprintf(" Todo step: todo-matched %d.", todoMatch.Index)
 	}
-	return fmt.Sprintf("Step %q signed off with %d evidence item(s) [%s].%s Move the next step to in_progress with todo_write.",
+	return fmt.Sprintf("Step %q signed off with %d evidence item(s) [%s].%s The host advances the task list for you — it marks this step completed and moves the next to in_progress, so you don't need another todo_write to mark completions.",
 		p.Step, len(p.Evidence), strings.Join(kinds, ", "), hostStatus+todoStatus), nil
 }
 

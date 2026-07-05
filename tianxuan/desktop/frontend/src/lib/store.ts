@@ -146,6 +146,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
         cacheMissTokens: s.perTurnUsage.cacheMissTokens + (u.cacheMissTokens ?? 0),
         sessionCacheHitTokens: u.sessionCacheHitTokens > 0 ? u.sessionCacheHitTokens : (s.perTurnUsage?.sessionCacheHitTokens ?? 0),
         sessionCacheMissTokens: u.sessionCacheMissTokens > 0 ? u.sessionCacheMissTokens : (s.perTurnUsage?.sessionCacheMissTokens ?? 0),
+        costUsd: (s.perTurnUsage.costUsd ?? 0) + (u.costUsd ?? 0),
       } : u;
       // V10.31: split by source — planner / executor / subagent
       const isPlanner = u?.source === "planner";
@@ -160,6 +161,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
         cacheMissTokens: prev.cacheMissTokens + cur.cacheMissTokens,
         sessionCacheHitTokens: cur.sessionCacheHitTokens > 0 ? cur.sessionCacheHitTokens : prev.sessionCacheHitTokens,
         sessionCacheMissTokens: cur.sessionCacheMissTokens > 0 ? cur.sessionCacheMissTokens : prev.sessionCacheMissTokens,
+        costUsd: (prev.costUsd ?? 0) + (cur.costUsd ?? 0),
       };
       const tagged = u ? { ...u } : undefined; const steps = tagged ? [...s.turnSteps, tagged] : s.turnSteps;
       return { ...s, usage: tagged, perTurnUsage: acc, perTurnPlannerUsage: accSrc(prevPlanner, isPlanner ? u : undefined), perTurnExecutorUsage: accSrc(prevExecutor, isExecutor ? u : undefined), perTurnSubUsage: accSrc(prevSub, isSub ? u : undefined), turnSteps: steps, context: { ...s.context, used }, turnTokens: s.turnTokens + (tagged?.completionTokens ?? 0) };

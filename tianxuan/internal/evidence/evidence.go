@@ -3,6 +3,7 @@ package evidence
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -273,6 +274,15 @@ func ReceiptFromToolCall(toolName string, args json.RawMessage, success bool, re
 		}
 		if toolName == "complete_step" {
 			r.Step = stringField(fields, "step")
+			// Also extract step_index (1-based integer) if step is empty.
+			if r.Step == "" {
+				if raw, ok := fields["step_index"]; ok {
+					var idx float64
+					if json.Unmarshal(raw, &idx) == nil && idx > 0 {
+						r.Step = fmt.Sprintf("%d", int(idx))
+					}
+				}
+			}
 		}
 		if toolName == "todo_write" {
 			r.Todos = todoItemsField(fields, "todos")

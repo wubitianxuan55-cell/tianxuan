@@ -56,6 +56,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // V10.13: 每轮重置成功循环计数
 	// V10.37: per-turn TurnResult tracking — accumulated here and returned by Run().
+	var turnFilesCreated []string
 	var turnFilesModified []string
 	var turnToolErrors []string
 	var turnLastSummary string
@@ -63,10 +64,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	if a.paramStorm != nil {
 		a.paramStorm.Reset()
 	}
-	// V5.8: ���� clear()�������� mtime У���Զ�ʧЧ������Ŀ
+	// V5.8: the clear() method resets mtime caches auto-expired entries
 
-	// V6.0: �����ٻ����ѡ���������ʾģ�ͼ�����м���
-			a.maybeRecallReminder()
+	// V6.0: recall-reminder lets the model know mid-turn context remains
+		a.maybeRecallReminder()
 
 			graceRound := false
 		// V10.0: stream recovery + empty final detection counters
@@ -105,15 +106,15 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				continue
 			}
 			a.preWG.Wait() // drain any in-flight pre-execution goroutines before returning
-			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), err
+			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), err
 		}
 		streamRecoveries = 0
 
-		// V6.0 P1: ������Ƚضϡ���finish_reason="length" ���޹��ߵ���ʱע�� nudge
+		// V6.0 P1: length-truncation — inject nudge when finish_reason="length" and no tool calls
 		if a.maybeContinueOutputLength(usage, calls) {
 			continue
 		}
-		// V6.0 P1: ��Ч������ԡ�����˼��/������غ�����
+		// V6.0 P1: invalid output — handle empty reasoning/text after retry
 		if a.maybeRetryInvalidOutput(text, reasoning, calls) {
 			continue
 		}
@@ -122,7 +123,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			a.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: a.pricing,
 				SessionHit: int(a.sessCacheHit.Load()), SessionMiss: int(a.sessCacheMiss.Load()),
 				UsageSource: event.UsageSourceExecutor})
-			// V5.15: Ԥ���ſء�������ۼƷ���
+			// V5.15: budget gate — cumulative fee check
 			if a.budgetGate != nil {
 				status := a.budgetGate.Check(a.pricing, usage)
 				if status == BudgetWarn {
@@ -133,7 +134,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 						Text: a.budgetGate.StatusMessage()})
 					a.preWG.Wait()
-					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
+					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
 				}
 			}
 		}
@@ -179,14 +180,14 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 
 		if len(calls) == 0 {
-			// V7.0: ��բ��ֹͣ������ֹģ����ǰֹͣ
+			// V7.0: finish-gate — prevent premature model stop
 			// V10.0: Grace Round — model produced summary, done.
 			if graceRound {
 				// V10.16: clean up grace-round nudge from session before exit
 				if len(a.session.Messages) > 0 {
 					a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 				}
-				return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), nil
+				return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), nil
 			}
 
 			// V10.0: empty final detection — model returned no tool calls
@@ -194,7 +195,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			if strings.TrimSpace(text) == "" {
 				emptyFinalBlocks++
 				if emptyFinalBlocks >= maxEmptyFinalBlocks {
-					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
+					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
 				}
 				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 					Text: fmt.Sprintf("empty final answer blocked: retrying (%d/%d)", emptyFinalBlocks, maxEmptyFinalBlocks)})
@@ -203,12 +204,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				continue
 			}
 
-			// Gate 1: task gate �� ���δ�������
+			// Gate 1: task gate — check against task completion state
 
 			if a.taskGate() {
 				continue
 			}
-			// Gate 2: goal gate �� ���� judge ģ����֤Ŀ��
+			// Gate 2: goal gate — judge model goal verification
 			if a.goalGate() {
 				continue
 			}
@@ -217,7 +218,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			if blocked, reason := a.finalReadinessCheck(); blocked {
 				finalReadinessBlocks++
 				if finalReadinessBlocks >= maxFinalReadinessBlocks {
-					return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
+					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
 				}
 				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 					Text: "final-answer readiness blocked: " + reason})
@@ -228,21 +229,21 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			if a.steerQueueLen() > 0 {
 				continue // V10.0: more steers pending — another pass
 			}
-			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), nil // all gates passed
+			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), nil // all gates passed
 		}
 
 		// V4.2: wait for stream() pre-execution goroutines to finish before
 		// dispatching the full batch — avoids races and double-execution.
 		emptyFinalBlocks = 0 // V10.0: reset empty-final counter when model calls tools successfully
-		// V10.13: Grace Round 守卫 — grace 轮次中模型仍调用工具则退出。
-		// 移植自 Reasonix，防止 MaxSteps 限制下无限循环。
+		// V10.13: Grace Round guard — if model still calls tools during grace round, exit.
+		// Ported from Reasonix to prevent infinite loops under MaxSteps limit.
 		if graceRound {
 			a.preWG.Wait() // drain pre-exec goroutines started during grace streaming
-			// V10.16: 清理 grace round nudge，防止残留到下一用户轮次
+			// V10.16: clean up grace-round nudge to prevent leaking to next user turn
 			if len(a.session.Messages) > 0 {
 				a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 			}
-			return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
+			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
 		}
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
@@ -252,7 +253,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		for i, call := range calls {
 			// V10.37: track writer tool paths for TurnResult
 			switch call.Name {
-			case "write_file", "edit_file", "move_file", "delete_range", "delete_symbol":
+			case "write_file":
+				if p := extractFilePath(call.Name, call.Arguments); p != "" {
+					turnFilesCreated = append(turnFilesCreated, p)
+				}
+			case "edit_file", "move_file", "delete_range", "delete_symbol":
 				if p := extractFilePath(call.Name, call.Arguments); p != "" {
 					turnFilesModified = append(turnFilesModified, p)
 				}
@@ -316,7 +321,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			continue
 		}
 
-		// V6.0 P2: �ظ������⡪������ 3 ����ͬ���ߵ���ʱע�� nudge
+		// V6.0 P2: repeat-detection — inject nudge after 3 same-tool calls
 		if a.detectRepeatedSteps(calls) {
 			continue // nudge injected, skip compaction and continue loop
 		}
@@ -333,18 +338,28 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			continue
 		}
 
-			// V7.1: no mid-turn compaction �� cache grows monotonically within each turn
+			// V7.1: no mid-turn compaction — cache grows monotonically within each turn
 	}
 	// Only reached when a positive maxSteps guard is configured. The work so far
 	// is already in the session, so the user can just send another message to pick
 	// up where it left off.
-	return buildTurnResult(turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps)", a.maxSteps)
+	return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps)", a.maxSteps)
 }
 
 // buildTurnResult assembles a TurnResult from per-turn tracking variables.
 // Used by runDirect at every return point so callers get partial results
 // even when the turn ends with an error.
-func buildTurnResult(files []string, errors []string, summary string) *TurnResult {
+func buildTurnResult(created []string, modified []string, errors []string, summary string) *TurnResult {
+	return &TurnResult{
+		FilesCreated:  uniqFiles(created),
+		FilesModified: uniqFiles(modified),
+		Summary:       summary,
+		Success:       len(errors) == 0,
+		Errors:        errors,
+	}
+}
+
+func uniqFiles(files []string) []string {
 	seen := make(map[string]bool, len(files))
 	uniq := make([]string, 0, len(files))
 	for _, f := range files {
@@ -353,10 +368,5 @@ func buildTurnResult(files []string, errors []string, summary string) *TurnResul
 			uniq = append(uniq, f)
 		}
 	}
-	return &TurnResult{
-		FilesModified: uniq,
-		Summary:       summary,
-		Success:       len(errors) == 0,
-		Errors:        errors,
-	}
+	return uniq
 }

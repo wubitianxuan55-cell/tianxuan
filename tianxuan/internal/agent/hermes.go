@@ -25,7 +25,11 @@ If the task is a read-only query, answer directly — do not produce a plan.
 If you need to clarify scope or ask the user a question, use the ask tool —
 do NOT put <!--plan--> in your output until you have a concrete executable plan.
 When you have a concrete executable plan ready, start it with <!--plan--> on its own line.
-Never include <!--plan--> in a question, clarification, or direct answer.`
+Never include <!--plan--> in a question, clarification, or direct answer.
+When you receive a message prefixed with [上一轮执行结果], it is a reliable summary of Hephaestus'
+execution from the previous turn. Use it to understand what happened — trust its file-modification
+list, error messages, and summary. Do not re-read files unless the summary contradicts itself
+or indicates errors that require deeper investigation.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 
@@ -185,17 +189,22 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	return execResult, execErr
 }
 
-// formatExecutionFeedback converts a TurnResult into a short structured summary
-// for injection into the planner's session.
+// formatExecutionFeedback converts a TurnResult into a structured summary
+// for injection into the planner's session so the planner knows what happened.
 func formatExecutionFeedback(r *TurnResult) string {
 	var b strings.Builder
-	b.WriteString("[system] 上一轮执行完成")
+	b.WriteString("[上一轮执行结果]")
 	if r.Success {
-		b.WriteString(" (success)")
+		b.WriteString(" success")
 	} else {
-		b.WriteString(" (errors)")
+		b.WriteString(" errors")
 	}
-	b.WriteString(":\n")
+	b.WriteString("\n")
+	if len(r.FilesCreated) > 0 {
+		b.WriteString("Created: ")
+		b.WriteString(strings.Join(r.FilesCreated, ", "))
+		b.WriteString("\n")
+	}
 	if len(r.FilesModified) > 0 {
 		b.WriteString("Modified: ")
 		b.WriteString(strings.Join(r.FilesModified, ", "))
@@ -207,16 +216,8 @@ func formatExecutionFeedback(r *TurnResult) string {
 		b.WriteString("\n")
 	}
 	if r.Summary != "" {
-		b.WriteString("Result: ")
-		// Keep summary concise — cap at 500 chars at sentence boundary
-		s := r.Summary
-		if len(s) > 500 {
-			s = s[:500]
-			if idx := strings.LastIndexAny(s, ".。!！?？\n"); idx > 200 {
-				s = s[:idx+1]
-			}
-		}
-		b.WriteString(s)
+		b.WriteString("Summary: ")
+		b.WriteString(r.Summary)
 	}
 	return b.String()
 }

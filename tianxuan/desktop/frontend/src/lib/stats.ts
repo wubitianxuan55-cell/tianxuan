@@ -61,6 +61,7 @@ export interface StepRecord {
   completion: number;
   cacheHit: number;
   cacheMiss: number;
+  cost: number;
   source?: string;
 }
 
@@ -72,26 +73,23 @@ export interface ColStats {
   cost: number;
 }
 
-/** Aggregate a list of steps into column stats. */
-export function aggSteps(steps: StepRecord[], modelLabel?: string): ColStats {
-  const price = priceFor(modelLabel);
-  let prompt = 0, completion = 0, cacheHit = 0, cacheMiss = 0;
+/** Aggregate a list of steps into column stats (cost summed directly from StepRecord). */
+export function aggSteps(steps: StepRecord[]): ColStats {
+  let prompt = 0, completion = 0, cacheHit = 0, cacheMiss = 0, cost = 0;
   for (const s of steps) {
     prompt += s.prompt;
     completion += s.completion;
     cacheHit += s.cacheHit;
     cacheMiss += s.cacheMiss;
+    cost += s.cost ?? 0;
   }
-  const cost = calcCost(cacheHit, price.cacheHit) + calcCost(cacheMiss, price.input) + calcCost(completion, price.output);
   return { prompt, completion, cacheHit, cacheMiss, cost };
 }
 
-/** Convert a WireUsage snapshot to column stats. */
-export function colFromUsage(u: WireUsage | undefined, modelLabel?: string): ColStats {
+/** Convert a WireUsage snapshot to column stats (cost from costUsd). */
+export function colFromUsage(u: WireUsage | undefined): ColStats {
   if (!u) return { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
-  const price = priceFor(modelLabel);
-  const cost = calcCost(u.cacheHitTokens, price.cacheHit) + calcCost(u.cacheMissTokens, price.input) + calcCost(u.completionTokens, price.output);
-  return { prompt: u.promptTokens, completion: u.completionTokens, cacheHit: u.cacheHitTokens, cacheMiss: u.cacheMissTokens, cost };
+  return { prompt: u.promptTokens, completion: u.completionTokens, cacheHit: u.cacheHitTokens, cacheMiss: u.cacheMissTokens, cost: u.costUsd ?? 0 };
 }
 
 /** Filter steps by source tag. */

@@ -103,19 +103,20 @@ describe("colFromUsage", () => {
       promptTokens: 1000, completionTokens: 500,
       cacheHitTokens: 800, cacheMissTokens: 200,
       totalTokens: 1500, sessionCacheHitTokens: 0, sessionCacheMissTokens: 0,
+      costUsd: 0.005,
     });
     expect(c.prompt).toBe(1000);
     expect(c.completion).toBe(500);
     expect(c.cacheHit).toBe(800);
     expect(c.cacheMiss).toBe(200);
-    expect(c.cost).toBeGreaterThan(0);
+    expect(c.cost).toBe(0.005);
   });
 });
 
 describe("aggSteps", () => {
   const steps: StepRecord[] = [
-    { step: 1, prompt: 100, completion: 50, cacheHit: 80, cacheMiss: 20, source: "main" },
-    { step: 2, prompt: 200, completion: 100, cacheHit: 160, cacheMiss: 40, source: "subagent" },
+    { step: 1, prompt: 100, completion: 50, cacheHit: 80, cacheMiss: 20, cost: 0.001, source: "main" },
+    { step: 2, prompt: 200, completion: 100, cacheHit: 160, cacheMiss: 40, cost: 0.002, source: "subagent" },
   ];
 
   it("aggregates all steps", () => {
@@ -124,7 +125,7 @@ describe("aggSteps", () => {
     expect(c.completion).toBe(150);
     expect(c.cacheHit).toBe(240);
     expect(c.cacheMiss).toBe(60);
-    expect(c.cost).toBeGreaterThan(0);
+    expect(c.cost).toBeCloseTo(0.003, 5);
   });
 
   it("returns zeros for empty array", () => {
@@ -136,8 +137,8 @@ describe("aggSteps", () => {
 
 describe("filterSteps", () => {
   const steps: StepRecord[] = [
-    { step: 1, prompt: 100, completion: 50, cacheHit: 80, cacheMiss: 20, source: "main" },
-    { step: 2, prompt: 200, completion: 100, cacheHit: 160, cacheMiss: 40, source: "subagent" },
+    { step: 1, prompt: 100, completion: 50, cacheHit: 80, cacheMiss: 20, cost: 0.001, source: "main" },
+    { step: 2, prompt: 200, completion: 100, cacheHit: 160, cacheMiss: 40, cost: 0.002, source: "subagent" },
     { step: 3, prompt: 150, completion: 75, cacheHit: 0, cacheMiss: 0 }, // no source → main
   ];
 

@@ -77,7 +77,7 @@ var compactSchema = map[string]json.RawMessage{
 	"todo_write": json.RawMessage(
 		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string"},"activeForm":{"type":"string"},"level":{"type":"integer"}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(
-		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["result","evidence"]}`),
+		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
 	"notebook_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string"},"edit_mode":{"type":"string"}},"required":["path"]}`),
 	"git_status": json.RawMessage(

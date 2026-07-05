@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, TrendingUp, Zap } from "lucide-react";
 import type { WireUsage } from "../lib/types";
+import { aggSteps, colFromUsage, hitRateColor, type StepRecord, type ColStats } from "../lib/stats";
 
 interface Point { x: number; y: number; label: string; }
 
@@ -35,54 +36,8 @@ interface TurnRecord {
   totalTokens: number;
 }
 
-interface StepRecord {
-  step: number;
-  prompt: number;
-  completion: number;
-  cacheHit: number;
-  cacheMiss: number;
-  source?: string;
-}
-
 function tk(n: number): string { return n.toLocaleString(); }
 function cash(v: number): string { return "¥" + v.toFixed(4); }
-
-const MODEL_PRICES: Record<string, { cacheHit: number; input: number; output: number; label: string }> = {
-  "deepseek-v4-flash": { cacheHit: 0.0203, input: 1.015, output: 2.03, label: "V4 Flash" },
-  "deepseek-v4-pro":   { cacheHit: 0.0263, input: 3.154, output: 6.308, label: "V4 Pro" },
-};
-const DEFAULT_PRICE = MODEL_PRICES["deepseek-v4-flash"];
-
-function modelPrice(label?: string) {
-  if (!label) return DEFAULT_PRICE;
-  for (const [key, p] of Object.entries(MODEL_PRICES)) {
-    if (label.includes(key)) return p;
-  }
-  return DEFAULT_PRICE;
-}
-
-function calcCost(tokens: number, pricePerM: number): number {
-  return (tokens / 1_000_000) * pricePerM;
-}
-
-function hitRateColor(rate: number): string {
-  return rate >= 80 ? "text-ok" : rate >= 50 ? "text-warning" : "text-err";
-}
-
-// ─── aggregated step stats ──────────────────────────────
-interface ColStats { prompt: number; completion: number; cacheHit: number; cacheMiss: number; cost: number; }
-function aggCol(steps: StepRecord[], price: ReturnType<typeof modelPrice>): ColStats {
-  let prompt = 0, completion = 0, cacheHit = 0, cacheMiss = 0;
-  for (const s of steps) { prompt += s.prompt; completion += s.completion; cacheHit += s.cacheHit; cacheMiss += s.cacheMiss; }
-  const cost = calcCost(cacheHit, price.cacheHit) + calcCost(cacheMiss, price.input) + calcCost(completion, price.output);
-  return { prompt, completion, cacheHit, cacheMiss, cost };
-}
-
-function colFromUsage(u: WireUsage | undefined, price: ReturnType<typeof modelPrice>): ColStats {
-  if (!u) return { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
-  const cost = calcCost(u.cacheHitTokens, price.cacheHit) + calcCost(u.cacheMissTokens, price.input) + calcCost(u.completionTokens, price.output);
-  return { prompt: u.promptTokens, completion: u.completionTokens, cacheHit: u.cacheHitTokens, cacheMiss: u.cacheMissTokens, cost };
-}
 
 // ─── 统计表格 ─────────────────────────────────────────────
 function StatsTable({ title, planner, executor, sub, total }: {
@@ -252,7 +207,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
 }) {
   const turnRef = useRef(0);
   const stepRef = useRef(0);
-  const turnAccumRef = useRef<{ prompt: number; completion: number; cacheHit: number; cacheMiss: number }>({ prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 });
+  const turnAccumRef = useRef<{ prompt: number; completion: number; cacheHit: number; cacheMiss: number; cost: number }>({ prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 });
   const perTurnRef = useRef<WireUsage | null>(null);
   const [data, setData] = useState<StoredData>(() => {
     const loaded = loadData(sessionKey);
@@ -274,7 +229,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
     skipWriteRef.current = true;
     saveData(sessionKey, { turns: [], steps: [] });
     turnRef.current = 0; stepRef.current = 0;
-    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
+    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
     perTurnRef.current = null;
     setData({ turns: [], steps: [] });
   }, [resetKey, sessionKey]);
@@ -283,7 +238,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
     const loaded = loadData(sessionKey);
     turnRef.current = loaded.turns.length > 0 ? loaded.turns[loaded.turns.length - 1].turn : 0;
     stepRef.current = loaded.steps.length > 0 ? loaded.steps[loaded.steps.length - 1].step : 0;
-    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
+    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
     perTurnRef.current = null;
     setData(loaded);
   }, [sessionKey]);
@@ -307,12 +262,14 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
         completion: lastStep.completionTokens,
         cacheHit: lastStep.cacheHitTokens,
         cacheMiss: lastStep.cacheMissTokens,
+        cost: lastStep.costUsd ?? 0,
         source: lastStep.source,
       };
       turnAccumRef.current.prompt += lastStep.promptTokens;
       turnAccumRef.current.completion += lastStep.completionTokens;
       turnAccumRef.current.cacheHit += lastStep.cacheHitTokens;
       turnAccumRef.current.cacheMiss += lastStep.cacheMissTokens;
+      turnAccumRef.current.cost += lastStep.costUsd ?? 0;
       const next = { ...prev, steps: [...prev.steps, rec] };
       saveData(sessionKey, next);
       return next;
@@ -330,9 +287,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
         completion: turnAccumRef.current.completion,
         cacheHit: turnAccumRef.current.cacheHit,
         cacheMiss: turnAccumRef.current.cacheMiss,
-        cost: calcCost(turnAccumRef.current.cacheHit, modelPrice(model).cacheHit)
-          + calcCost(turnAccumRef.current.cacheMiss, modelPrice(model).input)
-          + calcCost(turnAccumRef.current.completion, modelPrice(model).output),
+        cost: turnAccumRef.current.cost,
         totalTokens: last.totalTokens,
       };
       setData(prev => {
@@ -341,22 +296,19 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
         return next;
       });
     }
-    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0 };
+    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
     perTurnRef.current = null;
   }, [perTurnUsage]);
 
   // ── stats computation ──────────────────────────────────
-  const price = modelPrice(model);           // executor model price
-  const plannerPrice = modelPrice(plannerModel); // planner model price
-  const subPrice = modelPrice(subagentModel); // subagent model price (V10.31: use subagent's own price)
 
   // session-level: aggregate from localStorage stepHistory, split by source
   const plannerSteps = stepHistory.filter(s => s.source === "planner");
   const executorSteps = stepHistory.filter(s => s.source !== "subagent" && s.source !== "planner"); // "main" or legacy
   const subSteps = stepHistory.filter(s => s.source === "subagent");
-  const sessPlanner = useMemo(() => aggCol(plannerSteps, plannerPrice), [plannerSteps, plannerPrice]);
-  const sessExecutor = useMemo(() => aggCol(executorSteps, price), [executorSteps, price]);
-  const sessSub = useMemo(() => aggCol(subSteps, subPrice), [subSteps, subPrice]);
+  const sessPlanner = useMemo(() => aggSteps(plannerSteps), [plannerSteps]);
+  const sessExecutor = useMemo(() => aggSteps(executorSteps), [executorSteps]);
+  const sessSub = useMemo(() => aggSteps(subSteps), [subSteps]);
   const sessTotal = useMemo(() => ({
     prompt: sessPlanner.prompt + sessExecutor.prompt + sessSub.prompt,
     completion: sessPlanner.completion + sessExecutor.completion + sessSub.completion,
@@ -366,9 +318,9 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
   }), [sessPlanner, sessExecutor, sessSub]);
   
   // turn-level: from store accumulators
-  const turnPlanner = useMemo(() => colFromUsage(perTurnPlannerUsage, plannerPrice), [perTurnPlannerUsage, plannerPrice]);
-  const turnExecutor = useMemo(() => colFromUsage(perTurnExecutorUsage, price), [perTurnExecutorUsage, price]);
-  const turnSub = useMemo(() => colFromUsage(perTurnSubUsage, subPrice), [perTurnSubUsage, subPrice]);
+  const turnPlanner = useMemo(() => colFromUsage(perTurnPlannerUsage), [perTurnPlannerUsage]);
+  const turnExecutor = useMemo(() => colFromUsage(perTurnExecutorUsage), [perTurnExecutorUsage]);
+  const turnSub = useMemo(() => colFromUsage(perTurnSubUsage), [perTurnSubUsage]);
   const turnTotal = useMemo(() => ({
     prompt: turnPlanner.prompt + turnExecutor.prompt + turnSub.prompt,
     completion: turnPlanner.completion + turnExecutor.completion + turnSub.completion,
@@ -433,10 +385,10 @@ export function StatsPanel({ perTurnUsage, turnSteps, model, subagentModel, plan
         )}
 
         {/* ── 命中率趋势（规划）── */}
-        <HitRateTrend steps={plannerSteps} title={`命中率趋势 · ${plannerModel || "规划模型"}`} color="var(--accent)" />
+        <HitRateTrend steps={plannerSteps} title="命中率趋势 · Hermes" color="var(--accent)" />
 
         {/* ── 命中率趋势（执行）── */}
-        <HitRateTrend steps={executorSteps} title={`命中率趋势 · ${model || "执行模型"}`} color="#3b82f6" />
+        <HitRateTrend steps={executorSteps} title="命中率趋势 · Hephaestus" color="#3b82f6" />
 
         {/* ── 命中率趋势（子代理）── */}
         <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" />

@@ -20,6 +20,7 @@ import { AskCard } from "./components/AskCard";
 import { PlanCard } from "./components/PlanCard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { ToolbarButton } from "./components/ToolbarButton";
+import { Tooltip } from "./components/Tooltip";
 import { StatusBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
@@ -51,6 +52,7 @@ import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH,
 } from "./hooks/useLayoutSizes";
 import CompactContext from "./hooks/useCompact";
+import { fmtTokens } from "../lib/stats";
 
 function NewSessionToast({ done }: { done: boolean }) {
   const toast = useToast();
@@ -395,6 +397,29 @@ export default function App() {
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
+            {/* 顶栏上下文用量 — Hermes(紫) + Hephaestus(青) */}
+            {!state.running && state.context.window > 0 && (() => {
+              const pUsed = state.perTurnPlannerUsage?.promptTokens ?? 0;
+              const eUsed = state.perTurnExecutorUsage?.promptTokens ?? 0;
+              const totalUsed = state.context.used > 0 ? state.context.used : (pUsed + eUsed);
+              if (totalUsed === 0) return null;
+              const pct = Math.round((totalUsed / state.context.window) * 100);
+              const pctP = Math.round((pUsed / state.context.window) * 100);
+              const pctE = Math.round((eUsed / state.context.window) * 100);
+              const plannerLabel = state.meta?.plannerLabel ? state.meta.plannerLabel.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "Hermes";
+              const execLabel = state.meta?.label ? state.meta.label.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "Hephaestus";
+              return (
+                <Tooltip label={`${plannerLabel}: ${fmtTokens(pUsed)} · ${execLabel}: ${fmtTokens(eUsed)}`}>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex gap-px h-1.5 rounded-full overflow-hidden w-12">
+                      {pctP > 0 && <div className="h-full bg-purple-500/60" style={{ width: `${pctP}%` }} />}
+                      {pctE > 0 && <div className="h-full bg-cyan-500/60" style={{ width: `${pctE}%` }} />}
+                    </div>
+                    <span className="text-[10px] text-fg-dim font-mono tabular-nums leading-none">{pct}%</span>
+                  </div>
+                </Tooltip>
+              );
+            })()}
             <div className="flex items-center gap-2 px-3">
               {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
             </div>

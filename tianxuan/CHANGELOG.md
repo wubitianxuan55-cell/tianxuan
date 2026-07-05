@@ -1,3 +1,32 @@
+## [10.41.0] — 2026-07-05
+
+### 📊 统计面板成本重构
+
+- 前端完全改用后端 `costUsd` 汇总成本，删除硬编码 `MODEL_PRICES`
+- `store.ts` usage 累加器新增 `costUsd` 累加
+- `StepRecord` 加 `cost` 字段，`aggSteps`/`colFromUsage` 改用 `costUsd`
+- 修复不同模型单价不同时 TurnRecord 成本计算错误
+- 命中率趋势图标题改为 `Hermes` / `Hephaestus` 角色名
+
+### 🐛 Bug 修复
+
+- 修复设置面板思考深度选择后无高亮（`||` → `??`）
+- 修复计划确认弹窗无计划内容（`desktop/wire.go` 缺少 `Plan` 字段）
+- 修复 TodoPanel 无法正确追踪进度（`step_index` 字段断裂）
+- `complete_step` 精简 Schema 补上 `step` 必填要求
+- `complete_step` 返回消息不再指示手动调用 `todo_write`
+
+### 🧠 Hermes 执行反馈增强
+
+- HermesPrompt 新增 `[上一轮执行结果]` 消息的识别和信任指令
+- `formatExecutionFeedback` 改用明确标记、不截断摘要、区分 Created/Modified
+- `TurnResult` 新增 `FilesCreated` 字段区分新建和修改
+
+### 📐 前端
+
+- 顶栏新增上下文用量双色迷你条（紫色 Hermes + 青色 Hephaestus）
+- 状态栏上下文条支持分角色显示
+
 ## [10.40.0] — 2026-07-05
 
 ### 🧠 推理深度分角色控制

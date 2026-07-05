@@ -167,13 +167,19 @@ func successfulToolCallIDs(msgs []provider.Message) map[string]bool {
 	return out
 }
 
-// extractStepFromArgs extracts the "step" field from complete_step JSON arguments.
+// extractStepFromArgs extracts the step identifier from complete_step JSON arguments.
+// It supports both "step" (string title/number) and "step_index" (1-based integer).
+// When both are present, step_index takes precedence since it's unambiguous.
 func extractStepFromArgs(args string) string {
 	var v struct {
-		Step string `json:"step"`
+		Step      string `json:"step"`
+		StepIndex int    `json:"step_index"`
 	}
 	if err := json.Unmarshal([]byte(args), &v); err != nil {
 		return ""
+	}
+	if v.StepIndex > 0 {
+		return fmt.Sprintf("%d", v.StepIndex)
 	}
 	return v.Step
 }

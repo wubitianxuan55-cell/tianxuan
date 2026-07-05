@@ -274,7 +274,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
         />
         <div className="mt-2">
           <EffortSelect
-            value={s.agent.plannerEffort || s.agent.effort}
+            value={s.agent.plannerEffort ?? s.agent.effort}
             busy={busy}
             onChange={(e: string) => void apply(() => app.SetPlannerEffort(e))}
           />
@@ -290,7 +290,7 @@ function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { o
         />
         <div className="mt-2">
           <EffortSelect
-            value={s.agent.subagentEffort || s.agent.effort}
+            value={s.agent.subagentEffort ?? s.agent.effort}
             busy={busy}
             onChange={(e: string) => void apply(() => app.SetSubagentEffort(e))}
           />

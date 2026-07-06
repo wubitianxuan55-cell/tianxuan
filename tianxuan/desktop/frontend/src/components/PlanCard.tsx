@@ -18,6 +18,7 @@ export function PlanCard({
   const q = ask.questions[0];
   const plan = q.plan ?? "";
   const [note, setNote] = useState("");
+  const [chatOnly, setChatOnly] = useState(false);
 
   // ── 拖拽：位置状态 ──────────────────────────────────────────────
   const cardRef = useRef<HTMLDivElement>(null);
@@ -100,23 +101,37 @@ export function PlanCard({
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
-      if (e.key === "1") { e.preventDefault(); submit("提交执行"); }
+      if (e.key === "1") { e.preventDefault(); handleSubmit(); }
       if (e.key === "2") { e.preventDefault(); submit("取消"); }
+      if (e.key === "3") { e.preventDefault(); setChatOnly(v => !v); }
       if (e.key === "Enter" && !e.shiftKey && note.trim()) {
         e.preventDefault();
-        submit(note.trim());
+        handleSubmit();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [note, chatOnly]);
 
   const submit = (selected: string) => {
     onAnswer(ask.id, [{ questionId: q.id, selected: [selected] }]);
   };
+  const submitRevise = () => {
+    const sel = note.trim() ? ["按用户意见修改计划", note.trim()] : ["按用户意见修改计划"];
+    onAnswer(ask.id, [{ questionId: q.id, selected: sel }]);
+  };
 
   const hasNote = note.trim() !== "";
-  const submitLabel = hasNote ? "提交并附修改意见" : "提交执行";
+  const handleSubmit = () => {
+    if (chatOnly) {
+      submit("仅聊天");
+    } else if (hasNote) {
+      submitRevise();
+    } else {
+      submit("提交执行");
+    }
+  };
+  const btnLabel = chatOnly ? "提交 → 仅聊天" : hasNote ? "提交修改意见" : "1 提交执行";
 
   return (
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
@@ -162,34 +177,47 @@ export function PlanCard({
         </div>
 
         {/* 修改意见 */}
-        <div className="px-5 pb-2">
+        <div className="px-5 pb-1">
           <input
             className="w-full border border-border-soft rounded-lg bg-bg text-fg text-[12.5px] px-3 py-2 outline-none placeholder:text-fg-faint/40 transition-colors duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
-            placeholder="输入修改意见后提交…"
+            placeholder="输入修改意见… 不满意计划时填写，提交后将重新规划"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && note.trim()) {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                submit(note.trim());
+                handleSubmit();
               }
             }}
           />
         </div>
 
-        {/* 底部按钮 */}
+        {/* 兜底 checkbox */}
+        <div className="px-5 pb-2">
+          <label className="flex items-center gap-2 text-[12px] text-fg-dim cursor-pointer select-none hover:text-fg transition-colors">
+            <input
+              type="checkbox"
+              className="w-3.5 h-3.5 accent-accent rounded cursor-pointer"
+              checked={chatOnly}
+              onChange={(e) => setChatOnly(e.target.checked)}
+            />
+            <span>3 仅聊天，不派送执行者</span>
+          </label>
+        </div>
+
+        {/* 底部按钮: [取消] [提交] */}
         <div className="flex justify-end gap-2 px-5 pb-4 pt-2 border-t border-border-soft">
           <button
             className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-[var(--dur-fast)] hover:text-fg hover:border-border hover:bg-bg-soft hover:-translate-y-px active:scale-[0.98]"
             onClick={() => submit("取消")}
           >
-            取消
+            2 取消
           </button>
           <button
             className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-[var(--dur-fast)] hover:brightness-110 hover:-translate-y-px active:scale-[0.98]"
-            onClick={() => submit(hasNote ? note.trim() : "提交执行")}
+            onClick={handleSubmit}
           >
-            {submitLabel}
+            {btnLabel}
           </button>
         </div>
       </div>

@@ -5,7 +5,7 @@
 - Hermes prompt 新增操作类任务分类：构建/启动/测试/git 等纯操作任务跳过代码研究，输出极简计划
 - Hephaestus 强制 ask 弹窗：执行中需用户决策时必须用 ask 工具，纯文本提问会导致重新规划
 
-### 🎨 前端优化（8项）
+### 🎨 前端优化（11项）
 
 - SettingsPanel 拆分：1056行→9文件（Shared/Models/Providers/Permissions/Sandbox/Agent/Appearance/Updates）
 - useController 全量订阅修复：`store(s=>s)` → `useShallow`，流式输出减少全局重渲染
@@ -14,13 +14,20 @@
 - App.tsx 删除空 useEffect 死代码、删除重复注释行
 - scrollVersion/currentSessionKey 细粒度优化、splashHold 统一来源、TokenTrendChart 提取独立组件
 - 命中率趋势图增加各模型 API 调用次数显示（`12次调用 · 均值 85.3%`）
+- **HitRateTrend 完全恢复**：自适应 Y 轴粒度（99.5%→0.1%）、面积填充、X 轴步号标签、SVG H=80
+- **StatsTable 合计行补全**：显示 Prompt/Compl/成本/缓存命中率四项
+- **StatsPanel 修复**：executorSteps 正向匹配过滤、StepRecord 去重加 source 检查、resetKey 竞态修复
+- **TrendChart 组件提取**：通用 SVG 趋势图组件，支持 Y 轴标签/面积填充/X 轴标签
 
-### 🔧 后端优化（4项）
+### 🔧 后端优化（7项）
 
 - hermes.go 新增 20 个单元测试（shouldSkipPlanner/isAnswerNotAction/formatHandoff/HandoffTask/persistAnswer）
 - LastCacheShape 死代码清理：删除 AgentRunner/Controller 存根 + serve_handlers 不可达分支
 - agent.go 死代码删除 + clearSteerQueue 内联 + 重复注释清理
 - agent_run.go/boot.go 版本标记残留注释清理（~40 处）
+- **isAnswerNotAction 修复**：移除 100 字符阈值短路，改为仅依赖 `<!--plan-->` 标记判断
+- **serve/wire.go 同步**：wireUsage 新增 Source/Turn 字段，对齐 desktop/wire.go
+- **PlanCard 三路决策**：checkbox 兜底（仅聊天）+ 修改意见重规划 + 正常执行
 
 ## [10.41.0] — 2026-07-05
 

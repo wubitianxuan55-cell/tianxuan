@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, TrendingUp, Zap } from "lucide-react";
 import type { WireUsage } from "../lib/types";
 import { aggSteps, colFromUsage, hitRateColor, type StepRecord, type ColStats } from "../lib/stats";
+import { TrendChart, type TrendPoint } from "./TrendChart";
 
 interface Point { x: number; y: number; label: string; }
 
@@ -67,25 +68,29 @@ export function useStatsPersistence(
 
   const lastResetRef = useRef(resetKey);
   const skipWriteRef = useRef(false);
+  // Merged effect: keyChanged (load data) runs before reset (clear data) to avoid
+  // race when both sessionKey and resetKey change in the same render cycle.
   useEffect(() => {
-    if (resetKey === undefined || resetKey === lastResetRef.current) return;
-    lastResetRef.current = resetKey;
-    skipWriteRef.current = true;
-    saveData(sessionKey, { turns: [], steps: [] });
-    turnRef.current = 0; stepRef.current = 0;
-    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
-    perTurnRef.current = null;
-    setData({ turns: [], steps: [] });
+    const kc = lastKeyRef.current !== sessionKey;
+    if (kc) {
+      lastKeyRef.current = sessionKey;
+      const loaded = loadData(sessionKey);
+      turnRef.current = loaded.turns.length > 0 ? loaded.turns[loaded.turns.length - 1].turn : 0;
+      stepRef.current = loaded.steps.length > 0 ? loaded.steps[loaded.steps.length - 1].step : 0;
+      turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
+      perTurnRef.current = null;
+      setData(loaded);
+    }
+    if (resetKey !== undefined && resetKey !== lastResetRef.current) {
+      lastResetRef.current = resetKey;
+      skipWriteRef.current = true;
+      saveData(sessionKey, { turns: [], steps: [] });
+      turnRef.current = 0; stepRef.current = 0;
+      turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
+      perTurnRef.current = null;
+      setData({ turns: [], steps: [] });
+    }
   }, [resetKey, sessionKey]);
-  useEffect(() => {
-    if (!keyChanged) return;
-    const loaded = loadData(sessionKey);
-    turnRef.current = loaded.turns.length > 0 ? loaded.turns[loaded.turns.length - 1].turn : 0;
-    stepRef.current = loaded.steps.length > 0 ? loaded.steps[loaded.steps.length - 1].step : 0;
-    turnAccumRef.current = { prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 };
-    perTurnRef.current = null;
-    setData(loaded);
-  }, [sessionKey]);
 
   useEffect(() => {
     if (!turnSteps || turnSteps.length === 0) return;
@@ -95,7 +100,8 @@ export function useStatsPersistence(
       if (prev.steps.length > 0) {
         const prevStep = prev.steps[prev.steps.length - 1];
         if (prevStep.prompt === lastStep.promptTokens && prevStep.completion === lastStep.completionTokens
-          && prevStep.cacheHit === lastStep.cacheHitTokens && prevStep.cacheMiss === lastStep.cacheMissTokens) {
+          && prevStep.cacheHit === lastStep.cacheHitTokens && prevStep.cacheMiss === lastStep.cacheMissTokens
+          && prevStep.source === lastStep.source) {
           return prev;
         }
       }
@@ -210,11 +216,22 @@ function StatsTable({ title, planner, executor, sub, total }: {
               </tr>
             );
           })}
-          <tr className="font-bold">
+          <tr className="font-bold border-t-2 border-border-soft">
             <td className="py-1 text-fg">合计</td>
+            <td className="py-1 text-right font-mono tabular-nums">{tk(total.prompt)}</td>
+            <td className="py-1 text-right font-mono tabular-nums">{tk(total.completion)}</td>
             <td className="py-1 text-right font-mono tabular-nums">{cash(total.cost)}</td>
-            <td className="py-1"/>
-            <td className="py-1"/>
+          </tr>
+          <tr className="font-bold text-[10px]">
+            <td/>
+            <td colSpan={3} className="py-0 text-right font-mono tabular-nums text-fg-faint">
+              {(() => {
+                const t = total.cacheHit + total.cacheMiss;
+                if (t === 0) return "—";
+                const rate = (total.cacheHit / t) * 100;
+                return (<><span className={hitRateColor(rate)}>{rate.toFixed(2)}%</span><span className="ml-1"> 缓存命中</span></>);
+              })()}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -224,34 +241,54 @@ function StatsTable({ title, planner, executor, sub, total }: {
 
 // ─── 命中率趋势 ──────────────────────────────────────────
 function HitRateTrend({ steps, title, color, callCount }: { steps: StepRecord[]; title: string; color: string; callCount: number }) {
-  if (steps.length < 2) return null;
-  const points: { x: number; y: number; rate: number; step: number }[] = [];
-  for (let i = 0; i < steps.length; i++) {
-    const s = steps[i];
-    const total = s.prompt;
-    const rate = total > 0 ? s.cacheHit / total : 0;
-    points.push({ x: i, y: 1 - rate, rate, step: s.step });
-  }
-  const W = 260, H = 36, padL = 4, padR = 4, padT = 2, padB = 2;
+  const recent = steps.slice(-20);
+  if (recent.length < 2) return null;
+  // 命中率 = cacheHit / (cacheHit + cacheMiss)
+  const rates = recent.map(r => {
+    const total = r.cacheHit + r.cacheMiss;
+    return total > 0 ? (r.cacheHit / total) * 100 : 0;
+  });
+  // 自适应 Y 轴粒度：数据范围越窄，刻度越精细
+  const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
+  let step: number, padding: number;
+  if (spread <= 0.5)    { step = 0.1; padding = 0.05; }
+  else if (spread <= 1) { step = 0.2; padding = 0.1; }
+  else if (spread <= 2) { step = 1;   padding = 0.5; }
+  else if (spread <= 5) { step = 2;   padding = 1.0; }
+  else                  { step = 5;   padding = Math.max(5, spread * 0.15); }
+  const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
+  const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
+  const range = Math.max(maxRate - minRate || 1, step);
+  const W = 260, H = 80, padL = 30, padR = 8, padT = 8, padB = 16;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const toX = (i: number) => padL + (i / Math.max(1, steps.length - 1)) * plotW;
-  const toY = (v: number) => padT + v * plotH;
-  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.x).toFixed(1)},${toY(p.y).toFixed(1)}`).join(" ");
-  const avgRate = points.reduce((a, p) => a + p.rate, 0) / points.length;
+  const points: TrendPoint[] = recent.map((r, i) => {
+    const x = padL + (i / Math.max(1, recent.length - 1)) * plotW;
+    const total = r.cacheHit + r.cacheMiss;
+    const rate = total > 0 ? (r.cacheHit / total) * 100 : 0;
+    const y = padT + plotH - ((rate - minRate) / range) * plotH;
+    return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
+  });
+  const fmt = (v: number) => step < 1 ? v.toFixed(1) + "%" : `${Math.round(v)}%`;
+  const yLabels: [number, string][] = [[minRate, fmt(minRate)]];
+  const mid = minRate + range * 0.5;
+  if (mid !== minRate && mid !== maxRate) yLabels.push([mid, fmt(mid)]);
+  if (maxRate !== minRate) yLabels.push([maxRate, fmt(maxRate)]);
+  const xLabels = [
+    { at: points[0].x, text: `#${recent[0].step}` },
+    ...(recent.length >= 3 ? [{ at: points[Math.floor(points.length / 2)].x, text: `#${recent[Math.floor(recent.length / 2)].step}` }] : []),
+    { at: points[points.length - 1].x, text: `#${recent[recent.length - 1].step}` },
+  ];
+  const avgRate = rates.reduce((a, r) => a + r, 0) / rates.length;
   return (
     <div className="py-3 border-b border-border-soft">
       <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-1.5">
-        {title} · {callCount}次调用 · 均值 { (avgRate * 100).toFixed(1)}%
+        {title} · 最近 {recent.length} 步 · {callCount}次调用 · 均值 {avgRate.toFixed(1)}%
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-        <line x1={padL} y1={toY(0)} x2={padL + plotW} y2={toY(0)} stroke="var(--border-soft)" strokeWidth={0.5} />
-        <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
-        {points.filter((_, i) => i === 0 || i === points.length - 1).map((p) => (
-          <circle key={p.step} cx={toX(p.x)} cy={toY(p.y)} r={2} fill={color}>
-            <title>步#{p.step}: {(p.rate * 100).toFixed(1)}%</title>
-          </circle>
-        ))}
-      </svg>
+      <TrendChart
+        W={W} H={H} padL={padL} padR={padR} padT={padT} padB={padB}
+        points={points} yTicks={yLabels} color={color} xLabels={xLabels}
+        fillOpacity={0.08}
+      />
     </div>
   );
 }
@@ -314,7 +351,6 @@ function TokenTrendChart({ history }: { history: TurnRecord[] }) {
 }
 
 // ─── StatsPanel ──────────────────────────────────────────
-// ─── StatsPanel ──────────────────────────────────────────
 // 纯展示组件，不再管理 localStorage 持久化。
 // 持久化由 App 层调用 useStatsPersistence 负责。
 
@@ -331,7 +367,7 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
 
   // session-level: aggregate from localStorage stepHistory, split by source
   const plannerSteps = stepHistory.filter(s => s.source === "planner");
-  const executorSteps = stepHistory.filter(s => s.source !== "subagent" && s.source !== "planner");
+  const executorSteps = stepHistory.filter(s => s.source === "main" || s.source === "executor" || !s.source);
   const subSteps = stepHistory.filter(s => s.source === "subagent");
   const sessPlanner = useMemo(() => aggSteps(plannerSteps), [plannerSteps]);
   const sessExecutor = useMemo(() => aggSteps(executorSteps), [executorSteps]);

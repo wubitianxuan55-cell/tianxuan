@@ -198,23 +198,44 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · hermes"})
 	prePlanLen := len(h.hermesSess.Messages)
-	plan, err := h.plan(ctx, input)
-	if err != nil {
-		return nil, fmt.Errorf("hermes: %w", err)
-	}
-	if isAnswerNotAction(plan) {
-		// Hermes answered directly — no Hephaestus needed.
-		// Text has already been streamed by planWithTools/planStream; emitting
-		// the full plan again here would duplicate the output.
-		h.persistAnswer(input, plan)
-		return &TurnResult{Summary: plan, Success: true}, nil
-	}
+	var userNote, plan string
+	var planErr error
+	// V10.??: replan loop — user clicks "按用户意见修改计划" to revise the plan
+	// with feedback, then the new plan goes through confirmation again.
+	for {
+		plan, planErr = h.plan(ctx, input)
+		if planErr != nil {
+			return nil, fmt.Errorf("hermes: %w", planErr)
+		}
+		if isAnswerNotAction(plan) {
+			// Hermes answered directly — no Hephaestus needed.
+			// Text has already been streamed by planWithTools/planStream; emitting
+			// the full plan again here would duplicate the output.
+			h.persistAnswer(input, plan)
+			return &TurnResult{Summary: plan, Success: true}, nil
+		}
 
-	userNote, err := h.confirmPlan(ctx, input, plan)
-	if err != nil {
-		// User cancelled — roll back planner session to pre-plan state.
-		h.hermesSess.Truncate(prePlanLen)
-		return nil, err
+		var chatOnly, revise bool
+		userNote, chatOnly, revise, planErr = h.confirmPlan(ctx, input, plan)
+		if planErr != nil {
+			// User cancelled — roll back planner session to pre-plan state.
+			h.hermesSess.Truncate(prePlanLen)
+			return nil, planErr
+		}
+		if chatOnly {
+			// User chose "仅聊天" — treat as direct answer, don't dispatch executor.
+			h.persistAnswer(input, plan)
+			return &TurnResult{Summary: plan, Success: true}, nil
+		}
+		if revise {
+			// User chose "按用户意见修改计划" — append feedback and re-plan.
+			if userNote != "" {
+				input = input + "\n\n—— User feedback on previous plan ——\n" + userNote
+			}
+			prePlanLen = len(h.hermesSess.Messages) // new baseline for next round
+			continue
+		}
+		break // execute with Hephaestus
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
 	// Suppress the executor's TurnStarted — Hermes already started the turn.
@@ -276,20 +297,23 @@ func formatExecutionFeedback(r *TurnResult) string {
 }
 
 // confirmPlan asks the user to approve the planner's output before handing off to
-// the executor. Returns the user's free-typed note ("" when none) and an error on
+// the executor. Returns the user's free-typed note ("" when none), a chatOnly
+// flag, and a revise flag (= user clicked "按用户意见修改计划"), and an error on
 // cancellation. In headless mode (asker == nil) it auto-confirms.
 //
 // The confirmation dialog shows:
-//   ○ 提交执行 — 同意计划，直接交由 Hephaestus 执行
-//   ○ 取消 — 放弃本次任务
-//   📝 文本框 — 输入修改意见（选填），提交后转发给 Hephaestus
+//   ○ 提交执行          — 同意计划，直接交由 Hephaestus 执行
+//   ○ 仅聊天            — 计划误触发，仅作为普通对话回复，不派送执行者
+//   ○ 按用户意见修改计划   — 将修改意见送回 Hermes 重新规划
+//   ○ 取消              — 放弃本次任务
+//   📝 文本框 — 输入修改意见
 //
-// If the user types a note in the text box, that note becomes the return value
-// and is injected into the handoff as "📌 User note". Clicking "取消" or
-// dismissing returns an error.
-func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, error) {
+// For "按用户意见修改计划", the note text is extracted from Selected[1] (when
+// available) and returned as the first string so the caller can feed it back
+// to Hermes for re-planning.
+func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note string, chatOnly bool, revise bool, err error) {
 	if h.asker == nil {
-		return "", nil // headless: auto-confirm
+		return "", false, false, nil // headless: auto-confirm
 	}
 	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
 		ID:     "confirm",
@@ -298,24 +322,34 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (string, er
 		Plan:   plan, // full plan rendered by PlanCard with Markdown
 		Options: []event.AskOption{
 			{Label: "提交执行", Description: "按计划交由 Hephaestus 立即执行"},
+			{Label: "仅聊天", Description: "计划误触发，仅作为普通对话回复，不派送执行者"},
+			{Label: "按用户意见修改计划", Description: "将修改意见送回 Hermes 重新规划"},
 			{Label: "取消", Description: "放弃本次任务，不做任何更改"},
 		},
 	}})
 	if err != nil {
-		return "", fmt.Errorf("plan confirmation cancelled: %w", err)
+		return "", false, false, fmt.Errorf("plan confirmation cancelled: %w", err)
 	}
 	if len(answers) == 0 || len(answers[0].Selected) == 0 {
-		return "", fmt.Errorf("计划被取消（无回复）")
+		return "", false, false, fmt.Errorf("计划被取消（无回复）")
 	}
 	selected := answers[0].Selected[0]
 	switch selected {
 	case "提交执行":
-		return "", nil // agree without notes
+		return "", false, false, nil // agree without notes
+	case "仅聊天":
+		return "", true, false, nil // chat-only: don't dispatch to executor
+	case "按用户意见修改计划":
+		feedback := ""
+		if len(answers[0].Selected) > 1 {
+			feedback = answers[0].Selected[1]
+		}
+		return feedback, false, true, nil // revise: re-plan with feedback
 	case "取消":
-		return "", fmt.Errorf("计划被用户取消")
+		return "", false, false, fmt.Errorf("计划被用户取消")
 	default:
 		// Free-typed text in the input box: agree with user notes
-		return selected, nil
+		return selected, false, false, nil
 	}
 }
 
@@ -429,13 +463,12 @@ func shouldSkipPlanner(input string) (string, bool) {
 
 // isAnswerNotAction checks whether the planner's output is a direct answer
 // that needs no executor. The planner self-marks executable plans with
-// <!--plan--> — if absent, Hermes answered directly. Short outputs (<100 chars)
-// are always treated as direct answers to avoid false plan detection.
+// <!--plan--> — if absent, Hermes answered directly. No length short-circuit:
+// even short plans with the <!--plan--> marker trigger confirmation.
 func isAnswerNotAction(plan string) bool {
-	if len(strings.TrimSpace(plan)) < 100 {
-		return true
-	}
-	return !strings.Contains(plan, "<!--plan-->")
+	trimmed := strings.TrimSpace(plan)
+	// <!--plan--> marks executable plans; absent means direct answer.
+	return !strings.Contains(trimmed, "<!--plan-->")
 }
 
 func formatHandoff(task, plan, userNote string) string {

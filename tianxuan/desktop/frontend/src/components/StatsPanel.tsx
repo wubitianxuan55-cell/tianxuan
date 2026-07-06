@@ -161,16 +161,48 @@ export function useStatsPersistence(
 }
 
 // ─── 统计表格 ─────────────────────────────────────────────
-function StatsTable({ title, planner, executor, sub, total }: {
+function StatsTable({ title, planner, executor, sub, total, collapsed }: {
   title: string; planner: ColStats; executor: ColStats; sub: ColStats; total: ColStats;
+  collapsed?: boolean;
 }) {
+  // ── collapsed: summary only ──
+  if (collapsed) {
+    const t = total.cacheHit + total.cacheMiss;
+    const rate = t > 0 ? (total.cacheHit / t) * 100 : 0;
+    return (
+      <div className="py-3 border-b border-border-soft">
+        <table className="w-full text-[11px] border-collapse">
+          <tbody>
+            <tr className="font-bold">
+              <td className="py-1 text-fg" style={{width:"28%"}}>{title}</td>
+              <td className="py-1 text-right font-mono tabular-nums" style={{width:"24%"}}>{tk(total.prompt)}</td>
+              <td className="py-1 text-right font-mono tabular-nums" style={{width:"24%"}}>{tk(total.completion)}</td>
+              <td className="py-1 text-right font-mono tabular-nums" style={{width:"24%"}}>{cash(total.cost)}</td>
+            </tr>
+            <tr>
+              <td colSpan={4} className="py-1 text-left">
+                {t === 0 ? (
+                  <span className="text-[10px] text-fg-faint">—</span>
+                ) : (
+                  <span className={`text-base font-bold tabular-nums ${hitRateColor(rate)}`}>
+                    {rate.toFixed(2)}% <span className="text-[10px] text-fg-faint font-normal">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
+                  </span>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  // ── expanded: full detail ──
   const rows: { label: string; render: (c: ColStats) => string }[] = [
     { label: "Prompt", render: c => tk(c.prompt) },
     { label: "Compl", render: c => tk(c.completion) },
     { label: "缓存命中", render: c => {
-      const t = c.cacheHit + c.cacheMiss;
-      const rate = t > 0 ? (c.cacheHit / t * 100) : 0;
-      return `${rate.toFixed(2)}%`;
+      const t2 = c.cacheHit + c.cacheMiss;
+      const r2 = t2 > 0 ? (c.cacheHit / t2 * 100) : 0;
+      return `${r2.toFixed(2)}%`;
     }},
     { label: "成本", render: c => cash(c.cost) },
   ];
@@ -222,14 +254,18 @@ function StatsTable({ title, planner, executor, sub, total }: {
             <td className="py-1 text-right font-mono tabular-nums">{tk(total.completion)}</td>
             <td className="py-1 text-right font-mono tabular-nums">{cash(total.cost)}</td>
           </tr>
-          <tr className="font-bold text-[10px]">
-            <td/>
-            <td colSpan={3} className="py-0 text-right font-mono tabular-nums text-fg-faint">
+          <tr>
+            <td colSpan={4} className="py-2 text-left">
               {(() => {
-                const t = total.cacheHit + total.cacheMiss;
-                if (t === 0) return "—";
-                const rate = (total.cacheHit / t) * 100;
-                return (<><span className={hitRateColor(rate)}>{rate.toFixed(2)}%</span><span className="ml-1"> 缓存命中</span></>);
+                const t2 = total.cacheHit + total.cacheMiss;
+                if (t2 === 0) return <span className="text-[10px] text-fg-faint">—</span>;
+                const rate2 = (total.cacheHit / t2) * 100;
+                return (
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate2)}`}>{rate2.toFixed(2)}%</span>
+                    <span className="text-[10px] text-fg-faint tabular-nums">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
+                  </div>
+                );
               })()}
             </td>
           </tr>
@@ -362,6 +398,8 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
   perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
 }) {
   const { turns: history, steps: stepHistory } = data;
+  const [sessionExpanded, setSessionExpanded] = useState(false);
+  const [turnExpanded, setTurnExpanded] = useState(false);
 
   // ── stats computation ──────────────────────────────────
 
@@ -408,15 +446,26 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
       <div className="flex flex-col gap-0 p-3 overflow-y-auto">
 
         {/* ── 会话级统计表格 ── */}
-        <StatsTable
-          title={`会话 (${history.length}轮·${stepHistory.length}步)`}
-          planner={sessPlanner} executor={sessExecutor} sub={sessSub} total={sessTotal}
-        />
+        <div className="cursor-pointer select-none" onClick={() => setSessionExpanded(!sessionExpanded)}>
+          <StatsTable
+            title={`会话 (${history.length}轮·${stepHistory.length}步)`}
+            planner={sessPlanner} executor={sessExecutor} sub={sessSub} total={sessTotal}
+            collapsed={!sessionExpanded}
+          />
+        </div>
+        {sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▲ 点击收起明细</div>)}
+        {!sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▼ 点击展开明细</div>)}
 
         {/* ── 本轮级统计表格 ── */}
 
         {(perTurnPlannerUsage || perTurnExecutorUsage || perTurnSubUsage) && (
-          <StatsTable title={`本轮 (${turnSteps?.length || 0}步)`} planner={turnPlanner} executor={turnExecutor} sub={turnSub} total={turnTotal} />
+          <>
+            <div className="cursor-pointer select-none" onClick={() => setTurnExpanded(!turnExpanded)}>
+              <StatsTable title={`本轮 (${turnSteps?.length || 0}步)`} planner={turnPlanner} executor={turnExecutor} sub={turnSub} total={turnTotal} collapsed={!turnExpanded} />
+            </div>
+            {turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▲ 点击收起明细</div>)}
+            {!turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▼ 点击展开明细</div>)}
+          </>
         )}
 
         {/* ── 当前步 ── */}

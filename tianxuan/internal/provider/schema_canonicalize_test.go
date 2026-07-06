@@ -37,3 +37,56 @@ func TestCanonicalizeSchemaStable(t *testing.T) {
 }
 
 func keys(m map[string]int) string { var s []string; for k := range m { s = append(s, k) }; return strings.Join(s, " | ") }
+
+func TestCanonicalizeSchemaStripsDescriptions(t *testing.T) {
+	// MCP tools often include "description" on the schema object and
+	// on individual properties — these are redundant with the tool-level
+	// description and inflate per-turn prompt tokens.
+	input := json.RawMessage(`{
+		"type": "object",
+		"description": "Fetches data from the API",
+		"properties": {
+			"url": {
+				"type": "string",
+				"description": "The URL to fetch from"
+			},
+			"timeout": {
+				"type": "integer",
+				"description": "Timeout in milliseconds"
+			}
+		},
+		"required": ["url"]
+	}`)
+	out := string(CanonicalizeSchema(input))
+	t.Logf("compressed: %s", out)
+	if strings.Contains(out, `"description"`) {
+		t.Errorf("description field survived compression: %s", out)
+	}
+}
+
+func TestCanonicalizeSchemaStripsNestedDescriptions(t *testing.T) {
+	// Nested objects (arrays of objects, etc.) should also lose descriptions.
+	input := json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"items": {
+				"type": "array",
+				"description": "List of things",
+				"items": {
+					"type": "object",
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "The name"
+						}
+					}
+				}
+			}
+		}
+	}`)
+	out := string(CanonicalizeSchema(input))
+	t.Logf("nested compressed: %s", out)
+	if strings.Contains(out, `"description"`) {
+		t.Errorf("description field survived nested compression: %s", out)
+	}
+}

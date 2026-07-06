@@ -18,6 +18,9 @@ func compressSchema(v any, depth int) any {
 	if !ok {
 		return v
 	}
+	// Strip all description fields — they mirror the tool-level Description()
+	// and only inflate per-turn prompt tokens. Applies at every nesting level.
+	delete(obj, "description")
 	// Do NOT remove "type":"object" — DeepSeek API requires it.
 	// Remove "type":"string" from property values (safe: implied when omitted)
 	if prop, hasProps := obj["properties"]; hasProps {

@@ -64,6 +64,10 @@ type Options struct {
 	// Sub-agents set this to true so the verify gate doesn't inject
 	// "[system] All tasks complete" into their fresh session.
 	DisableVerify bool
+	// PlannerMode skips executor-specific logic in runDirect —
+	// turn preferences, todo rebuild, steer, repeat detection,
+	// bg cycle detection, and grace round (V10.46).
+	PlannerMode bool
 }
 
 // StormBreaker tracks repeated failures to detect death spirals (V3.0 Phase 4).

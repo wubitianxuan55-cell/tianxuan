@@ -128,6 +128,7 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 			Pricing:        hermesPricing,
 			Gate:           &autoGate{},
 			DisableVerify:  true,
+			PlannerMode:    true,
 			ContextWindow:  contextWindow,
 			Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: contextWindow},
 		}, plannerSink)

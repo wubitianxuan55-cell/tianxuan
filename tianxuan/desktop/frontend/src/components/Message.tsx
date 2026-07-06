@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Brain } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -107,7 +107,6 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
     streaming: item.streaming ?? false,
     truncateStreaming: true,
   });
-  const reasoningTruncated = !!(item.reasoning && reasoningDisplay !== item.reasoning);
   const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
 
   const elapsed = turnStartAt > 0 ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
@@ -129,11 +128,12 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: { item:
                 onClick={toggleReasoning}
                 aria-expanded={reasoningOpen}
               >
+                <Brain size={13} className="flex-shrink-0" />
                 <span className="font-medium">{reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinking")}</span>
-                <span className="text-fg-faint/50 text-[10px] ml-auto">
+                <span className="text-fg-faint/50 text-[10px] ml-auto tabular-nums">
                   {reasoningRunning
-                    ? reasoningTruncated ? `…${reasoningDisplay.length}c` : elapsedStr
-                    : `${reasoningLines} 行`}
+                    ? elapsedStr
+                    : `${reasoningLines} 行 · ${elapsedStr}`}
                 </span>
                 <ChevronRight
                   className={`transition-transform duration-200 ${reasoningOpen ? "rotate-90" : ""}`}

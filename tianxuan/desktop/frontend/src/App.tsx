@@ -20,8 +20,8 @@ import { AskCard } from "./components/AskCard";
 import { PlanCard } from "./components/PlanCard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { ToolbarButton } from "./components/ToolbarButton";
-import { Tooltip } from "./components/Tooltip";
 import { StatusBar } from "./components/StatusBar";
+import { ContextBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
@@ -53,11 +53,69 @@ import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
 } from "./hooks/useLayoutSizes";
 import CompactContext from "./hooks/useCompact";
 import { fmtTokens } from "./lib/stats";
+import { useNow } from "./lib/useNow";
 
 function NewSessionToast({ done }: { done: boolean }) {
   const toast = useToast();
   useEffect(() => { if (done) toast.show("新会话已创建", "info"); }, [done]);
   return null;
+}
+
+// ── RunStatus — 输入框上方的运行时状态行 ─────────────────────
+
+function modelShort(s: string) {
+  return s.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "");
+}
+
+function RunStatus({ running, turnStartAt, turnTokens, label, plannerLabel, phase }: {
+  running: boolean;
+  turnStartAt: number;
+  turnTokens: number;
+  label: string;
+  plannerLabel?: string;
+  phase: string; // "hermes" | "hephaestus" | ""
+}) {
+  const now = useNow();
+  if (!running) return null;
+  const elapsed = turnStartAt > 0 ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
+  const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+  const tokStr = turnTokens > 0 ? `↓${fmtTokens(turnTokens)}` : "";
+  const isPlanner = phase === "hermes";
+  const isExecutor = phase === "hephaestus";
+  return (
+    <div className="flex items-center justify-between px-4 py-1.5 text-[11px] select-none border-b border-border-soft/50 bg-bg-soft/30">
+      <div className="flex items-center gap-2 text-fg-dim tabular-nums font-mono">
+        <span className="font-medium">{elapsedStr}</span>
+        {tokStr && <span className="text-fg-faint">{tokStr}</span>}
+      </div>
+      <div className="flex items-center gap-3">
+        {plannerLabel && (
+          <span className={`flex items-center gap-1.5 ${isPlanner ? "text-fg" : "text-fg-faint/60"}`}>
+            <Brain size={12} className={isPlanner ? "text-purple-400" : ""} />
+            <span className="font-medium">{modelShort(plannerLabel)}</span>
+            <span>规划</span>
+            {isPlanner && (
+              <span className="inline-flex items-center gap-1 ml-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                <span className="text-[10px] text-purple-400/70">中</span>
+              </span>
+            )}
+          </span>
+        )}
+        <span className={`flex items-center gap-1.5 ${isExecutor ? "text-fg" : "text-fg-faint/60"}`}>
+          <Cpu size={12} className={isExecutor ? "text-cyan-400" : ""} />
+          <span className="font-medium">{modelShort(label)}</span>
+          <span>执行</span>
+          {isExecutor && (
+            <span className="inline-flex items-center gap-1 ml-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-[10px] text-cyan-400/70">中</span>
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -94,7 +152,7 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
   const [capsOpen, setCapsOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("files");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
@@ -343,6 +401,17 @@ export default function App() {
       }) as CSSProperties,
     [effectiveWorkspacePanelWidth, sidebarWidth],
   );
+  const activePhase = useMemo(() => {
+    for (let i = state.items.length - 1; i >= 0; i--) {
+      const item = state.items[i];
+      if (item.kind === "phase") {
+        const t = item.text.toLowerCase();
+        if (t.includes("hermes")) return "hermes";
+        if (t.includes("hephaestus")) return "hephaestus";
+      }
+    }
+    return "";
+  }, [state.items]);
   return (
     <ToastProvider>
     {!splashDone && <StartupSplash hold={splashHold} onDone={() => setSplashDone(true)} />}
@@ -391,28 +460,26 @@ export default function App() {
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
             {/* 顶栏上下文用量 — Hermes(紫) + Hephaestus(青) */}
-            {!state.running && state.context.window > 0 && (() => {
-              const pUsed = state.perTurnPlannerUsage?.promptTokens ?? 0;
-              const eUsed = state.perTurnExecutorUsage?.promptTokens ?? 0;
-              const totalUsed = state.context.used > 0 ? state.context.used : (pUsed + eUsed);
-              if (totalUsed === 0) return null;
-              const pct = Math.round((totalUsed / state.context.window) * 100);
-              const pctP = Math.round((pUsed / state.context.window) * 100);
-              const pctE = Math.round((eUsed / state.context.window) * 100);
-              const plannerLabel = state.meta?.plannerLabel ? state.meta.plannerLabel.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "Hermes";
-              const execLabel = state.meta?.label ? state.meta.label.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "") : "Hephaestus";
-              return (
-                <Tooltip label={`${plannerLabel}: ${fmtTokens(pUsed)} · ${execLabel}: ${fmtTokens(eUsed)}`}>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <div className="flex gap-px h-1.5 rounded-full overflow-hidden w-12">
-                      {pctP > 0 && <div className="h-full bg-purple-500/60" style={{ width: `${pctP}%` }} />}
-                      {pctE > 0 && <div className="h-full bg-cyan-500/60" style={{ width: `${pctE}%` }} />}
-                    </div>
-                    <span className="text-[10px] text-fg-dim font-mono tabular-nums leading-none">{pct}%</span>
-                  </div>
-                </Tooltip>
-              );
-            })()}
+            {(state.context.window > 0 || state.context.plannerWindow > 0) && (
+              <div className="flex flex-col gap-0.5 min-w-[180px] max-w-[260px] flex-1">
+                {state.context.plannerWindow > 0 && (
+                  <ContextBar
+                    label="规划"
+                    used={state.context.plannerUsed}
+                    window={state.context.plannerWindow}
+                    color="bg-purple-500/60"
+                  />
+                )}
+                {state.context.window > 0 && (
+                  <ContextBar
+                    label="执行"
+                    used={state.context.used}
+                    window={state.context.window}
+                    color="bg-cyan-500/60"
+                  />
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2 px-3">
               {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
             </div>
@@ -459,6 +526,14 @@ export default function App() {
           <footer className={`shrink-0 border-t border-border-soft bg-bg px-8 ${compactMode ? "pt-2 pb-0.5" : "pt-3 pb-1"}`}>
             <CompactContext.Provider value={compactMode}>
             {showTodos && <TodoPanel todos={todos} onDismiss={() => setDismissedTodo(todoItem!.id)} />}
+            <RunStatus
+              running={state.running}
+              turnStartAt={state.turnStartAt}
+              turnTokens={state.turnTokens}
+              label={state.meta?.label ?? ""}
+              plannerLabel={state.meta?.plannerLabel}
+              phase={activePhase}
+            />
             <div className="composer-glow">
             <Composer
               running={state.running}
@@ -472,14 +547,11 @@ export default function App() {
             />
             </div>
             <StatusBar
-              context={state.context}
               usage={state.usage}
               balance={state.balance}
               jobs={state.jobs}
               running={state.running}
               bridgeAlive={bridgeAlive}
-              turnStartAt={state.turnStartAt}
-              turnTokens={state.turnTokens}
               sessionTotal={state.sessionTotal}
               model={state.meta?.label}
               subagentModel={state.meta?.subagentLabel}

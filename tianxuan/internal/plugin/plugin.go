@@ -649,6 +649,14 @@ func (t *remoteTool) Schema() json.RawMessage {
 	return canonicalizeSchema(t.schema)
 }
 
+// CompactDescriptor — V10.46: MCP tools now participate in compact schema
+// mode. The tool-level description stays as-is; the JSON schema is
+// canonicalized (strips description fields, sorts keys).
+func (t *remoteTool) CompactDescription() string { return t.desc }
+func (t *remoteTool) CompactSchema() json.RawMessage {
+	return t.Schema() // canonicalizeSchema already compresses
+}
+
 func (t *remoteTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var argMap map[string]any
 	if len(args) > 0 {

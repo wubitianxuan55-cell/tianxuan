@@ -1,20 +1,11 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import { Cpu, Wallet, Coins, GitBranch } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
-import type { BalanceInfo, ContextInfo, JobView, WireUsage } from "../lib/types";
-import { priceFor, calcCost, fmtTokens, fmtCost, fmtElapsed } from "../lib/stats";
+import type { BalanceInfo, JobView, WireUsage } from "../lib/types";
+import { priceFor, calcCost, fmtTokens, fmtCost } from "../lib/stats";
 
-function useTick(on: boolean): number {
-  const [, setN] = useState(0);
-  useEffect(() => {
-    if (!on) return;
-    const id = setInterval(() => setN((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [on]);
-  return Date.now();
-}
 
 // ─── Jobs popover ─────────────────────────────────────────────────
 
@@ -53,7 +44,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 
 // ─── ContextBar ─────────────────────────────────────────────────
 
-function ContextBar({ label, used, window: win, color }: { label: string; used: number; window: number; color: string }) {
+export function ContextBar({ label, used, window: win, color }: { label: string; used: number; window: number; color: string }) {
   const pct = win > 0 ? Math.round((used / win) * 100) : 0;
   const barColor = pct > 80 ? "bg-err" : pct > 60 ? "bg-warning" : color;
   return (
@@ -72,16 +63,13 @@ function ContextBar({ label, used, window: win, color }: { label: string; used: 
 // ─── StatusBar ──────────────────────────────────────────────────
 
 export const StatusBar = memo(function StatusBar({
-  context, usage, balance, jobs, running, permLevel, turnStartAt, turnTokens, sessionTotal = 0, bridgeAlive = true, model, subagentModel,
+  usage, balance, jobs, running, permLevel, sessionTotal = 0, bridgeAlive = true, model, subagentModel,
 }: {
-  context: ContextInfo;
   usage?: WireUsage;
   balance?: BalanceInfo;
   jobs?: JobView[];
   running: boolean;
   permLevel?: string;
-  turnStartAt: number;
-  turnTokens: number;
   sessionTotal?: number;
   bridgeAlive?: boolean;
   model?: string;
@@ -89,11 +77,6 @@ export const StatusBar = memo(function StatusBar({
   onOpenStats?: () => void;
 }) {
   const compact = useCompact();
-  const now = useTick(running);
-
-  const elapsedMs = running && turnStartAt ? Math.max(0, now - turnStartAt) : 0;
-  const elapsed = elapsedMs > 0 ? fmtElapsed(elapsedMs) : "";
-  const tokLabel = running && turnTokens > 0 ? fmtTokens(turnTokens) : "";
 
   // ── 会话成本 ──
   const p = priceFor(model);
@@ -156,23 +139,7 @@ export const StatusBar = memo(function StatusBar({
 
       {/* ── 中: 运行指标 ── */}
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        {running ? (
-          <>
-            <Tooltip label="本轮耗时">
-              <span className="text-fg-dim tabular-nums font-mono">{elapsed}</span>
-            </Tooltip>
-            {tokLabel && (
-              <>
-                <span className="text-border/40 select-none">·</span>
-                <Tooltip label="本轮 Token">
-                  <span className="text-fg-dim tabular-nums font-mono">↓{tokLabel}</span>
-                </Tooltip>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            {sessionTotal > 0 && (
+        {sessionTotal > 0 && (
               <>
                 <Tooltip label="会话 Token 总量">
                   <span className="text-fg-dim font-mono tabular-nums">
@@ -189,32 +156,6 @@ export const StatusBar = memo(function StatusBar({
                 </Tooltip>
               </>
             )}
-            {/* 上下文用量 — 规划者/执行者各自独立 */}
-            {(context.window > 0 || context.plannerWindow > 0) && (
-              <>
-                <span className="text-border/40 select-none">·</span>
-                <div className="flex flex-col gap-0.5 flex-1 min-w-[160px]">
-                  {context.plannerWindow > 0 && (
-                    <ContextBar
-                      label="规划"
-                      used={context.plannerUsed}
-                      window={context.plannerWindow}
-                      color="bg-purple-500/60"
-                    />
-                  )}
-                  {context.window > 0 && (
-                    <ContextBar
-                      label="执行"
-                      used={context.used}
-                      window={context.window}
-                      color="bg-cyan-500/60"
-                    />
-                  )}
-                </div>
-              </>
-            )}
-          </>
-        )}
       </div>
 
       {/* ── 右: badge 区 ── */}

@@ -79,6 +79,23 @@ func TestRemoteToolSchemaCanonicalizesOnReturn(t *testing.T) {
 	}
 }
 
+func TestRemoteToolCompactDescriptor(t *testing.T) {
+	rt := &remoteTool{
+		desc:   "Fetches data from the API",
+		schema: json.RawMessage(`{"type":"object","description":"Ignored by compact","properties":{"url":{"type":"string","description":"The URL"}},"required":["url"]}`),
+	}
+	// CompactDescription returns the tool-level description unmodified.
+	if got := rt.CompactDescription(); got != "Fetches data from the API" {
+		t.Fatalf("CompactDescription() = %q, want %q", got, "Fetches data from the API")
+	}
+	// CompactSchema strips descriptions via canonicalizeSchema.
+	got := string(rt.CompactSchema())
+	if strings.Contains(got, "Ignored") || strings.Contains(got, "The URL") {
+		t.Fatalf("CompactSchema() still contains descriptions: %s", got)
+	}
+	t.Logf("compact schema: %s", got)
+}
+
 func TestSortToolsByName(t *testing.T) {
 	tools := []tool.Tool{
 		testTool{name: "zulu"},

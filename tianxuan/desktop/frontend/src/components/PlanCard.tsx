@@ -109,7 +109,7 @@ export function PlanCard({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, []);
 
   const submit = (selected: string) => {
     onAnswer(ask.id, [{ questionId: q.id, selected: [selected] }]);

@@ -31,7 +31,7 @@ import { RuntimePanel } from "./components/RuntimePanel";
 import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { SkillsPanel } from "./components/SkillsPanel";
-import { StatsPanel } from "./components/StatsPanel";
+import { StatsPanel, useStatsPersistence } from "./components/StatsPanel";
 import { MessageNavigator } from "./components/MessageNavigator";
 import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -100,7 +100,7 @@ export default function App() {
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
-  const splashHold = !(state.meta?.ready ?? false);
+  const splashHold = useMemo(() => !splashDone && !(state.meta?.ready ?? false), [splashDone, state.meta?.ready]);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const {
@@ -123,10 +123,6 @@ export default function App() {
   }, [onReconnect, refreshMeta]);
 
   const { todoItem, todos, showTodos, setDismissedTodo } = useTodoExtractor(state.items);
-
-
-
-  // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
 
   // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
   // panel reflects what landed on disk.
@@ -185,14 +181,6 @@ export default function App() {
     const minForPanel = effectiveSidebarWidth + CHAT_MIN_WIDTH + WORKSPACE_PANEL_MIN_WIDTH;
     if (window.innerWidth < minForPanel) setWorkspacePanel(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 轮次结束时不再自动刷新侧边栏：refreshSessions 会改变 sidebarSessions
-  // 引用，导致 useMemo 重算 currentSessionKey。若 session 路径恰好变化
-  //（如首轮自动持久化），StatsPanel 会从空 localStorage key 加载数据，
-  // 表现为统计面板全部清零。侧边栏列表由用户显式操作驱动刷新。
-  useEffect(() => {
-    // sidebar session list refresh is driven by explicit user actions
-  }, [state.running, state.items.length, refreshSessions]);
 
 
   // History drawer: opening fetches the saved-session list; picking one resumes it
@@ -312,12 +300,17 @@ export default function App() {
   // 当前会话标识：直接使用 Go 后端生成的 .jsonl 文件路径作为 key。
   // 每个会话文件对应唯一的 localStorage key：新会话自然空数据开始，
   // 恢复/重启同一会话则统计数据持续累加，会话之间互不干扰。
+  const currentSessionPath = useMemo(
+    () => sidebarSessions.find(s => s.current)?.path,
+    [sidebarSessions],
+  );
   const currentSessionKey = useMemo(() => {
-    const cur = sidebarSessions.find(s => s.current);
-    return cur?.path
-      ? cur.path.replace(/[\\/:*?"<>|]/g, "_")
+    return currentSessionPath
+      ? currentSessionPath.replace(/[\\/:*?"<>|]/g, "_")
       : cwd ? `unsaved_${cwd.replace(/[\\/:*?"<>|]/g, "_")}` : "unsaved";
-  }, [sidebarSessions, cwd]);
+  }, [currentSessionPath, cwd]);
+
+  const statsPersistence = useStatsPersistence(currentSessionKey, statsReset, state.turnSteps, state.perTurnUsage);
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
     const cmds: PaletteItem[] = [
@@ -573,12 +566,19 @@ export default function App() {
             ) : rightTab === "skills" ? (
               <SkillsPanel counts={skillCounts} />
             ) : null}
-            {/* V5.25: StatsPanel 始终挂载（用 display:none 隐藏），
-                确保在其他 tab 时也能接收 usage 事件并写入 localStorage。
-                否则切换会话后打开统计面板，loadHistory 返回空数组。 */}
-            <div style={{ display: rightTab === "stats" ? undefined : "none" }}>
-              <StatsPanel perTurnUsage={state.perTurnUsage} perTurnPlannerUsage={state.perTurnPlannerUsage} perTurnExecutorUsage={state.perTurnExecutorUsage} perTurnSubUsage={state.perTurnSubUsage} turnSteps={state.turnSteps} subagentModel={state.meta?.subagentLabel} sessionKey={currentSessionKey} resetKey={statsReset} toolCounts={toolCounts} skillCounts={skillCounts} />
-            </div>
+            {rightTab === "stats" && (
+              <StatsPanel
+                data={statsPersistence.data}
+                clearData={statsPersistence.clearData}
+                perTurnPlannerUsage={state.perTurnPlannerUsage}
+                perTurnExecutorUsage={state.perTurnExecutorUsage}
+                perTurnSubUsage={state.perTurnSubUsage}
+                turnSteps={state.turnSteps}
+                subagentModel={state.meta?.subagentLabel}
+                toolCounts={toolCounts}
+                skillCounts={skillCounts}
+              />
+            )}
             {rightTab === "messages" && (
               <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />
             )}

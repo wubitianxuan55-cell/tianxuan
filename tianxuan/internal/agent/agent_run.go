@@ -16,61 +16,61 @@ func (a *AgentRunner) Run(ctx context.Context, input string) (*TurnResult, error
 
 // runDirect is the original single-model execution path.
 func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult, error) {
-	// V3.3: generate trace ID for this turn
+	// generate trace ID for this turn
 	traceID := NewTraceID()
 	ctx = WithTraceID(ctx, traceID)
-	defer a.clearSteerQueue() // V10.0: drain any remaining steer on turn exit
+	defer func() { a.steerMu.Lock(); a.steerQueue = nil; a.steerConsumed = false; a.steerMu.Unlock() }() // drain any remaining steer on turn exit
 
 	if a.evidence != nil {
 		a.evidence.Reset()
 	}
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
-	// V10.0: wrap user input with transient language preference blocks
+	// wrap user input with transient language preference blocks
 	// (Design adopted from DeepSeek-Reasonix-V1.12)
 	input = a.withTurnPreferences(input)
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
-	// V10.0: rebuild canonical todo state from session history
+	// rebuild canonical todo state from session history
 	// (Design adopted from DeepSeek-Reasonix-V1.12)
 	a.rebuildTodoState(a.session.Messages)
 
-	// V8.0 P0-1: reset tool filter from previous turn (prefix must be immutable).
+	// P0-1: reset tool filter from previous turn (prefix must be immutable).
 	a.activeSchemasMu.Lock()
 	a.activeSchemas = nil
 	a.activeSchemasMu.Unlock()
 
 
 
-	// V4.2: reset pre-execution cache and tool result cache for new turn
+	// reset pre-execution cache and tool result cache for new turn
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
-		a.dedupHashes = nil // V8.0 P0-2: reset dedup hashes each turn
-		a.steerCount = 0 // V8.0 P0-3: reset steer counter each turn
-		a.bgJobStartedThisTurn = false // V10.27: 每轮重置启停标志
+		a.dedupHashes = nil // P0-2: reset dedup hashes each turn
+		a.steerCount = 0 // P0-3: reset steer counter each turn
+		a.bgJobStartedThisTurn = false // 每轮重置启停标志
 		a.bgOutputReadThisTurn = false
 		a.bgJobKilledThisTurn = false
-		a.bgStartKillStreak = 0  // V10.27: 新用户轮次重置循环计数
-		a.staleWrittenFiles = nil   // V10.28: 每轮重置 stale anchor 追踪
+		a.bgStartKillStreak = 0  // 新用户轮次重置循环计数
+		a.staleWrittenFiles = nil   // 每轮重置 stale anchor 追踪
 		a.staleReadFiles = nil
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
-	a.repeatSuccessCounts = nil // V10.13: 每轮重置成功循环计数
-	// V10.37: per-turn TurnResult tracking — accumulated here and returned by Run().
+	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
+	// per-turn TurnResult tracking — accumulated here and returned by Run().
 	var turnFilesCreated []string
 	var turnFilesModified []string
 	var turnToolErrors []string
 	var turnLastSummary string
-	// V5.13: 重置参数风暴断路器——每个 turn 独立统计
+	// 重置参数风暴断路器——每个 turn 独立统计
 	if a.paramStorm != nil {
 		a.paramStorm.Reset()
 	}
-	// V5.8: the clear() method resets mtime caches auto-expired entries
+	// the clear() method resets mtime caches auto-expired entries
 
-	// V6.0: recall-reminder lets the model know mid-turn context remains
+	// recall-reminder lets the model know mid-turn context remains
 		a.maybeRecallReminder()
 
 			graceRound := false
-		// V10.0: stream recovery + empty final detection counters
+		// stream recovery + empty final detection counters
 		streamRecoveries := 0
 		const maxStreamRecoveries = 3
 		emptyFinalBlocks := 0
@@ -78,7 +78,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		finalReadinessBlocks := 0
 		const maxFinalReadinessBlocks = 3
 		for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
-		// V10.0: consume a queued mid-turn steer as session guidance
+		// consume a queued mid-turn steer as session guidance
 		// (Design adopted from DeepSeek-Reasonix-V1.12)
 		if text, ok := a.consumeSteer(); ok {
 			a.session.Add(provider.Message{Role: provider.RoleUser, Content: midTurnSteerMessage(text)})
@@ -86,7 +86,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 		text, reasoning, signature, calls, usage, interrupted, err := a.stream(ctx, step+1)
 		if err != nil {
-			// V10.0: stream recovery — save partial output and inject recovery prompt
+			// stream recovery — save partial output and inject recovery prompt
 			if interrupted && streamRecoveries < maxStreamRecoveries {
 				streamRecoveries++
 				if strings.TrimSpace(text) != "" {
@@ -110,11 +110,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 		streamRecoveries = 0
 
-		// V6.0 P1: length-truncation — inject nudge when finish_reason="length" and no tool calls
+		// length-truncation — inject nudge when finish_reason="length" and no tool calls
 		if a.maybeContinueOutputLength(usage, calls) {
 			continue
 		}
-		// V6.0 P1: invalid output — handle empty reasoning/text after retry
+		// invalid output — handle empty reasoning/text after retry
 		if a.maybeRetryInvalidOutput(text, reasoning, calls) {
 			continue
 		}
@@ -123,7 +123,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			a.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: a.pricing,
 				SessionHit: int(a.sessCacheHit.Load()), SessionMiss: int(a.sessCacheMiss.Load()),
 				UsageSource: event.UsageSourceExecutor})
-			// V5.15: budget gate — cumulative fee check
+			// budget gate — cumulative fee check
 			if a.budgetGate != nil {
 				status := a.budgetGate.Check(a.pricing, usage)
 				if status == BudgetWarn {
@@ -149,7 +149,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 
 
-		// V8.2.5: automatic compaction — truncates history when prompt
+		// automatic compaction — truncates history when prompt
 		// exceeds the high-water mark. legacyTruncate preserves
 		// L1+L2+prefix+summary+tail for maximum cache continuity.
 		a.maybeCompact(ctx, usage)
@@ -165,10 +165,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			ReasoningSignature: signature,
 			ToolCalls:          calls,
 		})
-		// V10.37: capture last assistant text for TurnResult
+		// capture last assistant text for TurnResult
 		turnLastSummary = text
 
-		// V7.0: archive the assistant turn for cross-session analysis
+		// archive the assistant turn for cross-session analysis
 		if a.archive != nil {
 			tcJSON := "[]"
 			if len(calls) > 0 {
@@ -180,17 +180,17 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 
 		if len(calls) == 0 {
-			// V7.0: finish-gate — prevent premature model stop
-			// V10.0: Grace Round — model produced summary, done.
+			// finish-gate — prevent premature model stop
+			// Grace Round — model produced summary, done.
 			if graceRound {
-				// V10.16: clean up grace-round nudge from session before exit
+				// clean up grace-round nudge from session before exit
 				if len(a.session.Messages) > 0 {
 					a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 				}
 				return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), nil
 			}
 
-			// V10.0: empty final detection — model returned no tool calls
+			// empty final detection — model returned no tool calls
 			// and no visible text. Inject retry prompt; fail after 3 blocks.
 			if strings.TrimSpace(text) == "" {
 				emptyFinalBlocks++
@@ -213,8 +213,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			if a.goalGate() {
 				continue
 			}
-			// V10.3: verify gate merged into taskGate — no separate call needed
-			// V10.0: final-answer readiness gate — verify evidence before accepting completion
+			// verify gate merged into taskGate — no separate call needed
+			// final-answer readiness gate — verify evidence before accepting completion
 			if blocked, reason := a.finalReadinessCheck(); blocked {
 				finalReadinessBlocks++
 				if finalReadinessBlocks >= maxFinalReadinessBlocks {
@@ -227,19 +227,19 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				continue
 			}
 			if a.steerQueueLen() > 0 {
-				continue // V10.0: more steers pending — another pass
+				continue // more steers pending — another pass
 			}
 			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), nil // all gates passed
 		}
 
-		// V4.2: wait for stream() pre-execution goroutines to finish before
+		// wait for stream() pre-execution goroutines to finish before
 		// dispatching the full batch — avoids races and double-execution.
-		emptyFinalBlocks = 0 // V10.0: reset empty-final counter when model calls tools successfully
-		// V10.13: Grace Round guard — if model still calls tools during grace round, exit.
+		emptyFinalBlocks = 0 // reset empty-final counter when model calls tools successfully
+		// Grace Round guard — if model still calls tools during grace round, exit.
 		// Ported from Reasonix to prevent infinite loops under MaxSteps limit.
 		if graceRound {
 			a.preWG.Wait() // drain pre-exec goroutines started during grace streaming
-			// V10.16: clean up grace-round nudge to prevent leaking to next user turn
+			// clean up grace-round nudge to prevent leaking to next user turn
 			if len(a.session.Messages) > 0 {
 				a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
 			}
@@ -247,11 +247,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 		a.preWG.Wait()
 		results := a.executeBatch(ctx, calls)
-		// V8.0 P0-2: deterministic pruning — skip duplicate tool results.
-		// V10.8: only dedup ReadOnly tools — bash/git_commit etc. may produce
+		// P0-2: deterministic pruning — skip duplicate tool results.
+		// only dedup ReadOnly tools — bash/git_commit etc. may produce
 		// different results on repeated calls (state changed between calls).
 		for i, call := range calls {
-			// V10.37: track writer tool paths for TurnResult
+			// track writer tool paths for TurnResult
 			switch call.Name {
 			case "write_file":
 				if p := extractFilePath(call.Name, call.Arguments); p != "" {
@@ -262,7 +262,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 					turnFilesModified = append(turnFilesModified, p)
 				}
 			}
-			// V10.37: collect tool errors for TurnResult (max 5)
+			// collect tool errors for TurnResult (max 5)
 			if strings.HasPrefix(results[i], "error:") && len(turnToolErrors) < 5 {
 				turnToolErrors = append(turnToolErrors, results[i])
 			}
@@ -300,7 +300,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			})
 		}
 
-		// V10.0: advance canonical todo state for successful complete_step calls
+		// advance canonical todo state for successful complete_step calls
 		for i, call := range calls {
 			if call.Name == "complete_step" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
 				step := extractStepFromArgs(call.Arguments)
@@ -310,24 +310,24 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			}
 		}
 
-		// V8.0 P0-3: mid-turn steer — detect error patterns and inject corrective hints.
+		// P0-3: mid-turn steer — detect error patterns and inject corrective hints.
 		if a.shouldMidTurnSteer(calls, results) {
 			continue // steer injected, skip compaction and continue loop
 		}
 
-		// V10.27: bg start-kill cycle — detect repeated background job start→kill
+		// bg start-kill cycle — detect repeated background job start→kill
 		// without reading output, inject corrective nudge after 3 cycles.
 		if a.checkBgStartKillCycle() {
 			continue
 		}
 
-		// V6.0 P2: repeat-detection — inject nudge after 3 same-tool calls
+		// repeat-detection — inject nudge after 3 same-tool calls
 		if a.detectRepeatedSteps(calls) {
 			continue // nudge injected, skip compaction and continue loop
 		}
 
 
-		// V10.0: Grace Round — when maxSteps is reached, give one extra final turn.
+		// Grace Round — when maxSteps is reached, give one extra final turn.
 		if a.maxSteps > 0 && step+1 >= a.maxSteps && !graceRound {
 			graceRound = true
 			nudge := "Do not call any more tools — your tool-call round limit (agent.max_steps) has been reached. Instead, synthesize a final answer from all the work already completed: summarize what was accomplished, what remains to be done, and any decisions the user should make."
@@ -338,7 +338,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			continue
 		}
 
-			// V7.1: no mid-turn compaction — cache grows monotonically within each turn
+			// no mid-turn compaction — cache grows monotonically within each turn
 	}
 	// Only reached when a positive maxSteps guard is configured. The work so far
 	// is already in the session, so the user can just send another message to pick

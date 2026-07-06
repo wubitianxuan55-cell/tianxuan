@@ -599,15 +599,6 @@ func (c *Controller) TCCAReport() tiancontext.CacheReport {
 	}
 	return c.ctxMgr.Metrics()
 }
-// LastCacheShape returns the most recent cache-shape fingerprint from the
-// executor's run loop (nil before the first turn). For /tcca-report on-demand
-// diagnostics -- not emitted as chat notices.
-func (c *Controller) LastCacheShape() *agent.CacheShape {
-	if c.executor == nil {
-		return nil
-	}
-	return c.executor.LastCacheShape()
-}
 
 // SystemPrompt returns the L1 system prompt.
 func (c *Controller) SystemPrompt() string {

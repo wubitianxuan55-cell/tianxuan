@@ -974,16 +974,8 @@ func (s *Server) tccaReport(w http.ResponseWriter, _ *http.Request) {
 		"cacheHitTokens":  r.CacheHitTokens,
 		"cacheMissTokens": r.CacheMissTokens,
 		"breakCount":      r.BreakCount,
-	}
-	if shape := s.ctrl.LastCacheShape(); shape != nil {
-		resp["lastShape"] = map[string]any{
-			"prefixHash":        shape.PrefixHash,
-			"systemHash":        shape.SystemHash,
-			"toolsHash":         shape.ToolsHash,
-			"toolSchemaTokens":  shape.ToolSchemaTokens,
-			"logRewriteVersion": shape.LogRewriteVersion,
-		}
-	}
+}
+	writeJSON(w, resp)
 }
 
 // ── helpers ────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/shallow";
 import { app, onEvent, onReady } from "./bridge";
 import type {
   BalanceInfo, ContextInfo, HistoryMessage, JobView, MemoryView,
@@ -213,7 +214,7 @@ export const useStore = create<ControllerState>()((set) => ({ ...initialState, _
 
 export function useController() {
   const store = useStore;
-  const state = store(s => s);
+  const state = store(useShallow(s => s));
   const dispatch = store.getState()._dispatch;
 
   const loadSessionData = useCallback(async () => {
@@ -301,9 +302,6 @@ export function useController() {
 // useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
 // 使用 useShallow 做浅比较：仅当 items 长度或元素引用变化时才触发重渲染，
 // 非 items 字段（meta/context/balance 等）的变化不会影响此 hook。
-// useItems 订阅 items 数组，与 useController 分离。
-// 流式输出时 items 高频变化（每次 text/reasoning 事件），通过独立 hook 避免
-// useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
 export function useItems(): Item[] {
   return useStore(s => s.items);
 }

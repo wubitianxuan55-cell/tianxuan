@@ -1,3 +1,27 @@
+## [10.45.0] — 2026-07-06
+
+### 🧠 流程优化
+
+- Hermes prompt 新增操作类任务分类：构建/启动/测试/git 等纯操作任务跳过代码研究，输出极简计划
+- Hephaestus 强制 ask 弹窗：执行中需用户决策时必须用 ask 工具，纯文本提问会导致重新规划
+
+### 🎨 前端优化（8项）
+
+- SettingsPanel 拆分：1056行→9文件（Shared/Models/Providers/Permissions/Sandbox/Agent/Appearance/Updates）
+- useController 全量订阅修复：`store(s=>s)` → `useShallow`，流式输出减少全局重渲染
+- StatsPanel 条件渲染：移除 display:none 始终挂载，提取 useStatsPersistence hook
+- PlanCard useEffect 补充依赖数组、Transcript as any 类型守卫、store.ts 重复注释清理
+- App.tsx 删除空 useEffect 死代码、删除重复注释行
+- scrollVersion/currentSessionKey 细粒度优化、splashHold 统一来源、TokenTrendChart 提取独立组件
+- 命中率趋势图增加各模型 API 调用次数显示（`12次调用 · 均值 85.3%`）
+
+### 🔧 后端优化（4项）
+
+- hermes.go 新增 20 个单元测试（shouldSkipPlanner/isAnswerNotAction/formatHandoff/HandoffTask/persistAnswer）
+- LastCacheShape 死代码清理：删除 AgentRunner/Controller 存根 + serve_handlers 不可达分支
+- agent.go 死代码删除 + clearSteerQueue 内联 + 重复注释清理
+- agent_run.go/boot.go 版本标记残留注释清理（~40 处）
+
 ## [10.41.0] — 2026-07-05
 
 ### 📊 统计面板成本重构

@@ -110,13 +110,3 @@ func (d CacheDiagnostics) Format() string {
 	}
 	return fmt.Sprintf("cache prefix changed: %v [hit=%d miss=%d tools=%dtok]", d.PrefixChangeReasons, d.CacheHitTokens, d.CacheMissTokens, d.ToolSchemaTokens)
 }
-
-// CacheShape is a deprecated alias for PrefixShape (V8.18).
-// Kept for backward compatibility with controller.go / serve_handlers.go.
-type CacheShape = PrefixShape
-
-// LastCacheShape is a deprecated stub (V8.18 Phase 3).
-// Cache diagnostics are now real-time Notices via CompareShape.
-func (a *AgentRunner) LastCacheShape() *CacheShape {
-	return nil
-}

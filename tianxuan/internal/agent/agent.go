@@ -751,13 +751,10 @@ func (a *AgentRunner) checkBgStartKillCycle() bool {
 	return true
 }
 
-
 // ProvName returns the provider model name for diagnostic display.
 func (a *AgentRunner) ProvName() string { return a.prov.Name() }
 
-// SetCtxMgr wires the TCCA context kernel (V3.0 Phase 5).
-
-// SetCtxMgr wires the TCCA context kernel (V3.0 Phase 5).
+// SetCtxMgr wires the TCCA context kernel.
 func (a *AgentRunner) SetCtxMgr(m *tiancontext.ContextManager) {
 	a.ctxMgr = m
 	if a.dispatcher != nil {
@@ -808,13 +805,6 @@ func (a *AgentRunner) consumeSteer() (string, bool) {
 	a.steerQueue = a.steerQueue[1:]
 	a.steerConsumed = len(a.steerQueue) == 0
 	return t, true
-}
-
-func (a *AgentRunner) clearSteerQueue() {
-	a.steerMu.Lock()
-	defer a.steerMu.Unlock()
-	a.steerQueue = nil
-	a.steerConsumed = false
 }
 
 func (a *AgentRunner) steerQueueLen() int {

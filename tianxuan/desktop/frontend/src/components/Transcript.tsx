@@ -120,7 +120,7 @@ export function Transcript({
   }, [scrollToBottom]);
 
   // ── 内容变化时自动跟随 ──────────────────────────────────────────
-  const contentVersion = scrollVersion(items);
+  const contentVersion = useMemo(() => scrollVersion(items), [items]);
   const prevItemsLen = useRef(items.length);
   useEffect(() => {
     if (items.length > prevItemsLen.current) {
@@ -150,7 +150,7 @@ export function Transcript({
   // items 重置（新会话/切换会话）时清空 turnEls，防止残留旧 DOM 引用。
   useEffect(() => {
     if (items.length === 0) turnEls.current.clear();
-  }, [items.length === 0]);
+  }, [items.length]);
   const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
 
   // turn→DOM 元素映射（用于跳转）
@@ -279,7 +279,7 @@ export function Transcript({
             case "notice":
               if (it.level === "warn") {
                 if (dismissedErrors.has(it.id)) return null;
-                return <ErrorCard key={it.id} item={it as any} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
+                return <ErrorCard key={it.id} item={it as Extract<Item, { kind: "notice" }>} onDismiss={(id) => setDismissedErrors((p) => new Set(p).add(id))} />;
               }
               if (it.text.startsWith("diagnostics:")) {
                 const clean = it.text.includes("— clean");

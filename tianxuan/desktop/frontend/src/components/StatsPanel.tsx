@@ -39,172 +39,17 @@ interface TurnRecord {
 function tk(n: number): string { return n.toLocaleString(); }
 function cash(v: number): string { return "¥" + v.toFixed(4); }
 
-// ─── 统计表格 ─────────────────────────────────────────────
-function StatsTable({ title, planner, executor, sub, total }: {
-  title: string; planner: ColStats; executor: ColStats; sub: ColStats; total: ColStats;
-}) {
-  const rows: { label: string; render: (c: ColStats) => string }[] = [
-    { label: "Prompt", render: c => tk(c.prompt) },
-    { label: "Compl", render: c => tk(c.completion) },
-    { label: "缓存命中", render: c => {
-      const t = c.cacheHit + c.cacheMiss;
-      const rate = t > 0 ? (c.cacheHit / t * 100) : 0;
-      return `${rate.toFixed(2)}%`;
-    }},
-    { label: "成本", render: c => cash(c.cost) },
-  ];
-  return (
-    <div className="py-3 border-b border-border-soft">
-      <table className="w-full text-[11px] border-collapse">
-        <thead>
-          <tr className="text-fg-faint border-b border-border-soft">
-            <th className="text-left font-semibold pb-1 text-[10px] uppercase tracking-wider text-fg-faint" style={{width:"28%"}}>{title}</th>
-            <th className="text-right font-normal pb-1" style={{width:"24%"}}>规划</th>
-            <th className="text-right font-normal pb-1" style={{width:"24%"}}>执行</th>
-            <th className="text-right font-normal pb-1" style={{width:"24%"}}>子代理</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const isHitRow = row.label === "缓存命中";
-            const pRate = isHitRow && planner.cacheHit + planner.cacheMiss > 0 ? (planner.cacheHit / (planner.cacheHit + planner.cacheMiss) * 100) : 0;
-            const eRate = isHitRow && executor.cacheHit + executor.cacheMiss > 0 ? (executor.cacheHit / (executor.cacheHit + executor.cacheMiss) * 100) : 0;
-            const sRate = isHitRow && sub.cacheHit + sub.cacheMiss > 0 ? (sub.cacheHit / (sub.cacheHit + sub.cacheMiss) * 100) : 0;
-            return (
-              <tr key={row.label} className="border-b border-border-soft/50">
-                <td className="py-1 text-fg-dim">{row.label}</td>
-                {isHitRow ? (
-                  <>
-                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(pRate)}`}>
-                      {planner.cacheHit + planner.cacheMiss > 0 ? `${pRate.toFixed(2)}%` : "—"}
-                    </td>
-                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(eRate)}`}>
-                      {executor.cacheHit + executor.cacheMiss > 0 ? `${eRate.toFixed(2)}%` : "—"}
-                    </td>
-                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(sRate)}`}>
-                      {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(2)}%` : "—"}
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(planner)}</td>
-                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(executor)}</td>
-                    <td className="py-1 text-right font-mono tabular-nums text-fg">{row.render(sub)}</td>
-                  </>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {/* 汇总行 — 表格下方独立展示 */}
-      <div className="mt-1.5 pt-1.5 border-t border-border-soft/70">
-        <div className="flex items-center gap-2 text-[10px]">
-          <span className="text-fg-faint font-semibold shrink-0">汇总</span>
-          <span className="text-fg-faint select-none">·</span>
-          <span className="font-mono tabular-nums text-fg">Prompt {tk(total.prompt)}</span>
-          <span className="text-border select-none">·</span>
-          <span className="font-mono tabular-nums text-fg">Compl {tk(total.completion)}</span>
-          <span className="text-border select-none">·</span>
-          <span className="font-mono tabular-nums text-fg font-semibold">{cash(total.cost)}</span>
-        </div>
-        {total.cacheHit + total.cacheMiss > 0 && (() => {
-          const rate = (total.cacheHit / (total.cacheHit + total.cacheMiss)) * 100;
-          return (
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className={`text-xl font-bold tabular-nums ${hitRateColor(rate)}`}>{rate.toFixed(2)}%</span>
-              <span className="text-[10px] text-fg-faint tabular-nums">{tk(total.cacheHit)} 命中 / {tk(total.cacheMiss)} 未命中</span>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-}
+// ─── useStatsPersistence ──────────────────────────────────
+// 将 localStorage 持久化逻辑提取为独立 hook，在 App 层运行。
+// StatsPanel 可安全条件渲染（不再需要 display:none 保活），
+// 此 hook 始终运行以接收 usage 事件并写入 localStorage。
 
-// ─── 微型面积图 ─────────────────────────────────────────
-function MiniAreaChart({
-  title, W, H, padL, padR, padT, padB, points, yTicks, color, xLabels,
-}: {
-  title: string; W: number; H: number; padL: number; padR: number; padT: number; padB: number;
-  points: Point[]; yTicks: [number, string][]; color: string;
-  xLabels: { at: number; text: string }[];
-}) {
-  const plotH = H - padT - padB;
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const last = points[points.length - 1];
-  const first = points[0];
-  const areaPath = `${path} L${last.x.toFixed(1)},${padT + plotH} L${first.x.toFixed(1)},${padT + plotH} Z`;
-  return (
-    <div className="py-3 border-b border-border-soft">
-      <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">{title}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-        {yTicks.map(([_val, label], i) => {
-          const y = padT + plotH - (i / (yTicks.length - 1)) * plotH;
-          return (
-            <g key={`y${i}`}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} />
-              <text x={padL - 4} y={y + 3} fontSize={9} fill="var(--fg-faint)" textAnchor="end">{label}</text>
-            </g>
-          );
-        })}
-        <path d={areaPath} fill={color} opacity={0.08} />
-        <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2} fill={color}>
-            <title>{p.label}</title>
-          </circle>
-        ))}
-        {xLabels.map((xl, i) => (
-          <text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-// ─── 命中率趋势图（从 StepRecord[] 生成）─────────────────
-function HitRateTrend({ steps, title, color }: { steps: StepRecord[]; title: string; color: string }) {
-  const recent = steps.slice(-20);
-  if (recent.length < 2) return null;
-  const rates = recent.map(r => r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0);
-  const dataMin = Math.min(...rates), dataMax = Math.max(...rates), spread = dataMax - dataMin || 1;
-  let step: number, padding: number;
-  if (spread <= 0.5)    { step = 0.1; padding = 0.05; }
-  else if (spread <= 1) { step = 0.2; padding = 0.1; }
-  else if (spread <= 2) { step = 1;   padding = 0.5; }
-  else if (spread <= 5) { step = 2;   padding = 1.0; }
-  else                  { step = 5;   padding = Math.max(5, spread * 0.15); }
-  const minRate = Math.max(0, Math.floor((dataMin - padding) / step) * step);
-  const maxRate = Math.min(100, Math.ceil((dataMax + padding) / step) * step);
-  const range = Math.max(maxRate - minRate || 1, step);
-  const W = 260, H = 80, padL = 30, padR = 8, padT = 8, padB = 16;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const points: Point[] = recent.map((r, i) => {
-    const x = padL + (i / Math.max(1, recent.length - 1)) * plotW;
-    const rate = r.prompt > 0 ? (r.cacheHit / r.prompt) * 100 : 0;
-    const y = padT + plotH - ((rate - minRate) / range) * plotH;
-    return { x, y, label: `步#${r.step}: ${rate.toFixed(2)}%` };
-  });
-  const fmt = (v: number) => step < 1 ? v.toFixed(1) + "%" : `${Math.round(v)}%`;
-  const mid = minRate + range * 0.5;
-  const yLabels: [number, string][] = [[minRate, fmt(minRate)]];
-  if (mid !== minRate && mid !== maxRate) yLabels.push([mid, fmt(mid)]);
-  if (maxRate !== minRate) yLabels.push([maxRate, fmt(maxRate)]);
-  const xLabels = [
-    { at: points[0].x, text: `#${recent[0].step}` },
-    ...(recent.length >= 3 ? [{ at: points[Math.floor(points.length / 2)].x, text: `#${recent[Math.floor(recent.length / 2)].step}` }] : []),
-    { at: points[points.length - 1].x, text: `#${recent[recent.length - 1].step}` },
-  ];
-  return <MiniAreaChart title={title} W={W} H={H} padL={padL} padR={padR} padT={padT} padB={padB} points={points} yTicks={yLabels} color={color} xLabels={xLabels} />;
-}
-
-
-export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey, resetKey, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
-  perTurnUsage?: WireUsage | null; turnSteps?: WireUsage[]; subagentModel?: string;
-  sessionKey: string; resetKey?: number; toolCounts: Record<string, number>; skillCounts: Record<string, number>;
-  perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
-}) {
+export function useStatsPersistence(
+  sessionKey: string,
+  resetKey: number | undefined,
+  turnSteps: WireUsage[] | undefined,
+  perTurnUsage: WireUsage | null | undefined,
+) {
   const turnRef = useRef(0);
   const stepRef = useRef(0);
   const turnAccumRef = useRef<{ prompt: number; completion: number; cacheHit: number; cacheMiss: number; cost: number }>({ prompt: 0, completion: 0, cacheHit: 0, cacheMiss: 0, cost: 0 });
@@ -215,7 +60,6 @@ export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey,
     if (loaded.steps.length > 0) stepRef.current = loaded.steps[loaded.steps.length - 1].step;
     return loaded;
   });
-  const { turns: history, steps: stepHistory } = data;
 
   const lastKeyRef = useRef(sessionKey);
   const keyChanged = lastKeyRef.current !== sessionKey;
@@ -300,11 +144,194 @@ export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey,
     perTurnRef.current = null;
   }, [perTurnUsage]);
 
+  const clearData = () => {
+    saveData(sessionKey, { turns: [], steps: [] });
+    turnRef.current = 0;
+    stepRef.current = 0;
+    setData({ turns: [], steps: [] });
+  };
+
+  return { data, clearData };
+}
+
+// ─── 统计表格 ─────────────────────────────────────────────
+function StatsTable({ title, planner, executor, sub, total }: {
+  title: string; planner: ColStats; executor: ColStats; sub: ColStats; total: ColStats;
+}) {
+  const rows: { label: string; render: (c: ColStats) => string }[] = [
+    { label: "Prompt", render: c => tk(c.prompt) },
+    { label: "Compl", render: c => tk(c.completion) },
+    { label: "缓存命中", render: c => {
+      const t = c.cacheHit + c.cacheMiss;
+      const rate = t > 0 ? (c.cacheHit / t * 100) : 0;
+      return `${rate.toFixed(2)}%`;
+    }},
+    { label: "成本", render: c => cash(c.cost) },
+  ];
+  return (
+    <div className="py-3 border-b border-border-soft">
+      <table className="w-full text-[11px] border-collapse">
+        <thead>
+          <tr className="text-fg-faint border-b border-border-soft">
+            <th className="text-left font-semibold pb-1 text-[10px] uppercase tracking-wider text-fg-faint" style={{width:"28%"}}>{title}</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>规划</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>执行</th>
+            <th className="text-right font-normal pb-1" style={{width:"24%"}}>子代理</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const isHitRow = row.label === "缓存命中";
+            const pRate = isHitRow && planner.cacheHit + planner.cacheMiss > 0 ? (planner.cacheHit / (planner.cacheHit + planner.cacheMiss) * 100) : 0;
+            const eRate = isHitRow && executor.cacheHit + executor.cacheMiss > 0 ? (executor.cacheHit / (executor.cacheHit + executor.cacheMiss) * 100) : 0;
+            const sRate = isHitRow && sub.cacheHit + sub.cacheMiss > 0 ? (sub.cacheHit / (sub.cacheHit + sub.cacheMiss) * 100) : 0;
+            return (
+              <tr key={row.label} className="border-b border-border-soft/50">
+                <td className="py-1 text-fg-dim">{row.label}</td>
+                {isHitRow ? (
+                  <>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(pRate)}`}>
+                      {planner.cacheHit + planner.cacheMiss > 0 ? `${pRate.toFixed(2)}%` : "—"}
+                    </td>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(eRate)}`}>
+                      {executor.cacheHit + executor.cacheMiss > 0 ? `${eRate.toFixed(2)}%` : "—"}
+                    </td>
+                    <td className={`py-1 text-right font-mono tabular-nums font-bold ${hitRateColor(sRate)}`}>
+                      {sub.cacheHit + sub.cacheMiss > 0 ? `${sRate.toFixed(2)}%` : "—"}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-1 text-right font-mono tabular-nums">{row.render(planner)}</td>
+                    <td className="py-1 text-right font-mono tabular-nums">{row.render(executor)}</td>
+                    <td className="py-1 text-right font-mono tabular-nums">{row.render(sub)}</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+          <tr className="font-bold">
+            <td className="py-1 text-fg">合计</td>
+            <td className="py-1 text-right font-mono tabular-nums">{cash(total.cost)}</td>
+            <td className="py-1"/>
+            <td className="py-1"/>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── 命中率趋势 ──────────────────────────────────────────
+function HitRateTrend({ steps, title, color, callCount }: { steps: StepRecord[]; title: string; color: string; callCount: number }) {
+  if (steps.length < 2) return null;
+  const points: { x: number; y: number; rate: number; step: number }[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const total = s.prompt;
+    const rate = total > 0 ? s.cacheHit / total : 0;
+    points.push({ x: i, y: 1 - rate, rate, step: s.step });
+  }
+  const W = 260, H = 36, padL = 4, padR = 4, padT = 2, padB = 2;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const toX = (i: number) => padL + (i / Math.max(1, steps.length - 1)) * plotW;
+  const toY = (v: number) => padT + v * plotH;
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.x).toFixed(1)},${toY(p.y).toFixed(1)}`).join(" ");
+  const avgRate = points.reduce((a, p) => a + p.rate, 0) / points.length;
+  return (
+    <div className="py-3 border-b border-border-soft">
+      <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-1.5">
+        {title} · {callCount}次调用 · 均值 { (avgRate * 100).toFixed(1)}%
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        <line x1={padL} y1={toY(0)} x2={padL + plotW} y2={toY(0)} stroke="var(--border-soft)" strokeWidth={0.5} />
+        <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+        {points.filter((_, i) => i === 0 || i === points.length - 1).map((p) => (
+          <circle key={p.step} cx={toX(p.x)} cy={toY(p.y)} r={2} fill={color}>
+            <title>步#{p.step}: {(p.rate * 100).toFixed(1)}%</title>
+          </circle>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+
+// ─── Token 趋势图 ────────────────────────────────────────
+function TokenTrendChart({ history }: { history: TurnRecord[] }) {
+  const recent = history.slice(-20);
+  let cumP = 0, cumC = 0;
+  const pCumulative: number[] = []; const cCumulative: number[] = [];
+  for (const r of recent) { cumP += r.prompt; cumC += r.completion; pCumulative.push(cumP); cCumulative.push(cumC); }
+  const pMax = Math.max(...pCumulative, 1); const cMax = Math.max(...cCumulative, 1);
+  const W = 260, H = 88, padL = 40, padR = 40, padT = 6, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const pToY = (v: number) => padT + plotH - (v / pMax) * plotH;
+  const cToY = (v: number) => padT + plotH - (v / cMax) * plotH;
+  const pPoints: Point[] = pCumulative.map((v, i) => ({
+    x: padL + (i / Math.max(1, pCumulative.length - 1)) * plotW, y: pToY(v),
+    label: `轮#${recent[i].turn}: Prompt ${tk(v)}`,
+  }));
+  const cPoints: Point[] = cCumulative.map((v, i) => ({
+    x: padL + (i / Math.max(1, cCumulative.length - 1)) * plotW, y: cToY(v),
+    label: `轮#${recent[i].turn}: Compl ${tk(v)}`,
+  }));
+  const pPath = pPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const cPath = cPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const tkK = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K" : String(n);
+  const pYLabels: [number, string][] = [[0, "0"], [Math.round(pMax * 0.5), tkK(Math.round(pMax * 0.5))], [pMax, tkK(pMax)]];
+  const cYLabels: [number, string][] = [[0, "0"], [Math.round(cMax * 0.5), tk(Math.round(cMax * 0.5))], [cMax, tk(cMax)]];
+  const xLabels = recent.length >= 3 ? [{ at: pPoints[0].x, text: `#${recent[0].turn}` }, { at: pPoints[pPoints.length - 1].x, text: `#${recent[recent.length - 1].turn}` }] : [];
+  return (
+    <div className="py-3 border-b border-border-soft">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider">
+          <TrendingUp size={11} className="inline mr-1 align-middle" />
+          Token 趋势 (最近 {recent.length} 轮)
+        </div>
+        <div className="flex items-center gap-3 text-[9px] text-fg-faint">
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#22d3ee"}} />输入</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#fb923c"}} />输出</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        {pYLabels.map(([_val, label], i) => {
+          const y = padT + plotH - (i / (pYLabels.length - 1)) * plotH;
+          return (<g key={`py${i}`}><line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} /><text x={padL - 4} y={y + 3} fontSize={9} fill="#22d3ee" textAnchor="end">{label}</text></g>);
+        })}
+        {cYLabels.map(([_val, label], i) => {
+          const y = padT + plotH - (i / (cYLabels.length - 1)) * plotH;
+          return (<g key={`cy${i}`}><text x={W - padR + 4} y={y + 3} fontSize={9} fill="#fb923c" textAnchor="start">{label}</text></g>);
+        })}
+        <path d={pPath} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinejoin="round" />
+        {pPoints.map((p, i) => (<circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="#22d3ee"><title>{p.label}</title></circle>))}
+        <path d={cPath} fill="none" stroke="#fb923c" strokeWidth={2} strokeLinejoin="round" />
+        {cPoints.map((p, i) => (<circle key={"c"+i} cx={p.x} cy={p.y} r={2} fill="#fb923c"><title>{p.label}</title></circle>))}
+        {xLabels.map((xl, i) => (<text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>))}
+      </svg>
+    </div>
+  );
+}
+
+// ─── StatsPanel ──────────────────────────────────────────
+// ─── StatsPanel ──────────────────────────────────────────
+// 纯展示组件，不再管理 localStorage 持久化。
+// 持久化由 App 层调用 useStatsPersistence 负责。
+
+export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCounts, skillCounts, perTurnPlannerUsage, perTurnExecutorUsage, perTurnSubUsage }: {
+  data: StoredData;
+  clearData: () => void;
+  turnSteps?: WireUsage[]; subagentModel?: string;
+  toolCounts: Record<string, number>; skillCounts: Record<string, number>;
+  perTurnPlannerUsage?: WireUsage; perTurnExecutorUsage?: WireUsage; perTurnSubUsage?: WireUsage;
+}) {
+  const { turns: history, steps: stepHistory } = data;
+
   // ── stats computation ──────────────────────────────────
 
   // session-level: aggregate from localStorage stepHistory, split by source
   const plannerSteps = stepHistory.filter(s => s.source === "planner");
-  const executorSteps = stepHistory.filter(s => s.source !== "subagent" && s.source !== "planner"); // "main" or legacy
+  const executorSteps = stepHistory.filter(s => s.source !== "subagent" && s.source !== "planner");
   const subSteps = stepHistory.filter(s => s.source === "subagent");
   const sessPlanner = useMemo(() => aggSteps(plannerSteps), [plannerSteps]);
   const sessExecutor = useMemo(() => aggSteps(executorSteps), [executorSteps]);
@@ -316,7 +343,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey,
     cacheMiss: sessPlanner.cacheMiss + sessExecutor.cacheMiss + sessSub.cacheMiss,
     cost: sessPlanner.cost + sessExecutor.cost + sessSub.cost,
   }), [sessPlanner, sessExecutor, sessSub]);
-  
+
   // turn-level: from store accumulators
   const turnPlanner = useMemo(() => colFromUsage(perTurnPlannerUsage), [perTurnPlannerUsage]);
   const turnExecutor = useMemo(() => colFromUsage(perTurnExecutorUsage), [perTurnExecutorUsage]);
@@ -385,69 +412,16 @@ export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey,
         )}
 
         {/* ── 命中率趋势（规划）── */}
-        <HitRateTrend steps={plannerSteps} title="命中率趋势 · Hermes" color="var(--accent)" />
+        <HitRateTrend steps={plannerSteps} title="命中率趋势 · Hermes" color="var(--accent)" callCount={plannerSteps.length} />
 
         {/* ── 命中率趋势（执行）── */}
-        <HitRateTrend steps={executorSteps} title="命中率趋势 · Hephaestus" color="#3b82f6" />
+        <HitRateTrend steps={executorSteps} title="命中率趋势 · Hephaestus" color="#3b82f6" callCount={executorSteps.length} />
 
         {/* ── 命中率趋势（子代理）── */}
-        <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" />
+        <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" callCount={subSteps.length} />
 
         {/* ── Token 趋势 ── */}
-        {history.length > 1 && (() => {
-          const recent = history.slice(-20);
-          let cumP = 0, cumC = 0;
-          const pCumulative: number[] = []; const cCumulative: number[] = [];
-          for (const r of recent) { cumP += r.prompt; cumC += r.completion; pCumulative.push(cumP); cCumulative.push(cumC); }
-          const pMax = Math.max(...pCumulative, 1); const cMax = Math.max(...cCumulative, 1);
-          const W = 260, H = 88, padL = 40, padR = 40, padT = 6, padB = 18;
-          const plotW = W - padL - padR, plotH = H - padT - padB;
-          const pToY = (v: number) => padT + plotH - (v / pMax) * plotH;
-          const cToY = (v: number) => padT + plotH - (v / cMax) * plotH;
-          const pPoints: Point[] = pCumulative.map((v, i) => ({
-            x: padL + (i / Math.max(1, pCumulative.length - 1)) * plotW, y: pToY(v),
-            label: `轮#${recent[i].turn}: Prompt ${tk(v)}`,
-          }));
-          const cPoints: Point[] = cCumulative.map((v, i) => ({
-            x: padL + (i / Math.max(1, cCumulative.length - 1)) * plotW, y: cToY(v),
-            label: `轮#${recent[i].turn}: Compl ${tk(v)}`,
-          }));
-          const pPath = pPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-          const cPath = cPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-          const tkK = (n: number) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K" : String(n);
-          const pYLabels: [number, string][] = [[0, "0"], [Math.round(pMax * 0.5), tkK(Math.round(pMax * 0.5))], [pMax, tkK(pMax)]];
-          const cYLabels: [number, string][] = [[0, "0"], [Math.round(cMax * 0.5), tk(Math.round(cMax * 0.5))], [cMax, tk(cMax)]];
-          const xLabels = recent.length >= 3 ? [{ at: pPoints[0].x, text: `#${recent[0].turn}` }, { at: pPoints[pPoints.length - 1].x, text: `#${recent[recent.length - 1].turn}` }] : [];
-          return (
-            <div className="py-3 border-b border-border-soft">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider">
-                  <TrendingUp size={11} className="inline mr-1 align-middle" />
-                  Token 趋势 (最近 {recent.length} 轮)
-                </div>
-                <div className="flex items-center gap-3 text-[9px] text-fg-faint">
-                  <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#22d3ee"}} />输入</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded" style={{background:"#fb923c"}} />输出</span>
-                </div>
-              </div>
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-                {pYLabels.map(([_val, label], i) => {
-                  const y = padT + plotH - (i / (pYLabels.length - 1)) * plotH;
-                  return (<g key={`py${i}`}><line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--border-soft)" strokeWidth={0.5} /><text x={padL - 4} y={y + 3} fontSize={9} fill="#22d3ee" textAnchor="end">{label}</text></g>);
-                })}
-                {cYLabels.map(([_val, label], i) => {
-                  const y = padT + plotH - (i / (cYLabels.length - 1)) * plotH;
-                  return (<g key={`cy${i}`}><text x={W - padR + 4} y={y + 3} fontSize={9} fill="#fb923c" textAnchor="start">{label}</text></g>);
-                })}
-                <path d={pPath} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinejoin="round" />
-                {pPoints.map((p, i) => (<circle key={"p"+i} cx={p.x} cy={p.y} r={2} fill="#22d3ee"><title>{p.label}</title></circle>))}
-                <path d={cPath} fill="none" stroke="#fb923c" strokeWidth={2} strokeLinejoin="round" />
-                {cPoints.map((p, i) => (<circle key={"c"+i} cx={p.x} cy={p.y} r={2} fill="#fb923c"><title>{p.label}</title></circle>))}
-                {xLabels.map((xl, i) => (<text key={i} x={xl.at} y={H - 3} fontSize={9} fill="var(--fg-faint)" textAnchor="middle">{xl.text}</text>))}
-              </svg>
-            </div>
-          );
-        })()}
+        {history.length > 1 && <TokenTrendChart history={history} />}
 
         {/* ── 工具 / 技能统计 ── */}
         {(Object.keys(toolCounts).length > 0 || Object.keys(skillCounts).length > 0) && (
@@ -487,7 +461,7 @@ export function StatsPanel({ perTurnUsage, turnSteps, subagentModel, sessionKey,
 
         {/* 清空按钮 */}
         <div className="flex justify-end pb-1">
-          <button className="text-[10px] px-1.5 py-0.5 border border-border-soft rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:border-err transition-colors" onClick={() => { setData({ turns: [], steps: [] }); saveData(sessionKey, { turns: [], steps: [] }); turnRef.current = 0; stepRef.current = 0; }} title="清空统计">
+          <button className="text-[10px] px-1.5 py-0.5 border border-border-soft rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:border-err transition-colors" onClick={clearData} title="清空统计">
             清空统计
           </button>
         </div>

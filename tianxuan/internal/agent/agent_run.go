@@ -164,7 +164,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		// automatic compaction — truncates history when prompt
 		// exceeds the high-water mark. legacyTruncate preserves
 		// L1+L2+prefix+summary+tail for maximum cache continuity.
-		a.maybeCompact(ctx, usage)
+		// Skip during grace round: compaction rewrites the message
+		// array (LogRewriteVersion++), zeroing the prefix cache
+		// right before the turn ends — pure waste.
+		if !graceRound {
+			a.maybeCompact(ctx, usage)
+		}
 
 		// Keep reasoning_content on the assistant turn for display and session
 		// archive. It is NOT re-uploaded to the API: the openai provider drops it

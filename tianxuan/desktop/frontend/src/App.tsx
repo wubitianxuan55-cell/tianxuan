@@ -63,15 +63,10 @@ function NewSessionToast({ done }: { done: boolean }) {
 
 // ── RunStatus — 输入框上方的运行时状态行 ─────────────────────
 
-function modelShort(s: string) {
-  return s.replace(/^.*\//, "").replace("deepseek-v4-", "").replace("mimo-v2.5-", "");
-}
-
-function RunStatus({ running, turnStartAt, turnTokens, label, plannerLabel, phase }: {
+function RunStatus({ running, turnStartAt, turnTokens, plannerLabel, phase }: {
   running: boolean;
   turnStartAt: number;
   turnTokens: number;
-  label: string;
   plannerLabel?: string;
   phase: string; // "hermes" | "hephaestus" | ""
 }) {
@@ -92,7 +87,7 @@ function RunStatus({ running, turnStartAt, turnTokens, label, plannerLabel, phas
         {plannerLabel && (
           <span className={`flex items-center gap-1.5 ${isPlanner ? "text-fg" : "text-fg-faint/60"}`}>
             <Brain size={12} className={isPlanner ? "text-purple-400" : ""} />
-            <span className="font-medium">{modelShort(plannerLabel)}</span>
+            <span className="font-medium">Hermes</span>
             <span>规划</span>
             {isPlanner && (
               <span className="inline-flex items-center gap-1 ml-0.5">
@@ -104,7 +99,7 @@ function RunStatus({ running, turnStartAt, turnTokens, label, plannerLabel, phas
         )}
         <span className={`flex items-center gap-1.5 ${isExecutor ? "text-fg" : "text-fg-faint/60"}`}>
           <Cpu size={12} className={isExecutor ? "text-cyan-400" : ""} />
-          <span className="font-medium">{modelShort(label)}</span>
+          <span className="font-medium">Hephaestus</span>
           <span>执行</span>
           {isExecutor && (
             <span className="inline-flex items-center gap-1 ml-0.5">
@@ -461,22 +456,26 @@ export default function App() {
             </div>
             {/* 顶栏上下文用量 — Hermes(紫) + Hephaestus(青) */}
             {(state.context.window > 0 || state.context.plannerWindow > 0) && (
-              <div className="flex flex-col gap-0.5 min-w-[180px] max-w-[260px] flex-1">
+              <div className="flex flex-row gap-2 min-w-[260px] max-w-[360px] flex-1">
                 {state.context.plannerWindow > 0 && (
-                  <ContextBar
-                    label="规划"
-                    used={state.context.plannerUsed}
-                    window={state.context.plannerWindow}
-                    color="bg-purple-500/60"
-                  />
+                  <div className="flex-1 min-w-0">
+                    <ContextBar
+                      label="规划"
+                      used={state.context.plannerUsed}
+                      window={state.context.plannerWindow}
+                      color="bg-purple-500/60"
+                    />
+                  </div>
                 )}
                 {state.context.window > 0 && (
-                  <ContextBar
-                    label="执行"
-                    used={state.context.used}
-                    window={state.context.window}
-                    color="bg-cyan-500/60"
-                  />
+                  <div className="flex-1 min-w-0">
+                    <ContextBar
+                      label="执行"
+                      used={state.context.used}
+                      window={state.context.window}
+                      color="bg-cyan-500/60"
+                    />
+                  </div>
                 )}
               </div>
             )}
@@ -530,7 +529,6 @@ export default function App() {
               running={state.running}
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
-              label={state.meta?.label ?? ""}
               plannerLabel={state.meta?.plannerLabel}
               phase={activePhase}
             />

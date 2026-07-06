@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Clock, FolderGit2, FolderPlus, Search, Square, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
 import type { CommandInfo, DirEntry, SlashArgItem, SlashArgsResult, WorkspaceView } from "../lib/types";
-import { useStore } from "../lib/store";
 import { SlashMenu } from "./SlashMenu";
 import { ArgMenu } from "./ArgMenu";
 import { FileMenu } from "./FileMenu";
@@ -81,20 +80,7 @@ export function Composer({
     }
   }, [running]);
 
-  // 计时
-  const turnStartAt = useStore(useCallback((s) => s.turnStartAt, []));
-  const turnActive = useStore(useCallback((s) => s.turnActive, []));
-  const turnTokens = useStore(useCallback((s) => s.turnTokens, []));
-  const [elapsed, setElapsed] = useState(0);
-  const [finalElapsed, setFinalElapsed] = useState<number | null>(null);
-  useEffect(() => {
-    if (!turnActive) { if (turnStartAt > 0) setFinalElapsed((Date.now() - turnStartAt) / 1000); return; }
-    setFinalElapsed(null);
-    const tick = () => setElapsed((Date.now() - turnStartAt) / 1000);
-    tick();
-    const id = setInterval(tick, 200);
-    return () => clearInterval(id);
-  }, [turnActive, turnStartAt]);
+
   useEffect(() => {
     if (wasRunning.current && !running && text.trim() === "") {
       paste.clearBlocks();
@@ -284,7 +270,6 @@ export function Composer({
   };
 
   const composerCardStyle = composerHeight === null ? undefined : ({ "--composer-height": `${composerHeight}px` } as CSSProperties);
-  const displayElapsed = finalElapsed ?? elapsed;
 
   // ── 项目感知 placeholder ──
   const placeholderText = useMemo(() => {
@@ -297,15 +282,6 @@ export function Composer({
 
   return (
     <div className="relative max-w-[--maxw] mx-auto">
-      {/* ── 计时条 ── */}
-      {(turnActive || finalElapsed !== null) && (
-        <div className="flex items-center gap-1.5 pb-1.5 pl-1 text-fg-faint text-[11px] tabular-nums font-mono">
-          <Clock size={11} className="text-accent" />
-          <span>{displayElapsed.toFixed(1)}s</span>
-          {turnTokens > 0 && <span className="text-fg-faint/70">{turnTokens} tok</span>}
-        </div>
-      )}
-
       {/* ── 工作区切换菜单 ── */}
       {workspaceMenuOpen && cwd && (
         <div

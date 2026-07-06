@@ -57,6 +57,11 @@ func (*runSkillTool) Schema() json.RawMessage {
 }`)
 }
 
+func (*runSkillTool) CompactDescription() string { return "Invoke a skill by name. Subagent skills spawn isolated loop; inline skills fold body as tool result." }
+func (*runSkillTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"},"arguments":{"type":"string"}},"required":["name"]}`)
+}
+
 func (t *runSkillTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
 		Name      string `json:"name"`
@@ -154,6 +159,24 @@ func (t *subagentSkillTool) Name() string        { return t.toolName }
 // affecting the prefix cache (ReadOnly is a runtime property, not part of the API schema).
 func (*subagentSkillTool) ReadOnly() bool        { return true }
 func (t *subagentSkillTool) Description() string { return t.description }
+
+func (t *subagentSkillTool) CompactDescription() string {
+	switch t.toolName {
+	case "explore":
+		return "Isolated subagent for read-only codebase investigation. Returns one distilled answer with file:line citations."
+	case "research":
+		return "Isolated subagent combining web_search + web_fetch + code reading. Returns synthesis with code and web citations."
+	case "review":
+		return "Isolated subagent reviewing current branch diff — correctness, security, missing tests per file:line."
+	default:
+		return "Isolated subagent for security review of current branch diff — injection, authz, secrets, crypto, severity-tagged."
+	}
+}
+
+func (t *subagentSkillTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string","description":` +
+		strconv.Quote(t.taskDesc) + `}},"required":["task"]}`)
+}
 
 func (t *subagentSkillTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string","description":` +
@@ -261,6 +284,11 @@ func (*installSkillTool) Schema() json.RawMessage {
 },
 "required":["name","description","body"]
 }`)
+}
+
+func (*installSkillTool) CompactDescription() string { return "Create a new skill from name + description + markdown body. Saves to project or global skills directory." }
+func (*installSkillTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"body":{"type":"string"},"scope":{"type":"string","enum":["project","global"]},"runAs":{"type":"string","enum":["inline","subagent","pipeline"]}},"required":["name","description","body"]}`)
 }
 
 func (t *installSkillTool) Execute(_ context.Context, args json.RawMessage) (string, error) {
@@ -444,6 +472,11 @@ func (*parallelSkillsTool) Schema() json.RawMessage {
 },
 "required":["tasks"]
 }`)
+}
+
+func (*parallelSkillsTool) CompactDescription() string { return "Run multiple skills in parallel or DAG order, collect results." }
+func (*parallelSkillsTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"tasks":{"type":"array","items":{"type":"object","properties":{"skill":{"type":"string"},"arguments":{"type":"string"},"id":{"type":"string"},"depends_on":{"type":"array","items":{"type":"string"}}},"required":["skill","arguments"]}}},"required":["tasks"]}`)
 }
 
 func (t *parallelSkillsTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {

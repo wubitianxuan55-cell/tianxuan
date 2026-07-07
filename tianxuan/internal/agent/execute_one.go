@@ -140,8 +140,6 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 
 	cctx := withCallContext(ctx, call.ID, a.sink, a.asker)
 	if a.evidence != nil {
-		// V10.8: 严格验证只在 Plan Mode 下启用
-		a.evidence.SetStrictVerification(false)
 		cctx = evidence.WithLedger(cctx, a.evidence)
 	}
 	if a.jobs != nil {

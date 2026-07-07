@@ -103,8 +103,11 @@ func TestCompleteStepVerifiesHostReceipts(t *testing.T) {
 	}
 }
 
+// TestCompleteStepRejectsUnverifiedHostEvidence tests that strict mode (Plan Mode)
+// rejects evidence that cannot be verified against host receipts.
 func TestCompleteStepRejectsUnverifiedHostEvidence(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8: 严格验证模式
 	ledger.Record(evidence.Receipt{ToolName: "bash", Success: false, Command: "go test ./..."})
 	ledger.Record(evidence.Receipt{ToolName: "write_file", Success: true, Paths: []string{"changed.go"}, Write: true})
 	ctx := evidence.WithLedger(context.Background(), ledger)
@@ -150,7 +153,9 @@ func TestCompleteStepRejectsUnverifiedHostEvidence(t *testing.T) {
 }
 
 func TestCompleteStepRejectsManualOnly(t *testing.T) {
-	ctx := evidence.WithLedger(context.Background(), evidence.NewLedger())
+	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8: 严格验证模式
+	ctx := evidence.WithLedger(context.Background(), ledger)
 	_, err := completeStep{}.Execute(ctx, json.RawMessage(`{
 		"step":"Manual check",
 		"result":"operator confirmed behavior",
@@ -166,6 +171,7 @@ func TestCompleteStepRejectsManualOnly(t *testing.T) {
 
 func TestCompleteStepMatchesTodoReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8: 严格验证模式
 	ledger.Record(evidence.Receipt{
 		ToolName: "bash",
 		Success:  true,
@@ -199,6 +205,7 @@ func TestCompleteStepMatchesTodoReceipt(t *testing.T) {
 
 func TestCompleteStepRejectsTodoMismatchAndPending(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // V10.8: 严格验证模式
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,
@@ -221,6 +228,7 @@ func TestCompleteStepRejectsTodoMismatchAndPending(t *testing.T) {
 	t.Run("pending_accepted", func(t *testing.T) {
 		// First, record a successful bash command as evidence
 		ledger2 := evidence.NewLedger()
+		ledger2.SetStrictVerification(true) // V10.8: 严格验证模式
 		ledger2.Record(evidence.Receipt{
 			ToolName: "bash", Success: true, Command: "echo done",
 		})
@@ -281,5 +289,96 @@ func TestCompleteStepIgnoresFailedTodoReceipt(t *testing.T) {
 func TestCompleteStepReadOnly(t *testing.T) {
 	if !(completeStep{}).ReadOnly() {
 		t.Fatal("complete_step must be ReadOnly so it stays available and needs no approval")
+	}
+}
+// ── V10.8: 非严格模式测试 ──────────────────────────────────────────
+
+// TestCompleteStepAcceptsUnverifiedEvidenceInNonStrictMode verifies that
+// complete_step accepts evidence without host receipt matching when
+// strict verification is disabled (the production default).
+func TestCompleteStepAcceptsUnverifiedEvidenceInNonStrictMode(t *testing.T) {
+	ledger := evidence.NewLedger()
+	// strictVerify defaults to false — no SetStrictVerification call
+	// ledger contains receipts that do NOT match the evidence
+	ledger.Record(evidence.Receipt{ToolName: "bash", Success: false, Command: "not-this-command"})
+	ctx := evidence.WithLedger(context.Background(), ledger)
+
+	cases := []struct {
+		name string
+		args string
+	}{
+		{
+			name: "verification without matching bash receipt",
+			args: `{"step":"x","result":"y","evidence":[{"kind":"verification","summary":"all tests pass","command":"go test ./..."}]}`,
+		},
+		{
+			name: "diff without matching writer receipt",
+			args: `{"step":"x","result":"y","evidence":[{"kind":"diff","summary":"changed files","paths":["nonexistent.go"]}]}`,
+		},
+		{
+			name: "files without matching read/write receipt",
+			args: `{"step":"x","result":"y","evidence":[{"kind":"files","summary":"inspected files","paths":["nonexistent.go"]}]}`,
+		},
+		{
+			name: "mix of verified and unverified kinds",
+			args: `{"step":"x","result":"y","evidence":[{"kind":"verification","summary":"tests pass","command":"go test ./..."},{"kind":"diff","summary":"changed files","paths":["nonexistent.go"]}]}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := completeStep{}.Execute(ctx, json.RawMessage(tc.args))
+			if err != nil {
+				t.Fatalf("non-strict mode should accept unverified evidence: %v", err)
+			}
+			if !strings.Contains(out, "signed off") {
+				t.Fatalf("ack missing 'signed off', got %q", out)
+			}
+		})
+	}
+}
+
+// TestCompleteStepAcceptsManualOnlyInNonStrictMode verifies that non-strict
+// mode allows pure manual evidence (no verification/diff/files required).
+func TestCompleteStepAcceptsManualOnlyInNonStrictMode(t *testing.T) {
+	ledger := evidence.NewLedger()
+	ctx := evidence.WithLedger(context.Background(), ledger)
+
+	out, err := completeStep{}.Execute(ctx, json.RawMessage(`{
+		"step":"Manual check",
+		"result":"visual inspection confirmed correct",
+		"evidence":[{"kind":"manual","summary":"checked the output visually"}]}`))
+	if err != nil {
+		t.Fatalf("non-strict mode should accept manual-only evidence: %v", err)
+	}
+	if !strings.Contains(out, "signed off") {
+		t.Fatalf("ack missing 'signed off', got %q", out)
+	}
+}
+
+// TestCompleteStepSkipsTodoMatchInNonStrictMode verifies that non-strict
+// mode does not require a matching todo_write item — the step can be any
+// text without triggering an error.
+func TestCompleteStepSkipsTodoMatchInNonStrictMode(t *testing.T) {
+	ledger := evidence.NewLedger()
+	// Record a todo_write with completely different items
+	ledger.Record(evidence.Receipt{
+		ToolName: "todo_write",
+		Success:  true,
+		Todos: []evidence.TodoItem{
+			{Content: "Unrelated task", Status: "in_progress"},
+		},
+	})
+	ctx := evidence.WithLedger(context.Background(), ledger)
+
+	out, err := completeStep{}.Execute(ctx, json.RawMessage(`{
+		"step":"Step not in todo list",
+		"result":"step is complete",
+		"evidence":[{"kind":"verification","summary":"tests pass","command":"go test ./..."}]}`))
+	if err != nil {
+		t.Fatalf("non-strict mode should skip todo matching: %v", err)
+	}
+	if !strings.Contains(out, "signed off") {
+		t.Fatalf("ack missing 'signed off', got %q", out)
 	}
 }

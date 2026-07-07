@@ -118,9 +118,12 @@ func (completeStep) Execute(ctx context.Context, args json.RawMessage) (string, 
 	if err != nil {
 		return "", err
 	}
-	// 编码铁律: manual 证据不能单独作为签退依据——至少需要一条可验证证据
+	// 编码铁律: manual 证据不能单独作为签退依据——至少需要一条可验证证据。
+	// V10.8: 严格验证只在 Plan Mode 下启用；非严格模式允许纯 manual 签退。
 	if hostVerified == 0 && manualUnverified > 0 {
-		return "", fmt.Errorf("all evidence is manual (%d item(s)) — at least one verification, diff, or files evidence is required; run a check with bash and cite its output, or cite a concrete code change", manualUnverified)
+		if ledger, ok := evidence.FromContext(ctx); !ok || ledger.StrictVerification() {
+			return "", fmt.Errorf("all evidence is manual (%d item(s)) — at least one verification, diff, or files evidence is required; run a check with bash and cite its output, or cite a concrete code change", manualUnverified)
+		}
 	}
 	hostStatus := ""
 	if _, ok := evidence.FromContext(ctx); ok {
@@ -138,6 +141,18 @@ func verifyStepEvidence(ctx context.Context, items []stepEvidence) (hostVerified
 	ledger, ok := evidence.FromContext(ctx)
 	if !ok {
 		return 0, 0, nil
+	}
+	// V10.8: 严格验证只在 Plan Mode 下启用；非严格模式跳过 host receipt 匹配，
+	// 只统计 manual 数量供 all-manual 检查使用。
+	if !ledger.StrictVerification() {
+		for _, e := range items {
+			if e.Kind == "manual" {
+				manualUnverified++
+			} else {
+				hostVerified++
+			}
+		}
+		return hostVerified, manualUnverified, nil
 	}
 	for i, e := range items {
 		switch e.Kind {
@@ -177,6 +192,10 @@ func verifyStepEvidence(ctx context.Context, items []stepEvidence) (hostVerified
 func verifyTodoStep(ctx context.Context, step string) (evidence.TodoStepMatch, bool, error) {
 	ledger, ok := evidence.FromContext(ctx)
 	if !ok {
+		return evidence.TodoStepMatch{}, false, nil
+	}
+	// V10.8: 严格验证只在 Plan Mode 下启用；非严格模式跳过 todo 匹配验证。
+	if !ledger.StrictVerification() {
 		return evidence.TodoStepMatch{}, false, nil
 	}
 	match, hasTodo := ledger.MatchLatestTodoStep(step)

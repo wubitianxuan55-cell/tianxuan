@@ -117,6 +117,7 @@ func TestEvidenceFlowRejectsUncitedCommand(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
+	a.evidence.SetStrictVerification(true) // V10.8: 严格验证模式
 	if _, err := a.Run(context.Background(), "vet the tree and sign off"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -157,6 +158,7 @@ func TestEvidenceFlowRejectsStepMissingFromTodoWrite(t *testing.T) {
 	}}
 
 	a := New(prov, reg, NewSession(""), Options{}, event.Discard)
+	a.evidence.SetStrictVerification(true) // V10.8: 严格验证模式
 	if _, err := a.Run(context.Background(), "update todos then sign off the wrong step"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}

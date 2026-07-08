@@ -111,3 +111,38 @@ func TestBashDescriptionReflectsShell(t *testing.T) {
 		t.Errorf("bash description should not mention PowerShell: %q", sh.Description())
 	}
 }
+
+func TestWrapLauncherCommand(t *testing.T) {
+	tests := []struct {
+		cmd    string
+		want   string
+		wantOk bool
+	}{
+		// start without /b → wrapped
+		{"start notepad.exe", `cmd /c start "" "notepad.exe"`, true},
+		{"start myapp.exe", `cmd /c start "" "myapp.exe"`, true},
+		// start /b → NOT wrapped (background, same window)
+		{"start /b myapp.exe", "", false},
+		{"start /B server.exe", "", false},
+		// Start-Process → wrapped
+		{"Start-Process notepad", `cmd /c start "" "notepad"`, true},
+		// npm / wails / go → wrapped
+		{"npm start", `cmd /c start "" "npm start"`, true},
+		{"npm run dev", `cmd /c start "" "npm run dev"`, true},
+		{"wails dev", `cmd /c start "" "wails dev"`, true},
+		{"go run ./cmd/server", `cmd /c start "" "go run ./cmd/server"`, true},
+		// normal commands → NOT wrapped
+		{"echo hello", "", false},
+		{"go build ./...", "", false},
+		{"git status", "", false},
+	}
+	for _, tt := range tests {
+		got, ok := wrapLauncherCommand(tt.cmd)
+		if ok != tt.wantOk {
+			t.Errorf("wrapLauncherCommand(%q) ok = %v, want %v", tt.cmd, ok, tt.wantOk)
+		}
+		if tt.wantOk && got != tt.want {
+			t.Errorf("wrapLauncherCommand(%q) =\n  got:  %q\n  want: %q", tt.cmd, got, tt.want)
+		}
+	}
+}

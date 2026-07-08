@@ -88,6 +88,14 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"conditional chaining, or issue the commands as separate calls")
 	}
 
+	// Windows PowerShell: 检测启动类命令（start、npm dev、wails dev 等），
+	// 包裹为 cmd /c start 以弹出独立窗口，避免 bash 阻塞等待服务进程退出。
+	if sh.Kind == sandbox.ShellPowerShell && runtime.GOOS == "windows" && !p.RunInBackground {
+		if wrapped, ok := wrapLauncherCommand(p.Command); ok {
+			p.Command = wrapped
+		}
+	}
+
 	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
 	argv, _ := sandbox.Command(b.sb, sh, p.Command)
 
@@ -320,4 +328,109 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 		return s, false
 	}
 	return result, true
+}
+
+// ── launcher command detection (Windows PowerShell) ──
+
+// launcherPrefixes are command prefixes that typically start long-running
+// server or GUI processes. On Windows PowerShell, these are wrapped via
+// cmd /c start to open a new visible window and return immediately,
+// preventing the bash tool from blocking on cmd.Wait().
+var launcherPrefixes = []string{
+	"npm start", "npm run dev", "npm run serve",
+	"wails dev",
+	"go run ",
+}
+
+// wrapLauncherCommand detects whether cmd starts a long-running process and
+// wraps it for non-blocking execution in a visible window. Returns the
+// (possibly wrapped) command and true if wrapping was applied.
+func wrapLauncherCommand(cmd string) (string, bool) {
+	trimmed := strings.TrimSpace(cmd)
+
+	// "start X" (without /b) or "Start-Process X" → pop out a new window
+	if isStartCmd(trimmed) {
+		rest := restAfterStart(trimmed)
+		if rest == "" {
+			return cmd, false
+		}
+		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(rest)), true
+	}
+
+	// Common dev-server patterns → new window
+	for _, prefix := range launcherPrefixes {
+		if strings.HasPrefix(strings.ToLower(trimmed), prefix) {
+			return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
+		}
+	}
+
+	return cmd, false
+}
+
+// isStartCmd reports whether cmd starts with "start " (PowerShell alias for
+// Start-Process) or "Start-Process ", excluding "start /b" (background).
+func isStartCmd(cmd string) bool {
+	lower := strings.ToLower(cmd)
+	if strings.HasPrefix(lower, "start /b") || strings.HasPrefix(lower, "start /B") {
+		return false // /b = same window, no wrapping needed
+	}
+	return strings.HasPrefix(lower, "start ") || strings.HasPrefix(lower, "start-process ")
+}
+
+// restAfterStart returns the command part after "start " or "Start-Process ",
+// stripping the optional quoted window title and Start-Process flags.
+func restAfterStart(cmd string) string {
+	lower := strings.ToLower(strings.TrimSpace(cmd))
+	var rest string
+	if strings.HasPrefix(lower, "start-process ") {
+		rest = strings.TrimSpace(cmd[len("start-process "):])
+	} else {
+		rest = strings.TrimSpace(cmd[len("start "):])
+	}
+	// Skip optional quoted window title (cmd.exe start convention)
+	if strings.HasPrefix(rest, `"`) {
+		if end := strings.Index(rest[1:], `"`); end >= 0 {
+			rest = strings.TrimSpace(rest[end+2:])
+		}
+	}
+	// Strip Start-Process flags that conflict with new-window wrapping
+	if strings.HasPrefix(lower, "start-process ") {
+		rest = stripStartProcessFlags(rest)
+	}
+	return rest
+}
+
+// stripStartProcessFlags removes -NoNewWindow, -WindowStyle, and -Wait flags
+// from a Start-Process argument list.
+func stripStartProcessFlags(cmd string) string {
+	for _, flag := range []string{"-NoNewWindow", "-WindowStyle", "-Wait"} {
+		for {
+			idx := findFlag(cmd, flag)
+			if idx < 0 {
+				break
+			}
+			end := idx + len(flag)
+			rest := strings.TrimSpace(cmd[end:])
+			// If next token is a value (e.g. -WindowStyle Hidden), skip it too
+			if len(rest) > 0 && rest[0] != '-' {
+				if spaceIdx := strings.IndexByte(rest, ' '); spaceIdx > 0 {
+					rest = rest[spaceIdx:]
+				} else {
+					rest = ""
+				}
+			}
+			cmd = strings.TrimSpace(cmd[:idx] + rest)
+		}
+	}
+	return cmd
+}
+
+func findFlag(s, flag string) int {
+	return strings.Index(strings.ToLower(s), strings.ToLower(flag))
+}
+
+// escapeCmdArg wraps a command for use as a single argument to cmd /c start.
+func escapeCmdArg(cmd string) string {
+	escaped := strings.ReplaceAll(cmd, `"`, `""`)
+	return `"` + escaped + `"`
 }

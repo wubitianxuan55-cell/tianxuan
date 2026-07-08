@@ -1,3 +1,55 @@
+## [10.49.0] — 2026-07-08
+
+### 🕐 定时任务系统（全新功能）
+
+- **核心调度器** (`internal/schedule/`)：进程内 goroutine 调度器，1 秒 ticker 检测到期任务
+- **数据模型**：Schedule（hourly/daily/weekly + 时间点）+ ScheduleResult（执行记录，最多保留 20 条）
+- **双层存储**：全局（`~/.config/tianxuan/schedules.json`）+ 工作区（`.tianxuan/schedules.json`），JSON 原子写入
+- **执行桥接**：跳过 Hermes 规划者，直接用 Hephaestus 执行者，PlannerMode=true
+- **桌面端集成**：7 个 Wails bindings（GetSchedules/CreateSchedule/UpdateSchedule/DeleteSchedule/ToggleSchedule/RunScheduleNow/GetResults）
+- **前端面板**：SchedulePanel 组件（列表/新建/编辑/删除/启停/立即执行/执行历史折叠），侧边栏入口
+- **系统托盘**：定时任务子菜单（暂停全部/恢复全部），5 秒更新状态标题
+
+### 🐛 修复
+
+- **规划者 ASK 工具**：显式注入 readOnlyReg + planWithTools 运行时重传 Asker，修复 asker=nil 导致 [Never-Ask]
+- **complete_step todo 同步**：同轮内 todo_write 立即同步 a.todoState + advanceCanonicalTodo 防御重建，修复代办窗口卡在第一步
+- **bash PowerShell 启动命令**：自动检测 start/npm start/wails dev/go run 等启动类命令，包裹为 `cmd /c start` 弹出独立窗口，避免阻塞
+
+## [10.48.0] — 2026-07-07
+
+### 🐛 修复
+
+- **complete_step strictVerify**：verifyStepEvidence/verifyTodoStep 在非严格模式（生产默认）下跳过 host receipt 匹配；execute_one 不再硬覆盖 strictVerify=false
+
+## [10.47.0] — 2026-07-07
+
+### ⚡ 优化
+
+- **Grace Round 跳过 maybeCompact**：轮末不再触发无效压缩
+- **技能工具 CompactDescriptor**：6 个工具（run_skill/install_skill/parallel_skills/explore/research/review/security_review）省约 1079 tokens/调用
+
+### 🧹 清理
+
+- 删除 7 个无用 ClaudeKit 技能目录（~6MB）+ 6 个未注册死代码 body 常量（~400 行）+ 重复 review/skills 文件
+
+### 🎨 UI
+
+- 顶栏上下文左右排列、删除 Composer 重复计时条、RunStatus 固定角色名
+
+## [10.46.0] — 2026-07-07
+
+### ⚡ 优化
+
+- **MCP 工具 schema 压缩**：compressSchema 递归 strip description，节省约 600-1000 token/API 调用
+- **PlannerMode**：规划者跳过 6 项执行器专属逻辑（turnPrefs/todo/recall/steer/bgCycle/repeat/graceRound），省约 60 token/轮
+
+### 🎨 UI
+
+- 统计面板可折叠详情、思考卡 Brain 图标+读秒、上下文条移到顶栏双行、RunStatus 双模型状态行
+
+---
+
 ## [10.45.0] — 2026-07-06
 
 ### 🧠 流程优化

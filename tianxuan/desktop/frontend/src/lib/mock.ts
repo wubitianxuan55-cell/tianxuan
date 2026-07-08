@@ -569,5 +569,18 @@ export function makeMockApp(): AppBindings {
     async GetResults(_scheduleID: string): Promise<ResultView[]> {
       return [];
     },
+    async RefineSchedulePrompt(prompt: string): Promise<string> {
+      return `任务目标：${prompt}
+
+执行步骤：
+1. 使用 grep 扫描项目中与目标相关的代码文件
+2. 使用 read_file 检查关键模块的实现
+3. 分析发现的问题并记录
+4. 如需修复或改进，使用 edit_file 应用更改
+5. 生成执行摘要报告
+
+成功标准：所有相关文件已检查，潜在问题已记录或修复。
+输出格式：简要摘要 + 文件扫描结果 + 问题/改进列表`;
+    },
   };
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Play, Trash2, Settings, ChevronDown, ChevronRight, CalendarDays } from "lucide-react";
+import { Plus, Play, Trash2, Settings, ChevronDown, ChevronRight, CalendarDays, Sparkles } from "lucide-react";
 import { app } from "../lib/bridge";
 import type { ScheduleView, ResultView } from "../lib/types";
 
@@ -35,6 +35,8 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleView | null>(null);
+  const [refining, setRefining] = useState(false);
+  const [refineErr, setRefineErr] = useState("");
   const [form, setForm] = useState({
     name: "",
     prompt: "",
@@ -91,6 +93,21 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
     await app.DeleteSchedule(id);
     load();
   };
+  const handleRefine = async () => {
+    const trimmed = form.prompt.trim();
+    if (!trimmed) return;
+    setRefining(true);
+    setRefineErr("");
+    try {
+      const refined = await app.RefineSchedulePrompt(trimmed);
+      setForm((f) => ({ ...f, prompt: refined }));
+    } catch (e: any) {
+      setRefineErr(e?.message || String(e));
+    } finally {
+      setRefining(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const env: Record<string, string> = {};
     if (form.envStr.trim()) {
@@ -125,6 +142,7 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
 
   const openEdit = (s: ScheduleView) => {
     setEditing(s);
+    setRefineErr("");
     setForm({
       name: s.name,
       prompt: s.prompt,
@@ -170,6 +188,7 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
                 scope: "global",
                 enabled: true,
               });
+              setRefineErr("");
               setFormOpen(true);
             }}
           >
@@ -246,15 +265,40 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
                   placeholder="如: 每日代码审查"
                 />
               </label>
-              <label className="block text-[12px] text-fg-faint">
-                Prompt{" "}
+              <div className="block text-[12px] text-fg-faint">
+                Prompt
+              </div>
+              <div className="flex items-start gap-2">
                 <textarea
-                  className="w-full mt-1 bg-bg border border-border-soft rounded-md px-2.5 py-2 text-[13px] text-fg outline-none focus:border-accent resize-y min-h-[80px]"
+                  className="flex-1 bg-bg border border-border-soft rounded-md px-2.5 py-2 text-[13px] text-fg outline-none focus:border-accent resize-y min-h-[80px]"
                   value={form.prompt}
-                  onChange={(e) => setForm({ ...form, prompt: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, prompt: e.target.value }); setRefineErr(""); }}
                   placeholder="发给 AI 执行者的任务描述"
                 />
-              </label>
+                <button
+                  className={`flex items-center gap-1 shrink-0 px-2.5 py-1.5 text-[12px] rounded-md border transition ${
+                    refining || !form.prompt.trim()
+                      ? "border-border-soft text-fg-faint/50 cursor-not-allowed"
+                      : "border-accent/30 text-accent hover:bg-accent-soft hover:border-accent/50"
+                  }`}
+                  onClick={handleRefine}
+                  disabled={refining || !form.prompt.trim()}
+                  title="AI 规划：将简要描述扩展为详细执行步骤"
+                >
+                  {refining ? (
+                    <>
+                      <Sparkles size={13} className="animate-spin" /> 规划中…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={13} /> AI 规划
+                    </>
+                  )}
+                </button>
+              </div>
+              {refineErr && (
+                <div className="text-[11px] text-err mt-0.5">规划失败: {refineErr}</div>
+              )}
               <div className="flex gap-2">
                 <label className="flex-1 text-[12px] text-fg-faint">
                   频率{" "}
@@ -301,16 +345,6 @@ export function SchedulePanel({ onClose }: { onClose: () => void }) {
                   value={form.workDir}
                   onChange={(e) => setForm({ ...form, workDir: e.target.value })}
                   placeholder="/absolute/path/to/project"
-                />
-              </label>
-              <label className="block text-[12px] text-fg-faint">
-                环境变量 (每行 KEY=VALUE){" "}
-                <textarea
-                  className="w-full mt-1 bg-bg border border-border-soft rounded-md px-2.5 py-2 text-[13px] text-fg outline-none font-mono text-[11px]"
-                  value={form.envStr}
-                  onChange={(e) => setForm({ ...form, envStr: e.target.value })}
-                  rows={3}
-                  placeholder="NODE_ENV=production"
                 />
               </label>
               <div className="flex gap-4">

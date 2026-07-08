@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import logoSymbol from "../assets/logo.svg";
+import { Zap } from "lucide-react";
 import { useT } from "../lib/i18n";
 
 const SPLASH_FLAG = "tianxuan.splash.shown";
@@ -68,8 +68,11 @@ export function StartupSplash({ hold, onDone }: { hold: boolean; onDone: () => v
   return (
     <div className="startup-splash" data-leaving={leaving} onClick={() => finish(true)}>
       <div className="startup-splash__card">
-        <div className="startup-splash__mark" aria-hidden="true">
-          <img src={logoSymbol} alt="" draggable={false} />
+        <div className="relative w-20 h-20 flex items-center justify-center mb-[22px]">
+          <span className="absolute inset-[-6px] rounded-2xl bg-accent/15 animate-pulse" />
+          <span className="absolute inset-[-10px] rounded-2xl border-2 border-accent/25 animate-[spin_12s_linear_infinite]" />
+          <span className="absolute inset-[-4px] rounded-xl border border-accent/35 animate-[spin_6s_linear_infinite_reverse]" />
+          <Zap size={36} className="text-accent relative z-10" style={{ filter: "drop-shadow(0 0 12px var(--accent))" }} />
         </div>
         <div className="startup-splash__name">tianxuan</div>
         <div className="startup-splash__sub">{t("app.splashSubtitle") ?? "AI 编程助手"}</div>

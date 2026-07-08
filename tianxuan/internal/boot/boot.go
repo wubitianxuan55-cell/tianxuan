@@ -364,7 +364,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			if err != nil {
 				return nil, fmt.Errorf("planner %q: %w", pm, err)
 			}
-			plannerSess := agent.NewSession(agent.HermesPrompt + "\n\n# Project context\n\n" + mem.Block())
+			plannerSess := agent.NewSession(agent.HermesPrompt + "\n\n# Project context\n\n" + mem.PlannerBlock())
 			// V10.32: build a read-only tool subset for the planner so it can
 			// investigate code before proposing a plan (read_file, grep, glob,
 			// web_search, web_fetch, lsp_*, code_index, memory_search,

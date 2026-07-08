@@ -1,5 +1,26 @@
 # Tianxuan 版本变更日志
 
+## V10.50.0 (2026-07-08) — Superpowers 蒸馏 + 双模型角色区分
+
+### 🧠 Superpowers v6.1.1 方法论融入 AGENTS.md
+- **修复 design_session 虚假引用**：工具已在 V10.4.0 移除，AGENTS.md 4处引用改为 ask/explore 真实工具路径
+- **systematic-debugging 扩展**：5级根因追溯（表象→直接原因→本地根因→系统根因→过程根因）+ 2条禁止项（跳过重现直接猜根因、修报错行不追问为什么）
+- **TDD 强化**：修 bug 必须先写复现测试
+
+### 🔀 双模型 AGENTS.md 角色区分（memory.PlannerBlock）
+- Hermes 规划者上下文过滤：移除编码铁律（7条）+ 计划粒度 + Superpowers 方法论全文
+- 减少规划者 ~35% 无关 token
+- 角色指代修正：（执行者，你）→（执行者），避免 Hermes 读到 Hephaestus 的"你"混淆
+- 新增 `memory.PlannerBlock()` + `filterAGENTSForPlanner()` + 5个单元测试
+- 执行者 Block() 不受影响，依然获得完整 AGENTS.md
+
+### 🖥️ 桌面端
+- 定时任务增强：LLM 辅助将简短描述扩展为结构化任务指令（refineScheduleSystemPrompt）
+- SchedulePanel 改进
+- Welcome 页面简化
+
+---
+
 ## V10.15.0 (2026-06-29) — 启动黑屏热修复
 
 ### 🔥 关键修复：启动黑屏

@@ -143,6 +143,119 @@ func (s *Set) Block() string {
 	return s.buildCompactBlock()
 }
 
+// PlannerBlock returns memory filtered for the Hermes planner: project
+// context (repo, architecture, skills, cache rules, role descriptions) minus
+// executor-only coding disciplines (TDD, verification, no-placeholders, plan
+// granularity, Superpowers methodology). The planner is read-only — coding
+// rules waste tokens and can confuse role attribution ("Hephaestus (you)"
+// read by Hermes).
+func (s *Set) PlannerBlock() string {
+	if s.Empty() {
+		return ""
+	}
+	full := s.buildPlannerFullBlock()
+	if len(full) <= 4096 {
+		return full
+	}
+	return s.buildPlannerCompactBlock()
+}
+
+// buildPlannerFullBlock is buildFullBlock with AGENTS.md-class docs filtered
+// for planner relevance.
+func (s *Set) buildPlannerFullBlock() string {
+	var b strings.Builder
+	b.WriteString("# Memory\n\n")
+	if profile := s.ProfileBlock(); profile != "" {
+		b.WriteString(profile + "\n\n")
+	}
+	for _, d := range s.Docs {
+		body := d.Body
+		if isAgentDoc(d.Path) {
+			body = filterAGENTSForPlanner(body)
+		}
+		fmt.Fprintf(&b, "\n## %s (%s)\n\n%s\n", d.Path, d.Scope, strings.TrimSpace(body))
+	}
+	if idx := strings.TrimSpace(s.Index); idx != "" {
+		b.WriteString("\n## Saved memories\n\n")
+		b.WriteString(idx)
+		fmt.Fprintf(&b, "\n\n(stored under %s)\n", s.Store.Dir)
+	}
+	return b.String()
+}
+
+// buildPlannerCompactBlock is buildCompactBlock with AGENTS.md-class docs
+// filtered for planner relevance.
+func (s *Set) buildPlannerCompactBlock() string {
+	var b strings.Builder
+	b.WriteString("# Memory\n\n")
+	if profile := s.ProfileBlock(); profile != "" {
+		b.WriteString(profile + "\n\n")
+	}
+	b.WriteString("Docs available:\n\n")
+	for _, d := range s.Docs {
+		first := strings.TrimSpace(d.Body)
+		if isAgentDoc(d.Path) {
+			first = filterAGENTSForPlanner(first)
+		}
+		if idx := strings.Index(first, "\n"); idx >= 0 {
+			first = first[:idx]
+		}
+		first = strings.TrimSpace(first)
+		if len(first) > 160 {
+			first = first[:160] + "\u2026"
+		}
+		fmt.Fprintf(&b, "- %s (%s): %s\n", filepath.Base(d.Path), d.Scope, first)
+	}
+	if idx := strings.TrimSpace(s.Index); idx != "" {
+		b.WriteString("\n## Saved memories\n\n")
+		b.WriteString(idx)
+		fmt.Fprintf(&b, "\n\n(stored under %s)\n", s.Store.Dir)
+	}
+	return b.String()
+}
+
+// isAgentDoc reports whether path is an AGENTS.md-class project memory file
+// whose content mixes planner-relevant context with executor-only rules.
+func isAgentDoc(path string) bool {
+	base := filepath.Base(path)
+	return base == "AGENTS.md" || base == "TIANXUAN.md" || base == "CLAUDE.md" ||
+		base == "AGENTS.local.md" || base == "TIANXUAN.local.md" || base == "CLAUDE.local.md"
+}
+
+// filterAGENTSForPlanner removes executor-only sections from AGENTS.md-class
+// content: encoding iron laws (TDD/verification/no-placeholders/…), plan
+// granularity, and the Superpowers methodology appendix. It also fixes the
+// "Hephaestus (执行者，你)" address so the planner (Hermes) isn't confused.
+func filterAGENTSForPlanner(body string) string {
+	// 1. Drop the Superpowers appendix (last major section in AGENTS.md).
+	if idx := strings.Index(body, "\n## 🦸 Superpowers"); idx >= 0 {
+		body = strings.TrimRight(body[:idx], "\n")
+	}
+
+	// 2. Drop the encoding iron-laws block, keeping subsequent list items.
+	const ironHeader = "- **编码铁律**（自动生效）："
+	const ironEndMarker = "- **子代理隔离**："
+	if start := strings.Index(body, ironHeader); start >= 0 {
+		if end := strings.Index(body[start:], ironEndMarker); end >= 0 {
+			body = body[:start] + body[start+end:]
+		}
+	}
+
+	// 3. Drop the plan-granularity line (a standalone list item between 工具直用优先 and 核心约束).
+	const planLine = "- **计划粒度**："
+	if start := strings.Index(body, planLine); start >= 0 {
+		end := strings.Index(body[start:], "\n")
+		if end >= 0 {
+			body = body[:start] + body[start+end+1:]
+		}
+	}
+
+	// 4. The "executor (you)" address confuses Hermes.
+	body = strings.Replace(body, "（执行者，你）", "（执行者）", 1)
+
+	return body
+}
+
 // DocBlock returns just the doc bodies for turn-tail injection (V5.30).
 // The controller calls this in the first turn to give the model full doc content
 // without expanding the cache-stable prefix.

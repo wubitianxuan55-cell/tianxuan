@@ -172,6 +172,7 @@ export interface AppBindings {
   ToggleSchedule(id: string, enabled: boolean): Promise<void>;
   RunScheduleNow(id: string): Promise<ResultView>;
   GetResults(scheduleID: string): Promise<ResultView[]>;
+  RefineSchedulePrompt(prompt: string): Promise<string>;
 }
 
 interface WailsRuntime {

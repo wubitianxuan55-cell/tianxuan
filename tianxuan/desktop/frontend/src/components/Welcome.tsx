@@ -1,6 +1,4 @@
-import { ArrowUp, FolderOpen, Bug, Code, Search, FileText, MessageSquare, Clock, Zap, PenTool, TestTube } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import logo from "../assets/logo.png";
+import { FolderOpen, Bug, Search, FileText, MessageSquare, Clock, Zap, PenTool, TestTube, Wrench, Brain, Blocks, Cpu } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { sessionTitle } from "../lib/session";
@@ -42,37 +40,6 @@ export function Welcome({
 }) {
   const t = useT();
   const compact = useCompact();
-  const [text, setText] = useState("");
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem("tianxuan.shortcutsSeen")) {
-        setShowShortcuts(true);
-        localStorage.setItem("tianxuan.shortcutsSeen", "1");
-        const timer = setTimeout(() => setShowShortcuts(false), 5000);
-        return () => clearTimeout(timer);
-      }
-    } catch {}
-  }, []);
-
-  const handleSubmit = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onPrompt(trimmed);
-    setText("");
-  }, [text, onPrompt]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit],
-  );
 
   const recentSessions = sessions?.filter(s => !s.current).slice(0, 3) ?? [];
 
@@ -86,58 +53,29 @@ export function Welcome({
         </div>
       )}
 
-      <img src={logo} className={`rounded-[10px] mb-3 ${compact ? "w-8 h-8" : "w-10 h-10"}`} alt="tianxuan" />
-      <div className={`text-fg-dim mb-7 ${compact ? "text-[13px]" : "text-[14px]"}`} style={{fontFamily: "var(--ds-font-display)", fontWeight: 500, letterSpacing: "-0.01em"}}>{t("welcome.tagline")}</div>
-
-      <div className="w-full border border-border-soft bg-bg-elev rounded-2xl shadow-[var(--ds-shadow-composer)] hover:border-fg-faint/30 focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] transition-all duration-[var(--dur-base)]">
-        <textarea
-          ref={taRef}
-          className={`w-full resize-none border-0 bg-transparent text-fg leading-relaxed outline-none placeholder:text-fg-faint px-5 pt-5 pb-2 ${compact ? "text-[13px] min-h-[64px]" : "text-[14px] min-h-[80px]"} max-h-[160px]`}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={cwdName ? `在 ${cwdName}/ 中提问…` : t("composer.placeholder")}
-          rows={2}
-        />
-        <div className="flex items-center justify-between px-4 pb-4">
-          <span className={`text-fg-faint ${compact ? "text-[10px]" : "text-[11px]"}`}>
-            <kbd className="ds-kbd">/</kbd> 命令
-            <span className="mx-1.5 text-fg-faint/40">·</span>
-            <kbd className="ds-kbd">@</kbd> 文件
-            <span className="mx-1.5 text-fg-faint/40">·</span>
-            <kbd className="ds-kbd">↵</kbd> 发送
-          </span>
-          <button
-            className={`inline-flex items-center justify-center w-8 h-8 border-0 rounded-full cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] active:scale-95 ${
-              text.trim()
-                ? "bg-accent text-accent-fg hover:brightness-110"
-                : "bg-bg-elev-2 text-fg-faint"
-            }`}
-            style={text.trim() ? {boxShadow: "var(--ds-shadow-accent-btn)"} : undefined}
-            onClick={handleSubmit}
-            disabled={!text.trim()}
-          >
-            <ArrowUp size={16} />
-          </button>
+      <div className="mb-7">
+        <div className="relative w-20 h-20 mx-auto flex items-center justify-center mb-[22px]">
+          <span className="absolute inset-[-6px] rounded-2xl bg-accent/15 animate-pulse" />
+          <span className="absolute inset-[-10px] rounded-2xl border-2 border-accent/25 animate-[spin_12s_linear_infinite]" />
+          <span className="absolute inset-[-4px] rounded-xl border border-accent/35 animate-[spin_6s_linear_infinite_reverse]" />
+          <Zap size={36} className="text-accent relative z-10" style={{ filter: "drop-shadow(0 0 12px var(--accent))" }} />
+        </div>
+        <div className="startup-splash__name">tianxuan</div>
+        <div className="startup-splash__sub">{t("app.splashSubtitle") ?? "AI 编程助手"}</div>
+        <div className="startup-splash__dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
         </div>
       </div>
 
-      {showShortcuts && (
-        <div className="w-full mt-3 animate-[toast-in_0.3s_ease-out]">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-soft border border-accent/15 text-[11px] text-fg-dim">
-            <Code size={12} className="text-accent" />
-            <span>
-              <kbd className="font-mono text-accent bg-accent/10 rounded px-1 py-px text-[10px]">Enter</kbd> 发送
-              <span className="mx-1.5 text-fg-faint">·</span>
-              <kbd className="font-mono text-accent bg-accent/10 rounded px-1 py-px text-[10px]">Shift+Enter</kbd> 换行
-              <span className="mx-1.5 text-fg-faint">·</span>
-              <kbd className="font-mono text-accent bg-accent/10 rounded px-1 py-px text-[10px]">/</kbd> 命令
-              <span className="mx-1.5 text-fg-faint">·</span>
-              <kbd className="font-mono text-accent bg-accent/10 rounded px-1 py-px text-[10px]">@</kbd> 文件引用
-            </span>
-          </div>
-        </div>
-      )}
+      {/* capability cards */}
+      <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-7">
+        <FeatureCard icon={<Wrench size={15} />} color="var(--accent)" title={t("skeleton.tools")} desc={t("skeleton.toolsDesc")} />
+        <FeatureCard icon={<Brain size={15} />} color="#a78bfa" title={t("skeleton.skills")} desc={t("skeleton.skillsDesc")} />
+        <FeatureCard icon={<Blocks size={15} />} color="#38bdf8" title={t("skeleton.models")} desc={t("skeleton.modelsDesc")} />
+        <FeatureCard icon={<Cpu size={15} />} color="#34d399" title={t("skeleton.cache")} desc={t("skeleton.cacheDesc")} />
+      </div>
 
       <div className={`grid grid-cols-3 gap-2 mt-4 w-full ${compact ? "[&_button]:p-2 [&_button]:text-[11px]" : ""}`}>
         {QUICK_COMMANDS.map((cmd) => (
@@ -174,6 +112,18 @@ export function Welcome({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, desc, color }: { icon: React.ReactNode; title: string; desc: string; color: string }) {
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2.5 bg-bg-elev border border-border-soft rounded-lg transition-[border-color] duration-[var(--dur-fast)] hover:border-fg-faint/40">
+      <span className="shrink-0" style={{ color }}>{icon}</span>
+      <div className="flex flex-col min-w-0">
+        <span className="text-[13px] font-medium text-fg truncate">{title}</span>
+        <span className="text-[11px] text-fg-faint truncate">{desc}</span>
+      </div>
     </div>
   );
 }

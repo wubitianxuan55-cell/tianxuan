@@ -14,10 +14,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// trayIconPNG is a 32x32 holographic hexagon icon in PNG format.
+// trayIconICO is the tray icon in ICO format (multi-size: 16/32/48).
 //
-//go:embed tray_icon.png
-var trayIconPNG []byte
+//go:embed tray_icon.ico
+var trayIconICO []byte
 
 var (
 	quitting = false
@@ -29,7 +29,7 @@ var (
 func runTray(ctx context.Context, app *App) {
 	systray.Run(
 		func() {
-			systray.SetIcon(trayIconPNG)
+			systray.SetIcon(trayIconICO)
 			systray.SetTitle("tianxuan")
 			systray.SetTooltip("tianxuan — AI Coding Agent")
 

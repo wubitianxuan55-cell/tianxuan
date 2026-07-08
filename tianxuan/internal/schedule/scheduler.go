@@ -278,6 +278,8 @@ func (sc *Scheduler) ListSchedules() []Schedule {
 
 // ListResults returns execution results for a given schedule ID, newest first.
 func (sc *Scheduler) ListResults(scheduleID string) ([]ScheduleResult, error) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
 	m, err := sc.global.LoadResults()
 	if err != nil {
 		return nil, err
@@ -291,6 +293,10 @@ func (sc *Scheduler) ListResults(scheduleID string) ([]ScheduleResult, error) {
 // RunNow immediately runs a schedule by ID and records the result.
 func (sc *Scheduler) RunNow(id string) (ScheduleResult, error) {
 	sc.mu.Lock()
+	if sc.running[id] {
+		sc.mu.Unlock()
+		return ScheduleResult{}, fmt.Errorf("schedule %q is already running", id)
+	}
 	var sched Schedule
 	found := false
 	for _, s := range sc.schedules {
@@ -300,11 +306,17 @@ func (sc *Scheduler) RunNow(id string) (ScheduleResult, error) {
 			break
 		}
 	}
-	sc.mu.Unlock()
 	if !found {
+		sc.mu.Unlock()
 		return ScheduleResult{}, fmt.Errorf("schedule %q not found", id)
 	}
-	result, err := sc.runner.Run(context.Background(), sched)
+	sc.running[id] = true
+	sc.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	result, err := sc.runner.Run(ctx, sched)
 	if err != nil {
 		result = ScheduleResult{
 			ID:         NewID(),
@@ -315,5 +327,10 @@ func (sc *Scheduler) RunNow(id string) (ScheduleResult, error) {
 		}
 	}
 	sc.global.SaveResult(result)
+
+	sc.mu.Lock()
+	sc.running[id] = false
+	sc.mu.Unlock()
+
 	return result, nil
 }

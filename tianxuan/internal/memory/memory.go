@@ -232,12 +232,24 @@ func filterAGENTSForPlanner(body string) string {
 		body = strings.TrimRight(body[:idx], "\n")
 	}
 
-	// 2. Drop the encoding iron-laws block, keeping subsequent list items.
-	const ironHeader = "- **编码铁律**（自动生效）："
+	// 2. Strip encoding iron laws except "拒绝谄媚" — the planner interacts
+	//    with the user (ask, plan confirmation, feedback) and must resist
+	//    sycophancy. Other iron laws (TDD, verification, etc.) are executor-only.
+	const ironHeader = "- **编码铁律**（自动生效）：\n"
 	const ironEndMarker = "- **子代理隔离**："
 	if start := strings.Index(body, ironHeader); start >= 0 {
 		if end := strings.Index(body[start:], ironEndMarker); end >= 0 {
-			body = body[:start] + body[start+end:]
+			ironBlock := body[start+len(ironHeader) : start+end]
+			var kept string
+			for _, line := range strings.SplitAfter(ironBlock, "\n") {
+				if strings.Contains(line, "拒绝谄媚") {
+					// Rewrite: "  - 🔴 **拒绝谄媚**：..." → "- **拒绝谄媚**：..."
+					line = strings.TrimPrefix(line, "  - 🔴 **")
+					kept = "- **" + line
+					break
+				}
+			}
+			body = body[:start] + kept + body[start+end:]
 		}
 	}
 

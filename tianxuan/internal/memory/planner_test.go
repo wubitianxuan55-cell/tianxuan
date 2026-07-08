@@ -16,6 +16,7 @@ func TestFilterAGENTSForPlanner_RemovesIronLaws(t *testing.T) {
   - 🔴 **设计优先**：编码前必须完成需求探索。
   - 🔴 **TDD**：无失败测试不写产品代码。
   - 🔴 **验证强制**：声称已修复前必须运行 verify。
+  - 🔴 **拒绝谄媚**：审查反馈时禁止表演性同意。
 - **子代理隔离**：复杂任务通过 task 工具派发。
 - **计划粒度**：todo_write 每步 2-5 分钟。
 
@@ -25,7 +26,7 @@ func TestFilterAGENTSForPlanner_RemovesIronLaws(t *testing.T) {
 
 	got := filterAGENTSForPlanner(input)
 
-	// Should NOT contain iron laws
+	// Should NOT contain iron laws (except 拒绝谄媚)
 	for _, banned := range []string{
 		"编码铁律",
 		"🔴 **设计优先**",
@@ -36,6 +37,14 @@ func TestFilterAGENTSForPlanner_RemovesIronLaws(t *testing.T) {
 		if strings.Contains(got, banned) {
 			t.Errorf("filterAGENTSForPlanner should remove %q but it remains:\n%s", banned, got)
 		}
+	}
+
+	// Should KEEP 拒绝谄媚 (planner needs anti-sycophancy)
+	if !strings.Contains(got, "拒绝谄媚") {
+		t.Error("filterAGENTSForPlanner should keep 拒绝谄媚 for the planner")
+	}
+	if strings.Contains(got, "🔴 **拒绝谄媚**") {
+		t.Error("filterAGENTSForPlanner should strip the 🔴 prefix from 拒绝谄媚")
 	}
 
 	// Should KEEP these
@@ -121,6 +130,7 @@ func TestPlannerBlock_FiltersAGENTS(t *testing.T) {
 
 - **编码铁律**（自动生效）：
   - 🔴 **TDD**：无失败测试不写产品代码。
+  - 🔴 **拒绝谄媚**：审查反馈时禁止表演性同意。
 - **子代理隔离**：复杂任务通过 task 工具派发。
 
 ## 🦸 Superpowers 开发方法论
@@ -150,6 +160,13 @@ func TestPlannerBlock_FiltersAGENTS(t *testing.T) {
 	}
 	if !strings.Contains(got, "task 工具") {
 		t.Error("PlannerBlock should keep shared context like task tool reference")
+	}
+	if !strings.Contains(got, "拒绝谄媚") {
+		t.Error("PlannerBlock should keep 拒绝谄媚 (planner anti-sycophancy)")
+	}
+	// But the 🔴 prefix should be stripped
+	if strings.Contains(got, "🔴 **拒绝谄媚**") {
+		t.Error("PlannerBlock should strip 🔴 prefix from 拒绝谄媚")
 	}
 
 	// Executor block (from same set) should contain everything

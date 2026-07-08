@@ -15,6 +15,8 @@ import type {
   MemorySuggestion,
   Meta,
   ProviderView,
+  ResultView,
+  ScheduleView,
   ServerView,
   SessionMeta,
   SettingsView,
@@ -551,6 +553,21 @@ export function makeMockApp(): AppBindings {
     },
     async SaveWindowState(_state: {width:number;height:number;x:number;y:number;maximised:boolean}) {
       // no-op in browser dev
+    },
+    async GetSchedules(): Promise<ScheduleView[]> {
+      return [];
+    },
+    async CreateSchedule(v: ScheduleView): Promise<ScheduleView> {
+      return { ...v, id: "mock-sched-1", createdAt: Math.floor(Date.now() / 1000), lastRunAt: 0 };
+    },
+    async UpdateSchedule(_v: ScheduleView): Promise<void> {},
+    async DeleteSchedule(_id: string): Promise<void> {},
+    async ToggleSchedule(_id: string, _enabled: boolean): Promise<void> {},
+    async RunScheduleNow(_id: string): Promise<ResultView> {
+      return { id: "mock-result-1", scheduleId: _id, executedAt: Math.floor(Date.now() / 1000), success: true, summary: "Mock run completed", sessionFile: "/mock/sessions/result.jsonl", duration: 1200 };
+    },
+    async GetResults(_scheduleID: string): Promise<ResultView[]> {
+      return [];
     },
   };
 }

@@ -421,3 +421,29 @@ export interface TabMeta {
   label?: string;
   activityStatus?: string;
 }
+
+// Schedule management types (desktop/schedule).
+export interface ScheduleView {
+  id: string;
+  name: string;
+  prompt: string;
+  frequency: string;
+  time: string;
+  dayOfWeek: number;
+  workDir: string;
+  env: Record<string, string>;
+  enabled: boolean;
+  createdAt: number;
+  lastRunAt: number;
+  scope: string;
+}
+
+export interface ResultView {
+  id: string;
+  scheduleId: string;
+  executedAt: number;
+  success: boolean;
+  summary: string;
+  sessionFile: string;
+  duration: number;
+}

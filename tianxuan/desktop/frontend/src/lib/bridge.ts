@@ -20,6 +20,8 @@ import type {
   MemoryView,
   MemorySuggestion,
   MemorySuggestionsView,
+  ResultView,
+  ScheduleView,
   SkillSuggestion,
   TabMeta,
   Meta,
@@ -162,6 +164,14 @@ export interface AppBindings {
   OpenDownloadPage(): Promise<void>;
   // Window state persistence.
   SaveWindowState(state: {width:number;height:number;x:number;y:number;maximised:boolean}): Promise<void>;
+  // Schedule management.
+  GetSchedules(): Promise<ScheduleView[]>;
+  CreateSchedule(v: ScheduleView): Promise<ScheduleView>;
+  UpdateSchedule(v: ScheduleView): Promise<void>;
+  DeleteSchedule(id: string): Promise<void>;
+  ToggleSchedule(id: string, enabled: boolean): Promise<void>;
+  RunScheduleNow(id: string): Promise<ResultView>;
+  GetResults(scheduleID: string): Promise<ResultView[]>;
 }
 
 interface WailsRuntime {

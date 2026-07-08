@@ -224,7 +224,8 @@ export function Transcript({
   }, [scrollToBottom]);
 
   return (
-    <div className="transcript" ref={scrollRef} onScroll={onScroll}>
+    <div className="relative flex-1 min-h-0">
+    <div className="transcript h-full" ref={scrollRef} onScroll={onScroll}>
       <div className="max-w-[--maxw] mx-auto px-8" ref={entranceRef}>
         {items.length === 0 && (
           <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
@@ -297,6 +298,7 @@ export function Transcript({
               return null;
           }
         })}
+      </div>
       </div>
       {/* 回到底部按钮 —— 居中圆形，accent 色调 */}
       {showScrollDown && (

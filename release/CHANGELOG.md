@@ -1,23 +1,30 @@
 # Tianxuan 版本变更日志
 
-## V10.50.0 (2026-07-08) — Superpowers 蒸馏 + 双模型角色区分
+## V10.50.0 (2026-07-08) — Superpowers 蒸馏 + 双模型角色区分 + 完整准则体系
 
-### 🧠 Superpowers v6.1.1 方法论融入 AGENTS.md
-- **修复 design_session 虚假引用**：工具已在 V10.4.0 移除，AGENTS.md 4处引用改为 ask/explore 真实工具路径
-- **systematic-debugging 扩展**：5级根因追溯（表象→直接原因→本地根因→系统根因→过程根因）+ 2条禁止项（跳过重现直接猜根因、修报错行不追问为什么）
-- **TDD 强化**：修 bug 必须先写复现测试
+### 🧠 Superpowers v6.1.1 → AGENTS.md 内联
+- 修复 design_session 虚假引用（V10.4.0 已移除）→ ask/explore 真实工具
+- systematic-debugging：5级根因追溯 + 2条禁止项
+- TDD 强化：修 bug 必须先写复现测试
 
-### 🔀 双模型 AGENTS.md 角色区分（memory.PlannerBlock）
-- Hermes 规划者上下文过滤：移除编码铁律（7条）+ 计划粒度 + Superpowers 方法论全文
-- 减少规划者 ~35% 无关 token
-- 角色指代修正：（执行者，你）→（执行者），避免 Hermes 读到 Hephaestus 的"你"混淆
-- 新增 `memory.PlannerBlock()` + `filterAGENTSForPlanner()` + 5个单元测试
-- 执行者 Block() 不受影响，依然获得完整 AGENTS.md
+### 🔀 双模型角色区分
+- memory.PlannerBlock()：Hermes 过滤编码铁律 + Superpowers 方法论，减 ~35% token
+- 保留"拒绝谄媚"（规划者与用户交流最多）
+- 角色指代修正：（执行者，你）→（执行者）
+
+### 🧠 Hermes 规划者准则（7 原则）
+- 专业判断 5 原则：证据优先/敢反驳/澄清不猜测/简单即美/拒绝坏计划
+- 设计质量 4 原则：SRP / OCP / YAGNI / KISS
+- 计划验证标准：每步含可验证成功条件
+
+### 🔨 Hephaestus 执行者铁律（7 → 10 条）
+- 🆕 手术级变更（Karpathy）：每行改动可追溯到需求 / 禁顺手优化 / 清 orphan
+- 🆕 极简实现（Karpathy + YAGNI/KISS）：不写未要求功能 / 3 行能解决不写 30 行
+- 🆕 防御性编程：错误大声失败 / 所有外部输入校验边界
 
 ### 🖥️ 桌面端
-- 定时任务增强：LLM 辅助将简短描述扩展为结构化任务指令（refineScheduleSystemPrompt）
-- SchedulePanel 改进
-- Welcome 页面简化
+- 🐛 一键到底按钮不随视口固定（从 .transcript 内部移到 wrapper）
+- 定时任务 LLM 辅助 + Welcome 简化
 
 ---
 

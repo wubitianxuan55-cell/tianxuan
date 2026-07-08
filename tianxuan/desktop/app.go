@@ -16,6 +16,7 @@ import (
 	"tianxuan/internal/event"
 	"tianxuan/internal/i18n"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/schedule"
 )
 
 // eventChannel is the Wails runtime event name the frontend subscribes to for the
@@ -58,6 +59,7 @@ type App struct {
 	ready          bool   // true once boot.Build completes (success or failure)
 	disabledMCP map[string]ServerView
 	mcpOrder    []string
+	scheduler   *schedule.Scheduler
 }
 
 // NewApp constructs the bound object. The controller is built later, in startup,
@@ -200,6 +202,9 @@ func (a *App) buildController() {
 	// approval_request events, answered via Approve.
 	ctrl.EnableInteractiveApproval()
 
+	// Start the scheduler for timed tasks.
+	a.startScheduler()
+
 	// Land auto-save in a fresh session file (same as a fresh chat/serve start).
 	if dir := ctrl.SessionDir(); dir != "" {
 		ctrl.SetSessionPath(agent.NewSessionPath(dir, ctrl.Label()))
@@ -243,6 +248,9 @@ func (a *App) buildController() {
 func (a *App) shutdown(context.Context) {
 	// Save window geometry before the webview tears down.
 	a.saveWindowStateSync()
+	if a.scheduler != nil {
+		a.scheduler.Stop()
+	}
 	a.mu.RLock()
 	tabs := make([]*WorkspaceTab, 0, len(a.tabs))
 	for _, t := range a.tabs {

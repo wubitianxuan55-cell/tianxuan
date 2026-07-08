@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"tianxuan/internal/event"
+	"tianxuan/internal/evidence"
 	"tianxuan/internal/provider"
 )
 
@@ -318,6 +319,16 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 
 		// advance canonical todo state for successful complete_step calls
+		// Also sync todo state from successful todo_write calls that ran
+		// in the current batch — rebuildTodoState at turn start can't see them.
+		for i, call := range calls {
+			if call.Name == "todo_write" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
+				rec := evidence.ReceiptFromToolCall(call.Name, json.RawMessage(call.Arguments), true, false)
+				if len(rec.Todos) > 0 {
+					a.setTodoState(rec.Todos)
+				}
+			}
+		}
 		for i, call := range calls {
 			if call.Name == "complete_step" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
 				step := extractStepFromArgs(call.Arguments)

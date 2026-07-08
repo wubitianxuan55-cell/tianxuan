@@ -78,6 +78,13 @@ func (a *AgentRunner) incompleteCanonicalTodos() ([]evidence.TodoStepMatch, bool
 func (a *AgentRunner) advanceCanonicalTodo(step string) {
 	a.todoMu.Lock()
 	if len(a.todoState) == 0 {
+		// rebuildTodoState runs at turn start and can't see todo_write calls
+		// from the same turn. Refresh from the session before giving up.
+		a.todoMu.Unlock()
+		a.rebuildTodoState(a.session.Messages)
+		a.todoMu.Lock()
+	}
+	if len(a.todoState) == 0 {
 		a.todoMu.Unlock()
 		return
 	}

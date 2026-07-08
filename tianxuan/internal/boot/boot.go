@@ -371,6 +371,13 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
 
+			// 显式添加 ask 工具到规划者只读工具集中。
+			// ask 工具 ReadOnly=true 理论上会被 newReadOnlyRegistry 自动包含，
+			// 但显式添加可确保它不受过滤逻辑变化的影响。
+			if askTool, ok := reg.Get("ask"); ok {
+				readOnlyReg.Add(askTool)
+			}
+
 			// V10.42: 为规划者注入只读子代理工具（task/explore/research/
 			// review/security_review）。每个子代理工具的 parentReg =
 			// readOnlyReg，确保子代理也只拿到只读工具 — headlessGate 无害。

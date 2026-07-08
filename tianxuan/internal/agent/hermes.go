@@ -411,6 +411,12 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if h.plannerAgent == nil {
 		return "", fmt.Errorf("hermes: planner agent not initialized (no read-only tools)")
 	}
+	// Re-propagate asker to plannerAgent before each planning run,
+	// ensuring the ask tool can interact with the user even if
+	// SetAsker was called before plannerAgent was created.
+	if h.asker != nil {
+		h.plannerAgent.SetAsker(h.asker)
+	}
 	if _, err := h.plannerAgent.Run(ctx, input); err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}

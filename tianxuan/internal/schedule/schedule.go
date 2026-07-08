@@ -70,17 +70,17 @@ func (s *Schedule) Due(now time.Time) bool {
 		if now.Minute() != 0 {
 			return false
 		}
-		return last.IsZero() || now.Sub(last) >= time.Hour
+		return s.LastRunAt == 0 || now.Sub(last) >= time.Hour
 	case Daily:
 		if now.Hour() != h || now.Minute() != m {
 			return false
 		}
-		return last.IsZero() || now.Sub(last) >= 23*time.Hour
+		return s.LastRunAt == 0 || now.Sub(last) >= 23*time.Hour
 	case Weekly:
 		if now.Weekday() != time.Weekday(s.DayOfWeek) || now.Hour() != h || now.Minute() != m {
 			return false
 		}
-		return last.IsZero() || now.Sub(last) >= 6*24*time.Hour
+		return s.LastRunAt == 0 || now.Sub(last) >= 6*24*time.Hour
 	}
 	return false
 }

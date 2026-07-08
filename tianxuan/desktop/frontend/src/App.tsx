@@ -27,6 +27,7 @@ const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ d
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
 const CapabilitiesPanel = lazy(() => import("./components/CapabilitiesPanel").then(m => ({ default: m.CapabilitiesPanel })));
+const SchedulePanel = lazy(() => import("./components/SchedulePanel").then(m => ({ default: m.SchedulePanel })));
 import { RuntimePanel } from "./components/RuntimePanel";
 import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
@@ -147,6 +148,7 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
   const [capsOpen, setCapsOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
@@ -330,6 +332,7 @@ export default function App() {
       if (ke.key === "Escape" && !inInput && !state.running) {
         if (capsOpen) { ke.preventDefault(); setCapsOpen(false); return; }
         if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); return; }
+        if (scheduleOpen) { ke.preventDefault(); setScheduleOpen(false); return; }
         if (memView !== null) { ke.preventDefault(); setMemView(null); return; }
         if (histView !== null) { ke.preventDefault(); setHistView(null); return; }
         if (workspacePanelOpen) { ke.preventDefault(); setWorkspacePanel(false); return; }
@@ -346,7 +349,7 @@ export default function App() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [state.running, capsOpen, settingsOpen, memView, histView, workspacePanelOpen]);
+  }, [state.running, capsOpen, settingsOpen, memView, histView, scheduleOpen, workspacePanelOpen]);
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
@@ -441,6 +444,7 @@ export default function App() {
           onOpenMemory={openMemory}
           onOpenCaps={() => setCapsOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSchedule={() => setScheduleOpen(true)}
           startResize={startSidebarResize}
           resizeWithKeyboard={resizeSidebarWithKeyboard}
           onDoubleClickResize={() => setExpandedSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
@@ -715,6 +719,10 @@ export default function App() {
 
       <Suspense fallback={null}>
         {capsOpen && <CapabilitiesPanel onClose={() => setCapsOpen(false)} />}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {scheduleOpen && <SchedulePanel onClose={() => setScheduleOpen(false)} />}
       </Suspense>
 
       <CommandPalette

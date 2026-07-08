@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import {
   SquarePen, Brain, Blocks, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
-  Settings as SettingsIcon,
+  Settings as SettingsIcon, CalendarDays,
 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
@@ -27,6 +27,7 @@ export interface SidebarProps {
   onOpenMemory: () => void;
   onOpenCaps: () => void;
   onOpenSettings: () => void;
+  onOpenSchedule: () => void;
   startResize: (e: ReactPointerEvent<HTMLButtonElement>) => void;
   resizeWithKeyboard: (e: KeyboardEvent<HTMLButtonElement>) => void;
   onDoubleClickResize: () => void;
@@ -52,6 +53,7 @@ export function Sidebar({
   onOpenMemory,
   onOpenCaps,
   onOpenSettings,
+  onOpenSchedule,
   startResize,
   resizeWithKeyboard,
   onDoubleClickResize,
@@ -275,6 +277,14 @@ export function Sidebar({
           >
             <Blocks size={15} />
             {!collapsed && <span>{t("caps.title")}</span>}
+          </button>
+          <button
+            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+            onClick={() => onOpenSchedule()}
+            title="定时任务"
+          >
+            <CalendarDays size={15} />
+            {!collapsed && <span>定时任务</span>}
           </button>
           <button
             className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-40 disabled:cursor-default ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}

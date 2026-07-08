@@ -99,7 +99,7 @@ func (a *App) startup(ctx context.Context) {
 	go a.buildController()
 
 	// Start system tray — close minimizes to tray, not exit.
-	go runTray(ctx)
+	go runTray(ctx, a)
 }
 
 // domReady fires after the frontend has loaded and rendered. Restore saved

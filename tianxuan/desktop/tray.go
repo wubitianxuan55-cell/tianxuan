@@ -1,12 +1,14 @@
 // tray.go — system tray icon + menu for tianxuan desktop.
 // Uses getlantern/systray to create a taskbar notification area icon.
-// The tray provides: Show/Hide window, Quit.
+// The tray provides: Show/Hide window, schedule controls, Quit.
 package main
 
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -24,25 +26,50 @@ var (
 // runTray initializes the system tray with a "T" icon and Show/Quit menu.
 // Must be called in a goroutine from App.startup() with the Wails context.
 // systray.Run is blocking; it returns when systray.Quit() is called.
-func runTray(ctx context.Context) {
+func runTray(ctx context.Context, app *App) {
 	systray.Run(
 		func() {
-			// onReady — runs in a new goroutine after systray initializes.
 			systray.SetIcon(trayIconPNG)
 			systray.SetTitle("tianxuan")
 			systray.SetTooltip("tianxuan — AI Coding Agent")
 
 			showItem := systray.AddMenuItem("显示 tianxuan", "恢复主窗口")
 			systray.AddSeparator()
+
+			// —— 定时任务子菜单 ——
+			schedItem := systray.AddMenuItem("定时任务: --", "定时任务状态")
+			pauseAllItem := schedItem.AddSubMenuItem("暂停全部", "暂停所有定时任务")
+			resumeAllItem := schedItem.AddSubMenuItem("恢复全部", "恢复所有定时任务")
+			systray.AddSeparator()
+			// —— 定时任务子菜单结束 ——
+
 			quitItem := systray.AddMenuItem("退出", "完全退出 tianxuan")
 
-			// Handle menu clicks in a separate goroutine (systray requires it).
+			// Update schedule title periodically
+			go func() {
+				updateScheduleTitle(schedItem, app)
+				ticker := time.NewTicker(5 * time.Second)
+				defer ticker.Stop()
+				for range ticker.C {
+					if quitting {
+						return
+					}
+					updateScheduleTitle(schedItem, app)
+				}
+			}()
+
 			go func() {
 				for {
 					select {
 					case <-showItem.ClickedCh:
 						runtime.WindowShow(ctx)
 						runtime.WindowUnminimise(ctx)
+					case <-pauseAllItem.ClickedCh:
+						toggleAllSchedules(app, false)
+						updateScheduleTitle(schedItem, app)
+					case <-resumeAllItem.ClickedCh:
+						toggleAllSchedules(app, true)
+						updateScheduleTitle(schedItem, app)
 					case <-quitItem.ClickedCh:
 						slog.Info("tray: quit requested")
 						quitting = true
@@ -53,11 +80,38 @@ func runTray(ctx context.Context) {
 			}()
 		},
 		func() {
-			// onExit — called when systray.Quit() is invoked or the tray is destroyed.
-			// Use runtime.Quit to trigger Wails' graceful shutdown (OnShutdown →
-			// snapshot + ctrl.Close) instead of os.Exit which would skip cleanup.
 			slog.Info("tray: exiting, requesting graceful shutdown")
 			runtime.Quit(ctx)
 		},
 	)
+}
+
+func updateScheduleTitle(item *systray.MenuItem, app *App) {
+	if app == nil || app.scheduler == nil {
+		item.SetTitle("定时任务: --")
+		item.Disable()
+		return
+	}
+	schedules := app.scheduler.ListSchedules()
+	total := len(schedules)
+	enabled := 0
+	for _, s := range schedules {
+		if s.Enabled {
+			enabled++
+		}
+	}
+	item.SetTitle(fmt.Sprintf("定时任务 (%d/%d)", enabled, total))
+	if total == 0 {
+		item.Disable()
+	}
+}
+
+func toggleAllSchedules(app *App, enabled bool) {
+	if app == nil || app.scheduler == nil {
+		return
+	}
+	schedules := app.scheduler.ListSchedules()
+	for _, s := range schedules {
+		_ = app.scheduler.ToggleSchedule(s.ID, enabled)
+	}
 }

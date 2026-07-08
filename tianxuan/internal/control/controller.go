@@ -608,6 +608,9 @@ func (c *Controller) SystemPrompt() string {
 	return c.systemPrompt
 }
 
+// Executor returns the raw executor Agent for scheduler use.
+func (c *Controller) Executor() *agent.Agent { return c.executor }
+
 // NewSession snapshots the current conversation, rotates to a fresh file, and
 // resets the executor to a clean session carrying the same system prompt. It
 // ends the old session and starts the new one for lifecycle hooks.

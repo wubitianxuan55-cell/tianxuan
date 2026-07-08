@@ -529,6 +529,12 @@ func (a *AgentRunner) ContextWindow() int { return a.compaction.Window }
 // fires (e.g. 0.8). The status line uses it to show headroom to the next compact.
 func (a *AgentRunner) CompactRatio() float64 { return a.compaction.Ratio }
 
+// Provider returns the LLM provider this runner uses.
+func (a *AgentRunner) Provider() provider.Provider { return a.prov }
+
+// Registry returns the tool registry.
+func (a *AgentRunner) Registry() *tool.Registry { return a.tools }
+
 // New constructs an AgentRunner. MaxSteps <= 0 means no cap �� the run loop
 // continues until the model gives a final answer, the context is cancelled, or
 // the provider errors (compaction keeps the context bounded). A nil sink is

@@ -194,6 +194,11 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	}
 	reg.Add(taskTool)
 
+	// parallel_tasks: dispatches multiple independent sub-agent tasks concurrently.
+	parallelTasksTool := agent.NewParallelTasksTool(execProv, entry.Price, reg, maxSteps,
+		entry.ContextWindow, cfg.Agent.Temperature, config.ArchiveDir(), "", headlessGate)
+	reg.Add(parallelTasksTool)
+
 	// The `remember` tool lets the model persist durable facts to the project's
 	// auto-memory store; `forget` prunes ones that turn out wrong. The saved index
 	// loads into the prefix on the next session.
@@ -268,6 +273,8 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	taskTool.SetCompiler(&taskCompilerAdapter{c: compiler})
 	// V5.25: 注入 L2 运行时上下文，子代理共享父代理的项目/工作区/目标
 	taskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
+	parallelTasksTool.SetCompiler(&taskCompilerAdapter{c: compiler})
+	parallelTasksTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
 
 	// V2.4: centralised ToolDispatcher for pre-execution checks.
 	toolDispatcher := agent.NewToolDispatcher(headlessGate, hookRunner)
@@ -778,7 +785,7 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	// (they are conceptually read-only) but each spawns a full-toolset sub-agent
 	// that can write files through headlessGate.
 	exclude := map[string]bool{
-		"task": true, "run_skill": true, "parallel_skills": true,
+		"task": true, "run_skill": true, "parallel_skills": true, "parallel_tasks": true,
 		"explore": true, "research": true, "review": true, "security_review": true,
 	}
 	for _, name := range full.Names() {

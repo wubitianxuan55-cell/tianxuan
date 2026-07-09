@@ -50,6 +50,22 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 	skills := skillStore.List()
 	sysPrompt = skill.ApplyIndex(sysPrompt, skills)
 
+	// parallel dispatch guidance — tells the model WHEN to use parallel_tasks / parallel_skills
+	sysPrompt += `
+## Parallel dispatch
+
+When you face 2+ independent tasks that can be worked on without shared state or
+sequential dependencies, dispatch them in parallel instead of one-by-one:
+
+- parallel_tasks — for arbitrary sub-agent investigations (e.g. "find all callers
+  of X in Go backend" + "find all consumers of X in frontend")
+- parallel_skills — for named skill invocations (explore, review, research,
+  security_review) that each need an isolated sub-agent
+
+Decision: if two tasks read different files/folders and neither result depends on
+the other, they are parallel-safe. If you're unsure, default to parallel — the
+worst case is two sub-agents racing to read the same file, which is harmless.`
+
 	builtin.WireReadSkillResolver(func(name string) (string, error) {
 		sk, ok := skillStore.Read(name)
 		if !ok {

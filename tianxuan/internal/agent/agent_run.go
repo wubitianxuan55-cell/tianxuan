@@ -32,6 +32,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	if !a.plannerMode {
 		input = a.withTurnPreferences(input)
 	}
+	// V10.49: Hermes pre-injects the original user input (origInput) before
+	// the formatHandoff call, so the handoff never enters the session as a
+	// user-visible message. Both messages reach the model; History() skips
+	// the handoff text by prefix. See app_session.go History().
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
 	// rebuild canonical todo state from session history

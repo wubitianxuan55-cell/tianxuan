@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"tianxuan/internal/agent/session"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 )
@@ -151,7 +152,11 @@ func (s *updateSink) replay(msgs []provider.Message) {
 			// Skip system-injected nudges (e.g. "[system] All tasks appear complete...")
 			// — they are internal prompts, not visible user messages.
 			if m.Content != "" && !strings.HasPrefix(m.Content, "[system]") {
-				s.send(messageChunk{SessionUpdate: "user_message_chunk", Content: textBlock(m.Content)})
+				content := session.StripTransientBlocks(m.Content)
+				if strings.HasPrefix(strings.TrimSpace(content), "<compaction-summary>") {
+					content = "〈会话摘要〉"
+				}
+				s.send(messageChunk{SessionUpdate: "user_message_chunk", Content: textBlock(content)})
 			}
 		case provider.RoleAssistant:
 			if m.ReasoningContent != "" {

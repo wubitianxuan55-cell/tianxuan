@@ -316,7 +316,7 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	input = c.Compose(input)
 	// Open a checkpoint for this turn before the user message is appended, so the
 	// recorded message boundary precedes it and pre-edit snapshots land here.
-	c.beginCheckpoint(input)
+	c.beginCheckpoint(agent.StripTransientBlocks(input))
 	// UserPromptSubmit / Stop hooks bracket the whole turn (incl. the plan
 	// research + approved-execution sub-turns below): a gating UserPromptSubmit
 	// aborts before any model call; Stop fires once when the turn returns.

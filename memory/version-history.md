@@ -1,7 +1,7 @@
 ---
 name: version-history
 title: 版本历史
-description: 版本历史汇总 — V7.6 到 V10.31 全部主要版本摘要
+description: 版本历史汇总 — V7.6 到 V10.51.1 全部主要版本摘要
 metadata:
   type: reference
 ---
@@ -10,6 +10,7 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.51.1 | 2026-07-09 | 重启历史会话中文输入显示修复 + 启动命令跨平台自动后台化 |
 | V10.31.0 | 2026-07-04 | 双模型弹性降级 + 统计面板规划/执行拆分 + 子代理冷启动优化 |
 | V10.30.0 | 2026-07-04 | web_fetch 代理(HTTP CONNECT+SOCKS5) + grep .gitignore 精确行走 + 启动动画重设计 |
 | V10.26.0 | 2026-07-04 | Reasonix V1.15 蒸馏完成 + 双模型协调器(planner+executor) + 桌面端适配 |
@@ -74,3 +75,23 @@ metadata:
 - 子代理 transcript 持久化 (SubagentStore/SubagentRun)
 - 双模型协调器 (Coordinator, ~260行): planner 流式规划 → executor 执行
 - 桌面端: 双视图 Planner 模型选择器 + SetPlannerModel 绑定
+
+## V10.51.1 详情
+
+- **产物**: `build/bin/tianxuan-desktop.exe`
+- **SHA256**: `c4ae09800a97ad9e40e14c58534e80d86f0fb1e9fb9b6b1e05014627ceb2fc4c`
+- **构建命令**: `cd tianxuan/desktop && wails build`
+- **变更**: 4 个核心文件 + 9 个周边文件
+
+### 重启后历史会话中文输入显示修复
+
+1. 根因：双模型模式下 handoff prompt 覆盖原始中文输入
+2. `Hermes.Run` 先注入 origInput，再调用 formatHandoff，两条消息都进 session
+3. `History()` 通过前缀检测识别 handoff，提取原始任务文本并显示
+4. 文件：`agent.go`, `agent_run.go`, `hermes.go`, `app_session.go`
+
+### 历史显示补齐
+
+- `History()` 增加 `StripTransientBlocks` 调用
+- extractOriginalTask 函数提取 handoff 中的原始任务
+- Compaction summary 跳过逻辑保留并正确整合

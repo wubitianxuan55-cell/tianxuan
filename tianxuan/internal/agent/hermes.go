@@ -361,6 +361,10 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		execSink.Emit(e)
 	}))
 	defer h.hephaestus.SetSink(execSink)
+	// V10.49: pre-inject the original Chinese input before the handoff prompt
+	// so it appears at the right position in the session. History() in
+	// app_session.go skips the handoff message by prefix detection.
+	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: origInput})
 	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(origInput, plan, userNote))
 
 	// V10.37: executor returns structured TurnResult — no more post-hoc extraction.

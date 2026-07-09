@@ -467,6 +467,7 @@ func (a *AgentRunner) Session() *Session {
 	return a.session
 }
 
+
 // SetSession replaces the agent's conversation wholesale. Used by
 // `tianxuan chat --resume` to load a saved JSONL transcript before the first turn,
 // so the model picks up exactly where it left off. Callers serialise it against a

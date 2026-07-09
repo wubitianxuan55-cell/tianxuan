@@ -1960,7 +1960,11 @@ func replaySectionsFor(history []provider.Message, width int, renderer *mdRender
 	for _, m := range history {
 		switch m.Role {
 		case provider.RoleUser:
-			out = append(out, renderUserBubble(m.Content, width)+"\n\n")
+			content := agent.StripTransientBlocks(m.Content)
+			if strings.HasPrefix(strings.TrimSpace(content), "<compaction-summary>") {
+				content = "〈会话摘要〉"
+			}
+			out = append(out, renderUserBubble(content, width)+"\n\n")
 		case provider.RoleAssistant:
 			body := strings.TrimSpace(m.Content)
 			if body == "" {

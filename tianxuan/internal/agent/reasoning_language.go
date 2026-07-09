@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"strings"
+
+	"tianxuan/internal/agent/session"
 )
 
 type reasoningLanguageContextKey struct{}
@@ -108,9 +110,27 @@ func hasLeadingInjectedBlock(content, target string) bool {
 			if !ok {
 				return false
 			}
+		case strings.HasPrefix(s, "<session-facts>"):
+			var ok bool
+			s, ok = trimLeadingTransientBlock(s, "session-facts")
+			if !ok {
+				return false
+			}
 		case strings.HasPrefix(s, "<background-jobs>"):
 			var ok bool
 			s, ok = trimLeadingTransientBlock(s, "background-jobs")
+			if !ok {
+				return false
+			}
+		case strings.HasPrefix(s, "<procedural-rules>"):
+			var ok bool
+			s, ok = trimLeadingTransientBlock(s, "procedural-rules")
+			if !ok {
+				return false
+			}
+		case strings.HasPrefix(s, "<episodic-memory>"):
+			var ok bool
+			s, ok = trimLeadingTransientBlock(s, "episodic-memory")
 			if !ok {
 				return false
 			}
@@ -118,6 +138,11 @@ func hasLeadingInjectedBlock(content, target string) bool {
 			return false
 		}
 	}
+}
+
+// StripTransientBlocks delegates to session.StripTransientBlocks.
+func StripTransientBlocks(content string) string {
+	return session.StripTransientBlocks(content)
 }
 
 func trimLeadingTransientBlock(content, tag string) (string, bool) {

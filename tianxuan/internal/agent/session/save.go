@@ -149,7 +149,12 @@ func previewSession(path string) (string, int) {
 		if m.Role == provider.RoleUser {
 			turns++
 			if first == "" {
-				s := strings.TrimSpace(m.Content)
+				s := strings.TrimSpace(StripTransientBlocks(m.Content))
+				// Skip compaction summaries — they are LLM-generated digests,
+				// not actual user input. Use the next real user message instead.
+				if strings.HasPrefix(s, "<compaction-summary>") {
+					continue
+				}
 				if r := []rune(s); len(r) > 80 {
 					s = string(r[:77]) + "…"
 				}

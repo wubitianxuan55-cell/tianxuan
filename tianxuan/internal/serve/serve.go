@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"tianxuan/internal/agent"
+	"tianxuan/internal/agent/session"
 	"tianxuan/internal/control"
 	"tianxuan/internal/provider"
 )
@@ -333,7 +334,14 @@ func (s *Server) history(w http.ResponseWriter, _ *http.Request) {
 	}
 	var out []msg
 	for _, m := range s.ctrl.History() {
-		out = append(out, msg{Role: string(m.Role), Content: m.Content})
+		content := m.Content
+		if m.Role == provider.RoleUser {
+			content = session.StripTransientBlocks(m.Content)
+			if strings.HasPrefix(strings.TrimSpace(content), "<compaction-summary>") {
+				content = "〈会话摘要〉"
+			}
+		}
+		out = append(out, msg{Role: string(m.Role), Content: content})
 	}
 	writeJSON(w, out)
 }

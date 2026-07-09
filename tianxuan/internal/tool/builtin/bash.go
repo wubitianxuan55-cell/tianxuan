@@ -57,7 +57,7 @@ func (b bash) resolved() sandbox.Shell {
 }
 
 func (bash) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw merged output. json returns structured {ok, exit_code, duration_ms, stdout, stderr, command} with separated stdout/stderr fields."}},"required":["command"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns. Use for persistent servers (dev/watch/serve/start), ngrok tunnels, docker compose up, and any command that does not exit on its own."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw merged output. json returns structured {ok, exit_code, duration_ms, stdout, stderr, command} with separated stdout/stderr fields."}},"required":["command"]}`)
 }
 
 // ReadOnly is false: bash's effect cannot be inferred from args (rm, curl,
@@ -88,10 +88,11 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"conditional chaining, or issue the commands as separate calls")
 	}
 
-	// Windows PowerShell: 检测启动类命令（start、npm dev、wails dev 等），
-	// 包裹为 cmd /c start 以弹出独立窗口，避免 bash 阻塞等待服务进程退出。
-	if sh.Kind == sandbox.ShellPowerShell && runtime.GOOS == "windows" && !p.RunInBackground {
-		if wrapped, ok := wrapLauncherCommand(p.Command); ok {
+// Detect launcher commands (dev servers, tunnels, watchers, etc.) and
+	// background them using the shell's native mechanism so the bash tool does
+	// not block on cmd.Wait(). Applies to any shell on any platform.
+	if !p.RunInBackground {
+		if wrapped, ok := wrapLauncherCommand(p.Command, sh); ok {
 			p.Command = wrapped
 		}
 	}
@@ -330,41 +331,105 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 	return result, true
 }
 
-// ── launcher command detection (Windows PowerShell) ──
+// ── launcher command detection (Windows, any shell) ──
 
 // launcherPrefixes are command prefixes that typically start long-running
-// server or GUI processes. On Windows PowerShell, these are wrapped via
+// server, tunnel, watcher, or GUI processes. On Windows, these are wrapped via
 // cmd /c start to open a new visible window and return immediately,
 // preventing the bash tool from blocking on cmd.Wait().
 var launcherPrefixes = []string{
-	"npm start", "npm run dev", "npm run serve",
-	"wails dev",
+	// Node.js / Bun
+	"npm start", "npm run dev", "npm run serve", "npm run watch", "npm run ",
+	"npx ",
+	"yarn dev", "yarn start", "yarn serve", "yarn watch", "yarn ",
+	"pnpm dev", "pnpm start", "pnpm serve", "pnpm watch", "pnpm ",
+	"bun dev", "bun start", "bun run ",
+	// Go
 	"go run ",
+	"air", // Go live-reload
+	// Rust
+	"cargo run", "cargo watch",
+	// Python
+	"python -m http.server", "python3 -m http.server",
+	"python -m uvicorn", "python3 -m uvicorn",
+	"python -m flask run", "python3 -m flask run",
+	"uvicorn ", "gunicorn ", "flask run",
+	// Wails / Tauri / Electron
+	"wails dev", "wails serve",
+	// Docker
+	"docker compose up", "docker-compose up",
+	// Tunnels / proxies
+	"ngrok ", "cloudflared tunnel", "localtunnel ",
+	// Watchers / live-reload
+	"nodemon ", "ts-node-dev ", "tsx watch",
+	// .NET
+	"dotnet watch", "dotnet run",
+	// Make / Task runners
+	"make dev", "make serve", "make watch",
+	// Misc
+	"vite", "webpack-dev-server", "next dev", "nuxt dev",
+	"hugo server", "jekyll serve", "mkdocs serve",
 }
 
 // wrapLauncherCommand detects whether cmd starts a long-running process and
-// wraps it for non-blocking execution in a visible window. Returns the
-// (possibly wrapped) command and true if wrapping was applied.
-func wrapLauncherCommand(cmd string) (string, bool) {
+// wraps it for non-blocking execution. The strategy depends on the shell:
+//   - bash: appends " &" so the shell backgrounds the command and returns.
+//   - PowerShell: wraps via cmd /c start (PowerShell has no native background
+//     operator; run_in_background is the preferred way for headless bg).
+// Returns the (possibly wrapped) command and true if wrapping was applied.
+func wrapLauncherCommand(cmd string, sh sandbox.Shell) (string, bool) {
 	trimmed := strings.TrimSpace(cmd)
+	lower := strings.ToLower(trimmed)
 
-	// "start X" (without /b) or "Start-Process X" → pop out a new window
+	if !isLauncher(trimmed, lower) {
+		return cmd, false
+	}
+
+	// PowerShell: "start"/"Start-Process" is already non-blocking.
+	// For other launcher commands, wrap via cmd /c start.
+	if sh.Kind == sandbox.ShellPowerShell {
+		if isStartCmd(trimmed) {
+			return cmd, false // already non-blocking
+		}
+		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
+	}
+
+	// Bash / POSIX shell: append " &" to background the command.
+	return trimmed + " &", true
+}
+
+// isLauncher reports whether cmd looks like a long-running server/tunnel/watcher.
+func isLauncher(trimmed, lower string) bool {
 	if isStartCmd(trimmed) {
-		rest := restAfterStart(trimmed)
-		if rest == "" {
-			return cmd, false
-		}
-		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(rest)), true
+		return true
 	}
-
-	// Common dev-server patterns → new window
 	for _, prefix := range launcherPrefixes {
-		if strings.HasPrefix(strings.ToLower(trimmed), prefix) {
-			return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
+		if strings.HasPrefix(lower, prefix) {
+			return true
 		}
 	}
+	return isLauncherByKeywords(lower)
+}
 
-	return cmd, false
+// isLauncherByKeywords detects commands that contain keywords strongly
+// associated with long-running servers, watchers, or tunnels even when
+// they don't match a known prefix. Catches ad-hoc commands like
+// "node server.js", "python app.py --serve", etc.
+func isLauncherByKeywords(lower string) bool {
+	// Pad so we can match keywords at the end of the string.
+	padded := lower + " "
+	for _, kw := range launcherKeywords {
+		if strings.Contains(padded, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// launcherKeywords are substrings that strongly indicate a long-running process.
+var launcherKeywords = []string{
+	" serve ", " dev ", " watch ", " start ",
+	" ngrok ", " tunnel ", " proxy ",
 }
 
 // isStartCmd reports whether cmd starts with "start " (PowerShell alias for

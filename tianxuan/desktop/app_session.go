@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 
 	"tianxuan/internal/agent"
@@ -200,9 +201,53 @@ func (a *App) History() []HistoryMessage {
 	for _, m := range msgs {
 		content := m.Content
 		if m.Role == provider.RoleUser {
-			content = resolve(m.Content)
+			// Strip transient blocks (reasoning-language, response-language,
+			// etc.) injected by withTurnPreferences, then resolve any
+			// display override (e.g. paste-expansion labels) keyed by the
+			// raw user input.
+			raw := agent.StripTransientBlocks(m.Content)
+
+			// Handoff messages (Hermes→Hephaestus instructions) embed the
+			// original user task. Extract and display it instead of the
+			// full handoff prompt.
+			if strings.HasPrefix(strings.TrimSpace(raw), "# tianxuan hephaestus handoff") {
+				if task := extractOriginalTask(raw); task != "" {
+					raw = agent.StripTransientBlocks(task)
+				} else {
+					continue // defensive: malformed handoff, skip
+				}
+			}
+
+			// Compaction summaries are LLM-generated digests injected as
+			// user messages for cache-prefix stability. They are NOT user
+			// content — show a brief label instead of the English summary.
+			if trimmed := strings.TrimSpace(raw); strings.HasPrefix(trimmed, "<compaction-summary>") {
+				content = "〈会话摘要〉"
+			} else {
+				display := resolve(raw)
+				if display != raw {
+					content = display
+				} else {
+					content = raw
+				}
+			}
 		}
 		out = append(out, HistoryMessage{Role: string(m.Role), Content: content})
 	}
 	return out
+}
+
+// extractOriginalTask extracts the original user task from a Hermes→Hephaestus
+// handoff message. Returns empty string if the content is not a valid handoff.
+func extractOriginalTask(content string) string {
+	const header = "Original task:\n"
+	i := strings.Index(content, header)
+	if i < 0 {
+		return ""
+	}
+	rest := content[i+len(header):]
+	if j := strings.Index(rest, "\n\nHermes output:"); j >= 0 {
+		rest = rest[:j]
+	}
+	return strings.TrimSpace(rest)
 }

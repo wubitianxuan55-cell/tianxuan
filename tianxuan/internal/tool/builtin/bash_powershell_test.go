@@ -113,36 +113,53 @@ func TestBashDescriptionReflectsShell(t *testing.T) {
 }
 
 func TestWrapLauncherCommand(t *testing.T) {
+	ps := sandbox.Shell{Kind: sandbox.ShellPowerShell}
+	bash := sandbox.Shell{Kind: sandbox.ShellBash}
+
 	tests := []struct {
 		cmd    string
+		sh     sandbox.Shell
 		want   string
 		wantOk bool
 	}{
-		// start without /b → wrapped
-		{"start notepad.exe", `cmd /c start "" "notepad.exe"`, true},
-		{"start myapp.exe", `cmd /c start "" "myapp.exe"`, true},
-		// start /b → NOT wrapped (background, same window)
-		{"start /b myapp.exe", "", false},
-		{"start /B server.exe", "", false},
-		// Start-Process → wrapped
-		{"Start-Process notepad", `cmd /c start "" "notepad"`, true},
-		// npm / wails / go → wrapped
-		{"npm start", `cmd /c start "" "npm start"`, true},
-		{"npm run dev", `cmd /c start "" "npm run dev"`, true},
-		{"wails dev", `cmd /c start "" "wails dev"`, true},
-		{"go run ./cmd/server", `cmd /c start "" "go run ./cmd/server"`, true},
+		// ── PowerShell path ──
+		// start without /b → already non-blocking, no wrap needed
+		{"start notepad.exe", ps, "", false},
+		{"start myapp.exe", ps, "", false},
+		// start /b → NOT a launcher (background, same window)
+		{"start /b myapp.exe", ps, "", false},
+		{"start /B server.exe", ps, "", false},
+		// Start-Process → already non-blocking, no wrap needed
+		{"Start-Process notepad", ps, "", false},
+		// npm / wails / go → wrapped via cmd /c start
+		{"npm start", ps, `cmd /c start "" "npm start"`, true},
+		{"npm run dev", ps, `cmd /c start "" "npm run dev"`, true},
+		{"wails dev", ps, `cmd /c start "" "wails dev"`, true},
+		{"go run ./cmd/server", ps, `cmd /c start "" "go run ./cmd/server"`, true},
 		// normal commands → NOT wrapped
-		{"echo hello", "", false},
-		{"go build ./...", "", false},
-		{"git status", "", false},
+		{"echo hello", ps, "", false},
+		{"go build ./...", ps, "", false},
+		{"git status", ps, "", false},
+
+		// ── Bash path ──
+		// launcher commands → " &" appended
+		{"npm start", bash, "npm start &", true},
+		{"npm run dev", bash, "npm run dev &", true},
+		{"wails dev", bash, "wails dev &", true},
+		{"go run ./cmd/server", bash, "go run ./cmd/server &", true},
+		{"ngrok http 8080", bash, "ngrok http 8080 &", true},
+		// normal commands → NOT wrapped
+		{"echo hello", bash, "", false},
+		{"go build ./...", bash, "", false},
+		{"git status", bash, "", false},
 	}
 	for _, tt := range tests {
-		got, ok := wrapLauncherCommand(tt.cmd)
+		got, ok := wrapLauncherCommand(tt.cmd, tt.sh)
 		if ok != tt.wantOk {
-			t.Errorf("wrapLauncherCommand(%q) ok = %v, want %v", tt.cmd, ok, tt.wantOk)
+			t.Errorf("wrapLauncherCommand(%q, %s) ok = %v, want %v", tt.cmd, tt.sh.Kind, ok, tt.wantOk)
 		}
 		if tt.wantOk && got != tt.want {
-			t.Errorf("wrapLauncherCommand(%q) =\n  got:  %q\n  want: %q", tt.cmd, got, tt.want)
+			t.Errorf("wrapLauncherCommand(%q, %s) =\n  got:  %q\n  want: %q", tt.cmd, tt.sh.Kind, got, tt.want)
 		}
 	}
 }

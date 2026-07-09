@@ -687,7 +687,6 @@ export default function App() {
       <Suspense fallback={null}>
         {memView !== null && (
           <MemoryPanel
-            view={memView}
             onClose={closeMemory}
             onRemember={onRemember}
             onForget={onForget}

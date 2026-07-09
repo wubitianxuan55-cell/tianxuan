@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Brain, Check, ChevronsUpDown, Search } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { ModelInfo } from "../lib/types";
+import { Tooltip } from "./Tooltip";
 
-// ModelSwitcher is the header model picker: the model label becomes a button
-// that opens a dropdown listing configured providers.
+// ModelSwitcher is the model picker used in the header and settings. It opens a
+// searchable dropdown grouped by provider with keyboard navigation.
 // When allowInherit is true and the selected value is empty, the button shows
 // inheritLabel and the dropdown includes an "inherit" option at the top.
 export function ModelSwitcher({
@@ -22,53 +23,175 @@ export function ModelSwitcher({
   const t = useT();
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const loadModels = useCallback(() => {
+    const p = app.Models();
+    p.then(setModels).catch(() => {});
+  }, []);
 
   useEffect(() => {
-    if (open) app.Models().then(setModels).catch(() => {});
+    if (open) {
+      setQuery("");
+      loadModels();
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open, loadModels]);
+
+  const keyword = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      keyword
+        ? models.filter(
+            (m) =>
+              m.model.toLowerCase().includes(keyword) ||
+              m.provider.toLowerCase().includes(keyword) ||
+              m.ref.toLowerCase().includes(keyword),
+          )
+        : models,
+    [models, keyword],
+  );
+
+  // Group by provider, with the current model's group first
+  const groups = useMemo(() => {
+    const map = new Map<string, ModelInfo[]>();
+    let currentProvider = "";
+    for (const m of filtered) {
+      if (m.current) currentProvider = m.provider;
+      const list = map.get(m.provider);
+      if (list) list.push(m);
+      else map.set(m.provider, [m]);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => {
+        if (a === currentProvider) return -1;
+        if (b === currentProvider) return 1;
+        return providerLabel(a, t).localeCompare(providerLabel(b, t));
+      })
+      .map(([provider, items]) => ({
+        provider,
+        label: providerLabel(provider, t),
+        items,
+      }));
+  }, [filtered, t]);
+
+  const currentModel = models.find((m) => m.current) ?? models.find((m) => m.model === label || m.ref === label);
+  const currentProvider = currentModel ? providerLabel(currentModel.provider, t) : null;
+  const triggerLabel = currentProvider ? `${label} · ${currentProvider}` : label;
+
+  const pick = useCallback(
+    (name: string) => {
+      setModels((prev) => prev.map((m) => ({ ...m, current: m.ref === name })));
+      setOpen(false);
+      onPick(name);
+    },
+    [onPick],
+  );
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const pick = (name: string) => {
-    setOpen(false);
-    onPick(name);
-  };
-
   return (
-    <div className="relative inline-flex">
-      <button className="flex items-center gap-1 px-1.5 py-0.5 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12px] font-medium cursor-pointer no-drag hover:text-fg hover:border-fg-faint" onClick={() => setOpen((v) => !v)} title={t("status.switchModel")}>
-        <span className="max-w-28 truncate font-mono text-[11px]">{label}</span>
-        <ChevronsUpDown size={11} />
-      </button>
+    <div className="modelsw" ref={containerRef}>
+      <Tooltip label={triggerLabel}>
+        <button
+          type="button"
+          className="modelsw__trigger"
+          aria-label={triggerLabel}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Brain size={13} className="modelsw__kind" />
+          <span className="modelsw__label">{label}</span>
+          <ChevronsUpDown size={11} />
+        </button>
+      </Tooltip>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-60 max-h-64 overflow-y-auto bg-bg-elev-2 border border-border rounded-lg z-20 p-1" role="listbox" style={{boxShadow: "var(--ds-shadow-dropdown)"}}>
-            {models.length === 0 && <div className="px-3 py-4 text-fg-faint text-xs text-center">{t("status.noModels")}</div>}
-            {allowInherit && (
-              <button
-                role="option"
-                aria-selected={!label || label === inheritLabel}
-                className={`flex items-center gap-2.5 w-full px-2.5 py-2 bg-transparent border-0 rounded-md text-left cursor-pointer text-fg-dim text-[13px] hover:bg-bg-soft hover:text-fg ${!label || label === inheritLabel ? "text-accent bg-accent-soft font-semibold hover:bg-accent-soft hover:text-accent" : ""}`}
-                onClick={() => pick("")}
-              >
-                <span className="flex-1 min-w-0 text-left font-medium">{inheritLabel || t("settings.subagentInherit")}</span>
-                {(!label || label === inheritLabel) && <Check size={13} className="shrink-0 text-accent" />}
-              </button>
-            )}
-            {models.map((m) => (
-              <button
-                key={m.ref}
-                role="option"
-                aria-selected={m.current}
-                className={`flex items-center gap-2.5 w-full px-2.5 py-2 bg-transparent border-0 rounded-md text-left cursor-pointer text-fg-dim text-[13px] hover:bg-bg-soft hover:text-fg ${m.current ? "text-accent bg-accent-soft font-semibold hover:bg-accent-soft hover:text-accent" : ""}`}
-                onClick={() => pick(m.ref)}
-              >
-                <span className="flex-1 min-w-0 text-left font-medium">{m.ref}</span>
-                {m.current && <Check size={13} className="shrink-0 text-accent" />}
-              </button>
-            ))}
+        <div
+          className="modelsw__menu"
+          role="listbox"
+        >
+          {/* search */}
+          <div className="modelsw__search" role="presentation">
+            <Search size={13} />
+            <input
+              ref={inputRef}
+              type="text"
+              className="modelsw__search-input"
+              placeholder={t("modelSwitcher.searchPlaceholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpen(false);
+                if (e.key === "Enter" && filtered.length === 1) pick(filtered[0].ref);
+              }}
+            />
           </div>
-        </>
+
+          {models.length === 0 && (
+            <div className="modelsw__empty">{t("status.noModels")}</div>
+          )}
+          {models.length > 0 && filtered.length === 0 && query && (
+            <div className="modelsw__empty">{t("modelSwitcher.noMatches")}</div>
+          )}
+
+          {/* inherit option */}
+          {allowInherit && (
+            <button
+              role="option"
+              aria-selected={!label || label === inheritLabel}
+              className={`modelsw__item ${!label || label === inheritLabel ? "modelsw__item--current" : ""}`}
+              onClick={() => pick("")}
+            >
+              <span className="modelsw__model">{inheritLabel || t("settings.subagentInherit")}</span>
+              {(!label || label === inheritLabel) && <Check size={13} className="modelsw__check" />}
+            </button>
+          )}
+
+          {/* groups */}
+          {groups.map((g) => (
+            <div key={g.provider} role="group" aria-label={g.label} className="modelsw__group">
+              <div className="modelsw__group-label" role="presentation">
+                <Brain size={11} />
+                {g.label}
+              </div>
+              {g.items.map((m) => (
+                <button
+                  key={m.ref}
+                  type="button"
+                  role="option"
+                  aria-selected={m.current}
+                  className={`modelsw__item ${m.current ? "modelsw__item--current" : ""}`}
+                  onClick={() => pick(m.ref)}
+                >
+                  <span className="modelsw__model">{m.ref}</span>
+                  {m.current && <Check size={13} className="modelsw__check" />}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
+}
+
+function providerLabel(provider: string, t: ReturnType<typeof useT>): string {
+  switch (provider) {
+    case "deepseek":
+    case "deepseek-flash":
+    case "deepseek-pro":
+      return t("settings.providerLabel.deepseek");
+    default:
+      return provider;
+  }
 }

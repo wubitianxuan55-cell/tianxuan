@@ -416,6 +416,7 @@ export interface TabMeta {
   id: string;
   scope: string;
   workspaceRoot: string;
+  workspaceName?: string;
   title: string;
   ready: boolean;
   label?: string;

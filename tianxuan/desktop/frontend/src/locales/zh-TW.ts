@@ -451,4 +451,14 @@ export const zhTW: Record<DictKey, string> = {
   "memory.savedBadge": "✓ 已儲存",
   "memory.createdBadge": "✓ 已建立",
   "memory.generatedAt": "生成於",
+  "memory.autoSuggestions": "自動掃描建議",
+  "memory.noArchives": "暫無歸檔記憶",
+  "memory.archivedAt": "歸檔於 {time}",
+  "memory.noFilterMatch": "沒有相符的項目",
+  "memory.filterPlaceholder": "篩選…",
+  "memory.archivedHint": "已從活躍記憶中移除，仍可查閱。",
+
+  "modelSwitcher.searchPlaceholder": "搜尋模型…",
+  "modelSwitcher.noMatches": "無相符模型",
+  "settings.providerLabel.deepseek": "DeepSeek",
 };

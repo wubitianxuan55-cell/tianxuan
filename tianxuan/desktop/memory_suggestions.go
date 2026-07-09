@@ -99,6 +99,32 @@ func (a *App) MemorySuggestions() MemorySuggestionsView {
 	return view
 }
 
+// MemorySuggestionsForTab scans recent history for a specific tab.
+func (a *App) MemorySuggestionsForTab(tabID string) MemorySuggestionsView {
+	view := MemorySuggestionsView{
+		Memories:    []MemorySuggestion{},
+		Skills:      []SkillSuggestion{},
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	ctrl := a.ctrlByTabID(tabID)
+	if ctrl == nil {
+		return view
+	}
+	set := ctrl.Memory()
+	if set == nil {
+		return view
+	}
+	view.Available = true
+	view.Source = "local-history"
+
+	sessionDir := config.WorkspaceSessionDir("")
+	sessions := loadSuggestionSessions(sessionDir, suggestionSessionLimit)
+	view.Memories = suggestMemories(set, sessions)
+	view.Skills = suggestSkills("", ctrl.Skills(), sessions)
+	return view
+}
+
 // AcceptMemorySuggestion persists a previously previewed memory candidate.
 func (a *App) AcceptMemorySuggestion(candidate MemorySuggestion) (string, error) {
 	ctrl := a.ctrlByTabID("")

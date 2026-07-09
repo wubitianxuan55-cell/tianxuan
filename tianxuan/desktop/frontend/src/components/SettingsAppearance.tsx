@@ -3,16 +3,15 @@ import { useI18n } from "../lib/i18n";
 import type { ColorScheme, ThemeMode } from "../lib/theme";
 
 const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; label: string }> = {
-  default: { accent: "#22C55E", bg: "#0F172A", label: "默认" },
-  warm:    { accent: "#F59E0B", bg: "#1E1814", label: "暖色" },
-  ice:     { accent: "#38BDF8", bg: "#0A111A", label: "冰蓝" },
-  forest:  { accent: "#4ADE80", bg: "#0D1510", label: "森林" },
-  sunset:  { accent: "#F97316", bg: "#1A1218", label: "日落" },
-  ocean:   { accent: "#14B8A6", bg: "#0A1418", label: "海洋" },
-  rose:    { accent: "#EC4899", bg: "#1A1018", label: "玫瑰" },
-  violet:  { accent: "#A855F7", bg: "#14101A", label: "紫罗兰" },
+  default: { accent: "#61AFEF", bg: "#1E212B", label: "默认" },
+  warm:    { accent: "#E0AF68", bg: "#1C1B19", label: "暖色" },
+  ice:     { accent: "#81A1C1", bg: "#252B37", label: "冰蓝" },
+  forest:  { accent: "#4EC9B0", bg: "#1A221E", label: "森林" },
+  sunset:  { accent: "#FF8564", bg: "#1F1A1C", label: "日落" },
+  ocean:   { accent: "#7DCFFF", bg: "#151A2B", label: "海洋" },
+  rose:    { accent: "#F5B8D2", bg: "#1D1928", label: "玫瑰" },
+  violet:  { accent: "#BD93F9", bg: "#1E1834", label: "紫罗兰" },
 };
-
 const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 
 export function AppearanceSection({

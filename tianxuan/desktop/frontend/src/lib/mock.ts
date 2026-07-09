@@ -428,6 +428,12 @@ export function makeMockApp(): AppBindings {
     async Forget(name: string) {
       emit({ kind: "notice", level: "info", text: `forgot → ${name}` });
     },
+    async ForgetForTab(_tabID: string, name: string) {
+      emit({ kind: "notice", level: "info", text: `forgot → ${name}` });
+    },
+    async MemoryForTab(_tabID: string) {
+      return { docs: [], facts: [], scopes: [], storeDir: "", available: false };
+    },
     async SaveDoc(path: string, _body: string) {
       emit({ kind: "notice", level: "info", text: `saved → ${path}` });
       return path;
@@ -441,6 +447,9 @@ export function makeMockApp(): AppBindings {
       return name;
     },
     async MemorySuggestions() {
+      return { memories: [], skills: [], generatedAt: new Date().toISOString(), available: false, source: "mock" };
+    },
+    async MemorySuggestionsForTab(_tabID: string) {
       return { memories: [], skills: [], generatedAt: new Date().toISOString(), available: false, source: "mock" };
     },
     async AcceptMemorySuggestion(_candidate: MemorySuggestion) {

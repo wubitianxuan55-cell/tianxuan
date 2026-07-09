@@ -452,5 +452,15 @@ export const en = {
   "memory.savedBadge": "✓ Saved",
   "memory.createdBadge": "✓ Created",
   "memory.generatedAt": "Generated at",
+  "memory.autoSuggestions": "Auto-scan suggestions",
+  "memory.noArchives": "No archived memories",
+  "memory.archivedAt": "Archived {time}",
+  "memory.noFilterMatch": "No matching items",
+  "memory.filterPlaceholder": "Filter…",
+  "memory.archivedHint": "Removed from active memory, but kept for reference.",
+
+  "modelSwitcher.searchPlaceholder": "Search models…",
+  "modelSwitcher.noMatches": "No matching models",
+  "settings.providerLabel.deepseek": "DeepSeek",
 };
 export type DictKey = keyof typeof en;

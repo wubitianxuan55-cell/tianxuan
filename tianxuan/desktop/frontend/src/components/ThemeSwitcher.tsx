@@ -2,16 +2,15 @@ import { useState } from "react";
 import type { ColorScheme, ThemeMode } from "../lib/theme";
 
 const SCHEME_META: Record<ColorScheme, { dot: string; label: string }> = {
-  default: { dot: "#22C55E", label: "默认" },
-  warm:    { dot: "#F59E0B", label: "暖色" },
-  ice:     { dot: "#38BDF8", label: "冰蓝" },
-  forest:  { dot: "#4ADE80", label: "森林" },
-  sunset:  { dot: "#F97316", label: "日落" },
-  ocean:   { dot: "#14B8A6", label: "海洋" },
-  rose:    { dot: "#EC4899", label: "玫瑰" },
-  violet:  { dot: "#A855F7", label: "紫罗兰" },
+  default: { dot: "#61AFEF", label: "默认" },
+  warm:    { dot: "#E0AF68", label: "暖色" },
+  ice:     { dot: "#81A1C1", label: "冰蓝" },
+  forest:  { dot: "#4EC9B0", label: "森林" },
+  sunset:  { dot: "#FF8564", label: "日落" },
+  ocean:   { dot: "#7DCFFF", label: "海洋" },
+  rose:    { dot: "#F5B8D2", label: "玫瑰" },
+  violet:  { dot: "#BD93F9", label: "紫罗兰" },
 };
-
 const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 
 export function ThemeSwitcher({

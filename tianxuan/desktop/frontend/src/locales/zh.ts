@@ -451,4 +451,14 @@ export const zh: Record<DictKey, string> = {
   "memory.savedBadge": "✓ 已保存",
   "memory.createdBadge": "✓ 已创建",
   "memory.generatedAt": "生成于",
+  "memory.autoSuggestions": "自动扫描建议",
+  "memory.noArchives": "暂无归档记忆",
+  "memory.archivedAt": "归档于 {time}",
+  "memory.noFilterMatch": "没有匹配的条目",
+  "memory.filterPlaceholder": "筛选…",
+  "memory.archivedHint": "已从活跃记忆中移除，但保留可查阅。",
+
+  "modelSwitcher.searchPlaceholder": "搜索模型…",
+  "modelSwitcher.noMatches": "无匹配模型",
+  "settings.providerLabel.deepseek": "DeepSeek",
 };

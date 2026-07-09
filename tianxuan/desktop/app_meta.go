@@ -419,6 +419,45 @@ func (a *App) Remember(scope, note string) (string, error) {
 	return ctrl.QuickAdd(parseScope(scope), note)
 }
 
+// MemoryForTab returns memory for a specific tab. When tabID is empty, uses
+// the active tab.
+func (a *App) MemoryForTab(tabID string) MemoryView {
+	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}}
+	ctrl := a.ctrlByTabID(tabID)
+	if ctrl == nil {
+		return view
+	}
+	set := ctrl.Memory()
+	if set == nil {
+		return view
+	}
+	view.StoreDir = set.Store.Dir
+	view.Available = true
+	for _, d := range set.Docs {
+		view.Docs = append(view.Docs, MemoryDoc{Path: d.Path, Scope: string(d.Scope), Body: d.Body})
+	}
+	for _, f := range set.Store.List() {
+		view.Facts = append(view.Facts, MemoryFact{
+			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+		})
+	}
+	for _, sc := range writableScopes {
+		if p := set.DocPath(sc); p != "" {
+			view.Scopes = append(view.Scopes, MemoryScope{Scope: string(sc), Path: p})
+		}
+	}
+	return view
+}
+
+// ForgetForTab deletes a saved auto-memory by name for a specific tab.
+func (a *App) ForgetForTab(tabID, name string) error {
+	ctrl := a.ctrlByTabID(tabID)
+	if ctrl == nil {
+		return nil
+	}
+	return ctrl.ForgetMemory(name)
+}
+
 // Forget deletes a saved auto-memory by name — the panel's delete action for a
 // fact the model owns. A no-op when no controller is attached.
 func (a *App) Forget(name string) error {

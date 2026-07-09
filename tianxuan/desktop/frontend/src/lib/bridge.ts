@@ -109,13 +109,15 @@ export interface AppBindings {
   // quick-add a note to a scope's REASONIX.md (≡ "#<note>"), and overwrite a doc
   // from the in-place editor.
   Memory(): Promise<MemoryView>;
+  MemoryForTab(tabID: string): Promise<MemoryView>;
   Remember(scope: string, note: string): Promise<string>;
   Forget(name: string): Promise<void>;
+  ForgetForTab(tabID: string, name: string): Promise<void>;
   SaveDoc(path: string, body: string): Promise<string>;
   UpdateFact(name: string, body: string): Promise<string>;
   ChangeFactType(name: string, type: string): Promise<string>;
   MemorySuggestions(): Promise<MemorySuggestionsView>;
-  MemorySuggestions(): Promise<MemorySuggestionsView>;
+  MemorySuggestionsForTab(tabID: string): Promise<MemorySuggestionsView>;
   AcceptMemorySuggestion(candidate: MemorySuggestion): Promise<string>;
   AcceptSkillSuggestion(candidate: SkillSuggestion): Promise<string>;
   SelectTab(tabID: string): Promise<void>;

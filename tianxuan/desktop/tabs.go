@@ -73,6 +73,7 @@ type TabMeta struct {
 	ID            string `json:"id"`
 	Scope         string `json:"scope"`
 	WorkspaceRoot string `json:"workspaceRoot"`
+	WorkspaceName string `json:"workspaceName,omitempty"`
 	Title         string `json:"title"`
 	Ready         bool   `json:"ready"`
 	Label         string `json:"label,omitempty"`
@@ -88,6 +89,7 @@ func (t *WorkspaceTab) tabMeta() TabMeta {
 		ID:             t.ID,
 		Scope:          t.Scope,
 		WorkspaceRoot:  t.WorkspaceRoot,
+		WorkspaceName:  filepath.Base(t.WorkspaceRoot),
 		Title:          t.TopicTitle,
 		Ready:          t.Ready,
 		Label:          t.Label,

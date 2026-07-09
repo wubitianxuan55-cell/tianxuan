@@ -13,7 +13,7 @@
 
 @theme {
   /*
-   * All tokens reference styles.css CSS variables (managed by :root[data-theme])
+   * All tokens reference styles.css CSS variables (managed by :root / [data-theme-mode] / [data-theme-scheme])
    * so Tailwind utilities automatically follow the active theme (dark/light/warm/ice).
    * styles.css is the single source of truth for color values.
    */

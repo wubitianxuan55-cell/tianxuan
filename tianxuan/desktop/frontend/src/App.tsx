@@ -7,7 +7,7 @@ import {
 import { Sidebar } from "./components/Sidebar";
 import { useT } from "./lib/i18n";
 import { sessionTitle, sessionTime } from "./lib/session";
-import { applyTheme } from "./lib/theme";
+import { applyColorScheme, applyThemeMode } from "./lib/theme";
 import { useController } from "./lib/store";
 import { app } from "./lib/bridge";
 import { Transcript } from "./components/Transcript";
@@ -140,7 +140,7 @@ export default function App() {
     changeFactType,
   } = useController();
   const t = useT();
-  const { permLevel, setPermLevel, themeNow, setTheme, switchingModel, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
+  const { permLevel, setPermLevel, colorScheme, setColorScheme, themeMode, setThemeMode, switchingModel, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
   const [memView, setMemView] = useState<MemoryView | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
@@ -503,7 +503,7 @@ export default function App() {
               <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
               <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
               <ToolbarButton onClick={() => void newSessionAndReset()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
-              <ThemeSwitcher theme={themeNow} onSet={applyTheme} onStore={setTheme} />
+              <ThemeSwitcher scheme={colorScheme} mode={themeMode} onScheme={(s) => { applyColorScheme(s); setColorScheme(s); }} onMode={(m) => { applyThemeMode(m); setThemeMode(m); }} />
             </div>
           </header>
 

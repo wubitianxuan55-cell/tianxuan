@@ -1,28 +1,34 @@
 import { useState } from "react";
 import { useI18n } from "../lib/i18n";
-import type { Theme } from "../lib/theme";
+import type { ColorScheme, ThemeMode } from "../lib/theme";
 
-function darkenHex(hex: string, amount: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.max(0, Math.min(255, ((n >> 16) & 0xff) + amount));
-  const g = Math.max(0, Math.min(255, ((n >> 8) & 0xff) + amount));
-  const b = Math.max(0, Math.min(255, (n & 0xff) + amount));
-  return ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-}
+const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; label: string }> = {
+  default: { accent: "#22C55E", bg: "#0F172A", label: "默认" },
+  warm:    { accent: "#F59E0B", bg: "#1E1814", label: "暖色" },
+  ice:     { accent: "#38BDF8", bg: "#0A111A", label: "冰蓝" },
+  forest:  { accent: "#4ADE80", bg: "#0D1510", label: "森林" },
+  sunset:  { accent: "#F97316", bg: "#1A1218", label: "日落" },
+  ocean:   { accent: "#14B8A6", bg: "#0A1418", label: "海洋" },
+  rose:    { accent: "#EC4899", bg: "#1A1018", label: "玫瑰" },
+  violet:  { accent: "#A855F7", bg: "#14101A", label: "紫罗兰" },
+};
 
-function mixHex(a: string, b: string, t: number): string {
-  const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
-  const r = Math.round(((na >> 16) & 0xff) * (1 - t) + ((nb >> 16) & 0xff) * t);
-  const g = Math.round(((na >> 8) & 0xff) * (1 - t) + ((nb >> 8) & 0xff) * t);
-  const bl = Math.round((na & 0xff) * (1 - t) + (nb & 0xff) * t);
-  return ((r << 16) | (g << 8) | bl).toString(16).padStart(6, "0");
-}
+const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 
-export function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
+export function AppearanceSection({
+  scheme,
+  mode,
+  onScheme,
+  onMode,
+}: {
+  scheme: ColorScheme;
+  mode: ThemeMode;
+  onScheme: (s: ColorScheme) => void;
+  onMode: (m: ThemeMode) => void;
+}) {
   const { t, pref, setPref } = useI18n();
-  const themeOptions: Theme[] = ["dark", "light", "warm", "ice", "forest"];
 
-  // 字体偏好（localStorage + DOM attribute）
+  // 字体偏好
   const [uiFont, setUiFont] = useState(() => {
     try { return localStorage.getItem("tianxuan.uiFont") || ""; } catch { return ""; }
   });
@@ -41,81 +47,61 @@ export function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (
     if (kind === "ui") setUiFont(value); else setMonoFont(value);
   };
 
-  const themeColors: Record<Theme, { bg: string; accent: string; fg: string; label: string }> = {
-    auto:   { bg: "#0b0f15", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeAuto") },
-    dark:   { bg: "#0b0f15", accent: "#6ee7ff", fg: "#e6ebf2", label: t("settings.themeDark") },
-    light:  { bg: "#f7f4ef", accent: "#3b82f6", fg: "#1f1d1a", label: t("settings.themeLight") },
-    warm:   { bg: "#fdf6e3", accent: "#a855f7", fg: "#3d2b1f", label: "暖色" },
-    ice:    { bg: "#0d1b2a", accent: "#6ee7ff", fg: "#e0e8f2", label: "冰蓝" },
-    forest: { bg: "#0f1a0f", accent: "#4ade80", fg: "#e0ecd8", label: "森林" },
-  };
-
-  const tc = themeColors[theme] ?? themeColors.dark;
-
   return (
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold mb-3">{t("settings.appearance")}</div>
 
+      {/* ── 配色方案 ── */}
       <div className="mb-4">
-        <label className="text-fg-dim text-[13px] font-medium mb-2 block">{t("settings.theme")}</label>
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            className={`flex items-center gap-2 px-3 py-1.5 bg-transparent border border-border-soft rounded-md text-fg-dim text-xs cursor-pointer transition-all hover:text-fg hover:bg-bg-soft ${theme === "auto" ? "border-accent bg-accent-soft text-accent" : ""}`}
-            onClick={() => onTheme("auto")}
-          >
-            <span className="w-3 h-3 rounded-full border border-fg-faint/30" style={{ background: "conic-gradient(#f4f5f7 0deg 180deg, #090a0c 180deg 360deg)" }} />
-            {t("settings.themeAuto")}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {themeOptions.map((opt) => {
-            const c = themeColors[opt];
-            const isActive = theme === opt;
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">配色方案</label>
+        <div className="grid grid-cols-4 gap-2">
+          {SCHEMES.map((s) => {
+            const c = SCHEME_META[s];
+            const isActive = scheme === s;
             return (
               <button
-                key={opt}
-                onClick={() => onTheme(opt)}
-                className={`text-left bg-bg-soft border rounded-lg p-2.5 cursor-pointer transition-all hover:-translate-y-px hover:shadow-lg ${
+                key={s}
+                onClick={() => onScheme(s)}
+                className={`text-left bg-bg-soft border rounded-lg p-2 cursor-pointer transition-all hover:-translate-y-px hover:shadow-lg ${
                   isActive ? "border-accent ring-1 ring-accent/50" : "border-border-soft hover:border-fg-faint/30"
                 }`}
               >
-                <div className="flex gap-1 mb-2 rounded-md overflow-hidden h-6" style={{ background: c.bg }}>
-                  <div className="flex-1" style={{ background: c.bg }} />
-                  <div className="w-3" style={{ background: c.accent }} />
-                  <div className="w-6 flex items-center justify-center text-[7px] font-mono" style={{ background: c.fg, color: c.bg }}>Aa</div>
+                <div className="flex items-center justify-center mb-1.5 rounded-md h-7" style={{ background: c.bg }}>
+                  <span className="w-3 h-3 rounded-full" style={{ background: c.accent }} />
                 </div>
-                <span className={`text-[11px] font-medium ${isActive ? "text-accent" : "text-fg-dim"}`}>{c.label}</span>
-                {isActive && <span className="ml-1.5 text-[10px] text-accent">✓</span>}
+                <span className={`text-[10px] font-medium block text-center ${isActive ? "text-accent" : "text-fg-dim"}`}>
+                  {c.label}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="mb-4 p-3 bg-bg-soft border border-border-soft rounded-lg">
-        <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">色板预览</div>
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { label: "bg", color: tc.bg },
-            { label: "bg-soft", color: "#" + darkenHex(tc.bg, -8) },
-            { label: "bg-elev", color: "#" + darkenHex(tc.bg, -16) },
-            { label: "accent", color: tc.accent },
-            { label: "border", color: "#" + mixHex(tc.bg, tc.fg, 0.3) },
-            { label: "fg", color: tc.fg },
-            { label: "fg-dim", color: "#" + mixHex(tc.bg, tc.fg, 0.7) },
-            { label: "ok", color: "#74b87a" },
-            { label: "warn", color: "#d9a441" },
-            { label: "err", color: "#e0696a" },
-          ].map(({ label, color }) => (
-            <div key={label} className="flex flex-col items-center gap-0.5">
-              <div className="w-7 h-7 rounded-md border border-border-soft" style={{ background: color }} />
-              <span className="text-[9px] text-fg-faint font-mono">{label}</span>
-            </div>
+      {/* ── 亮暗模式 ── */}
+      <div className="mb-4">
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">亮暗模式</label>
+        <div className="inline-flex border border-border-soft rounded-md overflow-hidden">
+          {([
+            { value: "light" as ThemeMode, icon: "☀️", label: "浅色" },
+            { value: "dark" as ThemeMode,  icon: "🌙", label: "深色" },
+            { value: "auto" as ThemeMode,  icon: "💻", label: "自动" },
+          ]).map(({ value, icon, label }) => (
+            <button
+              key={value}
+              className={`flex items-center gap-1.5 px-3.5 py-2 bg-transparent border-0 border-r border-border-soft text-fg-dim text-[13px] cursor-pointer transition-colors hover:text-fg hover:bg-bg-soft last:border-r-0 ${
+                mode === value ? "bg-accent-soft text-accent" : ""
+              }`}
+              onClick={() => onMode(value)}
+            >
+              <span>{icon}</span>
+              <span>{label}</span>
+            </button>
           ))}
         </div>
       </div>
 
+      {/* ── 界面字体 ── */}
       <div className="mb-4">
         <label className="text-fg-dim text-[13px] font-medium mb-2 block">界面字体</label>
         <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={uiFont} onChange={e => applyFont("ui", e.target.value)}>
@@ -126,6 +112,7 @@ export function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (
         </select>
       </div>
 
+      {/* ── 等宽字体 ── */}
       <div className="mb-4">
         <label className="text-fg-dim text-[13px] font-medium mb-2 block">等宽字体</label>
         <select className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={monoFont} onChange={e => applyFont("mono", e.target.value)}>
@@ -136,6 +123,7 @@ export function AppearanceSection({ theme, onTheme }: { theme: Theme; onTheme: (
         </select>
       </div>
 
+      {/* ── 语言 ── */}
       <div>
         <label className="text-fg-dim text-[13px] font-medium mb-2 block">{t("settings.language")}</label>
         <div className="inline-flex border border-border-soft rounded-md overflow-hidden">

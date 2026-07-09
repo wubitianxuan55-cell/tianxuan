@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
-import { applyTheme, getTheme, type Theme } from "../lib/theme";
+import { applyColorScheme, applyThemeMode, getColorScheme, getThemeMode, type ColorScheme, type ThemeMode } from "../lib/theme";
 import type { SettingsView } from "../lib/types";
 import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
@@ -24,7 +24,8 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
   const [s, setS] = useState<SettingsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [theme, setThemeState] = useState<Theme>(getTheme());
+  const [scheme, setSchemeState] = useState<ColorScheme>(getColorScheme());
+  const [mode, setModeState] = useState<ThemeMode>(getThemeMode());
   const [tab, setTab] = useState<SettingsTab>("models");
   const [query, setQuery] = useState("");
 
@@ -118,11 +119,10 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
                 {tab === "agent" && <AgentSection s={s} busy={busy} apply={apply} />}
                 {tab === "appearance" && (
                   <AppearanceSection
-                    theme={theme}
-                    onTheme={(t) => {
-                      applyTheme(t);
-                      setThemeState(t);
-                    }}
+                    scheme={scheme}
+                    mode={mode}
+                    onScheme={(s) => { applyColorScheme(s); setSchemeState(s); }}
+                    onMode={(m) => { applyThemeMode(m); setModeState(m); }}
                   />
                 )}
                 {tab === "updates" && <UpdatesSection configPath={s.configPath} />}

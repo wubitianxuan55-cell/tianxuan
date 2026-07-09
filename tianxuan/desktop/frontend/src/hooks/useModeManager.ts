@@ -1,8 +1,7 @@
 // 权限管理 hook — V10.19: 统一 ask/auto/yolo 三级权限
 import { useState, useCallback } from "react";
 import type { PermLevel } from "../lib/types";
-import { getTheme } from "../lib/theme";
-import type { Theme } from "../lib/theme";
+import { getColorScheme, getThemeMode, type ColorScheme, type ThemeMode } from "../lib/theme";
 import { app } from "../lib/bridge";
 
 const THINK_TEMPS: Record<string, number> = { fast: 0.1, normal: 0.3, deep: 0.7 };
@@ -14,7 +13,8 @@ export function useModeManager(
 ) {
   const [permLevel, setPermLevelState] = useState<PermLevel>("ask");
   const [thinkLevel, setThinkLevel] = useState<"fast" | "normal" | "deep">("normal");
-  const [themeNow, setTheme] = useState<Theme>(getTheme);
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(getColorScheme);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getThemeMode);
   const [switchingModel, setSwitchingModel] = useState(false);
 
   const setPermLevel = useCallback((level: PermLevel) => {
@@ -42,5 +42,5 @@ export function useModeManager(
     [setModel],
   );
 
-  return { permLevel, setPermLevel, thinkLevel, themeNow, setTheme, switchingModel, handleThinkLevelChange, switchModel };
+  return { permLevel, setPermLevel, thinkLevel, colorScheme, setColorScheme, themeMode, setThemeMode, switchingModel, handleThinkLevelChange, switchModel };
 }

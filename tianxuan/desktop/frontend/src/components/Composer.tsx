@@ -413,7 +413,6 @@ export function Composer({
           {/* 权限级别选择器：询问 / 自动 / YOLO */}
           <div className="flex gap-1">
             {(["ask", "auto", "yolo"] as const).map((level) => {
-              const labels: Record<string, string> = { ask: "询问", auto: "自动", yolo: <><Zap size={10} className="inline" /> YOLO</> };
               const descs: Record<string, string> = { ask: "写入前需确认（默认）", auto: "写入无需确认，deny 规则仍生效", yolo: "跳过所有确认提示" };
               const isYolo = level === "yolo";
               return (
@@ -426,7 +425,7 @@ export function Composer({
                   onClick={() => { if (permLevel !== level && onSetPermLevel) onSetPermLevel(level); }}
                   title={descs[level]}
                 >
-                  {labels[level]}
+                  {isYolo ? <><Zap size={10} /> YOLO</> : level === "ask" ? "询问" : "自动"}
                 </button>
               );
             })}

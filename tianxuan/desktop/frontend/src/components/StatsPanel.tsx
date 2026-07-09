@@ -437,34 +437,48 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
     <div className="flex flex-col h-full overflow-y-auto">
 
       {!hasAnyData ? (
-        <div className="flex flex-col items-center justify-center gap-2 flex-1 text-fg-faint">
-          <BarChart3 size={32} className="opacity-30" />
-          <span className="text-[12px]">暂无统计数据</span>
-          <span className="text-[10px] opacity-60">发起对话后自动开始记录</span>
+        <div className="flex flex-col items-center justify-center gap-3 flex-1 text-fg-faint py-12">
+          <BarChart3 size={36} className="opacity-25" />
+          <span className="text-sm font-medium">暂无统计数据</span>
+          <span className="text-[11px] opacity-50">发起对话后自动开始记录</span>
         </div>
       ) : (
-      <div className="flex flex-col gap-0 p-3 overflow-y-auto">
+      <div className="flex flex-col gap-0 p-3 overflow-y-auto" role="table" aria-label="统计面板">
 
         {/* ── 会话级统计表格 ── */}
-        <div className="cursor-pointer select-none" onClick={() => setSessionExpanded(!sessionExpanded)}>
+        <div
+          className="cursor-pointer select-none rounded-md transition-colors duration-150 hover:bg-bg-soft/50"
+          role="button"
+          tabIndex={0}
+          aria-expanded={sessionExpanded}
+          onClick={() => setSessionExpanded(!sessionExpanded)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSessionExpanded(!sessionExpanded); } }}
+        >
           <StatsTable
             title={`会话 (${history.length}轮·${stepHistory.length}步)`}
             planner={sessPlanner} executor={sessExecutor} sub={sessSub} total={sessTotal}
             collapsed={!sessionExpanded}
           />
         </div>
-        {sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▲ 点击收起明细</div>)}
-        {!sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▼ 点击展开明细</div>)}
+        {sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-2">▲ 点击收起明细</div>)}
+        {!sessionExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-2">▼ 点击展开明细</div>)}
 
         {/* ── 本轮级统计表格 ── */}
 
         {(perTurnPlannerUsage || perTurnExecutorUsage || perTurnSubUsage) && (
           <>
-            <div className="cursor-pointer select-none" onClick={() => setTurnExpanded(!turnExpanded)}>
+            <div
+              className="cursor-pointer select-none rounded-md transition-colors duration-150 hover:bg-bg-soft/50"
+              role="button"
+              tabIndex={0}
+              aria-expanded={turnExpanded}
+              onClick={() => setTurnExpanded(!turnExpanded)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTurnExpanded(!turnExpanded); } }}
+            >
               <StatsTable title={`本轮 (${turnSteps?.length || 0}步)`} planner={turnPlanner} executor={turnExecutor} sub={turnSub} total={turnTotal} collapsed={!turnExpanded} />
             </div>
-            {turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▲ 点击收起明细</div>)}
-            {!turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-1">▼ 点击展开明细</div>)}
+            {turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-2">▲ 点击收起明细</div>)}
+            {!turnExpanded && (<div className="text-[10px] text-fg-faint text-center -mt-2 mb-2">▼ 点击展开明细</div>)}
           </>
         )}
 
@@ -474,12 +488,12 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
             <div className="text-[10px] font-semibold text-fg-faint uppercase tracking-wider mb-2">
               当前步 #{lastStep.step}
               {lastStep.source && (
-                <span className={`ml-2 text-[9px] px-1 rounded ${lastStep.source === "subagent" ? "bg-warn-soft text-warning" : lastStep.source === "planner" ? "bg-accent-soft/50 text-accent/80" : "bg-accent-soft text-accent"}`}>
+                <span className={`ml-2 text-[10px] px-1.5 py-px rounded font-medium ${lastStep.source === "subagent" ? "bg-warn-soft/50 text-warning" : lastStep.source === "planner" ? "bg-accent-soft/50 text-accent" : "bg-ok-soft/50 text-ok"}`}>
                   {lastStep.source === "subagent" ? "子代理" : lastStep.source === "planner" ? "规划模型" : "执行模型"}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-fg-dim font-mono tabular-nums mb-1.5">
+            <div className="flex items-center gap-1 text-[11px] text-fg-dim font-mono tabular-nums mb-2">
               <span>Prompt {tk(lastStep.prompt)}</span>
               <span className="text-border mx-1.5">·</span>
               <span>Compl {tk(lastStep.completion)}</span>
@@ -545,8 +559,12 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
         )}
 
         {/* 清空按钮 */}
-        <div className="flex justify-end pb-1">
-          <button className="text-[10px] px-1.5 py-0.5 border border-border-soft rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:border-err transition-colors" onClick={clearData} title="清空统计">
+        <div className="flex justify-end pt-1 pb-1">
+          <button
+            className="text-[11px] px-2.5 py-1 border border-border-soft rounded-md bg-transparent text-fg-faint cursor-pointer transition-all duration-150 hover:text-err hover:border-err/60 hover:bg-err/5 focus-visible:ring-1 focus-visible:ring-err/30 focus-visible:outline-none active:scale-[0.97]"
+            onClick={clearData}
+            title="清空统计"
+          >
             清空统计
           </button>
         </div>

@@ -28,7 +28,7 @@ export function PromptShelf(p: {
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <span
             id={p.titleId}
-            className="text-fg text-[12.5px] font-semibold shrink-0"
+            className="text-fg text-xs font-semibold shrink-0"
           >
             {p.title}
           </span>
@@ -75,7 +75,7 @@ export function PromptHeaderAction(p: {
 }) {
   return (
     <button
-      className="border-0 bg-transparent text-fg-faint text-[11px] cursor-pointer px-1.5 py-0.5 rounded hover:text-fg hover:bg-bg transition-colors"
+      className="border-0 bg-transparent text-fg-faint text-[11px] cursor-pointer px-1.5 py-0.5 rounded hover:text-fg hover:bg-bg transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none"
       onClick={p.onClick}
       type="button"
     >

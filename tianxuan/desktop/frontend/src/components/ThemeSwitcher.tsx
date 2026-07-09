@@ -1,15 +1,15 @@
 import { useState } from "react";
 import type { ColorScheme, ThemeMode } from "../lib/theme";
 
-const SCHEME_META: Record<ColorScheme, { dot: string; label: string }> = {
-  default: { dot: "#61AFEF", label: "默认" },
-  warm:    { dot: "#E0AF68", label: "暖色" },
-  ice:     { dot: "#81A1C1", label: "冰蓝" },
-  forest:  { dot: "#4EC9B0", label: "森林" },
-  sunset:  { dot: "#FF8564", label: "日落" },
-  ocean:   { dot: "#7DCFFF", label: "海洋" },
-  rose:    { dot: "#F5B8D2", label: "玫瑰" },
-  violet:  { dot: "#BD93F9", label: "紫罗兰" },
+const SCHEME_META: Record<ColorScheme, { accent: string; label: string }> = {
+  default: { accent: "#61AFEF", label: "默认" },
+  warm:    { accent: "#D79921", label: "暖色" },
+  ice:     { accent: "#88C0D0", label: "冰蓝" },
+  forest:  { accent: "#83C092", label: "森林" },
+  sunset:  { accent: "#FFA759", label: "日落" },
+  ocean:   { accent: "#89B4FA", label: "海洋" },
+  rose:    { accent: "#EB6F92", label: "玫瑰" },
+  violet:  { accent: "#9D7CD8", label: "紫罗兰" },
 };
 const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 
@@ -34,8 +34,8 @@ export function ThemeSwitcher({
         title="切换主题"
       >
         <span
-          className="inline-block w-3 h-3 rounded-full border border-border-soft shrink-0"
-          style={{ background: SCHEME_META[scheme].dot }}
+          className="inline-block w-4 h-4 rounded border border-border-soft shrink-0"
+          style={{ background: SCHEME_META[scheme].accent }}
         />
         <span>{SCHEME_META[scheme].label}</span>
       </button>
@@ -48,23 +48,21 @@ export function ThemeSwitcher({
           >
             {/* ── 配色选择 ── */}
             <div className="px-2 mb-1 text-[10px] font-semibold text-fg-faint uppercase tracking-wider">配色</div>
-            <div className="grid grid-cols-4 gap-1.5 px-2 mb-2">
-              {SCHEMES.map((s) => (
-                <button
-                  key={s}
-                  className={`flex flex-col items-center gap-0.5 p-1.5 rounded-md border-0 bg-transparent cursor-pointer transition-colors hover:bg-bg-soft ${
-                    scheme === s ? "ring-1 ring-accent" : ""
-                  }`}
-                  onClick={() => onScheme(s)}
-                  title={SCHEME_META[s].label}
-                >
-                  <span
-                    className="inline-block w-4 h-4 rounded-full"
-                    style={{ background: SCHEME_META[s].dot }}
-                  />
-                </button>
-              ))}
-            </div>
+            {SCHEMES.map((s) => (
+              <button
+                key={s}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left bg-transparent border-0 text-fg-dim text-[12px] cursor-pointer transition-colors hover:bg-bg-soft hover:text-fg ${
+                  scheme === s ? "text-accent bg-accent-soft" : ""
+                }`}
+                onClick={() => { onScheme(s); setOpen(false); }}
+              >
+                <span
+                  className="inline-block w-3 h-3 rounded-full shrink-0 border border-border-soft"
+                  style={{ background: SCHEME_META[s].accent }}
+                />
+                {SCHEME_META[s].label}
+              </button>
+            ))}
 
             {/* ── 模式选择 ── */}
             <div className="border-t border-border-soft pt-2 px-2">

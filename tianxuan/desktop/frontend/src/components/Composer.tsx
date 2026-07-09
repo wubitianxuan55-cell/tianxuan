@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X, Zap } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
@@ -291,7 +291,7 @@ export function Composer({
         >
           <label className="flex items-center gap-[7px] px-2 py-1.5 mb-1 border border-border-soft rounded-md bg-bg-soft focus-within:border-accent transition-colors">
             <Search size={14} className="text-fg-faint" />
-            <input autoFocus className="flex-1 border-0 bg-transparent text-fg text-[13px] outline-none placeholder:text-fg-faint"
+            <input autoFocus className="flex-1 border-0 bg-transparent text-fg text-base outline-none placeholder:text-fg-faint"
               value={workspaceQuery} onChange={(e) => setWorkspaceQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") setWorkspaceMenuOpen(false); }}
               placeholder={t("composer.searchProjects")} />
@@ -299,18 +299,18 @@ export function Composer({
           <div className="max-h-[280px] overflow-y-auto mb-1">
             {filteredWorkspaces.map((w) => (
               <button key={w.path}
-                className={`flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer transition-colors duration-100 ${w.current ? "text-accent bg-accent-soft font-medium" : "text-fg-dim hover:bg-bg-soft hover:text-fg"}`}
+                className={`flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer transition-colors duration-150 ${w.current ? "text-accent bg-accent-soft font-medium" : "text-fg-dim hover:bg-bg-soft hover:text-fg"}`}
                 onClick={() => { if (w.current) { setWorkspaceMenuOpen(false); return; } void chooseWorkspace(w.path); }}
                 title={w.path}>
                 <FolderGit2 size={15} className="shrink-0" />
-                <span className="min-w-0 truncate flex-1 text-[13px]">{w.name}</span>
+                <span className="min-w-0 truncate flex-1 text-base">{w.name}</span>
                 {w.current && <Check size={15} className="text-accent shrink-0" />}
               </button>
             ))}
             {filteredWorkspaces.length === 0 && <div className="py-4 text-fg-faint text-xs text-center">{t("composer.noProjectMatches")}</div>}
           </div>
           <div className="pt-1 border-t border-border-soft">
-            <button className="flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer text-fg-dim hover:bg-bg-soft hover:text-fg text-[13px] transition-colors" onClick={() => void chooseWorkspace()}>
+            <button className="flex items-center gap-2.5 w-full px-2 py-1.5 bg-transparent border-0 rounded-lg text-left cursor-pointer text-fg-dim hover:bg-bg-soft hover:text-fg text-base transition-colors duration-150" onClick={() => void chooseWorkspace()}>
               <FolderPlus size={15} className="shrink-0" />
               <span>{t("composer.addProject")}</span>
             </button>
@@ -329,8 +329,8 @@ export function Composer({
           {attachments.map((a) => (
             <div className="flex items-center gap-1.5 pl-1.5 pr-1 py-1 bg-bg-elev-2 border border-border-soft rounded-lg text-xs" key={a.path}>
               <img src={a.previewUrl} alt="" className="w-8 h-8 rounded object-cover" />
-              <span className="max-w-[120px] truncate text-fg-dim font-mono text-[11px]">{a.path.split("/").pop()}</span>
-              <button type="button" className="flex items-center justify-center w-5 h-5 bg-transparent border-0 rounded text-fg-faint cursor-pointer hover:text-err hover:bg-bg-soft transition-colors" title="移除" onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}><X size={13} /></button>
+              <span className="max-w-[120px] truncate text-fg-dim font-mono text-xs">{a.path.split("/").pop()}</span>
+              <button type="button" className="flex items-center justify-center w-5 h-5 bg-transparent border-0 rounded text-fg-faint cursor-pointer hover:text-err hover:bg-bg-soft transition-colors duration-150" title="移除" onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}><X size={13} /></button>
             </div>
           ))}
         </div>
@@ -347,7 +347,7 @@ export function Composer({
 
       {/* ── 输入卡片 ── */}
       <div
-        className={`relative border border-border-soft bg-bg-elev rounded-2xl overflow-hidden transition-[border-color,box-shadow] duration-[var(--dur-base)] focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] ${composerHeight !== null ? "flex flex-col" : ""} ${composerResizing ? "cursor-ns-resize" : ""}`}
+        className={`relative border border-border-soft bg-bg-elev rounded-2xl overflow-hidden transition-[border-color,box-shadow] duration-150 focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] ${composerHeight !== null ? "flex flex-col" : ""} ${composerResizing ? "cursor-ns-resize" : ""}`}
         style={{ ...(composerHeight !== null ? { height: "var(--composer-height)" } : {}), ...composerCardStyle }}
         ref={composerCardRef}
       >
@@ -360,7 +360,7 @@ export function Composer({
 
         {/* 主输入行 */}
         <div
-          className={`flex gap-2 items-center shrink-0 min-h-0 bg-transparent border-0 border-b border-border-soft rounded-none px-[13px] py-2.5 ${composerHeight !== null ? "flex-1 items-start" : ""} ${dragOver ? "outline outline-1 outline-dashed outline-accent outline-offset-[-4px] bg-accent-[0.02]" : ""} ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+          className={`flex gap-2 items-center shrink-0 min-h-0 bg-transparent border-0 border-b border-border-soft rounded-none px-3 py-2.5 ${composerHeight !== null ? "flex-1 items-start" : ""} ${dragOver ? "outline outline-1 outline-dashed outline-accent outline-offset-[-4px] bg-accent-[0.02]" : ""} ${disabled ? "opacity-50 pointer-events-none" : ""}`}
           onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}
         >
           <span className="text-accent font-mono font-semibold text-lg leading-[1.55] shrink-0 select-none">›</span>
@@ -374,12 +374,12 @@ export function Composer({
             rows={1} disabled={disabled}
           />
           {running && (
-            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95" onClick={handleCancel} title={t("composer.stop")}>
+            <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-150 bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95 focus-visible:ring-1 focus-visible:ring-err/40 focus-visible:outline-none" onClick={handleCancel} title={t("composer.stop")}>
               <Square size={14} fill="currentColor" />
             </button>
           )}
           <button
-            className={`inline-flex items-center justify-center w-[32px] h-[32px] border-0 rounded-full cursor-pointer shrink-0 transition-all duration-[var(--dur-fast)] active:scale-95 ${running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none`}
+            className={`inline-flex items-center justify-center w-[32px] h-[32px] border-0 rounded-full cursor-pointer shrink-0 transition-all duration-150 active:scale-95 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none`}
             style={!running && !disabled ? {boxShadow: "var(--ds-shadow-accent-btn)"} : undefined}
             onClick={submit}
             disabled={disabled || pendingPaste > 0 || (!text.trim() && attachments.length === 0 && (!running || queueLen === 0))}
@@ -398,7 +398,7 @@ export function Composer({
           {cwd && (
             <div className="relative inline-flex min-w-0" ref={workspaceAnchorRef}>
               <button
-                className={`inline-flex items-center gap-1.5 max-w-60 px-2 py-1 border-0 rounded-md bg-transparent text-fg-dim text-xs cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft disabled:cursor-default disabled:opacity-60 no-drag ${workspaceMenuOpen ? "text-fg bg-bg-soft" : ""}`}
+                className={`inline-flex items-center gap-1.5 max-w-60 px-2 py-1 border-0 rounded-md bg-transparent text-fg-dim text-xs cursor-pointer transition-[color,background] duration-150 hover:text-fg hover:bg-bg-soft focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none disabled:cursor-default disabled:opacity-60 no-drag ${workspaceMenuOpen ? "text-fg bg-bg-soft" : ""}`}
                 onClick={() => { if (!running) setWorkspaceMenuOpen((o) => !o); }}
                 disabled={running}
                 title={running ? t("common.busyHint") : t("status.switchFolder", { cwd })}
@@ -411,14 +411,14 @@ export function Composer({
           )}
 
           {/* 权限级别选择器：询问 / 自动 / YOLO */}
-          <div className="flex gap-[3px]">
+          <div className="flex gap-1">
             {(["ask", "auto", "yolo"] as const).map((level) => {
-              const labels: Record<string, string> = { ask: "询问", auto: "自动", yolo: "⚡ YOLO" };
+              const labels: Record<string, string> = { ask: "询问", auto: "自动", yolo: <><Zap size={10} className="inline" /> YOLO</> };
               const descs: Record<string, string> = { ask: "写入前需确认（默认）", auto: "写入无需确认，deny 规则仍生效", yolo: "跳过所有确认提示" };
               const isYolo = level === "yolo";
               return (
                 <button key={level} type="button"
-                  className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-[color,background,border,transform] duration-[var(--dur-fast)] active:scale-[0.97] ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-all duration-150 active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${
                     permLevel === level
                       ? isYolo ? "text-err bg-err/10 border-err/20 shadow-[0_0_0_1px_var(--err)]" : "text-accent bg-accent-soft border-accent/30 shadow-[0_0_0_1px_var(--accent-soft)]"
                       : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"
@@ -433,7 +433,7 @@ export function Composer({
           </div>
 
 {/* 快捷提示 */}
-          <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-1.5">
+          <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-2">
             <span>/ 命令</span>
             <span>@ 文件</span>
           </span>

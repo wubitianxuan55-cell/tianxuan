@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import {
   SquarePen, Brain, Blocks, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
-  Settings as SettingsIcon, CalendarDays,
+  Settings as SettingsIcon, CalendarDays, X,
 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
@@ -85,13 +85,13 @@ export function Sidebar({
         aria-label="tianxuan navigation"
       >
         {/* Brand */}
-        <div className={`flex items-center gap-2.5 px-2 pb-3.5 text-fg text-[15px] font-semibold ${
+        <div className={`flex items-center gap-2.5 px-2 pb-3.5 text-fg text-lg font-semibold ${
           collapsed ? "flex-col gap-2 px-0 pb-3" : ""
         }`}>
           <img src={logo} alt="" className="w-6 h-6 rounded-md" />
           {!collapsed && <span>tianxuan</span>}
           <button
-            className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover no-drag ${
+            className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer transition-[color,background] duration-150 hover:text-fg hover:bg-sidebar-hover focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none no-drag ${
               collapsed ? "ml-0" : "ml-auto"
             }`}
             onClick={toggleSidebar}
@@ -104,7 +104,7 @@ export function Sidebar({
 
         {/* New session button */}
         <button
-          className={`w-full min-w-0 border-0 rounded-full bg-accent text-accent-fg font-semibold cursor-pointer transition-all duration-[var(--dur-fast)] hover:brightness-110 active:scale-[0.97] disabled:opacity-40 disabled:cursor-default flex items-center gap-2 h-9 px-3 mb-3 no-drag ${
+          className={`w-full min-w-0 border-0 rounded-full bg-accent text-accent-fg font-semibold cursor-pointer transition-all duration-150 hover:brightness-110 active:scale-[0.97] disabled:opacity-40 disabled:cursor-default flex items-center gap-2 h-9 px-3 mb-3 no-drag ${
             collapsed ? "justify-center w-9 h-9 !rounded-full !p-0 !gap-0" : ""
           }`}
           style={{ boxShadow: "var(--ds-shadow-accent-btn)" }}
@@ -138,7 +138,7 @@ export function Sidebar({
                 {t("sidebar.conversations")}
               </div>
               <button
-                className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11.5px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
+                className="shrink-0 border-0 rounded-md bg-transparent text-fg-faint text-[11px] px-1.5 py-0.5 cursor-pointer transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none disabled:opacity-50 disabled:cursor-default disabled:hover:text-fg-faint disabled:hover:bg-transparent"
                 onClick={() => void onOpenHistory()}
                 disabled={running}
                 title={running ? t("common.busyHint") : t("topbar.history")}
@@ -147,7 +147,7 @@ export function Sidebar({
               </button>
             </div>
             <input
-              className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none focus:border-accent no-drag"
+              className="w-full bg-bg-soft border border-border-soft rounded-[5px] text-fg text-xs py-1 px-2 mb-2 outline-none transition-colors duration-150 focus:border-accent no-drag"
               placeholder={t("sidebar.search")}
               value={localQuery}
               onChange={e => setLocalQuery(e.target.value)}
@@ -168,9 +168,9 @@ export function Sidebar({
                   return <div className="py-2 px-2.5 text-fg-faint text-xs">无匹配</div>;
                 return visible.map((session: SessionMeta) => (
                   <div
-                    className={`flex items-start gap-1 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
+                    className={`flex items-start gap-2 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
                       session.current
-                        ? "bg-sidebar-active border-l-[3px] border-accent pl-[8px]"
+                        ? "bg-sidebar-active border-l-[3px] border-accent pl-2"
                         : ""
                     }`}
                     key={session.path}
@@ -188,7 +188,7 @@ export function Sidebar({
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         {renameTarget === session.path ? (
                           <input
-                            className="w-full bg-bg border border-accent rounded px-1 py-0 text-fg text-[12.5px] outline-none"
+                            className="w-full bg-bg border border-accent rounded px-1 py-0 text-fg text-sm outline-none"
                             value={renameDraft}
                             onChange={e => setRenameDraft(e.target.value)}
                             onKeyDown={e => {
@@ -201,7 +201,7 @@ export function Sidebar({
                           />
                         ) : (
                           <span
-                            className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-[12.5px] leading-[1.35] font-medium cursor-text ${
+                            className={`overflow-hidden text-ellipsis whitespace-nowrap text-fg-dim text-sm leading-[1.35] font-medium cursor-text ${
                               session.current ? "text-accent" : ""
                             }`}
                             onDoubleClick={e => {
@@ -215,7 +215,7 @@ export function Sidebar({
                             {sessionTitle(session, t("history.emptySession"))}
                           </span>
                         )}
-                        <span className="text-fg-faint font-mono text-[10.5px]">
+                        <span className="text-fg-faint font-mono text-[10px]">
                           {session.current ? t("history.current") : sessionTime(session.modTime)}
                         </span>
                       </span>
@@ -223,20 +223,20 @@ export function Sidebar({
                     {!session.current && (
                       deleteConfirm === session.path ? (
                         <span className="flex items-center gap-1 shrink-0">
-                          <button className="bg-transparent border-0 text-[10px] text-err cursor-pointer px-1 py-0.5 rounded hover:bg-err/10" onClick={e => { e.stopPropagation(); void onDeleteSession(session.path); setDeleteConfirm(null); }}>
+                          <button className="bg-transparent border-0 text-[11px] text-err cursor-pointer px-1.5 py-0.5 rounded hover:bg-err/10 transition-colors duration-150" onClick={e => { e.stopPropagation(); void onDeleteSession(session.path); setDeleteConfirm(null); }}>
                             确认
                           </button>
-                          <button className="bg-transparent border-0 text-[10px] text-fg-faint cursor-pointer px-1 py-0.5 rounded hover:bg-bg-soft" onClick={e => { e.stopPropagation(); setDeleteConfirm(null); }}>
+                          <button className="bg-transparent border-0 text-[11px] text-fg-faint cursor-pointer px-1.5 py-0.5 rounded hover:bg-bg-soft transition-colors duration-150" onClick={e => { e.stopPropagation(); setDeleteConfirm(null); }}>
                             取消
                           </button>
                         </span>
                       ) : (
                         <button
-                          className="hidden group-hover:block bg-transparent border-0 text-fg-faint text-[15px] cursor-pointer px-1 py-0.5 rounded-[3px] mt-1 hover:text-err"
+                          className="hidden group-hover:flex bg-transparent border-0 text-fg-faint cursor-pointer p-0.5 rounded-[3px] mt-1 hover:text-err hover:bg-err/10 transition-colors duration-150 items-center justify-center"
                           title="删除"
                           onClick={e => { e.stopPropagation(); setDeleteConfirm(session.path); }}
                         >
-                          ×
+                          <X size={13} />
                         </button>
                       )
                     )}
@@ -245,7 +245,7 @@ export function Sidebar({
               })()}
               {hasMore && !localQuery && (
                 <button
-                  className="w-full mt-1 py-1.5 text-fg-faint text-[11.5px] border border-border-soft rounded-md bg-transparent cursor-pointer hover:text-fg hover:bg-sidebar-hover transition-colors"
+                  className="w-full mt-1 py-1.5 text-fg-faint text-xs border border-border-soft rounded-md bg-transparent cursor-pointer hover:text-fg hover:bg-sidebar-hover transition-colors duration-150"
                   onClick={() => void onLoadMore()}
                   type="button"
                 >
@@ -258,12 +258,12 @@ export function Sidebar({
 
         {/* Bottom nav */}
         <nav
-          className={`flex flex-col gap-0.5 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
+          className={`flex flex-col gap-1 shrink-0 pt-2.5 pb-2 border-t border-border-soft ${
             collapsed ? "items-center w-full !pt-0 !pb-3" : ""
           }`}
         >
           <button
-            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-base no-drag transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
             onClick={() => void onOpenMemory()}
             title={t("topbar.memory")}
           >
@@ -271,7 +271,7 @@ export function Sidebar({
             {!collapsed && <span>{t("topbar.memory")}</span>}
           </button>
           <button
-            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-base no-drag transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
             onClick={() => onOpenCaps()}
             title={t("caps.title")}
           >
@@ -279,7 +279,7 @@ export function Sidebar({
             {!collapsed && <span>{t("caps.title")}</span>}
           </button>
           <button
-            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-[13px] no-drag transition-[color,background,transform] duration-[var(--dur-fast)] hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
+            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-base no-drag transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
             onClick={() => onOpenSchedule()}
             title="定时任务"
           >

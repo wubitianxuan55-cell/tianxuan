@@ -2,15 +2,15 @@ import { useState } from "react";
 import { useI18n } from "../lib/i18n";
 import type { ColorScheme, ThemeMode } from "../lib/theme";
 
-const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; label: string }> = {
-  default: { accent: "#61AFEF", bg: "#1E212B", label: "默认" },
-  warm:    { accent: "#E0AF68", bg: "#1C1B19", label: "暖色" },
-  ice:     { accent: "#81A1C1", bg: "#252B37", label: "冰蓝" },
-  forest:  { accent: "#4EC9B0", bg: "#1A221E", label: "森林" },
-  sunset:  { accent: "#FF8564", bg: "#1F1A1C", label: "日落" },
-  ocean:   { accent: "#7DCFFF", bg: "#151A2B", label: "海洋" },
-  rose:    { accent: "#F5B8D2", bg: "#1D1928", label: "玫瑰" },
-  violet:  { accent: "#BD93F9", bg: "#1E1834", label: "紫罗兰" },
+const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; keyword: string; str: string; num: string; info: string; label: string }> = {
+  default: { accent: "#61AFEF", bg: "#282C34", keyword: "#C678DD", str: "#98C379", num: "#D19A66", info: "#56B6C2", label: "默认" },
+  warm:    { accent: "#D79921", bg: "#282828", keyword: "#D3869B", str: "#B8BB26", num: "#FE8019", info: "#83A598", label: "暖色" },
+  ice:     { accent: "#88C0D0", bg: "#2E3440", keyword: "#B48EAD", str: "#A3BE8C", num: "#D08770", info: "#81A1C1", label: "冰蓝" },
+  forest:  { accent: "#83C092", bg: "#232A2E", keyword: "#D699B6", str: "#A7C080", num: "#E69875", info: "#7FBBB3", label: "森林" },
+  sunset:  { accent: "#FFA759", bg: "#1F2430", keyword: "#D4BFFF", str: "#A8CC8C", num: "#FFA759", info: "#5CCFE6", label: "日落" },
+  ocean:   { accent: "#89B4FA", bg: "#1E1E2E", keyword: "#CBA6F7", str: "#A6E3A1", num: "#FAB387", info: "#89DCEB", label: "海洋" },
+  rose:    { accent: "#EB6F92", bg: "#1F1D2E", keyword: "#C4A7E7", str: "#9CCFD8", num: "#F6C177", info: "#C4A7E7", label: "玫瑰" },
+  violet:  { accent: "#9D7CD8", bg: "#16161E", keyword: "#BB9AF7", str: "#9ECE6A", num: "#FF9E64", info: "#7DCFFF", label: "紫罗兰" },
 };
 const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 
@@ -65,8 +65,15 @@ export function AppearanceSection({
                   isActive ? "border-accent ring-1 ring-accent/50" : "border-border-soft hover:border-fg-faint/30"
                 }`}
               >
-                <div className="flex items-center justify-center mb-1.5 rounded-md h-7" style={{ background: c.bg }}>
-                  <span className="w-3 h-3 rounded-full" style={{ background: c.accent }} />
+                <div className="rounded-md mb-1.5 overflow-hidden" style={{ background: c.bg }}>
+                  <div className="h-7" />
+                  <div className="flex gap-px p-0.5 bg-black/30">
+                    <span className="w-3 h-3 rounded-sm" style={{ background: c.accent }} />
+                    <span className="w-3 h-3 rounded-sm" style={{ background: c.keyword }} />
+                    <span className="w-3 h-3 rounded-sm" style={{ background: c.str }} />
+                    <span className="w-3 h-3 rounded-sm" style={{ background: c.num }} />
+                    <span className="w-3 h-3 rounded-sm" style={{ background: c.info }} />
+                  </div>
                 </div>
                 <span className={`text-[10px] font-medium block text-center ${isActive ? "text-accent" : "text-fg-dim"}`}>
                   {c.label}

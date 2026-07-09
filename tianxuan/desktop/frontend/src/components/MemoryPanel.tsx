@@ -263,7 +263,7 @@ export function MemoryPanel(p: {
   const selectedWs = uniqueTabs.find((tb) => tb.id === effectiveTabId);
   const wsSelector = uniqueTabs.length > 1 ? (
     <select
-      className="mem-select text-[12px]"
+      className="mem-select text-sm"
       value={effectiveTabId ?? ""}
       onChange={(e) => setSelTabId(e.target.value)}
     >
@@ -274,7 +274,7 @@ export function MemoryPanel(p: {
       ))}
     </select>
   ) : (
-    <span className="text-fg-dim text-[12px] font-medium truncate max-w-[200px]">
+    <span className="text-fg-dim text-sm font-medium truncate max-w-[200px]">
       {selectedWs?.workspaceName || selectedWs?.label || ""}
     </span>
   );
@@ -294,9 +294,9 @@ export function MemoryPanel(p: {
       </div>
       {/* error banner */}
       {error && (
-        <div className="mx-4 mt-2 px-3 py-2 rounded-lg bg-err/10 border border-err/20 text-err text-[11.5px] flex items-center justify-between">
+        <div className="mx-4 mt-2 px-3 py-2 rounded-lg bg-err/10 border border-err/20 text-err text-xs flex items-center justify-between">
           <span>{error}</span>
-          <button className="bg-transparent border-0 text-err cursor-pointer text-[11px]" onClick={() => setError(null)}>×</button>
+          <button className="bg-transparent border-0 text-err cursor-pointer hover:bg-err/10 rounded p-0.5 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-err/30 focus-visible:outline-none" onClick={() => setError(null)}><X size={13} /></button>
         </div>
       )}
 
@@ -355,7 +355,7 @@ export function MemoryPanel(p: {
               spellCheck={false}
             />
             {query && (
-              <button className="mem-search__clear" onClick={() => setQuery("")}><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg></button>
+              <button className="mem-search__clear" onClick={() => setQuery("")}><X size={12} /></button>
             )}
           </div>
           <div className="mem-type-chips">

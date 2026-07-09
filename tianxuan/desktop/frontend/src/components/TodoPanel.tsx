@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Circle, Loader } from "lucide-react";
+import { Check, Circle, Loader, X } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
@@ -38,9 +38,9 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
     }
   }, [open]);
 
-  const itemPy = compact ? "py-[5px]" : "py-[7px]";
-  const itemPx = compact ? "px-[7px] pl-[9px]" : "px-[7px] pl-[11px]";
-  const itemTextSize = compact ? "text-[11.5px]" : "text-[12.5px]";
+  const itemPy = compact ? "py-1" : "py-2";
+  const itemPx = compact ? "px-2 pl-2" : "px-2 pl-3";
+  const itemTextSize = compact ? "text-[11px]" : "text-xs";
 
   return (
     <PromptShelf
@@ -60,15 +60,15 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
             {open ? t("common.collapse") : t("common.expand")}
           </PromptHeaderAction>
           <PromptHeaderAction onClick={onDismiss}>
-            ✕
+            <X size={11} />
           </PromptHeaderAction>
         </>
       }
     >
-      {/* 进度条 — 加高+渐变色+百分比标注 */}
+      {/* 进度条 */}
       <div className="h-[5px] bg-border-soft relative">
         <div
-          className={`h-full transition-[width] duration-700 ease-out rounded-r-sm ${
+          className={`h-full transition-[width] duration-500 ease-in-out rounded-r-sm ${
             pct >= 100
               ? "bg-ok"
               : "bg-gradient-to-r from-accent via-accent to-ok/70"
@@ -98,13 +98,13 @@ export function TodoPanel({ todos, onDismiss }: { todos: Todo[]; onDismiss: () =
                   : "bg-transparent hover:bg-bg-elev"
               } ${isSub ? (compact ? "pl-8" : "pl-9") : ""}`}
             >
-              {/* 左强调条 — 进行中带微动画 */}
+              {/* 左强调条 — 进行中 */}
               {isCurrent && !isSub && (
-                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm animate-pulse" />
+                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-accent rounded-r-sm animate-[breathe_2s_ease-in-out_infinite]" />
               )}
               {/* 子任务连接线 */}
               {isSub && (
-                <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-border-soft" />
+                <div className="absolute left-3 top-0 bottom-0 w-[2px] bg-border-soft" />
               )}
 
               {statusIcon(td.status)}

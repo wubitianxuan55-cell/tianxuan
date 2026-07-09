@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { Markdown } from "./Markdown";
 import type { QuestionAnswer, WireAsk } from "../lib/types";
@@ -157,7 +158,7 @@ export function PlanCard({
         {/* 标题 */}
         <div className="flex items-center gap-2 px-5 pt-5 pb-1">
           <span className="w-1 h-4 rounded-full bg-accent shrink-0" />
-          <span className="text-fg text-[15px] font-semibold leading-tight">计划确认</span>
+          <span className="text-fg text-sm font-semibold leading-tight">计划确认</span>
         </div>
 
         {/* 任务描述 */}
@@ -165,9 +166,10 @@ export function PlanCard({
           <div className="px-5 pb-2 text-fg-dim text-[13px] leading-relaxed">{q.prompt}</div>
         )}
 
-        {/* 计划内容区 — Markdown 渲染，可滚动 */}
+        {/* 计划内容区 */}
         <div className="px-5 pb-3 flex-1 min-h-0">
-          <div className="max-h-[50vh] overflow-y-auto bg-bg-soft rounded-lg border border-border-soft p-4">
+          <div className="relative max-h-[50vh] overflow-y-auto bg-bg-soft rounded-lg border border-border-soft p-4">
+            <span className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-accent/40" />
             {plan ? (
               <Markdown text={plan} />
             ) : (
@@ -179,7 +181,7 @@ export function PlanCard({
         {/* 修改意见 */}
         <div className="px-5 pb-1">
           <input
-            className="w-full border border-border-soft rounded-lg bg-bg text-fg text-[12.5px] px-3 py-2 outline-none placeholder:text-fg-faint/40 transition-colors duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
+            className="w-full border border-border-soft rounded-lg bg-bg text-fg text-xs px-3 py-2 outline-none placeholder:text-fg-faint/40 transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
             placeholder="输入修改意见… 不满意计划时填写，提交后将重新规划"
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -194,10 +196,15 @@ export function PlanCard({
 
         {/* 兜底 checkbox */}
         <div className="px-5 pb-2">
-          <label className="flex items-center gap-2 text-[12px] text-fg-dim cursor-pointer select-none hover:text-fg transition-colors">
+          <label className="flex items-center gap-2 text-[12px] text-fg-dim cursor-pointer select-none hover:text-fg transition-colors duration-150">
+            <span className={`relative flex items-center justify-center w-[18px] h-[18px] rounded border-2 transition-colors duration-150 ${
+              chatOnly ? "border-accent bg-accent" : "border-fg-faint hover:border-fg-dim"
+            }`}>
+              {chatOnly && <Check size={11} strokeWidth={3} className="text-accent-fg" />}
+            </span>
             <input
               type="checkbox"
-              className="w-3.5 h-3.5 accent-accent rounded cursor-pointer"
+              className="sr-only"
               checked={chatOnly}
               onChange={(e) => setChatOnly(e.target.checked)}
             />
@@ -208,13 +215,13 @@ export function PlanCard({
         {/* 底部按钮: [取消] [提交] */}
         <div className="flex justify-end gap-2 px-5 pb-4 pt-2 border-t border-border-soft">
           <button
-            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-[12.5px] cursor-pointer transition-all duration-[var(--dur-fast)] hover:text-fg hover:border-border hover:bg-bg-soft hover:-translate-y-px active:scale-[0.98]"
+            className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-xs font-medium cursor-pointer transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none hover:text-fg hover:border-border hover:bg-bg-soft hover:shadow-sm active:scale-[0.98]"
             onClick={() => submit("取消")}
           >
             2 取消
           </button>
           <button
-            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-[12.5px] font-semibold cursor-pointer transition-all duration-[var(--dur-fast)] hover:brightness-110 hover:-translate-y-px active:scale-[0.98]"
+            className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-xs font-semibold cursor-pointer transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none hover:brightness-110 hover:shadow-md active:scale-[0.98]"
             onClick={handleSubmit}
           >
             {btnLabel}

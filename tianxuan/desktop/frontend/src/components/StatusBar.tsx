@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Cpu, Wallet, Coins, GitBranch } from "lucide-react";
+import { Cpu, Wallet, Coins, GitBranch, Zap } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -15,7 +15,7 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
   return (
     <div className="relative inline-flex">
       <button
-        className={`inline-flex items-center gap-1 ${compact ? "text-[11px]" : "text-[11px]"} px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors`}
+        className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded text-fg-dim hover:text-fg hover:bg-bg-elev transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none active:scale-[0.97]`}
         onClick={() => setOpen((v) => !v)}
         title={t("status.jobsTitle")}
       >
@@ -49,13 +49,13 @@ export function ContextBar({ label, used, window: win, color }: { label: string;
   const barColor = pct > 80 ? "bg-err" : pct > 60 ? "bg-warning" : color;
   return (
     <div className="flex items-center gap-1">
-      <span className="text-fg-faint text-[9px] shrink-0 w-6">{label}</span>
+      <span className="text-fg-faint text-[10px] shrink-0 w-6">{label}</span>
       <div className="flex-1 h-1.5 bg-border/40 rounded-full overflow-hidden min-w-[60px]">
         <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
-      <span className="text-fg-dim font-mono tabular-nums text-[9px] shrink-0 w-7 text-right">{pct}%</span>
-      <span className="text-fg-faint font-mono tabular-nums text-[8px] shrink-0">{fmtTokens(used)}/{fmtTokens(win)}</span>
+      <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0 w-7 text-right">{pct}%</span>
+      <span className="text-fg-faint font-mono tabular-nums text-[10px] shrink-0">{fmtTokens(used)}/{fmtTokens(win)}</span>
     </div>
   );
 }
@@ -99,7 +99,7 @@ export const StatusBar = memo(function StatusBar({
 
   const barH = compact ? "h-7" : "h-8";
   const barPx = compact ? "px-2" : "px-3";
-  const fontSize = compact ? "text-[11px]" : "text-[11.5px]";
+  const fontSize = "text-[11px]";
 
   const connLabel = !bridgeAlive ? "离线" : running ? "生成中" : "在线";
   const connColor = !bridgeAlive ? "bg-err" : running ? "bg-warning ds-pulse" : "bg-ok";
@@ -163,7 +163,7 @@ export const StatusBar = memo(function StatusBar({
         {/* 权限级别 badge */}
         {permLevel && permLevel !== "ask" && (() => {
           const isYolo = permLevel === "yolo";
-          const label = isYolo ? "⚡ YOLO" : "自动";
+          const label = isYolo ? <><Zap size={10} className="inline" /> YOLO</> : "自动";
           const desc = isYolo ? "跳过所有确认提示" : "写入无需确认";
           const colorClass = isYolo
             ? "text-err bg-err/10 border-err/20"

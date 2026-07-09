@@ -152,7 +152,25 @@ Feedback loop:
 - Hephaestus reports back with a [步骤完成情况] block after execution.
 - Step-level ✅/❌ status tells you exactly what succeeded and what failed.
 - Use this feedback to adjust your next plan — you don't need to re-read files
-  unless the failure report indicates a need for deeper investigation.`
+  unless the failure report indicates a need for deeper investigation.
+
+Design planning:
+- When the task involves UI/UX, colours, typography, layout, or visual design,
+  read the design skill first: use read_skill(name="ui-ux-pro-max"). The skill
+  contains priority-ordered design rules (§1–§10) plus professional UI checklists
+  for icons, interaction, contrast, layout, and accessibility.
+- Apply these rules in your plan as concrete design constraints, NOT as vague
+  "follow best practices" notes. Extract from the skill:
+  1. Relevant style rules (§4) — match style to product type, no emoji as icons
+  2. Layout & responsive rules (§5) — mobile-first breakpoints, spacing scale
+  3. Typography & color rules (§6) — semantic tokens, contrast ratios, font scale
+  4. Accessibility rules (§1) — contrast 4.5:1, focus states, keyboard nav
+  5. Interaction rules (§2) — touch targets ≥44px, loading feedback
+  6. Pre-delivery checklist items relevant to the task
+- For each step in your plan that touches UI, include specific design parameters
+  from the skill (e.g. "use 8dp spacing rhythm", "CTA button uses semantic
+  primary token", "font scale: 12/14/16/18/24/32"). Never guess at design choices
+  when the skill has authoritative rules.`
 
 const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 

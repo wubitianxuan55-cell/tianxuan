@@ -371,6 +371,15 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
 
+			// V10.32: 子代理注册表 = 只读工具 + bash。规划者本身不拿
+			// bash（保持只读），但 task 子代理需要 bash 执行构建/测试等
+			// 操作类命令。设计类技能（ui-ux-pro-max 等）已改为规划者
+			// 直接 read_skill 加载规则，不再需要子代理跑 Python 脚本。
+			subagentReg := newReadOnlyRegistry(reg)
+			if bashTool, ok := reg.Get("bash"); ok {
+				subagentReg.Add(bashTool)
+			}
+
 			// 显式添加 ask 工具到规划者只读工具集中。
 			// ask 工具 ReadOnly=true 理论上会被 newReadOnlyRegistry 自动包含，
 			// 但显式添加可确保它不受过滤逻辑变化的影响。
@@ -381,7 +390,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			// V10.42: 为规划者注入只读子代理工具（task/explore/research/
 			// review/security_review）。每个子代理工具的 parentReg =
 			// readOnlyReg，确保子代理也只拿到只读工具 — headlessGate 无害。
-			plannerTaskTool := agent.NewTaskTool(plannerProv, pe.Price, readOnlyReg, maxSteps,
+			plannerTaskTool := agent.NewTaskTool(plannerProv, pe.Price, subagentReg, maxSteps,
 				pe.ContextWindow, cfg.Agent.SubagentTemp(), config.ArchiveDir(), "", headlessGate)
 			plannerTaskTool.SetCompiler(&taskCompilerAdapter{c: compiler})
 			plannerTaskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
@@ -405,7 +414,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 						}
 					}
 				}
-				subReg := agent.FilterRegistry(readOnlyReg, sk.AllowedTools, agent.SubagentMetaTools()...)
+				subReg := agent.FilterRegistry(subagentReg, sk.AllowedTools, agent.SubagentMetaTools()...)
 				steps := maxSteps
 				if steps > 0 {
 					if steps /= 2; steps < 5 {

@@ -284,7 +284,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		applyCompactToolset(reg)
 	}
 
-	execSess := agent.NewSession(compiler.SystemPrompt())
+	execSess := agent.NewSession(compiler.WithInstructions(agent.HephaestusSystemPrompt))
 	executor := agent.New(execProv, reg, execSess, agent.Options{
 		MaxSteps:      maxSteps,
 		Temperature:   cfg.Agent.Temperature,

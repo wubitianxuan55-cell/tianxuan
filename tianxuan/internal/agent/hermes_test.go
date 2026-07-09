@@ -159,17 +159,3 @@ func TestHandoffTask_ShortMessage(t *testing.T) {
 		t.Fatal("short message should pass through")
 	}
 }
-
-// ── persistAnswer ─────────────────────────────────────────
-
-func TestPersistAnswer_NilReceiver(t *testing.T) {
-	var h *Hermes
-	// should not panic
-	h.persistAnswer("query", "answer")
-}
-
-func TestPersistAnswer_NilHephaestus(t *testing.T) {
-	h := &Hermes{}
-	// should not panic
-	h.persistAnswer("query", "answer")
-}

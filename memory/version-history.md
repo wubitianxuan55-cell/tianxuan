@@ -10,7 +10,8 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
-| V10.51.1 | 2026-07-09 | 重启历史会话中文输入显示修复 + 启动命令跨平台自动后台化 |
+| V10.52.2 | 2026-07-09 | 双模型 Prompt 全面重写 + 执行契约 L2 化 + 整体优化 |
+| V10.52.1 | 2026-07-09 | parallel_tasks 工具 + 品牌图标统一 + 系统提示并行指引 |
 | V10.31.0 | 2026-07-04 | 双模型弹性降级 + 统计面板规划/执行拆分 + 子代理冷启动优化 |
 | V10.30.0 | 2026-07-04 | web_fetch 代理(HTTP CONNECT+SOCKS5) + grep .gitignore 精确行走 + 启动动画重设计 |
 | V10.26.0 | 2026-07-04 | Reasonix V1.15 蒸馏完成 + 双模型协调器(planner+executor) + 桌面端适配 |
@@ -75,6 +76,32 @@ metadata:
 - 子代理 transcript 持久化 (SubagentStore/SubagentRun)
 - 双模型协调器 (Coordinator, ~260行): planner 流式规划 → executor 执行
 - 桌面端: 双视图 Planner 模型选择器 + SetPlannerModel 绑定
+
+## V10.52.2 详情
+
+- **构建命令**: `cd tianxuan/desktop && wails build`
+- **产物**: `C:\Users\吴比\AppData\Roaming\tianxuan\bin\tianxuan.exe`
+- **变更**: 6 文件，+235/-292 行
+
+### 规划者（HermesPrompt）全面优化
+1. 7原则→4信条（Evidence/Push back/Clarify/KISS+design quality）
+2. 5分支决策树：纯操作/只读/需澄清/需规划/执行反馈
+3. 5个研究终止条件（文件/签名/影响/测试/探索超越用户提及）
+4. Zero flattery 防献媚声明 + 独立验证规则
+5. 3-8步粒度约束 + Success 字段强制精确命令
+6. HermesPrompt 从 155 行压缩到 90 行
+
+### 执行者（HephaestusSystemPrompt 新增 L2 层）
+1. 执行契约从 formatHandoff 移到 L2 system prompt
+2. Pre-execution ritual / Step execution loop / Tool failure recovery / Parallel execution
+3. 与 AGENTS.md 去重，编码铁律零重复
+
+### 架构精简
+1. formatHandoff 精简 83→16 行
+2. formatExecutionFeedback 结构化 Markdown 格式
+3. boot.go 注入 `compiler.WithInstructions(agent.HephaestusSystemPrompt)`
+4. persistAnswer 空实现删除（-25行）
+5. confirmPlan default 注释明确语义
 
 ## V10.51.1 详情
 

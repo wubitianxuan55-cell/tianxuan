@@ -57,14 +57,20 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 When you face 2+ independent tasks that can be worked on without shared state or
 sequential dependencies, dispatch them in parallel instead of one-by-one:
 
-- parallel_tasks — for arbitrary sub-agent investigations (e.g. "find all callers
-  of X in Go backend" + "find all consumers of X in frontend")
+- parallel_tasks — for arbitrary sub-agent tasks, read-only or with writes
+  (e.g. "run tests for package A" + "run tests for package B",
+   "build the frontend" + "build the backend",
+   "find all callers of X in Go" + "find all consumers of X in frontend")
 - parallel_skills — for named skill invocations (explore, review, research,
   security_review) that each need an isolated sub-agent
+- bash run_in_background — for long-running commands (servers, watchers, builds)
+  that you want to start now and check later with bash_output or wait
 
-Decision: if two tasks read different files/folders and neither result depends on
-the other, they are parallel-safe. If you're unsure, default to parallel — the
-worst case is two sub-agents racing to read the same file, which is harmless.`
+Decision: if two tasks don't share state and neither result depends on the other,
+they are parallel-safe. When in doubt, default to parallel — sub-agents run in
+isolated sessions. Multiple independent bash commands (e.g. tests for different
+packages) should be dispatched via parallel_tasks, NOT chained serially in a
+single turn.`
 
 	builtin.WireReadSkillResolver(func(name string) (string, error) {
 		sk, ok := skillStore.Read(name)

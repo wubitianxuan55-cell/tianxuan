@@ -153,7 +153,7 @@ func (t *TaskTool) Schema() json.RawMessage {
   "prompt":{"type":"string","description":"What the sub-agent should accomplish. Be specific about the deliverable — the sub-agent does not see this conversation."},
   "description":{"type":"string","description":"Short label for the sub-task (3-7 words). Surfaced in the dispatch line so the user sees what's running."},
   "tools":{"type":"array","items":{"type":"string"},"description":"Optional tool whitelist. Subagent/skill meta-tools are still excluded so delegation stays one layer deep."},
-  "max_steps":{"type":"integer","description":"Optional cap on tool-call rounds. Defaults to half the parent's cap (min 5).","minimum":1},
+  "max_steps":{"type":"integer","description":"Optional cap on tool-call rounds. Unlimited by default.","minimum":1},
   "run_in_background":{"type":"boolean","description":"Run the sub-agent asynchronously: returns a job id immediately and keeps working across turns. Collect its final answer with wait, and you'll be notified when it finishes. Use for long, independent sub-tasks you don't need to block on right now."},
   "output_schema":{"type":"object","description":"Optional JSON Schema the sub-agent MUST return its result in. If set, the parent will attempt to parse the final answer as JSON. If the result is valid JSON matching the expected shape, it is returned verbatim; otherwise a diagnostic note is prefixed. Use when the parent needs structured data from the sub-agent."},
   "retry_until":{"type":"object","properties":{"check":{"type":"string","description":"Shell command to verify success, e.g. 'go test ./...'. Non-zero exit = retry."},"max_retries":{"type":"integer","description":"Maximum retry attempts (default 3, max 10).","minimum":1,"maximum":10}},"required":["check"]},
@@ -195,14 +195,8 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 	}
 
 	maxSteps := p.MaxSteps
-	if maxSteps <= 0 {
-		if t.maxSteps > 0 {
-			maxSteps = t.maxSteps / 2
-			if maxSteps < 5 {
-				maxSteps = 5
-			}
-		}
-	}
+	// V10.53: 子代理步数默认不限（0 = unlimited），仅当调用方显式指定 max_steps 时才设限。
+	// 不再继承父代理上限——子代理独立执行，不应被父代理的 GoalRouter 分级的 maxSteps 传导限制。
 
 	subReg := t.buildSubReg(p.Tools)
 

@@ -66,7 +66,7 @@ func (t *ParallelTasksTool) Name() string { return "parallel_tasks" }
 func (t *ParallelTasksTool) ReadOnly() bool { return false }
 
 func (t *ParallelTasksTool) Description() string {
-	return "Dispatch multiple read-only sub-agent tasks concurrently and collect their results. Each task runs in its own isolated session with read-only tools. Use for 2+ independent investigations that share no state — e.g. 'find all uses of X in the frontend' + 'find all uses of X in the backend'. Blocks until all complete."
+	return "Dispatch multiple sub-agent tasks concurrently and collect their results. Each task runs in its own isolated session with the full tool set (including write tools). Use for 2+ independent tasks that share no state — e.g. 'run tests for package A' + 'run tests for package B', or 'find all uses of X in the frontend' + 'find all uses of X in the backend'. Blocks until all complete."
 }
 
 func (t *ParallelTasksTool) Schema() json.RawMessage {
@@ -81,7 +81,7 @@ func (t *ParallelTasksTool) Schema() json.RawMessage {
         "prompt":{"type":"string","description":"The task prompt for the sub-agent."},
         "description":{"type":"string","description":"Optional short label (3-7 words) shown in the job list."},
         "tools":{"type":"array","items":{"type":"string"},"description":"Optional tool whitelist for the sub-agent."},
-        "max_steps":{"type":"integer","description":"Optional max tool-call rounds. Defaults to half the parent's cap (min 5).","minimum":1}
+        "max_steps":{"type":"integer","description":"Optional max tool-call rounds. Unlimited by default.","minimum":1}
       },
       "required":["prompt"]
     },
@@ -93,7 +93,7 @@ func (t *ParallelTasksTool) Schema() json.RawMessage {
 }
 
 func (t *ParallelTasksTool) CompactDescription() string {
-	return "Run multiple read-only sub-agent tasks concurrently, collect results."
+	return "Run multiple sub-agent tasks concurrently (full tool set), collect results."
 }
 
 func (t *ParallelTasksTool) CompactSchema() json.RawMessage {
@@ -134,14 +134,7 @@ func (t *ParallelTasksTool) Execute(ctx context.Context, args json.RawMessage) (
 			subCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 			defer cancel()
 
-			if maxSteps <= 0 {
-				if t.maxSteps > 0 {
-					maxSteps = t.maxSteps / 2
-					if maxSteps < 5 {
-						maxSteps = 5
-					}
-				}
-			}
+			// V10.53: 子代理步数默认不限（0 = unlimited），仅当调用方显式指定 max_steps 时才设限。
 
 			subReg := FilterRegistry(t.parentReg, tools, SubagentMetaTools()...)
 			sysPrompt := t.sysPrompt

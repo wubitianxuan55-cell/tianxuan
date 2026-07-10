@@ -23,6 +23,7 @@ import { ToolbarButton } from "./components/ToolbarButton";
 import { StatusBar } from "./components/StatusBar";
 import { ContextBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
@@ -412,6 +413,7 @@ export default function App() {
   }, [state.items]);
   return (
     <ToastProvider>
+    <ErrorBoundary>
     {!splashDone && <StartupSplash hold={splashHold} onDone={() => setSplashDone(true)} />}
     <div className="app">
       <div
@@ -730,6 +732,7 @@ export default function App() {
         onClose={() => setPaletteOpen(false)}
       />
     </div>
+    </ErrorBoundary>
     </ToastProvider>
   );
 }

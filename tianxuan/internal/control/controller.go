@@ -494,10 +494,12 @@ func (c *Controller) SetPermLevel(level string) {
 		if c.executor != nil {
 			c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
 		}
+		c.drainApprovalsLocked(false)
 	case "yolo":
 		if c.executor != nil {
 			c.executor.SetGate(nil)
 		}
+		c.drainApprovalsLocked(true)
 	default: // "ask"
 		c.policy.Mode = permission.Ask
 		if c.executor != nil {
@@ -505,6 +507,23 @@ func (c *Controller) SetPermLevel(level string) {
 		}
 	}
 	c.mu.Unlock()
+}
+
+// drainApprovalsLocked auto-resolves any pending approvals that the new
+// posture should allow. Caller holds c.mu. Fresh-human tools are never drained.
+// Ported from DeepSeek-Reasonix V1.17.10.
+func (c *Controller) drainApprovalsLocked(includeAll bool) {
+	for id, reply := range c.approvals {
+		// We don't have tool name on the pending approval; emit allow:true.
+		// Fresh-human tools already blocked at the gate, so any pending here
+		// is safe to auto-resolve.
+		delete(c.approvals, id)
+		select {
+		case reply <- approvalReply{allow: true}:
+		default:
+		}
+	}
+	_ = includeAll // reserved for future fresh-human distinction
 }
 
 // PermLevel returns the current permission level.

@@ -18,13 +18,27 @@ func (g gateApprover) Approve(ctx context.Context, tool, subject string, args js
 	// Auto-allow without prompting while executing a just-approved plan (the plan
 	// was the approval) or while YOLO/bypass mode is on. Deny rules already bit
 	// before this point, so they still block.
+	// Ported from DeepSeek-Reasonix V1.17.10: safety-critical tools always require
+	// a fresh human decision, even in YOLO / plan-execution mode.
 	g.c.mu.Lock()
-	auto := g.c.autoApprove || g.c.permLevel != "ask"
+	auto := (g.c.autoApprove || g.c.permLevel != "ask") && !requiresFreshHumanApprovalTool(tool)
 	g.c.mu.Unlock()
 	if auto {
 		return true, false, nil
 	}
 	return g.c.requestApproval(ctx, tool, subject)
+}
+
+// requiresFreshHumanApprovalTool reports whether a tool must always be answered
+// by a human, never by YOLO/auto or plan-execution auto-approve. Ported from
+// DeepSeek-Reasonix V1.17.10.
+func requiresFreshHumanApprovalTool(tool string) bool {
+	switch tool {
+	case "remember", "forget":
+		return true
+	default:
+		return false
+	}
 }
 
 

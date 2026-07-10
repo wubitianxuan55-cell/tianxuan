@@ -45,23 +45,23 @@ func saveAtomically(dir, pattern, path string, v any) error {
 		return err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+		return friendlySessionFileError(err)
 	}
 	tmp, err := os.CreateTemp(dir, pattern)
 	if err != nil {
-		return err
+		return friendlySessionFileError(err)
 	}
 	tmpPath := tmp.Name()
 	if _, err := tmp.Write(b); err != nil {
 		tmp.Close()
 		os.Remove(tmpPath)
-		return err
+		return friendlySessionFileError(err)
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpPath)
-		return err
+		return friendlySessionFileError(err)
 	}
-	return os.Rename(tmpPath, path)
+	return friendlySessionFileError(os.Rename(tmpPath, path))
 }
 
 // saveSessionTitles writes the map atomically (temp file + rename).
@@ -84,7 +84,7 @@ func setSessionTitle(dir, sessionPath, title string) error {
 // deleteSessionFile removes a session's .jsonl and its title entry.
 func deleteSessionFile(dir, sessionPath string) error {
 	if err := os.Remove(sessionPath); err != nil && !os.IsNotExist(err) {
-		return err
+		return friendlySessionFileError(err)
 	}
 	m := loadSessionTitles(dir)
 	if _, ok := m[filepath.Base(sessionPath)]; ok {

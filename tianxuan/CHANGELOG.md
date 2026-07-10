@@ -1,3 +1,50 @@
+## [10.54.0] — 2026-07-10
+
+### 🧬 V1.17.10 蒸馏（内核）
+
+- **任务/聊天分类器** (`internal/agent/task_classifier.go` 新建)：LLM + 启发式双模分类，SHA256 LRU 缓存，区分 "fix the bug" vs "hello"
+- **审批安全强化** (`internal/control/controller_approval.go`)：`remember`/`forget` 在 yolo/auto 模式下仍需人工审批
+- **模式切换排空** (`internal/control/controller.go`)：切换到 auto/yolo 时自动排空可批准项
+- **瞬态块剥离** (`internal/agent/session/transient.go`)：新增 `<hook-context>` / `<active-goal>` / `<capability-route>` 三种块类型
+
+### 🖥️ V1.17.10 蒸馏（桌面端）
+
+- **OS 错误友好化** (`desktop/session_errors*.go` 新建)：文件共享冲突/权限拒绝/磁盘满 → 用户可读消息
+- **Prompt 交换诊断** (`desktop/settings_app.go`)：配置变更恢复会话时若 system prompt 变化，记录 warn 日志
+- **TurnCollapse 推理折条** (`desktop/frontend/src/components/Message.tsx`)：推理过程独立折叠在正文上方，流式自动展开/完成后自动折叠
+
+### 🔧 改进
+
+- **Token 统计对齐分析**：对比 DeepSeek 官方 tokenizer，确认动态校准机制覆盖主要风险
+
+## [10.53.0] — 2026-07-09
+
+- Hermes prompt 全面升级 + 计划确认弹窗重设计 + 记忆文件发布记录 + 项目基准 + 版本历史
+
+## [10.52.2] — 2026-07-09
+
+- 双模型 Prompt 全面重写 + 执行契约 L2 化
+
+## [10.52.1] — 2026-07-09
+
+- parallel_tasks 工具 + 品牌图标统一 + 系统提示并行指引
+
+## [10.52.0] — 2026-07-08
+
+- UI 全面优化 — ui-ux-pro-max 设计规则系统应用
+
+## [10.51.1] — 2026-07-08
+
+- 修复重启后历史会话中文输入显示为英文 + 启动命令跨平台自动后台化
+
+## [10.51.0] — 2026-07-08
+
+- 配色重设计 + 记忆面板重构 + 模型面板升级 + 双模型协作强化
+
+## [10.50.0] — 2026-07-08
+
+- Hermes 设计质量原则 + Superpowers v6.1.1 蒸馏 + 双模型 AGENTS.md 角色区分
+
 ## [10.49.0] — 2026-07-08
 
 ### 🕐 定时任务系统（全新功能）

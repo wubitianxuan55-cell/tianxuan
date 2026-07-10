@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -214,7 +215,9 @@ func (a *App) rebuild() error {
 		path = agent.NewSessionPath(dir, ctrl.Label())
 	}
 	if len(carried) > 0 {
-		carried = withFreshSystemPrompt(carried, systemPromptFrom(ctrl.History()))
+		fresh := systemPromptFrom(ctrl.History())
+		logSystemPromptSwap(systemPromptFrom(carried), fresh, path)
+		carried = withFreshSystemPrompt(carried, fresh)
 		ctrl.Resume(&agent.Session{Messages: carried}, path)
 	} else if path != "" {
 		ctrl.SetSessionPath(path)
@@ -248,6 +251,17 @@ func withFreshSystemPrompt(messages []provider.Message, system string) []provide
 		}
 	}
 	return append([]provider.Message{{Role: provider.RoleSystem, Content: system}}, out...)
+}
+
+// logSystemPromptSwap traces a resume that replaces a persisted system prompt.
+// The swap invalidates the conversation's provider prefix cache (misses bill at
+// 10× hits). Ported from DeepSeek-Reasonix V1.17.10.
+func logSystemPromptSwap(persisted, fresh, path string) {
+	if persisted == "" || fresh == "" || persisted == fresh {
+		return
+	}
+	slog.Warn("desktop: resume swapped a differing system prompt; conversation prefix cache will miss",
+		"path", path, "persisted_len", len(persisted), "fresh_len", len(fresh))
 }
 
 // SetDefaultModel sets the config default and switches the live model to it.

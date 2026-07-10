@@ -16,6 +16,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
+	"tianxuan/internal/crash"
+
 	// Blank imports wire compile-time built-ins into their registries, exactly as
 	// cmd/tianxuan does — boot.Build resolves providers/tools from these registries.
 	_ "tianxuan/internal/provider/anthropic"
@@ -37,6 +39,7 @@ var assets embed.FS
 var version = "dev"
 
 func main() {
+	defer crash.Handle()
 	app := NewApp()
 
 	// Restore saved window size, or fall back to the default.

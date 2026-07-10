@@ -96,10 +96,10 @@ func (a *App) startup(ctx context.Context) {
 	// boot.Build — runs in the background so the webview appears instantly.
 	// During this window Meta().Ready is false and the frontend shows a loading
 	// state; bound calls are no-ops (ctrl is nil).
-	go a.buildController()
+	a.goSafe("buildController", a.buildController)
 
 	// Start system tray — close minimizes to tray, not exit.
-	go runTray(ctx, a)
+	a.goSafe("runTray", func() { runTray(ctx, a) })
 }
 
 // domReady fires after the frontend has loaded and rendered. Restore saved

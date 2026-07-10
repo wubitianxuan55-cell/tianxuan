@@ -7,11 +7,12 @@ import "strings"
 // directives. These blocks are prepended by withTurnPreferences, Compose, and
 // memory injection at send time; they are NOT user content.
 //
-// Handles all 7 block types:
+// Handles all 10 block types:
 //   - reasoning-language / response-language (language hints)
 //   - memory-update / session-facts (runtime memory state)
 //   - background-jobs (completed background tasks)
 //   - procedural-rules / episodic-memory (memory injection)
+//   - hook-context / active-goal / capability-route (V1.17.10 additions)
 func StripTransientBlocks(content string) string {
 	s := strings.TrimLeft(content, " \t\r\n")
 	for {
@@ -55,6 +56,24 @@ func StripTransientBlocks(content string) string {
 		case strings.HasPrefix(s, "<episodic-memory>"):
 			var ok bool
 			s, ok = trimTransientBlock(s, "episodic-memory")
+			if !ok {
+				return content
+			}
+		case strings.HasPrefix(s, "<hook-context>"):
+			var ok bool
+			s, ok = trimTransientBlock(s, "hook-context")
+			if !ok {
+				return content
+			}
+		case strings.HasPrefix(s, "<active-goal>"):
+			var ok bool
+			s, ok = trimTransientBlock(s, "active-goal")
+			if !ok {
+				return content
+			}
+		case strings.HasPrefix(s, "<capability-route>"):
+			var ok bool
+			s, ok = trimTransientBlock(s, "capability-route")
 			if !ok {
 				return content
 			}

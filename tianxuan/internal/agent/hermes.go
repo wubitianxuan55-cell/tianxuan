@@ -476,10 +476,9 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 			return &TurnResult{Summary: plan, Success: true}, nil
 		}
 
-		// Strip preamble — only content after <!--plan--> matters for the
-		// confirm dialog and Hephaestus handoff.
-		if _, after, found := strings.Cut(plan, "<!--plan-->"); found {
-			plan = strings.TrimSpace(after)
+		// Strip preamble, keep <!--plan--> at the beginning
+		if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
+			plan = "<!--plan-->\n" + strings.TrimSpace(plan[idx+len("<!--plan-->"):])
 		}
 
 		var chatOnly, revise bool

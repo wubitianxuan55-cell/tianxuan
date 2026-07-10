@@ -20,9 +20,6 @@ function UserAvatar({ size = 14 }: { size?: number }) {
   );
 }
 
-
-// ── 推理区 ────────────────────────────────────────────────────────────
-
 // ── UserMessage ───────────────────────────────────────────────────────────
 
 export const UserMessage = memo(function UserMessage({
@@ -84,79 +81,119 @@ export const UserMessage = memo(function UserMessage({
   );
 });
 
-// ── AssistantMessage ──────────────────────────────────────────────────────
+// ── ReasoningProcess ────────────────────────────────────────────────────
+// Standalone reasoning fold — renders ABOVE the answer text, not inside it.
+// Auto-expands during streaming, auto-collapses when done (unless user
+// toggled). Pattern ported from DeepSeek-Reasonix TurnCollapse.
 
-export const AssistantMessage = memo(function AssistantMessage({ item }: { item: AssistantItem; onCollapse?: () => void }) {
+export function ReasoningProcess({
+  item,
+  autoCollapse = true,
+}: {
+  item: AssistantItem;
+  autoCollapse?: boolean;
+}) {
   const t = useT();
-  const compact = useCompact();
   const now = useNow();
   const turnStartAt = useTurnStartAt();
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
+  const reasoningRunning = !!(item.streaming && !item.text);
 
-  const reasoningRunning = !!(item.streaming && !item.text && item.reasoning);
   const [userToggled, setUserToggled] = useState(false);
-  const [reasoningOpenState, setReasoningOpenState] = useState(false);
-  const reasoningOpen = userToggled ? reasoningOpenState : !!item.streaming;
-  useGSAPCollapse(reasoningBodyRef, reasoningOpen);
-  const toggleReasoning = useCallback(() => {
+  const [openState, setOpenState] = useState(false);
+  const open = userToggled
+    ? openState
+    : autoCollapse
+      ? !!item.streaming
+      : openState;
+
+  useGSAPCollapse(reasoningBodyRef, open);
+  const toggleOpen = useCallback(() => {
     setUserToggled(true);
-    setReasoningOpenState((v) => !v);
+    setOpenState((v) => !v);
   }, []);
 
   const reasoningDisplay = displayReasoningText(item.reasoning ?? "", {
     streaming: item.streaming ?? false,
     truncateStreaming: true,
   });
-  const reasoningLines = item.reasoning ? item.reasoning.split("\n").filter(l => l.trim()).length : 0;
+  const reasoningLines = item.reasoning
+    ? item.reasoning.split("\n").filter((l) => l.trim()).length
+    : 0;
+  const elapsed = turnStartAt > 0
+    ? Math.max(0, now - Math.floor(turnStartAt / 1000))
+    : 0;
+  const elapsedStr = elapsed < 60
+    ? `${elapsed}s`
+    : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
 
-  const elapsed = turnStartAt > 0 ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
-  const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+  return (
+    <div className="reasoning-process my-2">
+      <button
+        type="button"
+        className={`flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg border transition-colors ${
+          open
+            ? "border-accent/20 bg-accent/5"
+            : "border-transparent hover:bg-bg-soft"
+        } text-fg-faint text-[11px] cursor-pointer`}
+        onClick={toggleOpen}
+        aria-expanded={open}
+      >
+        <Brain size={13} className="flex-shrink-0" />
+        <span className="font-medium">
+          {reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinkingDone")}
+        </span>
+        <span className="text-fg-faint/50 text-[10px] ml-auto tabular-nums">
+          {reasoningRunning
+            ? elapsedStr
+            : `${reasoningLines} 行 · ${elapsedStr}`}
+        </span>
+        <ChevronRight
+          className={`transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+          size={11}
+        />
+      </button>
+      <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
+        <div
+          className={`mt-1 px-2.5 py-1.5 border-l-2 border-accent/20 ml-1 text-fg-dim/80 text-[11px] leading-relaxed whitespace-pre-wrap ${
+            reasoningDisplay.length > 3000 ? "max-h-[200px] overflow-y-auto" : ""
+          }`}
+        >
+          {reasoningDisplay}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  // 流式处理中的纯文本（不渲染 Markdown）
+// ── AssistantMessage ──────────────────────────────────────────────────────
+// Renders the assistant's answer text. If the item also carries reasoning,
+// ReasoningProcess renders ABOVE as a standalone fold (Reasonix TurnCollapse
+// pattern) — reasoning is NOT nested inside the answer bubble.
+
+export const AssistantMessage = memo(function AssistantMessage({
+  item,
+  hideReasoning = false,
+}: {
+  item: AssistantItem;
+  onCollapse?: () => void;
+  hideReasoning?: boolean;
+}) {
   const streaming = item.streaming ?? false;
+  const showReasoning = !hideReasoning && item.reasoning;
+
   return (
     <div className="flex justify-start my-2" data-entrance={item.id}>
       <div className="flex-1 min-w-0">
-          {/* 推理区 */}
-          {item.reasoning && (
-            <div className="mb-1.5">
-              <button
-                type="button"
-                className={`flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg border transition-colors ${
-                  reasoningOpen ? "border-accent/20 bg-accent/5" : "border-transparent hover:bg-bg-soft"
-                } text-fg-faint text-[11px] cursor-pointer`}
-                onClick={toggleReasoning}
-                aria-expanded={reasoningOpen}
-              >
-                <Brain size={13} className="flex-shrink-0" />
-                <span className="font-medium">{reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinking")}</span>
-                <span className="text-fg-faint/50 text-[10px] ml-auto tabular-nums">
-                  {reasoningRunning
-                    ? elapsedStr
-                    : `${reasoningLines} 行 · ${elapsedStr}`}
-                </span>
-                <ChevronRight
-                  className={`transition-transform duration-200 ${reasoningOpen ? "rotate-90" : ""}`}
-                  size={11}
-                />
-              </button>
-              <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
-                <div className={`mt-1 px-2.5 py-1.5 border-l-2 border-accent/20 ml-1 text-fg-dim/80 text-[11px] leading-relaxed whitespace-pre-wrap ${
-                  compact ? "max-h-[160px] overflow-y-auto" : ""
-                }`}>
-                  {reasoningDisplay}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 正文区 */}
-          {item.text && (
-            <div className="min-w-0">
-              <MemoMarkdown text={item.text} streaming={streaming} />
-            </div>
-          )}
-        </div>
+        {showReasoning && (
+          <ReasoningProcess item={item} autoCollapse />
+        )}
+        {item.text && (
+          <div className="min-w-0">
+            <MemoMarkdown text={item.text} streaming={streaming} />
+          </div>
+        )}
+      </div>
     </div>
   );
 });

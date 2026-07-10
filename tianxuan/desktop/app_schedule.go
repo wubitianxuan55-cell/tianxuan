@@ -279,9 +279,9 @@ func (a *App) startScheduler() {
 	})
 	a.mu.Unlock()
 
-	go func() {
+	a.goSafe("scheduler-start", func() {
 		_ = a.scheduler.Start(a.ctx)
-	}()
+	})
 }
 
 func scheduleDir() string {

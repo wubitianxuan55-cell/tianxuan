@@ -12,6 +12,8 @@ import (
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"tianxuan/internal/crash"
 )
 
 // trayIconICO is the tray icon in ICO format (multi-size: 16/32/48).
@@ -47,6 +49,7 @@ func runTray(ctx context.Context, app *App) {
 
 			// Update schedule title periodically
 			go func() {
+				defer crash.Recover("tray-schedule-title")
 				updateScheduleTitle(schedItem, app)
 				ticker := time.NewTicker(5 * time.Second)
 				defer ticker.Stop()
@@ -59,6 +62,7 @@ func runTray(ctx context.Context, app *App) {
 			}()
 
 			go func() {
+				defer crash.Recover("tray-event-loop")
 				for {
 					select {
 					case <-showItem.ClickedCh:

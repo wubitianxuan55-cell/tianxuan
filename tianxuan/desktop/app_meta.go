@@ -333,16 +333,18 @@ func (a *App) SetModel(name string) error {
 
 	var carried []provider.Message
 	var savedPermLevel string
+	var sessionDir string
 	if ctrl != nil {
 		_ = ctrl.Snapshot()
 		carried = ctrl.History()
 		savedPermLevel = ctrl.PermLevel()
+		sessionDir = ctrl.SessionDir()
 		ctrl.Close()
 	}
 
 	newCtrl, err := boot.Build(a.ctx, boot.Options{
 		Model: name, RequireKey: false, Sink: a.sink,
-		SessionDir: ctrl.SessionDir(),
+		SessionDir: sessionDir,
 	})
 	if err != nil {
 		return err

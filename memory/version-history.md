@@ -10,6 +10,7 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.53.0 | 2026-07-10 | 规划者进化 + 计划确认弹窗重构 + 7项Prompt改进 |
 | V10.52.2 | 2026-07-09 | 双模型 Prompt 全面重写 + 执行契约 L2 化 + 整体优化 |
 | V10.52.1 | 2026-07-09 | parallel_tasks 工具 + 品牌图标统一 + 系统提示并行指引 |
 | V10.31.0 | 2026-07-04 | 双模型弹性降级 + 统计面板规划/执行拆分 + 子代理冷启动优化 |
@@ -76,6 +77,26 @@ metadata:
 - 子代理 transcript 持久化 (SubagentStore/SubagentRun)
 - 双模型协调器 (Coordinator, ~260行): planner 流式规划 → executor 执行
 - 桌面端: 双视图 Planner 模型选择器 + SetPlannerModel 绑定
+
+## V10.53.0 详情
+
+- **构建命令**: `cd tianxuan/desktop && wails build`
+- **产物**: `build/bin/tianxuan-desktop.exe`
+- **SHA256**: `0fb758fcb4637f022582d005f8d08c492400cd7699eb3b2cac2758ccc5d73d76`
+- **变更**: 15 文件，+497/-605 行（含 11 个旧记忆文件清理）
+
+### 规划者进化（HermesPrompt）
+1. 角色定义：可行性/必要性/信息充分性前置三检查
+2. 4 信条加固：证据自检 + API 过时警告 + 可逆性优先
+3. 分类决策树 → 通用 5 步推理循环（理解意图→收集证据→评估可行性→决策→处理结果）
+4. 新增 Intent check：检测隐藏意图、过早请求、非代码方案
+5. 新增 Engineering judgment：blast radius / trade-off / scope discipline / priority
+6. 新增"Your errors are executed blindly"警示
+
+### 计划确认弹窗重构
+7. planParser 工具 + 10 测试用例覆盖全部边界
+8. PlanCard 重写：摘要栏 + 可折叠步骤卡片 + 降级方案
+9. `<!--plan-->` 前缀剥离，仅传计划正文给 UI 和执行者
 
 ## V10.52.2 详情
 

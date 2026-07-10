@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Brain, ChevronRight } from "lucide-react";
 import type { Item } from "../lib/store";
-import { useItems } from "../lib/store";
+import { useItems, useTurnStartAt } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
@@ -9,34 +9,27 @@ import { ToolGroup, scanGroups } from "./ToolGroup";
 import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
 import { useEntranceAnimation } from "../lib/useEntranceAnimation";
+import { useGSAPCollapse } from "../lib/useGSAPCollapse";
+import { useT } from "../lib/i18n";
+import { useNow } from "../lib/useNow";
 
-
-// ── 滚动参数 ──────────────────────────────────────────────────────────
+// ── Scroll helpers ──────────────────────────────────────────────────────
 const BOTTOM_THRESHOLD_PX = 80;
 const NOOP_SCROLL = () => {};
-
-function isNearBottom(el: HTMLElement): boolean {
-  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
-}
-
+function isNearBottom(el: HTMLElement) { return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX; }
 type ToolItem = Extract<Item, { kind: "tool" }>;
+type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
-// scrollVersion: 轻量级内容变化信号
 function scrollVersion(items: Item[]): string {
-  const n = items.length;
-  if (n === 0) return "0";
+  const n = items.length; if (n === 0) return "0";
   const last = items[n - 1];
   switch (last.kind) {
-    case "assistant":
-      return `${n}:${last.id}:${last.text.length}:${last.streaming ? 1 : 0}`;
-    case "tool":
-      return `${n}:${last.id}:${last.status}`;
-    default:
-      return `${n}:${last.id}`;
+    case "assistant": return `${n}:${last.id}:${last.text.length}:${last.streaming ? 1 : 0}`;
+    case "tool": return `${n}:${last.id}:${last.status}`;
+    default: return `${n}:${last.id}`;
   }
 }
 
-// mergeConsecutiveReasoning: 合并连续纯推理消息
 function mergeConsecutiveReasoning(items: Item[]): Item[] {
   const out: Item[] = [];
   for (const it of items) {
@@ -48,17 +41,108 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
       break;
     }
     const prev = prevIdx >= 0 ? out[prevIdx] : null;
-    if (
-      prev && prev.kind === "assistant" && it.kind === "assistant" &&
-      !prev.text && !it.text && !prev.streaming && !it.streaming
-    ) {
+    if (prev && prev.kind === "assistant" && it.kind === "assistant" && !prev.text && !it.text && !prev.streaming && !it.streaming) {
       out[prevIdx] = { ...prev, reasoning: prev.reasoning + "\n\n" + it.reasoning };
-    } else {
-      out.push(it);
-    }
+    } else { out.push(it); }
   }
   return out;
 }
+
+// ── TurnCollapse — fold process items, show final answer below ─────────
+// Ported from DeepSeek-Reasonix V1.17.10 partitionTurnItems pattern.
+// The last assistant with text is the "final answer" — rendered below.
+// All tools, intermediate reasoning, and phases before it go into the fold.
+
+interface TurnParts { processItems: Item[]; finalIndex: number }
+
+function partitionTurnItems(items: Item[]): TurnParts {
+  let finalIdx = -1;
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].kind === "assistant" && (items[i] as AssistantItem).text.trim()) { finalIdx = i; break; }
+  }
+  if (finalIdx < 0) return { processItems: [], finalIndex: -1 };
+  let userIdx = -1;
+  for (let i = finalIdx - 1; i >= 0; i--) {
+    if (items[i].kind === "user") { userIdx = i; break; }
+  }
+  if (userIdx < 0) return { processItems: [], finalIndex: finalIdx };
+  const processItems = items.slice(userIdx + 1, finalIdx).filter(
+    (it) => it.kind !== "user"
+      && !(it.kind === "tool" && (it as ToolItem).parentId)
+      && !(it.kind === "tool" && (it as ToolItem).name === "todo_write")
+  );
+  return { processItems, finalIndex: finalIdx };
+}
+
+function TurnCollapse({
+  items,
+  turnStartAt,
+}: { items: Item[]; turnStartAt?: number }) {
+  const t = useT();
+  const now = useNow();
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const toolCount = items.filter((it) => it.kind === "tool").length;
+  const hasRunning = items.some((it) =>
+    (it.kind === "tool" && (it as ToolItem).status === "running")
+    || (it.kind === "assistant" && (it as AssistantItem).streaming)
+  );
+
+  const [userToggled, setUserToggled] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = userToggled ? openState : hasRunning;
+
+  useGSAPCollapse(bodyRef, open);
+  const toggleOpen = useCallback(() => { setUserToggled(true); setOpenState((v) => !v); }, []);
+
+  const elapsed = turnStartAt ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
+  const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+
+  const label = hasRunning
+    ? t("msg.thinkingRunning")
+    : toolCount > 0
+      ? `${toolCount} ${"工具"} · ${elapsedStr}`
+      : t("msg.thinkingDone");
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="turn-collapse my-2" data-entrance={items[0]?.id}>
+      <button
+        type="button"
+        className={`flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border transition-colors ${
+          open ? "border-accent/20 bg-accent/5" : "border-transparent hover:bg-bg-soft"
+        } text-fg-faint text-[12px] cursor-pointer`}
+        onClick={toggleOpen} aria-expanded={open}
+      >
+        {hasRunning
+          ? <span className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+          : <Brain size={13} className="shrink-0" />}
+        <span className="font-medium">{label}</span>
+        <ChevronRight className={`ml-auto transition-transform duration-200 ${open ? "rotate-90" : ""}`} size={11} />
+      </button>
+      <div ref={bodyRef} style={{ overflow: "hidden" }}>
+        <div className="pt-1.5 space-y-1.5">
+          {items.map((it) => {
+            if (it.kind === "assistant" && (it as AssistantItem).reasoning) {
+              return (
+                <div key={it.id} className="text-fg-dim/70 text-[11px] leading-relaxed whitespace-pre-wrap px-1 border-l-2 border-accent/15 pl-2 ml-1">
+                  {(it as AssistantItem).reasoning}
+                </div>
+              );
+            }
+            if (it.kind === "tool") {
+              return null;
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Transcript ──────────────────────────────────────────────────────────
 
 export function Transcript({
   onPrompt, onRewind, running, onThreadEl, onScrollToTurnReady,
@@ -69,57 +153,39 @@ export function Transcript({
   running: boolean;
   onThreadEl?: (el: HTMLElement | null) => void;
   onScrollToTurnReady?: (fn: (turn: number) => void) => void;
-  cwd?: string;
-  cwdName?: string;
+  cwd?: string; cwdName?: string;
   sessions?: import("../lib/types").SessionMeta[];
   onResumeSession?: (path: string) => Promise<void>;
   meta?: import("../lib/types").Meta;
 }) {
   const items = useItems();
+  const turnStartAt = useTurnStartAt();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const rAF = useRef<number | null>(null);
 
-  useEffect(() => {
-    onThreadEl?.(scrollRef.current);
-    return () => onThreadEl?.(null);
-  }, [onThreadEl]);
-
-  useEffect(() => {
-    return () => { if (rAF.current !== null) cancelAnimationFrame(rAF.current); };
-  }, []);
+  useEffect(() => { onThreadEl?.(scrollRef.current); return () => onThreadEl?.(null); }, [onThreadEl]);
+  useEffect(() => { return () => { if (rAF.current !== null) cancelAnimationFrame(rAF.current); }; }, []);
 
   const [showScrollDown, setShowScrollDown] = useState(false);
-
   const onScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const el = scrollRef.current; if (!el) return;
     const atBottom = isNearBottom(el);
     stick.current = atBottom;
     setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight);
   }, []);
 
-  // ── 智能滚动 ──────────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!stick.current) return;
-
+    const el = scrollRef.current; if (!el || !stick.current) return;
     if (rAF.current !== null) cancelAnimationFrame(rAF.current);
     rAF.current = requestAnimationFrame(() => {
-      rAF.current = null;
-      if (!stick.current) return;
+      rAF.current = null; if (!stick.current) return;
       el.scrollTop = el.scrollHeight;
     });
   }, []);
 
-  const onNewQuestion = useCallback(() => {
-    stick.current = true;
-    setShowScrollDown(false);
-    scrollToBottom();
-  }, [scrollToBottom]);
+  const onNewQuestion = useCallback(() => { stick.current = true; setShowScrollDown(false); scrollToBottom(); }, [scrollToBottom]);
 
-  // ── 内容变化时自动跟随 ──────────────────────────────────────────
   const contentVersion = useMemo(() => scrollVersion(items), [items]);
   const prevItemsLen = useRef(items.length);
   useEffect(() => {
@@ -129,70 +195,38 @@ export function Transcript({
     }
     prevItemsLen.current = items.length;
   }, [items.length, onNewQuestion]);
+  useEffect(() => { scrollToBottom(); }, [contentVersion, scrollToBottom]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [contentVersion, scrollToBottom]);
-
-  // ── ResizeObserver ─────────────────────────────────────────────────
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      if (!stick.current) return;
-      scrollToBottom();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+    const el = scrollRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => { if (!stick.current) return; scrollToBottom(); });
+    ro.observe(el); return () => ro.disconnect();
   }, [scrollToBottom]);
 
-  // ── 预处理 ──────────────────────────────────────────────────────
-  // items 重置（新会话/切换会话）时清空 turnEls，防止残留旧 DOM 引用。
-  useEffect(() => {
-    if (items.length === 0) turnEls.current.clear();
-  }, [items.length]);
-  const grouped = useMemo(() => scanGroups(mergeConsecutiveReasoning(items)), [items]);
+  useEffect(() => { if (items.length === 0) turnEls.current.clear(); }, [items.length]);
+  const merged = useMemo(() => mergeConsecutiveReasoning(items), [items]);
+  const parts = useMemo(() => partitionTurnItems(merged), [merged]);
+  const grouped = useMemo(() => scanGroups(merged), [merged]);
 
-  // turn→DOM 元素映射（用于跳转）
   const turnEls = useRef(new Map<number, HTMLElement>());
   const scrollToTurnRef = useRef((turn: number) => {
-    const el = turnEls.current.get(turn);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const el = turnEls.current.get(turn); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  // V10.17.1: Transcript 卸载时清除 App 中的 scrollToTurn，避免
-  // 重新挂载后 MessageNavigator/JumpBar 仍持有旧实例的 turnEls 引用导致跳转失效。
-  useEffect(() => {
-    onScrollToTurnReady?.(scrollToTurnRef.current);
-    return () => onScrollToTurnReady?.(NOOP_SCROLL);
-  }, [onScrollToTurnReady]);
-  // ── 折叠/展开保持滚动 ──────────────────────────────────────────
-  // 250ms 与 GSAP collapse 动画时长耦合（useGSAPCollapse 默认 duration）。
-  // 若动画时长变更，此处需同步调整。
+  useEffect(() => { onScrollToTurnReady?.(scrollToTurnRef.current); return () => onScrollToTurnReady?.(NOOP_SCROLL); }, [onScrollToTurnReady]);
+
   const scheduleMeasure = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const el = scrollRef.current; if (!el) return;
     const savedTop = el.scrollTop;
-    setTimeout(() => {
-      if (scrollRef.current) scrollRef.current.scrollTop = savedTop;
-    }, 250);
+    setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = savedTop; }, 250);
   }, []);
 
-  // ── 入场动画 ──────────────────────────────────────────────────────
   const entranceRef = useEntranceAnimation<HTMLDivElement>(
-    items.length > 0 ? `${items[0].id}|${items[items.length - 1].id}` : undefined,
-    items.length,
+    items.length > 0 ? `${items[0].id}|${items[items.length - 1].id}` : undefined, items.length,
   );
 
-  // ── 子调用收集 ──────────────────────────────────────────────────
   const subcallsByParent = useMemo(() => {
     const map = new Map<string, ToolItem[]>();
-    for (const it of items) {
-      if (it.kind === "tool" && it.parentId) {
-        const arr = map.get(it.parentId) ?? [];
-        arr.push(it);
-        map.set(it.parentId, arr);
-      }
-    }
+    for (const it of items) { if (it.kind === "tool" && it.parentId) { const a = map.get(it.parentId) ?? []; a.push(it); map.set(it.parentId, a); } }
     return map;
   }, [items]);
 
@@ -200,28 +234,21 @@ export function Transcript({
   const [openTurn, setOpenTurn] = useState<number | null>(null);
   useEffect(() => {
     if (openTurn === null) return;
-    const onDown = (e: MouseEvent) => {
-      const el = e.target as Element | null;
-      if (!el || !el.closest(".rewind")) setOpenTurn(null);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    const onDown = (e: MouseEvent) => { if (!(e.target as Element)?.closest(".rewind")) setOpenTurn(null); };
+    document.addEventListener("mousedown", onDown); return () => document.removeEventListener("mousedown", onDown);
   }, [openTurn]);
 
   const userTurn = useMemo(() => {
-    const map = new Map<string, number>();
-    let nt = 0;
-    for (const it of items) {
-      if (it.kind === "user") map.set(it.id, nt++);
-    }
+    const map = new Map<string, number>(); let nt = 0;
+    for (const it of items) { if (it.kind === "user") map.set(it.id, nt++); }
     return map;
   }, [items]);
 
-  const scrollDown = useCallback(() => {
-    stick.current = true;
-    setShowScrollDown(false);
-    scrollToBottom();
-  }, [scrollToBottom]);
+  const scrollDown = useCallback(() => { stick.current = true; setShowScrollDown(false); scrollToBottom(); }, [scrollToBottom]);
+
+  // Track the final-answer assistant id so the render loop can skip it inside
+  // the TurnCollapse body (it's rendered separately below).
+  const finalAnswerId = parts.finalIndex >= 0 ? merged[parts.finalIndex].id : null;
 
   return (
     <div className="relative flex-1 min-h-0">
@@ -231,33 +258,38 @@ export function Transcript({
           <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
         )}
         <StreamingIndicator running={running} items={items} />
+
+        {/* TurnCollapse: process fold above the final answer */}
+        {parts.processItems.length > 0 && !running && (
+          <TurnCollapse items={parts.processItems} turnStartAt={turnStartAt} />
+        )}
+
         {grouped.map((g) => {
           if (g.kind === "group") {
+            // Don't render tool groups that are inside the process fold when turned is done
+            if (parts.processItems.length > 0 && !running) {
+              const allIds = new Set(parts.processItems.map((it) => it.id));
+              if (g.tools.every((t) => allIds.has(t.id))) return null;
+            }
             return <ToolGroup key={g.id} tools={g.tools} onCollapse={scheduleMeasure} />;
           }
           const it = g.item;
+
+          // Hide process items from inline rendering when TurnCollapse is active
+          if (parts.processItems.length > 0 && !running && it.id !== finalAnswerId && finalAnswerId) {
+            if (parts.processItems.some((p) => p.id === it.id)) return null;
+          }
+
           switch (it.kind) {
             case "user": {
               const tn = userTurn.get(it.id);
               return (
-                <div
-                  key={it.id}
-                  data-turn={tn != null ? tn : undefined}
-                  data-entrance={it.id}
-                  ref={(el) => {
-                    if (el && tn != null) {
-                      turnEls.current.set(tn, el);
-                    } else if (tn != null) {
-                      turnEls.current.delete(tn);
-                    }
-                  }}
-                >
-                  <UserMessage
-                    text={it.text} turn={tn}
+                <div key={it.id} data-turn={tn != null ? tn : undefined} data-entrance={it.id}
+                  ref={(el) => { if (el && tn != null) turnEls.current.set(tn, el); else if (tn != null) turnEls.current.delete(tn); }}>
+                  <UserMessage text={it.text} turn={tn}
                     open={tn != null && openTurn === tn}
                     onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
-                    onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }}
-                  />
+                    onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }} />
                 </div>
               );
             }
@@ -275,8 +307,7 @@ export function Transcript({
                   <ToolCard item={it} subcalls={subcallsByParent.get(it.id)} />
                 </div>
               );
-            case "phase":
-              return <div key={it.id} className="phase">{it.text}</div>;
+            case "phase": return <div key={it.id} className="phase">{it.text}</div>;
             case "notice":
               if (it.level === "warn") {
                 if (dismissedErrors.has(it.id)) return null;
@@ -284,30 +315,19 @@ export function Transcript({
               }
               if (it.text.startsWith("diagnostics:")) {
                 const clean = it.text.includes("— clean");
-                return (
-                  <div key={it.id} className={`flex items-center gap-1.5 px-4 py-1 text-[11px] ${clean ? "text-ok" : "text-warning"}`}>
-                    <span className="shrink-0">{clean ? "✔" : "⚠"}</span>
-                    <span>{it.text}</span>
-                  </div>
-                );
+                return <div key={it.id} className={`flex items-center gap-1.5 px-4 py-1 text-[11px] ${clean ? "text-ok" : "text-warning"}`}>
+                  <span className="shrink-0">{clean ? "✔" : "⚠"}</span><span>{it.text}</span></div>;
               }
               return <div key={it.id} className="notice">{it.text}</div>;
-            case "compaction":
-              return <CompactionCard key={it.id} item={it} />;
-            default:
-              return null;
+            case "compaction": return <CompactionCard key={it.id} item={it} />;
+            default: return null;
           }
         })}
       </div>
       </div>
-      {/* 回到底部按钮 —— 居中圆形，accent 色调 */}
       {showScrollDown && (
-        <button
-          className="absolute left-1/2 bottom-8 z-20 flex items-center justify-center w-9 h-9 rounded-full border border-accent/20 bg-bg-elev text-fg-dim cursor-pointer hover:text-accent hover:border-accent/40 hover:bg-bg-elev-2 active:scale-95 transition-all shadow-lg"
-          style={{ transform: "translateX(-50%)" }}
-          onClick={scrollDown}
-          aria-label="回到底部"
-        >
+        <button className="absolute left-1/2 bottom-8 z-20 flex items-center justify-center w-9 h-9 rounded-full border border-accent/20 bg-bg-elev text-fg-dim cursor-pointer hover:text-accent hover:border-accent/40 hover:bg-bg-elev-2 active:scale-95 transition-all shadow-lg"
+          style={{ transform: "translateX(-50%)" }} onClick={scrollDown} aria-label="回到底部">
           <ArrowDown size={15} />
         </button>
       )}
@@ -315,19 +335,13 @@ export function Transcript({
   );
 }
 
-
-
-
 // ── CompactionCard ──────────────────────────────────────────────────
 type CompactionItem = Extract<Item, { kind: "compaction" }>;
 function CompactionCard({ item }: { item: CompactionItem }) {
   const [open, setOpen] = useState(false);
   if (item.pending) {
-    return (
-      <div className="flex items-center gap-2 my-1 mx-2 px-3 py-2 border border-border-soft rounded-lg bg-bg-soft text-fg-faint text-xs animate-pulse">
-        <span className="text-accent font-bold">⋯</span> Compacting conversation…
-      </div>
-    );
+    return <div className="flex items-center gap-2 my-1 mx-2 px-3 py-2 border border-border-soft rounded-lg bg-bg-soft text-fg-faint text-xs animate-pulse">
+      <span className="text-accent font-bold">⋯</span> Compacting conversation…</div>;
   }
   return (
     <div className="my-1 mx-2 border border-border-soft rounded-lg bg-bg-soft overflow-hidden">

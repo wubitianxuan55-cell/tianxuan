@@ -88,7 +88,7 @@ export const UserMessage = memo(function UserMessage({
 
 export function ReasoningProcess({
   item,
-  autoCollapse = true,
+  autoCollapse = false,
 }: {
   item: AssistantItem;
   autoCollapse?: boolean;
@@ -100,12 +100,12 @@ export function ReasoningProcess({
   const reasoningRunning = !!(item.streaming && !item.text);
 
   const [userToggled, setUserToggled] = useState(false);
-  const [openState, setOpenState] = useState(false);
+  const [openState, setOpenState] = useState(true);
   const open = userToggled
     ? openState
     : autoCollapse
       ? !!item.streaming
-      : openState;
+      : true;
 
   useGSAPCollapse(reasoningBodyRef, open);
   const toggleOpen = useCallback(() => {

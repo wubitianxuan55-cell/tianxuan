@@ -220,10 +220,16 @@ export const zhTW: Record<DictKey, string> = {
   "plan.noContent": "（無計劃內容）",
   "plan.modifyPlaceholder": "輸入修改意見… 不滿意計劃時填寫，提交後將重新規劃",
   "plan.justChat": "3 僅聊天，不派送執行者",
+  "plan.justChatShort": "僅聊天",
   "plan.cancel": "2 取消",
+  "plan.cancelShort": "取消",
   "plan.submit": "1 提交執行",
+  "plan.submitShort": "提交",
   "plan.submitRevise": "提交修改意見",
   "plan.submitChatOnly": "提交 → 僅聊天",
+  "plan.modifyHint": "修改意見…",
+  "plan.modifyShort": "修改",
+  "plan.noSteps": "（無結構化步驟）",
 
   // history drawer
   "history.title": "歷史",

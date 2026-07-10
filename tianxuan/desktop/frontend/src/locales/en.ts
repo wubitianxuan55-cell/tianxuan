@@ -221,10 +221,16 @@ export const en = {
   "plan.noContent": "(No plan content)",
   "plan.modifyPlaceholder": "Enter revision notes… Submit to re-plan if unsatisfied",
   "plan.justChat": "3 Chat only, no executor",
+  "plan.justChatShort": "Chat",
   "plan.cancel": "2 Cancel",
+  "plan.cancelShort": "Cancel",
   "plan.submit": "1 Submit",
+  "plan.submitShort": "Submit",
   "plan.submitRevise": "Submit revision",
   "plan.submitChatOnly": "Submit → Chat only",
+  "plan.modifyHint": "Revision notes…",
+  "plan.modifyShort": "Revise",
+  "plan.noSteps": "(No structured steps)",
 
   // history drawer
   "history.title": "History",

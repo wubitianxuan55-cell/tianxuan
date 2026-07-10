@@ -208,6 +208,25 @@ export const zh: Record<DictKey, string> = {
   "ask.justChat": "只是聊聊",
   "ask.dragHint": "拖拽移动",
 
+  // 计划确认卡片
+  "plan.title": "计划确认",
+  "plan.stepCount_one": "{n} 个步骤",
+  "plan.stepCount_other": "{n} 个步骤",
+  "plan.fileCount_one": "{n} 个文件",
+  "plan.fileCount_other": "{n} 个文件",
+  "plan.change": "变更描述：",
+  "plan.dependsOn": "依赖步骤：",
+  "plan.dependsNone": "无",
+  "plan.success": "成功标准：",
+  "plan.riskRecovery": "风险恢复：",
+  "plan.noContent": "（无计划内容）",
+  "plan.modifyPlaceholder": "输入修改意见… 不满意计划时填写，提交后将重新规划",
+  "plan.justChat": "3 仅聊天，不派送执行者",
+  "plan.cancel": "2 取消",
+  "plan.submit": "1 提交执行",
+  "plan.submitRevise": "提交修改意见",
+  "plan.submitChatOnly": "提交 → 仅聊天",
+
   // 历史抽屉
   "history.title": "历史",
   "history.empty": "还没有已保存的会话。",

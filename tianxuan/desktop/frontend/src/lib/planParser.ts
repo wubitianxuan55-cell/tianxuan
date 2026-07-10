@@ -21,6 +21,7 @@ export interface ParsedStep {
   title: string;
   files: string[];
   change: string;
+  dependsOn: string;
   success: string;
   riskRecovery: string;
 }
@@ -31,7 +32,7 @@ export interface ParsedPlan {
 }
 
 // 步骤标题：步骤 N：标题 / 步骤 N: 标题
-const STEP_HEADER_RE = /^步骤\s*(\d+)[：:]\s*(.+)$/gm;
+const STEP_HEADER_RE = /^步骤\s*(\d+)[：:—]\s*(.+)$/gm;
 
 // 文件名提取：去掉 [NEW] 前缀、反引号
 function extractFiles(raw: string): string[] {
@@ -92,9 +93,9 @@ export function parsePlan(plan: string): ParsedPlan | null {
     const body = bodyLines.join("\n").trim();
 
     // 提取各字段——从 body 中用 FIELD_RE 逐行匹配
-    // 由于字段可能跨行（如 File(s) 有换行的子项），需用更灵活的方式
     let fileStr = "";
     let change = "";
+    let dependsOn = "";
     let success = "";
     let riskRecovery = "";
 
@@ -106,7 +107,7 @@ export function parsePlan(plan: string): ParsedPlan | null {
     let currentValue = "";
 
     for (const line of bulletLines) {
-      const fm = line.match(/^- \*\*([^*]+)\*\*[：:]\s*(.*)$/);
+      const fm = line.match(/^- \*\*([^*]+)\*\*\s*[：:—]\s*(.*)$/);
       if (fm) {
         // 遇到新字段，保存上一个
         if (currentKey) {
@@ -132,6 +133,10 @@ export function parsePlan(plan: string): ParsedPlan | null {
         case "change":
           change = fb.value;
           break;
+        case "depends on":
+        case "dependson":
+          dependsOn = fb.value;
+          break;
         case "success":
           success = fb.value;
           break;
@@ -151,6 +156,7 @@ export function parsePlan(plan: string): ParsedPlan | null {
       title: h.title,
       files: stepFiles,
       change,
+      dependsOn,
       success,
       riskRecovery,
     });

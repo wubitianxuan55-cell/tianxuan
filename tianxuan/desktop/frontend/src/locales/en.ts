@@ -207,6 +207,25 @@ export const en = {
   "ask.justChat": "Just chat",
   "ask.dragHint": "Drag to move",
 
+  // plan review card
+  "plan.title": "Plan Review",
+  "plan.stepCount_one": "{n} step",
+  "plan.stepCount_other": "{n} steps",
+  "plan.fileCount_one": "{n} file",
+  "plan.fileCount_other": "{n} files",
+  "plan.change": "Change:",
+  "plan.dependsOn": "Depends on:",
+  "plan.dependsNone": "none",
+  "plan.success": "Success:",
+  "plan.riskRecovery": "Risk recovery:",
+  "plan.noContent": "(No plan content)",
+  "plan.modifyPlaceholder": "Enter revision notes… Submit to re-plan if unsatisfied",
+  "plan.justChat": "3 Chat only, no executor",
+  "plan.cancel": "2 Cancel",
+  "plan.submit": "1 Submit",
+  "plan.submitRevise": "Submit revision",
+  "plan.submitChatOnly": "Submit → Chat only",
+
   // history drawer
   "history.title": "History",
   "history.empty": "No saved sessions yet.",

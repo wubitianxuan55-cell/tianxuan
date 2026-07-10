@@ -32,6 +32,7 @@ describe("parsePlan", () => {
     expect(step.title).toContain("新增计划内容解析工具函数");
     expect(step.files).toContain("tianxuan/desktop/frontend/src/lib/planParser.ts");
     expect(step.change).toContain("parsePlan");
+    expect(step.dependsOn).toBe("无");
     expect(step.success).toContain("npx vitest run");
     expect(step.riskRecovery).toContain("hermes.go");
   });
@@ -42,6 +43,7 @@ describe("parsePlan", () => {
     expect(step.number).toBe(2);
     expect(step.title).toContain("重写 PlanCard");
     expect(step.files).toContain("tianxuan/desktop/frontend/src/components/PlanCard.tsx");
+    expect(step.dependsOn).toBe("步骤 1");
     expect(step.success).toContain("npx tsc --noEmit");
     expect(step.riskRecovery).toContain("git checkout");
   });
@@ -125,5 +127,36 @@ describe("parsePlan", () => {
     expect(result.steps[0].title).toBe("英文冒号标题");
     expect(result.steps[0].change).toBe("修改逻辑");
     expect(result.steps[0].success).toBe("go test 通过");
+  });
+
+  it("使用 em dash — 作为步骤标题分隔符也能正确解析", () => {
+    const text = `
+步骤 1—使用 em dash 的标题
+- **File(s)**：\`main.go\`
+- **Change**：修改内容
+- **Depends on**：无
+- **Success**：go test 通过
+- **Risk recovery**：reset
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].title).toBe("使用 em dash 的标题");
+  });
+
+  it("字段使用 — (em dash) 作为分隔符也能正确解析", () => {
+    const text = `
+步骤 1：em dash 字段分隔符
+- **File(s)** — \`main.go\`
+- **Change** — 修改核心逻辑
+- **Depends on** — 无
+- **Success** — \`go test -run TestX\`
+- **Risk recovery** — \`git checkout -- main.go\`
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].change).toBe("修改核心逻辑");
+    expect(result.steps[0].success).toBe("`go test -run TestX`");
+    expect(result.steps[0].riskRecovery).toBe("`git checkout -- main.go`");
+    expect(result.steps[0].files).toContain("main.go");
   });
 });

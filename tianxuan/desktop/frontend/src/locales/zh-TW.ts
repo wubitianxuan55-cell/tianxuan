@@ -206,6 +206,25 @@ export const zhTW: Record<DictKey, string> = {
   "ask.justChat": "直接對話",
   "ask.dragHint": "拖曳移動",
 
+  // 計劃確認卡片
+  "plan.title": "計劃確認",
+  "plan.stepCount_one": "{n} 個步驟",
+  "plan.stepCount_other": "{n} 個步驟",
+  "plan.fileCount_one": "{n} 個檔案",
+  "plan.fileCount_other": "{n} 個檔案",
+  "plan.change": "變更描述：",
+  "plan.dependsOn": "依賴步驟：",
+  "plan.dependsNone": "無",
+  "plan.success": "成功標準：",
+  "plan.riskRecovery": "風險恢復：",
+  "plan.noContent": "（無計劃內容）",
+  "plan.modifyPlaceholder": "輸入修改意見… 不滿意計劃時填寫，提交後將重新規劃",
+  "plan.justChat": "3 僅聊天，不派送執行者",
+  "plan.cancel": "2 取消",
+  "plan.submit": "1 提交執行",
+  "plan.submitRevise": "提交修改意見",
+  "plan.submitChatOnly": "提交 → 僅聊天",
+
   // history drawer
   "history.title": "歷史",
   "history.empty": "尚無已儲存的工作階段。",

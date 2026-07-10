@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, ChevronDown, FileCode, ListChecks, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, FileCode, ListChecks, RotateCcw, FileEdit, Link } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { Markdown } from "./Markdown";
 import { parsePlan, type ParsedPlan } from "../lib/planParser";
@@ -9,15 +9,16 @@ import type { QuestionAnswer, WireAsk } from "../lib/types";
 const DRAG_MARGIN = 40;
 
 function PlanSummaryBar({ parsed }: { parsed: ParsedPlan }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 px-5 py-2">
       <div className="flex items-center gap-1.5 text-[12px] text-fg-dim bg-bg-soft rounded-lg px-2.5 py-1">
         <ListChecks size={13} strokeWidth={1.5} />
-        <span>{parsed.steps.length} 个步骤</span>
+        <span>{t(parsed.steps.length === 1 ? "plan.stepCount_one" : "plan.stepCount_other", { n: parsed.steps.length })}</span>
       </div>
       <div className="flex items-center gap-1.5 text-[12px] text-fg-dim bg-bg-soft rounded-lg px-2.5 py-1">
         <FileCode size={13} strokeWidth={1.5} />
-        <span>{parsed.allFiles.length} 个文件</span>
+        <span>{t(parsed.allFiles.length === 1 ? "plan.fileCount_one" : "plan.fileCount_other", { n: parsed.allFiles.length })}</span>
       </div>
       {parsed.allFiles.length > 0 && (
         <div className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar justify-end">
@@ -44,14 +45,18 @@ function StepCard({
   step: ParsedPlan["steps"][0];
 }) {
   const [open, setOpen] = useState(false);
-  const hasDetails = step.success || step.riskRecovery;
+  const t = useT();
+  const hasDetails = step.change || step.dependsOn || step.success || step.riskRecovery;
 
   return (
     <div className="rounded-lg border border-border-soft bg-bg-soft overflow-hidden">
       {/* 步骤标题行 — 点击切换折叠 */}
       <button
-        className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150 hover:bg-bg/40 active:bg-bg/60"
+        className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150 hover:bg-bg/40 active:bg-bg/60 ${
+          step.dependsOn && step.dependsOn !== "无" ? "border-l-2 border-accent/30" : ""
+        }`}
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
       >
         {/* 步骤编号圆形标记 */}
         <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-fg text-[11px] font-bold leading-none mt-0.5">
@@ -98,11 +103,35 @@ function StepCard({
       {hasDetails && open && (
         <div className="px-3 pb-3 pt-0 animate-[fadeIn_.12s_ease-out]">
           <div className="border-t border-border-soft/50 pt-2 space-y-1.5">
+            {step.change && (
+              <div className="flex items-start gap-1.5 text-[12px] text-fg-dim">
+                <FileEdit size={12} strokeWidth={1.5} className="shrink-0 mt-0.5 text-sky-500" />
+                <span>
+                  <span className="text-fg-muted">{t("plan.change")}</span>
+                  <span className="text-fg">{step.change}</span>
+                </span>
+              </div>
+            )}
+            {step.dependsOn && (
+              <div className="flex items-start gap-1.5 text-[12px] text-fg-dim">
+                <Link size={12} strokeWidth={1.5} className="shrink-0 mt-0.5 text-purple-500" />
+                <span>
+                  <span className="text-fg-muted">{t("plan.dependsOn")}</span>
+                  {step.dependsOn === "无" ? (
+                    <span className="text-fg-faint italic">{t("plan.dependsNone")}</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-medium">
+                      {step.dependsOn}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
             {step.success && (
               <div className="flex items-start gap-1.5 text-[12px] text-fg-dim">
                 <span className="shrink-0 mt-0.5 text-green-500">✓</span>
                 <span>
-                  <span className="text-fg-muted">成功标准：</span>
+                  <span className="text-fg-muted">{t("plan.success")}</span>
                   <code className="text-[11px] bg-bg px-1 py-0.5 rounded">{step.success}</code>
                 </span>
               </div>
@@ -111,7 +140,7 @@ function StepCard({
               <div className="flex items-start gap-1.5 text-[12px] text-fg-dim">
                 <RotateCcw size={12} strokeWidth={1.5} className="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span className="text-fg-muted">风险恢复：</span>
+                  <span className="text-fg-muted">{t("plan.riskRecovery")}</span>
                   <span className="text-fg">{step.riskRecovery}</span>
                 </span>
               </div>
@@ -250,7 +279,7 @@ export function PlanCard({
       submit("提交执行");
     }
   };
-  const btnLabel = chatOnly ? "提交 → 仅聊天" : hasNote ? "提交修改意见" : "1 提交执行";
+  const btnLabel = chatOnly ? t("plan.submitChatOnly") : hasNote ? t("plan.submitRevise") : t("plan.submit");
 
   return (
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
@@ -276,7 +305,7 @@ export function PlanCard({
         {/* 标题 */}
         <div className="flex items-center gap-2 px-5 pt-5 pb-1">
           <span className="w-1 h-4 rounded-full bg-accent shrink-0" />
-          <span className="text-fg text-sm font-semibold leading-tight">计划确认</span>
+          <span className="text-fg text-sm font-semibold leading-tight">{t("plan.title")}</span>
         </div>
 
         {/* 任务描述 */}
@@ -301,7 +330,7 @@ export function PlanCard({
               </div>
             ) : (
               <div className="bg-bg-soft rounded-lg border border-border-soft p-4 text-center text-fg-faint text-[13px] italic">
-                （无计划内容）
+                {t("plan.noContent")}
               </div>
             )}
           </div>
@@ -311,7 +340,7 @@ export function PlanCard({
         <div className="px-5 pb-1">
           <input
             className="w-full border border-border-soft rounded-lg bg-bg text-fg text-xs px-3 py-2 outline-none placeholder:text-fg-faint/40 transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_2px_var(--accent-soft)]"
-            placeholder="输入修改意见… 不满意计划时填写，提交后将重新规划"
+            placeholder={t("plan.modifyPlaceholder")}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => {
@@ -337,7 +366,7 @@ export function PlanCard({
               checked={chatOnly}
               onChange={(e) => setChatOnly(e.target.checked)}
             />
-            <span>3 仅聊天，不派送执行者</span>
+            <span>{t("plan.justChat")}</span>
           </label>
         </div>
 
@@ -347,7 +376,7 @@ export function PlanCard({
             className="px-4 py-2 border border-border-soft rounded-lg bg-transparent text-fg-dim text-xs font-medium cursor-pointer transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none hover:text-fg hover:border-border hover:bg-bg-soft hover:shadow-sm active:scale-[0.98]"
             onClick={() => submit("取消")}
           >
-            2 取消
+            {t("plan.cancel")}
           </button>
           <button
             className="px-4 py-2 border-0 rounded-lg bg-accent text-accent-fg text-xs font-semibold cursor-pointer transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none hover:brightness-110 hover:shadow-md active:scale-[0.98]"

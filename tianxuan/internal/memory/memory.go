@@ -126,6 +126,9 @@ func (s *Set) WriteDoc(path, body string) (string, error) {
 	return path, writeDocFile(path, body)
 }
 
+// compactMemoryThreshold caps how much full memory fits in the cache-stable prefix.
+const compactMemoryThreshold = 4096
+
 // Block renders memory for the cache-stable prefix. Returns a compact block when
 // the full memory would exceed a reasonable size, keeping the prefix lean.
 //
@@ -137,7 +140,7 @@ func (s *Set) Block() string {
 		return ""
 	}
 	full := s.buildFullBlock()
-	if len(full) <= 4096 {
+	if len(full) <= compactMemoryThreshold {
 		return full // small memory → everything in prefix
 	}
 	return s.buildCompactBlock()

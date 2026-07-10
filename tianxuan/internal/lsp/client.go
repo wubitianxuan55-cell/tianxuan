@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -99,7 +100,9 @@ func (c *client) initialize(ctx context.Context) error {
 			PositionEncoding string `json:"positionEncoding"`
 		} `json:"capabilities"`
 	}
-	_ = json.Unmarshal(res, &r)
+	if err := json.Unmarshal(res, &r); err != nil {
+		slog.Warn("lsp: parse initialize result", "err", err)
+	}
 	c.posEnc = r.Capabilities.PositionEncoding
 	if c.posEnc == "" {
 		c.posEnc = encodingUTF16
@@ -139,10 +142,17 @@ func (c *client) handleRequest(id int64, method string, params json.RawMessage) 
 		var p struct {
 			Items []json.RawMessage `json:"items"`
 		}
-		_ = json.Unmarshal(params, &p)
-		_ = c.conn.reply(id, make([]any, len(p.Items)))
+		if err := json.Unmarshal(params, &p); err != nil {
+			slog.Warn("lsp: parse workspace/configuration params", "err", err)
+			return
+		}
+		if err := c.conn.reply(id, make([]any, len(p.Items))); err != nil {
+			slog.Warn("lsp: workspace/configuration reply", "err", err)
+		}
 	default:
-		_ = c.conn.reply(id, nil)
+		if err := c.conn.reply(id, nil); err != nil {
+			slog.Warn("lsp: default reply", "err", err)
+		}
 	}
 }
 

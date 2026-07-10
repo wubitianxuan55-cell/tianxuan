@@ -58,16 +58,15 @@ func SaveImageBytes(declaredMime string, raw []byte) (string, error) {
 		return "", err
 	}
 	if n, err := f.Write(raw); err != nil {
-		_ = f.Close()
-		_ = os.Remove(rel)
+		cleanupAttachment(f, rel)
 		return "", err
 	} else if n != len(raw) {
-		_ = f.Close()
-		_ = os.Remove(rel)
+		cleanupAttachment(f, rel)
 		return "", io.ErrShortWrite
 	}
 	if err := f.Close(); err != nil {
-		_ = os.Remove(rel)
+		// Remove partial file on close failure.
+		cleanupAttachment(f, rel)
 		return "", err
 	}
 	return filepath.ToSlash(rel), nil
@@ -331,6 +330,12 @@ end try
 		return "", err
 	}
 	return SaveImageBytes("", raw)
+}
+
+// cleanupAttachment closes f and removes the file on error.
+func cleanupAttachment(f *os.File, rel string) {
+	_ = f.Close()
+	_ = os.Remove(rel)
 }
 
 func createAttachmentFile(ext string) (string, *os.File, error) {

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
+	"tianxuan/internal/codegraph"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
@@ -54,12 +56,20 @@ A single 5-step loop covers all scenarios. Never skip steps.
 
 1. **Understand intent** — what does the user actually need vs what they asked.
    Ask clarifying questions if ambiguous.
-2. **Gather evidence** — use codegraph, read_file, grep to collect facts.
+2. **Gather evidence** — 🔴 FIRST: is this a pure operation? Build, test, git,
+   deploy, or running a known command? If YES → skip this step entirely, go
+   straight to step 4 and output <!--plan-->. Do NOT call any tool. Otherwise,
+   use codegraph, read_file, grep to collect facts.
+   Review the injected ## 项目代码图谱 for project structure before searching;
+   known package paths and type names are authoritative.
 3. **Assess feasibility** — can this be done? Is it necessary? Is the info
    sufficient? If not, explain or ask.
 4. **Decide output type** — direct answer, ask question, or <!--plan--> for
    Hephaestus:
-   - Pure operations (build/test/git) → <!--plan--> + 1-2 lines, skip research
+   - 🔴 Pure operations FIRST — build, test, git, deploy, run a known command.
+     Output <!--plan--> with 1-2 lines IMMEDIATELY. Do NOT call any tools.
+     Do NOT try to execute it yourself. You are the PLANNER, not the executor.
+     Hand it to Hephaestus. That includes wails build, go test, npm run, etc.
    - Answer/discussion → direct answer, NEVER <!--plan-->
    - Ambiguous → ask tool, NEVER plain-text questions
    - Code change needed → research → <!--plan-->
@@ -99,6 +109,8 @@ Before writing the plan, apply these judgment filters:
 Before writing a plan, you MUST answer all 5:
 
 1. **Files** — which files need modification? (exact paths, verified)
+   Check Packages and Core Types in ## 项目代码图谱 for candidate paths before
+   guessing.
 2. **Signatures** — relevant function/type/struct signatures?
 3. **Impact** — which callers/consumers are affected?
 4. **Tests** — which existing tests cover this area?
@@ -120,13 +132,13 @@ After research:
 3–8 steps per plan. >8 → split into multiple plans. <3 → likely missed testing.
 
 Each step:
-- **File(s)** — verified paths, or [NEW] for new files. Never guess paths.
-- **Change** — one sentence.
-- **Depends on** — step number(s).
-- **Success** — 🔴 MUST be an exact command: "go test -run TestX ./pkg/..."
+- **File(s)**：verified paths, or [NEW] for new files. Never guess paths.
+- **Change**：one sentence.
+- **Depends on**：step number(s).
+- **Success**：🔴 MUST be an exact command: "go test -run TestX ./pkg/..."
   or "npm run build exits 0 with no new TS errors". Not accepted: "code looks
   correct", "tests pass". Name specific test functions.
-- **Risk recovery** — concrete action for Hephaestus.
+- **Risk recovery**：concrete action for Hephaestus.
 
 Your plan describes WHAT, not HOW. Never write code blocks, function bodies,
 or file contents. Hephaestus writes the code — it does NOT add features or
@@ -174,6 +186,15 @@ Before writing a single line of code:
 - Never start coding before you understand all step dependencies.
 - Set the first sub-task as in_progress, then scan for parallelizable steps, then execute.
 
+## Project context
+
+The session has a ## 项目代码图谱 injected by Hermes listing packages, core types,
+and key dependencies. Use it to locate files and understand the project structure:
+- Check Packages for candidate subdirectories before guessing paths
+- Cross-reference Core Types with the task's described types to find exact files
+- The information is authoritative — if a type is listed there, do NOT re-read
+  the file just to confirm it exists
+
 ## Your partner: Hermes
 
 Hermes is your planner — it investigated the codebase before writing the plan.
@@ -199,6 +220,18 @@ For each step, in dependency order:
 
 Exception: pure doc or comment changes may skip the build step.
 
+## Step memory
+
+After each complete_step, write a one-line key output in the 'result' field.
+This anchors what was accomplished so subsequent steps can refer to it:
+
+"新增了 quoteFilePaths 函数，位于 agent_helpers.go:95"
+"重构了 formatExecutionFeedback，删除 17 行重复代码"
+"修改了 Hermes.Run 第 410-425 行，注入 ProjectMap 到规划器会话"
+
+The session accumulates these [步骤完成] messages automatically. Later steps
+should reference prior outputs rather than re-reading files unnecessarily.
+
 ## Parallel execution
 
 When 2+ steps have their dependencies satisfied and touch disjoint files:
@@ -212,15 +245,20 @@ When 2+ steps have their dependencies satisfied and touch disjoint files:
 shared infrastructure (config, DB schema, shared type definitions). When
 uncertain, run serially.
 
-## Tool failure recovery
+## Smart failure diagnosis
 
-When a tool call fails:
-1. First failure — retry once with adjusted parameters (wider grep, longer wait,
-   different search terms)
-2. Second failure — try an alternative tool (read_file instead of codegraph,
-   edit_lines instead of edit_file, and so on)
-3. Third failure — STOP. Do NOT patch around the failure. Escalate by reporting
-   in [步骤完成情况] what was tried and why it keeps failing.
+When a tool call fails, diagnose before retrying:
+
+1. **File not found** (no such file, file does not exist) — do NOT guess paths.
+   Search with codegraph or glob first, then use the found path.
+2. **Syntax / compilation error** (syntax error, undefined, cannot find package) —
+   check imports, function signatures, and type definitions first. Read the
+   relevant files with read_file before editing.
+3. **Other failures** (permission, timeout, tool panic) — try an alternative tool
+   (edit_lines instead of edit_file, grep instead of glob), then escalate.
+
+Retry limit: 1 retry per diagnosis category. If the same failure persists after
+retry, STOP and report in [步骤完成情况] what was tried and why.
 
 ## Failure strategy
 
@@ -235,8 +273,8 @@ When a tool call fails:
 After ALL steps (or the 3-failure limit), output:
 
 [步骤完成情况]
-Step N — ✅ — what was done, key result
-Step N — ❌ — what failed, root cause, attempted fixes
+Step N — ✅ — {关键产出} — {涉及文件路径}
+Step N — ❌ — {失败原因} — {涉及文件路径}
 
 One line per step. Be precise — file paths, error messages, test counts.
 
@@ -267,13 +305,17 @@ type Hermes struct {
 
 	readonlyTools *tool.Registry // V10.32: if set, planner runs as AgentRunner
 	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
-	asker        Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
+	asker         Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
 
 	// V10.36: persistent planner Agent with compaction — replaces per-turn temp AgentRunner.
 	// The planner accumulates planning history + execution results across turns, with
 	// compaction keeping the context bounded. This gives the planner a proper TCCA-like
 	// architecture (L1 stable prefix + L4 growing flow + compaction).
 	plannerAgent *AgentRunner
+
+	// V10.54: workspace root for project map injection.
+	wsRoot          string
+	lastProjectHash string // hash of last injected ProjectMap; "" means not injected yet or stale
 }
 
 // NewHermes creates a Hermes orchestrator. hermesProvider is the planning model,
@@ -282,7 +324,7 @@ type Hermes struct {
 // V10.32: pass readonlyTools (nil for stream-only) and planMaxSteps to let
 // Hermes use read-only tools for code investigation before proposing a plan.
 // V10.36: contextWindow + archiveDir enable compaction on the planner's persistent session.
-func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesPricing *provider.Pricing, hephaestus *AgentRunner, temperature float64, sink event.Sink, readonlyTools *tool.Registry, planMaxSteps int, contextWindow int, archiveDir string) *Hermes {
+func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesPricing *provider.Pricing, hephaestus *AgentRunner, temperature float64, sink event.Sink, readonlyTools *tool.Registry, planMaxSteps int, contextWindow int, archiveDir string, wsRoot string) *Hermes {
 	if hermesSession == nil {
 		hermesSession = NewSession("")
 	}
@@ -297,6 +339,7 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 		sink:           sink,
 		readonlyTools:  readonlyTools,
 		planMaxSteps:   planMaxSteps,
+		wsRoot:         wsRoot,
 	}
 	// V10.36: create persistent planner Agent with compaction so the planner
 	// accumulates history across turns without unbounded growth.
@@ -399,6 +442,20 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · hermes"})
 	prePlanLen := len(h.hermesSess.Messages)
+
+	// V10.54: inject ProjectMap into planner session for structural context.
+	if h.wsRoot != "" {
+		pm := codegraph.Analyze(h.wsRoot)
+		pmHash := pm.Hash()
+		if pmHash != h.lastProjectHash {
+			h.hermesSess.Add(provider.Message{
+				Role:    provider.RoleUser,
+				Content: "## 项目代码图谱\n\n" + pm.Format() + "\n\n以上是当前项目的代码结构概览，规划时可直接引用其中的路径和类型名。",
+			})
+			h.lastProjectHash = pmHash
+		}
+	}
+
 	origInput := input // preserve original user input for handoff; replan loop may modify input
 	var userNote, plan string
 	var planErr error
@@ -478,6 +535,12 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 				Content: formatExecutionFeedback(execResult),
 			})
 		}
+
+		// V10.54: detect structural changes (go.mod, package.json, new files under internal/)
+		// and invalidate the project map hash so the next planning turn re-scans.
+		if h.wsRoot != "" && hasStructuralChange(execResult.FilesCreated, execResult.FilesModified) {
+			h.lastProjectHash = ""
+		}
 	}
 	return execResult, execErr
 }
@@ -490,23 +553,8 @@ func formatExecutionFeedback(r *TurnResult) string {
 		status = "errors"
 	}
 
-	created := "(none)"
-	if len(r.FilesCreated) > 0 {
-		quoted := make([]string, len(r.FilesCreated))
-		for i, f := range r.FilesCreated {
-			quoted[i] = "`" + f + "`"
-		}
-		created = strings.Join(quoted, ", ")
-	}
-
-	modified := "(none)"
-	if len(r.FilesModified) > 0 {
-		quoted := make([]string, len(r.FilesModified))
-		for i, f := range r.FilesModified {
-			quoted[i] = "`" + f + "`"
-		}
-		modified = strings.Join(quoted, ", ")
-	}
+	created := quoteFilePaths(r.FilesCreated)
+	modified := quoteFilePaths(r.FilesModified)
 
 	errors := "(none)"
 	if len(r.Errors) > 0 {
@@ -518,7 +566,31 @@ func formatExecutionFeedback(r *TurnResult) string {
 		summary = "(no summary)"
 	}
 
-	return fmt.Sprintf("[上一轮执行结果] %s\n- Created: %s\n- Modified: %s\n- Errors: %s\n- Summary: %s\n", status, created, modified, errors, summary)
+	conclusion := ""
+	if r.Success && len(r.Errors) == 0 {
+		conclusion = "\n- ✅ 任务已完成（Success=true, Errors 为空）"
+	} else {
+		conclusion = "\n- ⚠️ 任务未完成，请检查 Errors 并修正"
+	}
+
+	return fmt.Sprintf("[上一轮执行结果] %s\n- Created: %s\n- Modified: %s\n- Errors: %s\n- Summary: %s%s\n", status, created, modified, errors, summary, conclusion)
+}
+
+// hasStructuralChange checks whether any file path indicates a structural change
+// that would invalidate the cached ProjectMap (go.mod, package.json, or internal/ paths).
+func hasStructuralChange(created, modified []string) bool {
+	check := func(paths []string) bool {
+		for _, p := range paths {
+			if p == "go.mod" || p == "package.json" || p == "Cargo.toml" {
+				return true
+			}
+			if strings.HasPrefix(p, "internal/") && strings.HasSuffix(p, ".go") {
+				return true
+			}
+		}
+		return false
+	}
+	return check(created) || check(modified)
 }
 
 // confirmPlan asks the user to approve the planner's output before handing off to
@@ -646,8 +718,12 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if h.asker != nil {
 		h.plannerAgent.SetAsker(h.asker)
 	}
-	if _, err := h.plannerAgent.Run(ctx, input); err != nil {
+	turnResult, err := h.plannerAgent.Run(ctx, input)
+	if err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
+	}
+	if turnResult != nil && turnResult.Summary != "" {
+		slog.Info("hermes: planner run summary", "summary", turnResult.Summary)
 	}
 
 	// Extract the plan from the planner's persistent session (last assistant message).
@@ -660,7 +736,7 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 		}
 	}
 	if plan == "" {
-		plan = "(hermes produced no output)"
+		return "", fmt.Errorf("hermes: planner produced no output")
 	}
 	// NOTE: <!--plan--> marker is not stripped — it's an HTML comment, invisible
 	// in rendered Markdown (PlanCard) and harmless in executor prompts.
@@ -713,7 +789,12 @@ Original task:
 Hermes output:
 %s%s
 
-Carry out the task, adapting the plan as needed.`, hephaestusHandoffMarker, task, plan, note)
+Carry out the task, adapting the plan as needed.
+
+## Execution contract
+
+Each step has **File(s) / Change / Depends on / Success / Risk recovery**.
+Use 'complete_step' with step_index and evidence after finishing each step.`, hephaestusHandoffMarker, task, plan, note)
 }
 
 // HandoffTask returns the original user task embedded in an executor handoff

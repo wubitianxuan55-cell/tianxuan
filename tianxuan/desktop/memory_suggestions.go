@@ -17,6 +17,7 @@ import (
 const (
 	suggestionSessionLimit = 12
 	memorySuggestionLimit  = 6
+	maxMemoryStatementChars = 420
 )
 
 // MemorySuggestion is a user-confirmed candidate for an active saved memory.
@@ -300,7 +301,7 @@ func existingCovers(existing []string, key string) bool {
 
 func extractMemoryStatement(content string) (string, string) {
 	text := oneLine(content)
-	if len([]rune(text)) < 8 || len([]rune(text)) > 420 {
+	if len([]rune(text)) < 8 || len([]rune(text)) > maxMemoryStatementChars {
 		return "", ""
 	}
 	lower := strings.ToLower(text)

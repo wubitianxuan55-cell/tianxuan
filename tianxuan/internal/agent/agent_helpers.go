@@ -90,6 +90,19 @@ func midTurnSteerMessage(text string) string {
 	return MidTurnSteerPrefix + "\n" + text
 }
 
+// quoteFilePaths wraps each path in backticks and joins with ", ".
+// Returns "(none)" when the slice is empty.
+func quoteFilePaths(paths []string) string {
+	if len(paths) == 0 {
+		return "(none)"
+	}
+	quoted := make([]string, len(paths))
+	for i, p := range paths {
+		quoted[i] = "`" + p + "`"
+	}
+	return strings.Join(quoted, ", ")
+}
+
 // finalReadinessRetryMessage generates a retry prompt when the final-answer
 // readiness check blocks completion.
 // (Design adopted from DeepSeek-Reasonix-V1.12)

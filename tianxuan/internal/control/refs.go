@@ -17,6 +17,9 @@ import (
 // and the rest noted as truncated.
 const maxFileRefBytes = 64 * 1024
 
+// binarySniffBytes is how many bytes to scan for a NUL byte to detect binary files.
+const binarySniffBytes = 8192
+
 // refKind distinguishes the two things an @reference can resolve to.
 type refKind int
 
@@ -203,7 +206,7 @@ func readFileRef(path string) (content string, isDir bool, err error) {
 	if mime := imageMime(data, path); mime != "" {
 		return fmt.Sprintf("[image file %s, mime=%s, %d bytes — image bytes are not inlined. Use an available MCP image/OCR/vision tool with this path when visual understanding is needed.]", path, mime, info.Size()), false, nil
 	}
-	if bytes.IndexByte(data[:min(n, 8192)], 0) >= 0 {
+	if bytes.IndexByte(data[:min(n, binarySniffBytes)], 0) >= 0 {
 		return fmt.Sprintf("[binary file %s, %d bytes — not shown]", path, info.Size()), false, nil
 	}
 	if n > maxFileRefBytes {

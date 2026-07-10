@@ -101,6 +101,12 @@ func TestFormatHandoff_Normal(t *testing.T) {
 	if !strings.Contains(out, "Hermes output:\nrun wails build") {
 		t.Fatal("handoff missing Hermes output")
 	}
+	if !strings.Contains(out, "Execution contract") {
+		t.Fatal("handoff missing Execution contract section")
+	}
+	if !strings.Contains(out, "complete_step") {
+		t.Fatal("handoff missing complete_step instruction")
+	}
 	if strings.Contains(out, "📌 User note (written during plan confirmation)") {
 		t.Fatal("should not contain user note section when empty")
 	}

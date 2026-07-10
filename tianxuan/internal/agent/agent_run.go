@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -285,8 +286,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				}
 			}
 			// collect tool errors for TurnResult (max 5)
-			if strings.HasPrefix(results[i], "error:") && len(turnToolErrors) < 5 {
+			if isErrorResult(results[i]) && len(turnToolErrors) < 5 {
 				turnToolErrors = append(turnToolErrors, results[i])
+			}
+			if isErrorResult(results[i]) && len(turnToolErrors) == 5 {
+				slog.Warn("agent_run: too many tool errors, truncating to 5")
 			}
 			// Skip suppressed calls (already have placeholder result).
 			if strings.HasPrefix(results[i], "suppressed:") {
@@ -405,4 +409,13 @@ func uniqFiles(files []string) []string {
 		}
 	}
 	return uniq
+}
+
+// isErrorResult checks if a tool result indicates an error or blocked condition.
+// Detects multiple error prefix formats.
+func isErrorResult(result string) bool {
+	return strings.HasPrefix(result, "error:") ||
+		strings.HasPrefix(result, "Error:") ||
+		strings.HasPrefix(result, "blocked:") ||
+		strings.HasPrefix(result, "[error")
 }

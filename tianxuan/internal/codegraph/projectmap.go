@@ -2,10 +2,12 @@ package codegraph
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // ProjectMap is a lightweight, dependency-free project structure analyzer.
@@ -22,12 +24,16 @@ type ProjectInfo struct {
 	Packages   []string // key packages (internal/ names)
 	CoreTypes  []string // important struct/interface names
 	DepsShort  []string // <= 10 key dependencies from go.mod
+	FileCount  int      // total .go files in the project (Go) or .ts/.tsx files (TS)
+	LastModified time.Time // latest modtime across scanned files
 }
 
+// Analyze scans wsRoot (the project root) and returns a ProjectInfo.
 // Analyze scans wsRoot (the project root) and returns a ProjectInfo.
 // Returns zero-value ProjectInfo when the directory isn't recognizable.
 func Analyze(wsRoot string) ProjectInfo {
 	info := ProjectInfo{}
+	var latestMod time.Time
 
 	// Detect language and entry point
 	if hasFile(wsRoot, "go.mod") {
@@ -36,6 +42,11 @@ func Analyze(wsRoot string) ProjectInfo {
 		info.DepsShort = extractKeyDeps(filepath.Join(wsRoot, "go.mod"))
 		info.Packages = discoverPackages(wsRoot)
 		info.CoreTypes = discoverCoreTypes(wsRoot)
+		info.FileCount = countGoFiles(wsRoot)
+		// Track latest modtime of go.mod
+		if fi, err := os.Stat(filepath.Join(wsRoot, "go.mod")); err == nil {
+			latestMod = fi.ModTime()
+		}
 	} else if hasFile(wsRoot, "Cargo.toml") {
 		info.Language = "Rust"
 		info.EntryPoint = "Cargo.toml (workspace)"
@@ -47,8 +58,26 @@ func Analyze(wsRoot string) ProjectInfo {
 		} else {
 			info.EntryPoint = findEntryJS(wsRoot)
 		}
+		info.FileCount = countTSFiles(wsRoot)
 	}
 
+	// Track latest modtime across internal/ directories for change detection.
+	if !hasFile(wsRoot, "go.mod") {
+		// For non-Go projects, track package.json
+		if fi, err := os.Stat(filepath.Join(wsRoot, "package.json")); err == nil {
+			if fi.ModTime().After(latestMod) {
+				latestMod = fi.ModTime()
+			}
+		}
+	}
+	internalDir := filepath.Join(wsRoot, "internal")
+	if fi, err := os.Stat(internalDir); err == nil && fi.IsDir() {
+		if fi.ModTime().After(latestMod) {
+			latestMod = fi.ModTime()
+		}
+	}
+
+	info.LastModified = latestMod
 	return info
 }
 
@@ -65,6 +94,14 @@ func (p ProjectInfo) Format() string {
 
 	if p.EntryPoint != "" {
 		b.WriteString(fmt.Sprintf("- **Entry**: `%s`\n", p.EntryPoint))
+	}
+
+	if p.FileCount > 0 {
+		b.WriteString(fmt.Sprintf("- **Source Files**: %d\n", p.FileCount))
+	}
+
+	if !p.LastModified.IsZero() {
+		b.WriteString(fmt.Sprintf("- **Last Modified**: %s\n", p.LastModified.Format("2006-01-02 15:04")))
 	}
 
 	if len(p.Packages) > 0 {
@@ -86,6 +123,49 @@ func (p ProjectInfo) Format() string {
 	}
 
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// Hash returns a content hash of the project info for change detection.
+// Only the structural fields (packages, core types, deps, file count) affect
+// the hash — LastModified is excluded because it changes every edit.
+func (p ProjectInfo) Hash() string {
+	h := fnv.New64a()
+	h.Write([]byte(p.Language))
+	h.Write([]byte(p.EntryPoint))
+	for _, pkg := range p.Packages {
+		h.Write([]byte(pkg))
+	}
+	for _, ct := range p.CoreTypes {
+		h.Write([]byte(ct))
+	}
+	for _, dep := range p.DepsShort {
+		h.Write([]byte(dep))
+	}
+	// FileCount as string
+	h.Write([]byte(fmt.Sprintf("%d", p.FileCount)))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// Refresh checks whether go.mod has changed or directory structure has changed
+// since the last analysis. If nothing changed, returns old unchanged.
+// Otherwise performs a full re-analysis.
+func Refresh(wsRoot string, old ProjectInfo) ProjectInfo {
+	// Check go.mod modtime change
+	if hasFile(wsRoot, "go.mod") {
+		fi, err := os.Stat(filepath.Join(wsRoot, "go.mod"))
+		if err == nil && !fi.ModTime().After(old.LastModified) {
+			// go.mod not newer — check directory structure
+			internalDir := filepath.Join(wsRoot, "internal")
+			if fi2, err := os.Stat(internalDir); err == nil && fi2.IsDir() {
+				if !fi2.ModTime().After(old.LastModified) {
+					// Neither go.mod nor internal/ changed — return old
+					return old
+				}
+			}
+		}
+	}
+	// Something changed — re-analyze
+	return Analyze(wsRoot)
 }
 
 // --- helpers ---------------------------------------------------------------
@@ -247,22 +327,23 @@ func discoverPackages(root string) []string {
 	return pkgs
 }
 
-// discoverCoreTypes scans key packages for prominent type definitions.
-// It only reads the first 40 lines of key files to keep startup fast.
+// discoverCoreTypes scans all .go files under internal/ for prominent type
+// definitions. Reads only the first 40 lines of each file to keep startup fast.
 func discoverCoreTypes(root string) []string {
-	// Key files that likely define the core types
-	keyFiles := []string{
-		"internal/control/controller.go",
-		"internal/agent/agent.go",
-		"internal/tool/tool.go",
+	internalDir := filepath.Join(root, "internal")
+	fi, err := os.Stat(internalDir)
+	if err != nil || !fi.IsDir() {
+		return nil
 	}
 
 	var types []string
-	for _, rel := range keyFiles {
-		path := filepath.Join(root, rel)
+	filepath.Walk(internalDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() || !strings.HasSuffix(fi.Name(), ".go") {
+			return nil
+		}
 		b, err := os.ReadFile(path)
 		if err != nil {
-			continue
+			return nil
 		}
 		lines := strings.Split(string(b), "\n")
 		limit := 40
@@ -277,12 +358,13 @@ func discoverCoreTypes(root string) []string {
 				if len(parts) >= 2 {
 					name := strings.TrimSuffix(parts[1], ",")
 					if name != "" && !strings.HasPrefix(name, "//") {
-						types = append(types, name)
+						types = append(types, name+" ("+filepath.Base(filepath.Dir(path))+")")
 					}
 				}
 			}
 		}
-	}
+		return nil
+	})
 
 	// Deduplicate
 	seen := map[string]bool{}
@@ -297,4 +379,41 @@ func discoverCoreTypes(root string) []string {
 		unique = unique[:15]
 	}
 	return unique
+}
+
+// countGoFiles counts the number of .go files in the workspace.
+func countGoFiles(root string) int {
+	var count int
+	filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() {
+			return nil
+		}
+		// Skip vendor, node_modules, .git
+		if strings.Contains(path, "vendor") || strings.Contains(path, "node_modules") || strings.Contains(path, ".git") {
+			return nil
+		}
+		if strings.HasSuffix(fi.Name(), ".go") {
+			count++
+		}
+		return nil
+	})
+	return count
+}
+
+// countTSFiles counts TypeScript source files (.ts, .tsx).
+func countTSFiles(root string) int {
+	var count int
+	filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() {
+			return nil
+		}
+		if strings.Contains(path, "node_modules") || strings.Contains(path, ".git") {
+			return nil
+		}
+		if strings.HasSuffix(fi.Name(), ".ts") || strings.HasSuffix(fi.Name(), ".tsx") {
+			count++
+		}
+		return nil
+	})
+	return count
 }

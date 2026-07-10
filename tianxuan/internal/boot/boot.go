@@ -448,7 +448,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 				readOnlyReg.Add(t)
 			}
 
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir())
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir(), cwd)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

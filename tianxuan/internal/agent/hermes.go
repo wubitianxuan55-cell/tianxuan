@@ -781,20 +781,11 @@ func formatHandoff(task, plan, userNote string) string {
 	}
 	return fmt.Sprintf(`# %s
 
-You are Hephaestus now. Use your available tools to execute the task.
-
 Original task:
 %s
 
 Hermes output:
-%s%s
-
-Carry out the task, adapting the plan as needed.
-
-## Execution contract
-
-Each step has **File(s) / Change / Depends on / Success / Risk recovery**.
-Use 'complete_step' with step_index and evidence after finishing each step.`, hephaestusHandoffMarker, task, plan, note)
+%s%s`, hephaestusHandoffMarker, task, plan, note)
 }
 
 // HandoffTask returns the original user task embedded in an executor handoff

@@ -159,4 +159,85 @@ describe("parsePlan", () => {
     expect(result.steps[0].riskRecovery).toBe("`git checkout -- main.go`");
     expect(result.steps[0].files).toContain("main.go");
   });
+
+  it("支持 ### Markdown h3 标题前缀", () => {
+    const text = `
+### 步骤 1：Markdown 标题测试
+- **File(s)**：\`src/app.ts\`
+- **Change**：修改入口逻辑
+- **Depends on**：无
+- **Success**：\`npm run build\`
+- **Risk recovery**：回退
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].title).toBe("Markdown 标题测试");
+    expect(result.steps[0].files).toContain("src/app.ts");
+  });
+
+  it("支持 ## Markdown h2 标题前缀", () => {
+    const text = `
+## 步骤 1：H2 标题测试
+- **File(s)**：\`src/main.go\`
+- **Change**：修改主逻辑
+- **Depends on**：无
+- **Success**：\`go build\`
+- **Risk recovery**：\`git reset --hard\`
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].title).toBe("H2 标题测试");
+  });
+
+  it("支持纯数字编号列表格式", () => {
+    const text = `
+1. 第一步：修改入口文件
+- **File(s)**：\`src/index.ts\`
+- **Change**：添加导出
+- **Depends on**：无
+- **Success**：\`npm run build\`
+- **Risk recovery**：\`git checkout src/index.ts\`
+
+2. 第二步：更新测试
+- **File(s)**：\`tests/index.test.ts\`
+- **Change**：添加新测试用例
+- **Depends on**：第一步
+- **Success**：\`npm test\`
+- **Risk recovery**：\`git checkout tests/\`
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(2);
+    expect(result.steps[0].title).toBe("第一步：修改入口文件");
+    expect(result.steps[1].title).toBe("第二步：更新测试");
+  });
+
+  it("支持 **Key：** 字段格式（冒号在粗体标记内部）", () => {
+    const text = `
+步骤 1：冒号内嵌测试
+- **File(s)：** \`src/test.ts\`
+- **Change：** 修改测试配置
+- **Depends on：** 无
+- **Success：** \`npm test\`
+- **Risk recovery：** 回退配置
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].change).toBe("修改测试配置");
+    expect(result.steps[0].files).toContain("src/test.ts");
+    expect(result.steps[0].riskRecovery).toBe("回退配置");
+  });
+
+  it("处理 <!--plan--> 前缀", () => {
+    const text = `<!--plan-->
+步骤 1：带 plan 标记的步骤
+- **File(s)**：\`src/app.ts\`
+- **Change**：修改应用逻辑
+- **Depends on**：无
+- **Success**：\`npm run build\`
+- **Risk recovery**：回退
+`;
+    const result = parsePlan(text)!;
+    expect(result.steps.length).toBe(1);
+    expect(result.steps[0].title).toBe("带 plan 标记的步骤");
+  });
 });

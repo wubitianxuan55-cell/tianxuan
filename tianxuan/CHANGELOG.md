@@ -1,3 +1,30 @@
+## [10.56.0] — 2026-07-11
+
+### 🧠 双模型提示词全面重写
+
+- **Hermes（规划者）**：从 178 行碎片化 checklist 重写为 42 行 Reasonix 风格
+  - HARD-GATE 前置、5 步思考流程、Anti-patterns 拒绝标准全部删除
+  - 只定义输入输出边界：只读工具、输出类型（直接回答/Ask/计划）、步骤格式
+  - 搭档约束（Hephaestus 零判断执行）+ 执行回执协议（`[上一轮执行结果]`）
+  - UI 设计时调用 `read_skill(name="ui-ux-pro-max")`，skill 自身引导
+- **Hephaestus（执行者）**：从 107 行重写为 62 行，Karpathy 4 原则为骨架
+  - Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution
+  - 并行优先（Parallel first），Ask 工具允许真正的用户决策
+  - 步骤格式 5→3 字段（砍 Success、Risk recovery），TDD 自动
+
+### 🎨 8 套配色全面重新设计
+
+- **基于 ui-ux-pro-max skill**：`--design-system` + `--domain color` 生成，零手搓 hex
+- 默认/暖色/冰蓝/森林/霓虹/午夜/玫红/石墨 —— 每套独立个性
+- fg vs bg 对比度 ≥ 10:1，拒绝灰色模糊字体
+- SettingsAppearance 预览色同步更新
+
+### 🔧 计划确认弹窗同步优化
+
+- PlanCard 详情区删除 Success/Risk recovery 渲染（与步骤格式同步）
+- `RotateCcw` 导入移除
+- `planParser` 步骤标题正则增强：支持 `###`/`##` Markdown 前缀、数字编号列表
+
 ## [10.55.0] — 2026-07-10
 
 ### 🎨 计划确认弹窗重构

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, FileCode, ListChecks, RotateCcw, FileEdit, Link, GripVertical } from "lucide-react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, FileCode, ListChecks, FileEdit, Link, GripVertical } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { Markdown } from "./Markdown";
 import { parsePlan, type ParsedPlan } from "../lib/planParser";
@@ -67,7 +67,7 @@ function resolveDepNumber(dependsOn: string, steps: ParsedPlan["steps"]): string
 function StepCard({ step, steps }: { step: ParsedPlan["steps"][0]; steps: ParsedPlan["steps"] }) {
   const [open, setOpen] = useState(false);
   const t = useT();
-  const hasDetails = step.change || step.dependsOn || step.success || step.riskRecovery;
+  const hasDetails = step.change || step.dependsOn;
   const depLabel = step.dependsOn ? resolveDepNumber(step.dependsOn, steps) : null;
   const isDependent = depLabel && depLabel !== "无" && depLabel !== "None";
 
@@ -107,12 +107,6 @@ function StepCard({ step, steps }: { step: ParsedPlan["steps"][0]; steps: Parsed
             )}
             {step.dependsOn && (
               <div className="flex items-start gap-1.5"><Link size={12} strokeWidth={1.5} className="shrink-0 mt-0.5 text-purple-500" /><span><span className="text-fg-muted">{t("plan.dependsOn")}</span><span className="text-fg">{step.dependsOn}</span></span></div>
-            )}
-            {step.success && (
-              <div className="flex items-start gap-1.5"><Check size={12} strokeWidth={2} className="shrink-0 mt-0.5 text-green-500" /><span><span className="text-fg-muted">{t("plan.success")} </span><code className="text-[11px] bg-bg px-1 py-0.5 rounded font-mono">{step.success}</code></span></div>
-            )}
-            {step.riskRecovery && (
-              <div className="flex items-start gap-1.5"><RotateCcw size={12} strokeWidth={1.5} className="shrink-0 mt-0.5 text-amber-500" /><span><InlineMarkdown text={step.riskRecovery} /></span></div>
             )}
           </div>
         </div>

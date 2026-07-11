@@ -20,8 +20,13 @@ export interface ParsedPlan {
   allFiles: string[];
 }
 
-const STEP_HEADER_RE = /^步骤\s*(\d+)[：:—]\s*(.+)$/gm;
-const LOOSE_STEP_RE = /(?:^\**)\s*(?:步骤|Step)\s*(\d+)\**\s*[：:—]\s*(.+)$/gm;
+// 步骤标题正则 — 支持多种 LLM 输出变体：
+//   步骤 1：标题          纯文本格式
+//   ## 步骤 1：标题       Markdown h2
+//   ### 步骤 1：标题      Markdown h3
+//   **步骤 1**：标题     粗体包裹编号
+const STEP_HEADER_RE = /^#{0,3}\s*步骤\s*(\d+)[：:—]\s*(.+)$/gm;
+const LOOSE_STEP_RE = /^#{0,3}\s*(?:步骤|Step)\s*(\d+)\**\s*[：:—]\s*(.+)$/gm;
 
 function extractFiles(raw: string): string[] {
   const matches = raw.matchAll(/`([^`]+)`/g);
@@ -57,6 +62,15 @@ export function parsePlan(plan: string): ParsedPlan | null {
     }
   }
 
+  // Fallback 3: plain numbered list — "1. Title" or "1) Title" (with optional ##/### prefix)
+  if (headers.length === 0) {
+    const NUM_RE = /^#{0,3}\s*(\d+)[\.\)]\s+(.+)$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = NUM_RE.exec(trimmed)) !== null) {
+      headers.push({ number: parseInt(m[1], 10), title: m[2].trim(), start: m.index, end: trimmed.length });
+    }
+  }
+
   if (headers.length === 0) return null;
 
   for (let i = 0; i < headers.length - 1; i++) { headers[i].end = headers[i + 1].start; }
@@ -66,7 +80,9 @@ export function parsePlan(plan: string): ParsedPlan | null {
     const block = trimmed.slice(h.start, h.end).trim();
     const bodyLines: string[] = [];
     for (const line of block.split("\n")) {
-      if (STEP_HEADER_RE.test(line.trim()) || LOOSE_STEP_RE.test(line.trim())) continue;
+      // Also skip lines that look like another step header (numbered list variant)
+      const numMatch = line.trim().match(/^#{0,3}\s*(\d+)[\.\)]\s+/);
+      if (STEP_HEADER_RE.test(line.trim()) || LOOSE_STEP_RE.test(line.trim()) || numMatch) continue;
       bodyLines.push(line);
     }
     const body = bodyLines.join("\n").trim();
@@ -76,8 +92,8 @@ export function parsePlan(plan: string): ParsedPlan | null {
     let currentKey = "", currentValue = "";
 
     for (const line of body.split("\n")) {
-      // Match: - **Key**：value  or  **Key**: value
-      const fm = line.match(/(?:^-\s*)?\*\*([^*]+)\*\*\s*[：:—]\s*(.*)$/);
+      // Match: - **Key**：value, **Key**: value, or **Key：** value (colon before/after bold closing)
+      const fm = line.match(/(?:^-\s*)?\*\*([^*]+?)(?:\*\*\s*[：:—]|[：:—]\s*\*\*)\s*(.*)$/);
       if (fm) {
         if (currentKey) fieldBlocks.push({ key: currentKey, value: currentValue.trim() });
         currentKey = fm[1].trim();

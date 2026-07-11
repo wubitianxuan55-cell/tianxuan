@@ -3,14 +3,14 @@ import { useI18n } from "../lib/i18n";
 import type { ColorScheme, ThemeMode } from "../lib/theme";
 
 const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; keyword: string; str: string; num: string; info: string; label: string }> = {
-  default: { accent: "#61AFEF", bg: "#282C34", keyword: "#C678DD", str: "#98C379", num: "#D19A66", info: "#56B6C2", label: "默认" },
-  warm:    { accent: "#D79921", bg: "#282828", keyword: "#D3869B", str: "#B8BB26", num: "#FE8019", info: "#83A598", label: "暖色" },
-  ice:     { accent: "#88C0D0", bg: "#2E3440", keyword: "#B48EAD", str: "#A3BE8C", num: "#D08770", info: "#81A1C1", label: "冰蓝" },
-  forest:  { accent: "#83C092", bg: "#232A2E", keyword: "#D699B6", str: "#A7C080", num: "#E69875", info: "#7FBBB3", label: "森林" },
-  sunset:  { accent: "#FFA759", bg: "#1F2430", keyword: "#D4BFFF", str: "#A8CC8C", num: "#FFA759", info: "#5CCFE6", label: "日落" },
-  ocean:   { accent: "#89B4FA", bg: "#1E1E2E", keyword: "#CBA6F7", str: "#A6E3A1", num: "#FAB387", info: "#89DCEB", label: "海洋" },
-  rose:    { accent: "#EB6F92", bg: "#1F1D2E", keyword: "#C4A7E7", str: "#9CCFD8", num: "#F6C177", info: "#C4A7E7", label: "玫瑰" },
-  violet:  { accent: "#9D7CD8", bg: "#16161E", keyword: "#BB9AF7", str: "#9ECE6A", num: "#FF9E64", info: "#7DCFFF", label: "紫罗兰" },
+  default: { accent: "#22C55E", bg: "#020617", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#38BDF8", label: "默认" },
+  warm:    { accent: "#F59E0B", bg: "#1E1814", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#2DD4BF", label: "暖色" },
+  ice:     { accent: "#38BDF8", bg: "#050510", keyword: "#A78BFA", str: "#22C55E", num: "#FB923C", info: "#38BDF8", label: "冰蓝" },
+  forest:  { accent: "#4ADE80", bg: "#0A120C", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#2DD4BF", label: "森林" },
+  sunset:  { accent: "#F43F5E", bg: "#0F0F23", keyword: "#A78BFA", str: "#4ADE80", num: "#FBBF24", info: "#38BDF8", label: "霓虹" },
+  ocean:   { accent: "#818CF8", bg: "#0A0A1C", keyword: "#A78BFA", str: "#4ADE80", num: "#FB923C", info: "#38BDF8", label: "午夜" },
+  rose:    { accent: "#EC4899", bg: "#1A1018", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#38BDF8", label: "玫红" },
+  violet:  { accent: "#3B82F6", bg: "#09090B", keyword: "#D4D4D8", str: "#A1A1AA", num: "#E4E4E7", info: "#38BDF8", label: "石墨" },
 };
 const SCHEMES: ColorScheme[] = ["default", "warm", "ice", "forest", "sunset", "ocean", "rose", "violet"];
 

@@ -142,6 +142,11 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	pluginHost := po.host
 	lspMgr := po.lspMgr
 	cleanup := po.cleanup
+
+	// V10.59: 移除 GitNexus MCP 工具 — 其代码图能力已被 mcp__codegraph__* 完全覆盖，
+	// 保留 13 个冗余工具只会浪费执行者和子代理的 schema token 预算。
+	reg.RemovePrefix("mcp__gitnexus__")
+
 	maxSteps := cfg.Agent.MaxSteps
 	if opts.MaxSteps > 0 {
 		maxSteps = opts.MaxSteps
@@ -807,11 +812,15 @@ func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 		if !ok {
 			continue
 		}
-		// CodeGraph and GitNexus MCP tools (mcp__codegraph__*, mcp__gitnexus__*)
-		// are always included — they are code-intelligence engines whose graph
-		// tools are inherently read-only, even when the MCP server omits the
-		// optional readOnlyHint annotation.
-		if t.ReadOnly() || strings.HasPrefix(name, "mcp__codegraph__") || strings.HasPrefix(name, "mcp__gitnexus__") {
+		// CodeGraph MCP tools (mcp__codegraph__*) are always included — the
+		// local code-intelligence engine is inherently read-only.
+		// GitNexus and GitHub MCP tools are explicitly excluded: GitNexus is
+		// redundant with CodeGraph, and GitHub tools (search_code, list_issues,
+		// etc.) are irrelevant to local code investigation.
+		if strings.HasPrefix(name, "mcp__gitnexus__") || strings.HasPrefix(name, "mcp__modelcontextprotocol-server-github__") {
+			continue
+		}
+		if t.ReadOnly() || strings.HasPrefix(name, "mcp__codegraph__") {
 			ro.Add(t)
 		}
 	}

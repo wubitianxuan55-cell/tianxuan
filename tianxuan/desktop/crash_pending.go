@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -60,10 +61,28 @@ func writePendingCrash(site string, r any, stack []byte) {
 }
 
 // goSafe runs fn in a new goroutine with crash recovery.
-// Use instead of bare `go fn()` for any goroutine that touches the agent/provider/tool layer.
+// Caught panics are written to crash-pending.json and re-raised, killing the
+// process — use only for critical goroutines whose failure is fatal
+// (buildController, tray, scheduler).
 func (a *App) goSafe(site string, fn func()) {
 	go func() {
 		defer a.recoverToPending(site)
+		fn()
+	}()
+}
+
+// goSafeQuiet runs fn in a new goroutine with crash recovery that does NOT
+// re-panic. Panics are logged via slog and written to crash-pending.json for
+// diagnostics, but the process stays alive. Use for auxiliary goroutines
+// (mobile HTTP server, ngrok polling, etc.) whose failure should not kill the app.
+func (a *App) goSafeQuiet(site string, fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("desktop: goroutine panic (non-fatal)", "site", site, "panic", r)
+				writePendingCrash(site, r, debug.Stack())
+			}
+		}()
 		fn()
 	}()
 }

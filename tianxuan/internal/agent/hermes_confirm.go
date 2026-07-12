@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"tianxuan/internal/event"
 )
@@ -30,7 +31,7 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note strin
 		ID:     "confirm",
 		Header: "计划确认",
 		Prompt: fmt.Sprintf("任务：%s", truncateStr(task, 200)),
-		Plan:   plan, // full plan rendered by PlanCard with Markdown
+		Plan:   displayPlan(plan), // only show <!--plan--> portion, not preamble analysis
 		Options: []event.AskOption{
 			{Label: "提交执行", Description: "按计划交由 Hephaestus 立即执行"},
 			{Label: "仅聊天", Description: "计划误触发，仅作为普通对话回复，不派送执行者"},
@@ -63,4 +64,17 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note strin
 		// Treat as "提交执行" with the typed text as execution notes.
 		return selected, false, false, nil
 	}
+}
+
+// displayPlan extracts the structured plan portion (<!--plan--> onward) from the
+// full planner output for display in the confirmation dialog. The preamble
+// (analysis/reasoning) often references project memory entries that should not
+// leak into the user-visible plan card. The full output is preserved for the
+// executor via the session.
+func displayPlan(full string) string {
+	const marker = "<!--plan-->"
+	if idx := strings.Index(full, marker); idx >= 0 {
+		return strings.TrimSpace(full[idx:])
+	}
+	return full
 }

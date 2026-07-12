@@ -1,3 +1,39 @@
+## [10.59.0] — 2026-07-12
+
+### 🎯 MCP 工具精简
+
+- **移除 GitNexus MCP**：13 个工具从执行者 reg + 规划者只读注册表中移除，代码图能力已被 `mcp__codegraph__*` 完全覆盖
+- **规划者排除 GitHub MCP**：9 个只读 GitHub 工具（search_code/list_issues 等）对本地代码调查无价值，从规划者 schema 中排除
+- **HermesPrompt 更新**：工具列表移除 `gitnexus` 引用，与实际工具集一致
+- 合计节省 ~6,500 schema tokens/请求（规划者 ~4,000 + 执行者 ~2,500）
+
+### 🖥️ 桌面端 UI 优化
+
+- **上下文卡片移至侧边栏**：规划者（紫）+ 执行者（青）用量条从顶栏移到左侧边栏独立卡片，折叠时自动隐藏
+- **计划确认隐私修复**：`displayPlan()` 提取 `<!--plan-->` 之后的结构化计划，防止分析前言中的记忆内容泄漏到确认弹窗
+- **会话模块优化**（5 项）：
+  - `resumeSession` 闪白修复：新增 `resume` action 单次 dispatch
+  - 搜索/分组 `useMemo`：Sidebar 搜索过滤 + HistoryPanel 日期分组 memo 化
+  - 时间格式统一：`sessionTime` / `dayLabel` 跨年自动显示年份
+  - 编辑状态互斥：`startRename`/`startDelete`/`cancelEdit` 包装函数防止同时激活
+
+### ⚡ Go 后端优化
+
+- **Session preview 缓存**：`.sessions.cache.json` 按 mtime 缓存 preview+turns，命中时跳过 jsonl 读取，大幅减少 ListSessions I/O
+
+---
+
+## [10.58.0] — 2026-07-12
+
+### 📱 移动端远程操控
+
+- Token 认证 + ngrok 外网访问
+- 桌面端设置面板（移动访问开关 + Token 管理）
+- web-mobile 复用架构
+- 全库 goroutine panic 保护全覆盖
+
+---
+
 ## [10.57.0] — 2026-07-11
 
 ### 🔴 双模型架构深度优化（4 轮，19 项改进）

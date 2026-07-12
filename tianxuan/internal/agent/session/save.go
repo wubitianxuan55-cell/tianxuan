@@ -100,6 +100,7 @@ func List(dir string) ([]Info, error) {
 		return nil, err
 	}
 	var out []Info
+	cache := loadSessionCache(dir)
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
 			continue
@@ -109,7 +110,16 @@ func List(dir string) ([]Info, error) {
 			continue
 		}
 		full := filepath.Join(dir, e.Name())
-		preview, turns := previewSession(full)
+		mtime := info.ModTime().UnixNano()
+
+		var preview string
+		var turns int
+		if c, ok := cache.Files[e.Name()]; ok && c.Mtime == mtime {
+			preview, turns = c.Preview, c.Turns
+		} else {
+			preview, turns = previewSession(full)
+			cache.Files[e.Name()] = sessionCacheEntry{Preview: preview, Turns: turns, Mtime: mtime}
+		}
 		if turns == 0 {
 			// Skip sessions that have never had user interaction — they are
 			// empty conversations that should not appear in the history panel
@@ -126,7 +136,49 @@ func List(dir string) ([]Info, error) {
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].ModTime.After(out[j].ModTime)
 	})
+	cache.save(dir)
 	return out, nil
+}
+
+// ─── session preview cache ─────────────────────────────────────────────
+
+// sessionCacheEntry stores cached preview + turns for a single session file.
+type sessionCacheEntry struct {
+	Preview string `json:"preview"`
+	Turns   int    `json:"turns"`
+	Mtime   int64  `json:"mtime"` // unix nano — stale when mismatched
+}
+
+// sessionCache maps session filename → cached metadata.
+type sessionCache struct {
+	Entries int                          `json:"entries"`
+	Files   map[string]sessionCacheEntry `json:"files"`
+}
+
+const sessionCacheFile = ".sessions.cache.json"
+
+func loadSessionCache(dir string) *sessionCache {
+	data, err := os.ReadFile(filepath.Join(dir, sessionCacheFile))
+	if err != nil {
+		return &sessionCache{Files: make(map[string]sessionCacheEntry)}
+	}
+	var c sessionCache
+	if json.Unmarshal(data, &c) != nil {
+		return &sessionCache{Files: make(map[string]sessionCacheEntry)}
+	}
+	if c.Files == nil {
+		c.Files = make(map[string]sessionCacheEntry)
+	}
+	return &c
+}
+
+func (c *sessionCache) save(dir string) {
+	c.Entries = len(c.Files)
+	data, err := json.Marshal(c)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, sessionCacheFile), data, 0644)
 }
 
 // previewSession returns the first user message (truncated) and the number of

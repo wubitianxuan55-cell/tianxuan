@@ -108,7 +108,7 @@ func (a *App) StartMobileAccess(port int, ngrokToken string) (MobileAccessView, 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start HTTP server
-	go func() {
+	a.goSafeQuiet("mobile-http-server", func() {
 		slog.Info("desktop: 移动端 HTTP 服务已启动", "addr", listenAddr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Warn("desktop: 移动端 HTTP 服务出错", "err", err)
@@ -119,14 +119,14 @@ func (a *App) StartMobileAccess(port int, ngrokToken string) (MobileAccessView, 
 		}
 		mobileInst = nil
 		mobileMu.Unlock()
-	}()
+	})
 
-	go func() {
+	a.goSafeQuiet("mobile-shutdown-waiter", func() {
 		<-ctx.Done()
 		shutdownCtx, sc := context.WithTimeout(context.Background(), 5*time.Second)
 		defer sc()
 		_ = httpSrv.Shutdown(shutdownCtx)
-	}()
+	})
 
 	ms := &mobileServer{
 		srv:    httpSrv,
@@ -177,16 +177,16 @@ func (a *App) StartMobileAccess(port int, ngrokToken string) (MobileAccessView, 
 		}
 
 		// Kill ngrok on cancel
-		go func() {
+		a.goSafeQuiet("mobile-ngrok-cancel", func() {
 			<-ctx.Done()
 			ngrokCancel()
-		}()
+		})
 
 		// Poll ngrok local API for public URL
 		result.UsingNgrok = true
-		go func() {
+		a.goSafeQuiet("mobile-ngrok-poll", func() {
 			pollNgrok(ctx, ms, port)
-		}()
+		})
 	}
 
 	mobileInst = ms

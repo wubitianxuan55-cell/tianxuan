@@ -7,6 +7,7 @@ import (
 
 	"tianxuan/internal/codegraph"
 	"tianxuan/internal/config"
+	"tianxuan/internal/crash"
 	"tianxuan/internal/event"
 	"tianxuan/internal/lsp"
 	"tianxuan/internal/plugin"
@@ -42,6 +43,7 @@ func startPlugins(ctx context.Context, cfg *config.Config, reg *tool.Registry, s
 			notify := func(msg string) { sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo, Text: msg}) }
 			notify("codegraph: fetching code-intelligence runtime in the background (one-time) — symbol-graph tools available next session")
 			go func() {
+				defer crash.Recover("boot-codegraph-install")
 				if _, err := codegraph.Install(context.WithoutCancel(ctx), nil); err != nil {
 					notify("codegraph: install failed (" + err.Error() + ") — using grep/glob; retries next session")
 				} else {

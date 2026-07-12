@@ -19,6 +19,7 @@ import (
 	"tianxuan/internal/agent"
 	"tianxuan/internal/agent/session"
 	"tianxuan/internal/control"
+	"tianxuan/internal/crash"
 	"tianxuan/internal/provider"
 )
 
@@ -210,6 +211,7 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 	}
 	errCh := make(chan error, 1)
 	go func() {
+		defer crash.Recover("serve-listen")
 		errCh <- srv.ListenAndServe()
 	}()
 	select {

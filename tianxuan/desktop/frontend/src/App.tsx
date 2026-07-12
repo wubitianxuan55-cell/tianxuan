@@ -21,7 +21,6 @@ import { PlanCard } from "./components/PlanCard";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { ToolbarButton } from "./components/ToolbarButton";
 import { StatusBar } from "./components/StatusBar";
-import { ContextBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
@@ -446,6 +445,7 @@ export default function App() {
           onOpenCaps={() => setCapsOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSchedule={() => setScheduleOpen(true)}
+          context={state.context}
           startResize={startSidebarResize}
           resizeWithKeyboard={resizeSidebarWithKeyboard}
           onDoubleClickResize={() => setExpandedSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
@@ -459,27 +459,6 @@ export default function App() {
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
-            {/* 顶栏上下文用量 — 规划者(紫) + 执行者(青) */}
-            {(state.context.window > 0 || state.context.plannerWindow > 0) && (
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                {state.context.plannerWindow > 0 && (
-                  <ContextBar
-                    label="规划"
-                    used={state.context.plannerUsed}
-                    window={state.context.plannerWindow}
-                    color="bg-purple-500/55"
-                  />
-                )}
-                {state.context.window > 0 && (
-                  <ContextBar
-                    label="执行"
-                    used={state.context.used}
-                    window={state.context.window}
-                    color="bg-cyan-500/55"
-                  />
-                )}
-              </div>
-            )}
             <div className="flex items-center gap-2 px-3">
               {cwd && (<button className="toolbar-btn no-drag" onClick={() => void switchFolder()} disabled={state.running}><FolderGit2 size={13} /><span>{cwdName}</span><ChevronDown size={11} /></button>)}
             </div>

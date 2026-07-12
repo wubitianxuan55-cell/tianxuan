@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -69,10 +70,26 @@ func (a *App) SaveWindowState(state DesktopWindowState) error {
 // saveWindowStateSync saves the current window geometry from the Go side.
 // Called during shutdown so the last-known state is persisted even if the
 // frontend's beforeunload hasn't resolved yet.
+//
+// Known Wails v2.12.0 boundary: the shutdown callback fires while the
+// underlying Win32 window is tearing down. At that point WindowGetSize /
+// WindowGetPosition can hit a divide-by-zero in winc's DPI scaling (DPI
+// denominator may already be zero), so we guard with recover.
 func (a *App) saveWindowStateSync() {
 	if a.ctx == nil {
 		return
 	}
+	// Context already cancelled is a strong signal that shutdown is past the
+	// point where the window handle is valid — bail out early.
+	if a.ctx.Err() != nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Warn("saveWindowStateSync: window already torn down, skipping geometry save",
+				"panic", r)
+		}
+	}()
 	w, h := runtime.WindowGetSize(a.ctx)
 	x, y := runtime.WindowGetPosition(a.ctx)
 	max := runtime.WindowIsMaximised(a.ctx)

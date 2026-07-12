@@ -45,13 +45,16 @@ export function HistoryPanel({
   };
 
   // 按日期分组
-  const groups: { label: string; items: SessionMeta[] }[] = [];
-  for (const s of filtered) {
-    const label = dayLabel(s.modTime);
-    const last = groups[groups.length - 1];
-    if (last && last.label === label) last.items.push(s);
-    else groups.push({ label, items: [s] });
-  }
+  const groups = useMemo(() => {
+    const g: { label: string; items: SessionMeta[] }[] = [];
+    for (const s of filtered) {
+      const label = dayLabel(s.modTime);
+      const last = g[g.length - 1];
+      if (last && last.label === label) last.items.push(s);
+      else g.push({ label, items: [s] });
+    }
+    return g;
+  }, [filtered]);
 
   const hasSessions = sessions.length > 0;
 
@@ -214,7 +217,8 @@ function dayLabel(ms: number): string {
   const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(ms))) / 86_400_000);
   if (days <= 0) return t("history.today");
   if (days === 1) return t("history.yesterday");
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const y = new Date(ms).getFullYear() !== new Date().getFullYear();
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", ...(y ? { year: "numeric" } : {}) });
 }
 
 function timeLabel(ms: number): string {

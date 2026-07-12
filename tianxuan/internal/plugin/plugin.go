@@ -138,6 +138,12 @@ func StartAll(ctx context.Context, specs []Spec) (*Host, []tool.Tool, error) {
 	ch := make(chan result, len(specs))
 	for i, s := range specs {
 		go func(idx int, spec Spec) {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("plugin: start goroutine panic", "plugin", spec.Name, "panic", r)
+					ch <- result{idx: idx, err: fmt.Errorf("panic starting plugin %q: %v", spec.Name, r)}
+				}
+			}()
 			c, err := start(ctx, spec)
 			if err != nil {
 				ch <- result{idx: idx, err: fmt.Errorf("start plugin %q: %w", spec.Name, err)}

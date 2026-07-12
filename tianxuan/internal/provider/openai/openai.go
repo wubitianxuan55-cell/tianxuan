@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/provider"
 	"sync/atomic"
 )
@@ -346,6 +347,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	idleDone := make(chan struct{})
 	defer close(idleDone)
 	go func() {
+		defer crash.Recover("openai-body-close")
 		select {
 		case <-ctx.Done():
 			resp.Body.Close()
@@ -373,6 +375,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	lastDataNano.Store(time.Now().UnixNano())
 	keepaliveSent := false
 	go func() {
+		defer crash.Recover("openai-idle-timer")
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for {

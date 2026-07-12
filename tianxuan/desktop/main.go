@@ -8,6 +8,12 @@ package main
 
 import (
 	"embed"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -39,6 +45,19 @@ var assets embed.FS
 var version = "dev"
 
 func main() {
+	// Redirect stderr and slog to a log file — GUI apps (-H windowsgui) have no
+	// console, so panics, crash.Recover, slog.Error etc. are silently lost without
+	// this. The file lives under ~/.tianxuan/logs/ and is rotated per launch.
+	logDir := filepath.Join(os.Getenv("USERPROFILE"), ".tianxuan", "logs")
+	os.MkdirAll(logDir, 0700)
+	logPath := filepath.Join(logDir, fmt.Sprintf("desktop-%s.log", time.Now().Format("20060102-150405")))
+	logFile, logErr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if logErr == nil {
+		os.Stderr = logFile
+		slog.SetDefault(slog.New(slog.NewTextHandler(io.MultiWriter(logFile, os.Stderr), nil)))
+	}
+	cleanOldLogs(logDir, 20)
+
 	defer crash.Handle()
 	app := NewApp()
 
@@ -104,5 +123,21 @@ func main() {
 	})
 	if err != nil {
 		println("Error:", err.Error())
+	}
+}
+
+// cleanOldLogs removes old log files, keeping only the most recent `keep` entries.
+func cleanOldLogs(dir string, keep int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	if len(entries) <= keep {
+		return
+	}
+	for _, e := range entries[:len(entries)-keep] {
+		if !e.IsDir() {
+			os.Remove(filepath.Join(dir, e.Name()))
+		}
 	}
 }

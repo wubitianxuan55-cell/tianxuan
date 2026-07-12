@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/sandbox"
 	"tianxuan/internal/tool"
@@ -125,6 +126,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			// V8.2: 后台任务也加上前台同款保护——jobCtx 取消时立刻强杀进程树，
 			// 防止 cmd.Wait() 永久阻塞（软件启动后卡死或不正常退出）。
 			go func() {
+				defer crash.Recover("bash-bg-kill")
 				<-jobCtx.Done()
 				killProcessTree(cmd)
 			}()
@@ -169,6 +171,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		// V7.5: 监听 ctx 取消——不等 cmd.Wait()，卡死时立即强杀进程树。
 		// cmd.Wait() 可能永久阻塞（进程卡死不响应信号），此时 killProcessTree 永远执行不到。
 		go func() {
+			defer crash.Recover("bash-fg-kill")
 			<-ctx.Done()
 			killProcessTree(cmd)
 		}()

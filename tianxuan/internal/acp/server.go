@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+
+	"tianxuan/internal/crash"
 )
 
 // maxMessageBytes caps a single inbound NDJSON line. ACP messages can embed
@@ -204,6 +206,7 @@ func (c *Conn) dispatch(ctx context.Context, line []byte) {
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
+			defer crash.Recover("acp-serve-request")
 			c.serveRequest(ctx, in.ID, in.Method, in.Params)
 		}()
 	case in.Method != "" && !hasID:
@@ -211,6 +214,7 @@ func (c *Conn) dispatch(ctx context.Context, line []byte) {
 			c.wg.Add(1)
 			go func() {
 				defer c.wg.Done()
+				defer crash.Recover("acp-notification")
 				h(ctx, in.Params)
 			}()
 		}

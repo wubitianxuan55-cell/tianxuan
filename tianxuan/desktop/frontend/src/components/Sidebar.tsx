@@ -1,5 +1,5 @@
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   SquarePen, Brain, Blocks, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
@@ -8,7 +8,8 @@ import {
 import logo from "../assets/logo.png";
 import { useT } from "../lib/i18n";
 import { sessionTitle, sessionTime } from "../lib/session";
-import type { SessionMeta } from "../lib/types";
+import type { SessionMeta, ContextInfo } from "../lib/types";
+import { ContextBar } from "./StatusBar";
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -28,6 +29,7 @@ export interface SidebarProps {
   onOpenCaps: () => void;
   onOpenSettings: () => void;
   onOpenSchedule: () => void;
+  context: ContextInfo;
   startResize: (e: ReactPointerEvent<HTMLButtonElement>) => void;
   resizeWithKeyboard: (e: KeyboardEvent<HTMLButtonElement>) => void;
   onDoubleClickResize: () => void;
@@ -54,6 +56,7 @@ export function Sidebar({
   onOpenCaps,
   onOpenSettings,
   onOpenSchedule,
+  context,
   startResize,
   resizeWithKeyboard,
   onDoubleClickResize,
@@ -64,9 +67,12 @@ export function Sidebar({
   const t = useT();
   const toggleTitle = collapsed ? t("sidebar.expand") : t("sidebar.collapse");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  // 内联重命名
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+  // 互斥包装：两个编辑状态不能同时激活
+  const startRename = (path: string, draft: string) => { setDeleteConfirm(null); setRenameTarget(path); setRenameDraft(draft); };
+  const cancelEdit = () => { setRenameTarget(null); setDeleteConfirm(null); };
+  const startDelete = (path: string) => { setRenameTarget(null); setDeleteConfirm(path); };
   // 搜索防抖：本地输入即时更新，200ms 后才同步到父组件触发过滤
   const [localQuery, setLocalQuery] = useState(searchQuery);
   useEffect(() => { setLocalQuery(searchQuery); }, [searchQuery]);
@@ -74,6 +80,14 @@ export function Sidebar({
     const timer = setTimeout(() => onSearchChange(localQuery), 200);
     return () => clearTimeout(timer);
   }, [localQuery]);
+
+  const q = localQuery.trim().toLowerCase();
+  const visibleSessions = useMemo(() => q
+    ? sessions.filter((s: SessionMeta) =>
+        (s.title || s.preview || "").toLowerCase().includes(q) ||
+        s.path.toLowerCase().includes(q)
+      )
+    : sessions, [sessions, q]);
 
   return (
     <>
@@ -154,19 +168,11 @@ export function Sidebar({
               onKeyDown={e => e.stopPropagation()}
             />
             <div className="min-h-0 overflow-y-auto pr-0.5">
-              {(() => {
-                const q = localQuery.trim().toLowerCase();
-                const visible = q
-                  ? sessions.filter((s: SessionMeta) =>
-                      (s.title || s.preview || "").toLowerCase().includes(q) ||
-                      s.path.toLowerCase().includes(q)
-                    )
-                  : sessions;
-                if (sessions.length === 0)
-                  return <div className="py-2 px-2.5 text-fg-faint text-xs">{t("sidebar.noRecent")}</div>;
-                if (visible.length === 0 && q)
-                  return <div className="py-2 px-2.5 text-fg-faint text-xs">无匹配</div>;
-                return visible.map((session: SessionMeta) => (
+              {sessions.length === 0
+                  ? <div className="py-2 px-2.5 text-fg-faint text-xs">{t("sidebar.noRecent")}</div>
+                : visibleSessions.length === 0 && q
+                  ? <div className="py-2 px-2.5 text-fg-faint text-xs">无匹配</div>
+                : visibleSessions.map((session: SessionMeta) => (
                   <div
                     className={`flex items-start gap-2 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
                       session.current
@@ -192,10 +198,10 @@ export function Sidebar({
                             value={renameDraft}
                             onChange={e => setRenameDraft(e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") { e.preventDefault(); void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); setRenameTarget(null); }
-                              if (e.key === "Escape") { e.preventDefault(); setRenameTarget(null); }
+                              if (e.key === "Enter") { e.preventDefault(); void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); cancelEdit(); }
+                              if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
                             }}
-                            onBlur={() => { void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); setRenameTarget(null); }}
+                            onBlur={() => { void onRenameSession(session.path, renameDraft.trim() || sessionTitle(session, "")); cancelEdit(); }}
                             autoFocus
                             onClick={e => e.stopPropagation()}
                           />
@@ -207,8 +213,7 @@ export function Sidebar({
                             onDoubleClick={e => {
                               if (session.current) return;
                               e.stopPropagation();
-                              setRenameTarget(session.path);
-                              setRenameDraft(sessionTitle(session, ""));
+                              startRename(session.path, sessionTitle(session, ""));
                             }}
                             title="双击重命名"
                           >
@@ -223,10 +228,10 @@ export function Sidebar({
                     {!session.current && (
                       deleteConfirm === session.path ? (
                         <span className="flex items-center gap-1 shrink-0">
-                          <button className="bg-transparent border-0 text-[11px] text-err cursor-pointer px-1.5 py-0.5 rounded hover:bg-err/10 transition-colors duration-150" onClick={e => { e.stopPropagation(); void onDeleteSession(session.path); setDeleteConfirm(null); }}>
+                          <button className="bg-transparent border-0 text-[11px] text-err cursor-pointer px-1.5 py-0.5 rounded hover:bg-err/10 transition-colors duration-150" onClick={e => { e.stopPropagation(); void onDeleteSession(session.path); cancelEdit(); }}>
                             确认
                           </button>
-                          <button className="bg-transparent border-0 text-[11px] text-fg-faint cursor-pointer px-1.5 py-0.5 rounded hover:bg-bg-soft transition-colors duration-150" onClick={e => { e.stopPropagation(); setDeleteConfirm(null); }}>
+                          <button className="bg-transparent border-0 text-[11px] text-fg-faint cursor-pointer px-1.5 py-0.5 rounded hover:bg-bg-soft transition-colors duration-150" onClick={e => { e.stopPropagation(); cancelEdit(); }}>
                             取消
                           </button>
                         </span>
@@ -234,15 +239,14 @@ export function Sidebar({
                         <button
                           className="hidden group-hover:flex bg-transparent border-0 text-fg-faint cursor-pointer p-0.5 rounded-[3px] mt-1 hover:text-err hover:bg-err/10 transition-colors duration-150 items-center justify-center"
                           title="删除"
-                          onClick={e => { e.stopPropagation(); setDeleteConfirm(session.path); }}
+                          onClick={e => { e.stopPropagation(); startDelete(session.path); }}
                         >
                           <X size={13} />
                         </button>
                       )
                     )}
                   </div>
-                ));
-              })()}
+                ))}
               {hasMore && !localQuery && (
                 <button
                   className="w-full mt-1 py-1.5 text-fg-faint text-xs border border-border-soft rounded-md bg-transparent cursor-pointer hover:text-fg hover:bg-sidebar-hover transition-colors duration-150"
@@ -254,6 +258,20 @@ export function Sidebar({
               )}
             </div>
           </section>
+        )}
+
+        {/* Context card — planner + executor token usage */}
+        {!collapsed && (context.window > 0 || context.plannerWindow > 0) && (
+          <div className="shrink-0 px-1 pb-1">
+            <div className="rounded-lg border border-border-soft bg-bg/40 px-2.5 py-2.5 space-y-2">
+              {context.plannerWindow > 0 && (
+                <ContextBar label="规划" used={context.plannerUsed} window={context.plannerWindow} color="bg-purple-500/55" />
+              )}
+              {context.window > 0 && (
+                <ContextBar label="执行" used={context.used} window={context.window} color="bg-cyan-500/55" />
+              )}
+            </div>
+          </div>
         )}
 
         {/* Bottom nav */}

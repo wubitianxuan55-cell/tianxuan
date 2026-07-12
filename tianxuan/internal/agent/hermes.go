@@ -250,10 +250,8 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlan
 			return nil, nil // Hermes answered directly
 		}
 
-		// Strip preamble, keep <!--plan--> at the beginning.
-		if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
-			plan = "<!--plan-->\n" + strings.TrimSpace(plan[idx+len("<!--plan-->"):])
-		}
+		// Keep the full planner output — preamble (analysis/reasoning) is valuable
+		// context for the executor. Previously only the <!--plan--> portion was kept.
 
 		userNote, chatOnly, revise, err := h.confirmPlan(ctx, input, plan)
 		if err != nil {

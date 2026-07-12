@@ -242,7 +242,8 @@ func (a *App) buildController() {
 	runtime.EventsEmit(ctx, "agent:ready")
 
 	// Auto-start mobile access if previously configured.
-	a.AutoStartMobileAccess()
+	// FIXME: re-enable after root-causing desktop crash on executor execution.
+	// a.AutoStartMobileAccess()
 
 	// Persist the default tab so a relaunch can restore it.
 	a.saveTabs()
@@ -300,7 +301,14 @@ func (s *eventSink) Emit(e event.Event) {
 	}
 	// Also forward to the mobile SSE broadcaster if active.
 	if s.bc != nil {
-		s.bc.Emit(e)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("desktop: eventSink mobile broadcast panic", "panic", r)
+				}
+			}()
+			s.bc.Emit(e)
+		}()
 	}
 }
 

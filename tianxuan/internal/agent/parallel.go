@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +131,16 @@ func (t *ParallelTasksTool) Execute(ctx context.Context, args json.RawMessage) (
 		wg.Add(1)
 		go func(idx int, prompt, desc string, tools []string, maxSteps int) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("agent: parallel task panic", "idx", idx, "panic", r)
+					results[idx] = taskResult{
+						idx:  idx,
+						desc: desc,
+						err:  fmt.Errorf("panic: %v", r),
+					}
+				}
+			}()
 
 			subCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 			defer cancel()

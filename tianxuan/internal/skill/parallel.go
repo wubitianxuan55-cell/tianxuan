@@ -3,6 +3,7 @@ package skill
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,14 @@ func RunParallel(ctx context.Context, tasks []ParallelTask, runner SubagentRunne
 		wg.Add(1)
 		go func(idx int, task ParallelTask) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("skill: parallel task panic", "idx", idx, "skill", task.Skill, "panic", r)
+					results[idx].Skill = task.Skill
+					results[idx].Task = task.Arguments
+					results[idx].Error = fmt.Sprintf("panic: %v", r)
+				}
+			}()
 
 			subCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 			defer cancel()

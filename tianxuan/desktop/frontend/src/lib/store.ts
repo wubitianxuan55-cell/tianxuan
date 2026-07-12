@@ -43,7 +43,8 @@ type Action =
   | { type: "meta"; meta: Meta } | { type: "context"; context: ContextInfo }
   | { type: "balance"; balance: BalanceInfo } | { type: "jobs"; jobs: JobView[] }
   | { type: "tcca"; report: TCCAReport }
-  | { type: "history"; messages: HistoryMessage[] } | { type: "clearApproval" } | { type: "clearAsk" } | { type: "reset" };
+  | { type: "history"; messages: HistoryMessage[] } | { type: "clearApproval" } | { type: "clearAsk" } | { type: "reset" }
+  | { type: "resume"; messages: HistoryMessage[] };
 
 
 function flushPendingUser(s: ControllerState): ControllerState {
@@ -196,6 +197,7 @@ function reducer(s: ControllerState, a: Action): ControllerState {
     case "history": { const visible = a.messages.filter(m => (m.role === "user" || m.role === "assistant") && m.content.trim() !== ""); const lastIdx = visible.reduceRight((acc, m, i) => acc >= 0 ? acc : m.role === "assistant" ? i : -1, -1); return { ...s, items: visible.map((m, i) => m.role === "user" ? { kind: "user", id: `h${i}`, text: m.content } as Item : { kind: "assistant", id: `h${i}`, text: m.content, reasoning: "", streaming: false } as Item), seq: s.seq + visible.length, lastAssistantIdx: lastIdx }; }
     case "clearApproval": return { ...s, approval: undefined }; case "clearAsk": return { ...s, ask: undefined };
     case "reset": return { ...initialState, meta: s.meta, context: { ...s.context, used: 0 }, balance: s.balance, jobs: s.jobs, seq: s.seq, sessionNonce: s.sessionNonce + 1, _dispatch: s._dispatch };
+    case "resume": { const visible = a.messages.filter(m => (m.role === "user" || m.role === "assistant") && m.content.trim() !== ""); const lastIdx = visible.reduceRight((acc, m, i) => acc >= 0 ? acc : m.role === "assistant" ? i : -1, -1); return { ...initialState, items: visible.map((m, i) => m.role === "user" ? { kind: "user", id: `h${i}`, text: m.content } as Item : { kind: "assistant", id: `h${i}`, text: m.content, reasoning: "", streaming: false } as Item), seq: s.seq + visible.length, lastAssistantIdx: lastIdx, meta: s.meta, context: { ...s.context, used: 0 }, balance: s.balance, jobs: s.jobs, sessionNonce: s.sessionNonce + 1, _dispatch: s._dispatch }; }
     case "event": return applyEvent(s, a.e);
     default: return s;
   }
@@ -281,7 +283,7 @@ export function useController() {
   const setPermLevel = useCallback((level: string) => { app.SetPermLevel(level).catch(() => {}); }, []);
   const newSession = useCallback(async () => { await app.NewSession().catch(() => {}); dispatch({ type: "reset" }); }, [dispatch]);
   const listSessions = useCallback((): Promise<SessionMeta[]> => app.ListSessions().catch(() => []), []);
-  const resumeSession = useCallback(async (path: string) => { const ms = await app.ResumeSession(path).catch(() => [] as HistoryMessage[]); dispatch({ type: "reset" }); if (ms.length) dispatch({ type: "history", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
+  const resumeSession = useCallback(async (path: string) => { const ms = await app.ResumeSession(path).catch(() => [] as HistoryMessage[]); dispatch({ type: "resume", messages: ms }); app.ContextUsage().then(c => dispatch({ type: "context", context: c })).catch(() => {}); }, [dispatch]);
   const deleteSession = useCallback((path: string) => app.DeleteSession(path).catch(() => {}), []);
   const renameSession = useCallback((path: string, title: string) => app.RenameSession(path, title).catch(() => {}), []);
   const refreshMeta = useCallback(async () => { try { dispatch({ type: "meta", meta: await app.Meta() }); dispatch({ type: "context", context: await app.ContextUsage() }); } catch {} }, [dispatch]);

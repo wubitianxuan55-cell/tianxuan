@@ -89,6 +89,14 @@ func (sc *Scheduler) checkAndFire(now time.Time) {
 		sc.wg.Add(1)
 		go func() {
 			defer sc.wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("scheduler: fire panic", "schedule", sched.ID, "panic", r)
+					sc.mu.Lock()
+					sc.running[sched.ID] = false
+					sc.mu.Unlock()
+				}
+			}()
 			sc.fire(sched)
 		}()
 	}

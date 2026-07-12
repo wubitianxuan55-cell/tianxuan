@@ -1,9 +1,10 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useRef } from "react";
 import { ChevronRight, Brain } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
+import { useAutoCollapse } from "../lib/useAutoCollapse";
 import { displayReasoningText } from "../lib/reasoningDisplay";
 import { useNow } from "../lib/useNow";
 import { useTurnStartAt } from "../lib/store";
@@ -41,7 +42,7 @@ export const UserMessage = memo(function UserMessage({
   const rewind = (scope: string) => onRewind?.(turn as number, scope);
   const displayText = text.replace(/@\.tianxuan\/attachments\/[^\s]+/g, "[image]");
   return (
-    <div className="flex justify-end my-2 group" data-entrance={turn != null ? `u${turn}` : undefined}>
+    <div className={`flex justify-end group ${compact ? "my-1" : "my-2"}`} data-entrance={turn != null ? `u${turn}` : undefined}>
       <div className={`flex items-start gap-2 max-w-[85%] ${compact ? "min-w-[120px]" : "min-w-[160px]"}`}>
         <div className="flex-1">
           <div className={`rounded-2xl rounded-br-md px-3.5 py-2 bg-accent/10 border border-accent/15 ${
@@ -88,30 +89,19 @@ export const UserMessage = memo(function UserMessage({
 
 export function ReasoningProcess({
   item,
-  autoCollapse = false,
 }: {
   item: AssistantItem;
-  autoCollapse?: boolean;
 }) {
+  const compact = useCompact();
   const t = useT();
   const now = useNow();
   const turnStartAt = useTurnStartAt();
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
   const reasoningRunning = !!(item.streaming && !item.text);
 
-  const [userToggled, setUserToggled] = useState(false);
-  const [openState, setOpenState] = useState(true);
-  const open = userToggled
-    ? openState
-    : autoCollapse
-      ? !!item.streaming
-      : true;
+  const { open, toggleOpen } = useAutoCollapse(reasoningRunning);
 
   useGSAPCollapse(reasoningBodyRef, open);
-  const toggleOpen = useCallback(() => {
-    setUserToggled(true);
-    setOpenState((v) => !v);
-  }, []);
 
   const reasoningDisplay = displayReasoningText(item.reasoning ?? "", {
     streaming: item.streaming ?? false,
@@ -128,7 +118,7 @@ export function ReasoningProcess({
     : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
 
   return (
-    <div className="reasoning-process my-2">
+    <div className={`reasoning-process ${compact ? "my-1" : "my-2"}`}>
       <button
         type="button"
         className={`flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg border transition-colors ${
@@ -179,14 +169,15 @@ export const AssistantMessage = memo(function AssistantMessage({
   onCollapse?: () => void;
   hideReasoning?: boolean;
 }) {
+  const compact = useCompact();
   const streaming = item.streaming ?? false;
   const showReasoning = !hideReasoning && item.reasoning;
 
   return (
-    <div className="flex justify-start my-2" data-entrance={item.id}>
+    <div className={`flex justify-start ${compact ? "my-1" : "my-2"}`} data-entrance={item.id}>
       <div className="flex-1 min-w-0">
         {showReasoning && (
-          <ReasoningProcess item={item} autoCollapse />
+        <ReasoningProcess item={item} />
         )}
         {item.text && (
           <div className="min-w-0">

@@ -47,6 +47,11 @@ func RenderTOML(c *Config) string {
 	} else {
 		b.WriteString("# planner_model = \"mimo\"   # optional: enable two-model collaboration\n")
 	}
+	if c.Agent.PlannerMaxSteps > 0 {
+		fmt.Fprintf(&b, "planner_max_steps = %d   # max planner tool-call rounds per turn\n", c.Agent.PlannerMaxSteps)
+	} else {
+		b.WriteString("# planner_max_steps = 12   # cap planner turns (0 = unlimited)\n")
+	}
 	if c.Agent.SubagentModel != "" {
 		fmt.Fprintf(&b, "subagent_model = %q   # default model for runAs=subagent skills\n", c.Agent.SubagentModel)
 	} else {

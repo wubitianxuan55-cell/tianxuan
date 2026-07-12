@@ -265,7 +265,22 @@ func (c *Controller) runGuarded(body func(ctx context.Context) error) {
 	c.mu.Unlock()
 
 	go func() {
+		panicked := false
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("controller: runGuarded panic", "panic", r)
+				panicked = true
+				c.mu.Lock()
+				c.running = false
+				c.cancel = nil
+				c.mu.Unlock()
+				c.sink.Emit(event.Event{Kind: event.TurnDone, Err: fmt.Errorf("panic: %v", r)})
+			}
+		}()
 		err := body(ctx)
+		if panicked {
+			return // TurnDone already emitted in recover path
+		}
 		c.mu.Lock()
 		c.running = false
 		c.cancel = nil

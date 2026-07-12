@@ -99,6 +99,11 @@ func (ws webSearch) Execute(ctx context.Context, args json.RawMessage) (string, 
 	for _, eng := range engines {
 		eng := eng
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					errCh <- engineError{name: eng.Name(), err: fmt.Errorf("panic: %v", r), elapsed: 0}
+				}
+			}()
 			start := time.Now()
 			results, err := eng.Search(ctx, p.Query, p.TopK)
 			elapsed := time.Since(start)

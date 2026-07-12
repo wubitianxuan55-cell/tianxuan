@@ -15,7 +15,8 @@ export type EventKind =
   | "ask_request"
   | "turn_done"
   | "compaction_started"
-  | "compaction_done";
+  | "compaction_done"
+  | "turn_result";
 
 export interface WireCompaction {
   trigger?: string; // "auto" | "manual"
@@ -95,6 +96,7 @@ export interface WireEvent {
   approval?: WireApproval;
   ask?: WireAsk;
   compaction?: WireCompaction;
+  planResult?: PlanRecord;
   err?: string;
 }
 
@@ -139,6 +141,15 @@ export interface ContextInfo {
   window: number;
   plannerUsed: number;
   plannerWindow: number;
+}
+
+export interface PlanRecord {
+  plan: string;
+  filesCreated: string[];
+  filesModified: string[];
+  success: boolean;
+  errors: string[];
+  summary: string;
 }
 
 export interface Meta {

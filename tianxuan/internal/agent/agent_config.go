@@ -68,6 +68,12 @@ type Options struct {
 	// turn preferences, todo rebuild, steer, repeat detection,
 	// bg cycle detection, and grace round (V10.46).
 	PlannerMode bool
+	// StrictEvidence enables host-side verification of complete_step
+	// claims (bash command must appear in turn ledger, todo step must
+	// match latest todo_write). ON by default in dual-model / Plan Mode
+	// where execution follows a structured plan; OFF in single-model
+	// mode where the model manages its own flow.
+	StrictEvidence bool
 }
 
 // StormBreaker tracks repeated failures to detect death spirals (V3.0 Phase 4).

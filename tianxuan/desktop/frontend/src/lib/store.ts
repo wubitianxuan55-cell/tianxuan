@@ -6,7 +6,7 @@ import { useShallow } from "zustand/shallow";
 import { app, onEvent, onReady } from "./bridge";
 import type {
   BalanceInfo, ContextInfo, HistoryMessage, JobView, MemoryView,
-  Meta, QuestionAnswer, SessionMeta, TCCAReport, WireApproval, WireAsk,
+  Meta, PlanRecord, QuestionAnswer, SessionMeta, TCCAReport, WireApproval, WireAsk,
   WireEvent, WireUsage,
 } from "./types";
 
@@ -34,6 +34,7 @@ interface ControllerState {
   perTurnSubUsage?: WireUsage;      // V10.22: subagent usage only
   turnSteps: WireUsage[]; // V5.31: raw per-step usage within current turn
   sessionNonce: number; // V5.25: 每次新建/恢复会话递增，确保统计面板按会话区分
+  plans: PlanRecord[]; // 会话中所有计划+执行结果
   _dispatch: (a: Action) => void;
 }
 
@@ -171,6 +172,7 @@ function applyEvent(s: ControllerState, e: WireEvent): ControllerState {
     case "phase": return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "phase", id: `p${s.seq}`, text: e.text ?? "" }] };
     case "approval_request": return { ...s, approval: e.approval };
     case "ask_request": return { ...s, ask: e.ask };
+    case "turn_result": return e.planResult ? { ...s, plans: [...s.plans, e.planResult] } : s;
     case "turn_done": {
       if (s.pendingUser !== undefined) s = flushPendingUser(s);
       const finalized = s.items.map(it => { if (it.kind === "assistant" && it.streaming) return { ...it, streaming: false }; if (it.kind === "tool" && it.status === "running") return { ...it, status: "stopped" as const }; return it; });
@@ -207,6 +209,7 @@ const initialState: ControllerState = {
   tcca: undefined,
   jobs: [], currentAssistant: undefined, pendingUser: undefined, discardTurn: false, lastAssistantIdx: -1,
   turnStartAt: 0, turnTokens: 0, seq: 0, sessionTotal: 0, sessionNonce: 0, perTurnUsage: null, turnSteps: [],
+  plans: [],
   _dispatch: () => {},
 };
 

@@ -67,6 +67,8 @@ const (
 	// Steer is a mid-turn user guidance message injected while the agent is running.
 	Steer
 	Retrying
+	// TurnResultEvent carries the planner's plan and executor's result at turn end.
+	TurnResultEvent
 )
 
 // Level classifies a Notice so sinks can style or filter it.
@@ -191,6 +193,18 @@ type Event struct {
 	// RetryAttempt / RetryMax track stream-recovery progress (Retrying events).
 	RetryAttempt int // Retrying: current attempt number (1-based)
 	RetryMax     int // Retrying: maximum allowed attempts
+	// PlanResult carries the planner's plan and executor's result at turn end.
+	PlanResult *PlanResult
+}
+
+// PlanResult bundles a planner's plan with the executor's result for the frontend.
+type PlanResult struct {
+	Plan          string   `json:"plan"`
+	FilesCreated  []string `json:"filesCreated"`
+	FilesModified []string `json:"filesModified"`
+	Success       bool     `json:"success"`
+	Errors        []string `json:"errors"`
+	Summary       string   `json:"summary"`
 }
 
 // Sink consumes a turn's events. The agent calls Emit serially from its run

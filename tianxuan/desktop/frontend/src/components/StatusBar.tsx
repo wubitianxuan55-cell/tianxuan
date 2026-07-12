@@ -44,18 +44,19 @@ function JobsChip({ jobs, compact }: { jobs: JobView[]; compact: boolean }) {
 
 // ─── ContextBar ─────────────────────────────────────────────────
 
-export function ContextBar({ label, used, window: win, color }: { label: string; used: number; window: number; color: string }) {
+export function ContextBar({ label, used, window: win, color }: { label: string; used: number; window: number; color: string; barH?: string }) {
   const pct = win > 0 ? Math.round((used / win) * 100) : 0;
-  const barColor = pct > 80 ? "bg-err" : pct > 60 ? "bg-warning" : color;
+  const barColor = pct > 80 ? "bg-err/50" : pct > 60 ? "bg-warning/50" : color;
+  const textColor = pct > 80 ? "text-err" : pct > 60 ? "text-warning" : "text-fg-dim";
   return (
-    <div className="flex items-center gap-1">
-      <span className="text-fg-faint text-[10px] shrink-0 w-6">{label}</span>
-      <div className="flex-1 h-1.5 bg-border/40 rounded-full overflow-hidden min-w-[60px]">
+    <div className="flex items-center gap-2 flex-1 min-w-0">
+      <span className="text-fg-faint text-xs shrink-0 font-medium">{label}</span>
+      <div className="flex-1 h-3 bg-border/30 rounded-full overflow-hidden min-w-[50px] relative">
         <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
-      <span className="text-fg-dim font-mono tabular-nums text-[10px] shrink-0 w-7 text-right">{pct}%</span>
-      <span className="text-fg-faint font-mono tabular-nums text-[10px] shrink-0">{fmtTokens(used)}/{fmtTokens(win)}</span>
+      <span className={`font-mono tabular-nums text-xs shrink-0 w-9 text-right font-semibold ${textColor}`}>{pct}%</span>
+      <span className="text-fg-faint font-mono tabular-nums text-[11px] shrink-0 text-right">{fmtTokens(used)}/{fmtTokens(win)}</span>
     </div>
   );
 }

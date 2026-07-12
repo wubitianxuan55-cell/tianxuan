@@ -65,6 +65,7 @@ func CallContext(ctx context.Context) (parentID string, sink event.Sink, asker A
 // It lets upstream callers (e.g. Hermes) consume execution outcomes without
 // having to extract them post-hoc from the agent's session.
 type TurnResult struct {
+	Plan          string   // the plan that was executed (empty for non-Hermes turns)
 	FilesCreated  []string // paths of files newly created this turn (vs. modified)
 	FilesModified []string // paths of files written/edited/moved/deleted this turn
 	Summary       string   // agent's final conclusion (last assistant message)
@@ -590,6 +591,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		disableVerify: opts.DisableVerify,
 		plannerMode:  opts.PlannerMode,
 	}
+	r.evidence.SetStrictVerification(opts.StrictEvidence)
 	// V5.13: �������籩��·��
 	if opts.ParamStorm != nil {
 		r.paramStorm = NewParamStormBreaker(*opts.ParamStorm)
@@ -602,10 +604,18 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	if opts.ModelProfile != nil {
 		ApplyModelProfile(&r.compaction, opts.ModelProfile)
 	}
-	// V10.22: sub-agent cache alignment — when TemplatePrefix is set, prepend
-	// it as a system message so same-kind sub-agents share prefix bytes.
+	// V10.57: sub-agent cache alignment — when TemplatePrefix is set, append
+	// it to the LAST system message instead of prepending. This keeps L1 bytes
+	// at the front (shared with parent → cache hit) while TemplatePrefix follows
+	// (shared among same-kind sub-agents).
 	if opts.TemplatePrefix != "" {
-		r.session.PrependSystem(opts.TemplatePrefix)
+		// Find the last system message and append to it.
+		for i := len(r.session.Messages) - 1; i >= 0; i-- {
+			if r.session.Messages[i].Role == provider.RoleSystem {
+				r.session.Messages[i].Content += "\n\n" + opts.TemplatePrefix
+				break
+			}
+		}
 	}
 	// V5.30: override tools JSON sent to API for cache alignment with parent.
 	if opts.ActiveSchemas != nil {

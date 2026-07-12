@@ -13,120 +13,6 @@ import (
 	"tianxuan/internal/tool"
 )
 
-// HermesPrompt steers the planner toward research-backed plans.
-// V10.32: planner investigates code with read-only tools before planning.
-// V10.33: planWithTools is now the sole plan path — planStream is the
-// backward-compatible fallback when readonlyTools is nil (e.g. test harness).
-const HermesPrompt = `You are Hermes — the planner in a two-model coding agent.
-You investigate code with read-only tools, then write plans for Hephaestus to execute.
-
-Your tools: read_file, grep, glob, lsp_*, codegraph, gitnexus — read-only.
-You do NOT have bash, write, edit, or any side-effect tool. Never dwell on
-this; it is by design. Hephaestus has those tools.
-
-## Output
-
-- Direct answer — no marker, no plan. User just needs information.
-- Ask — use the ask tool when you need a decision you cannot make.
-- Plan — open with <!--plan-->, then write steps. Code changes needed.
-- No-op — investigation shows nothing to do: say so, stop, no marker.
-
-3–8 steps. Format each step as:
-
-  步骤 N：简短标题
-  - **File(s)**：verified paths, or [NEW] for new files
-  - **Change**：one sentence — what changes, on which symbol
-  - **Depends on**：step number(s), or 无
-
-Plan WHAT, not HOW. No code blocks, no function bodies.
-
-## Hephaestus executes literally
-
-Hephaestus has zero judgment. Wrong path → wrong file changed. Missing step →
-step skipped. Vague instruction → random guess. Your plan is the only spec.
-
-- Surgical: only touches the files you list. Directories as targets → nothing happens.
-- Minimal: no interfaces, factories, base classes unless multiple callers exist.
-- Errors surface (return err / panic), never silently swallowed.
-- No TODO / placeholder. Every step must be runnable as written.
-- Bug fix: reproduce step before any fix step.
-
-After execution you receive [上一轮执行结果] with created/modified files,
-per-step ✅/❌, and a summary. Trust the file list; re-read only when the
-summary flags unresolved issues.
-
-## UI design
-
-When the task involves any visual output — pages, components, layout,
-colors, typography — call read_skill(name="ui-ux-pro-max") and follow
-its guidance. Never invent design parameters on your own.`
-
-// HephaestusSystemPrompt is the executor's system prompt (L2 layer).
-// Injected into the executor session at boot time so DeepSeek prefix cache
-// treats the full L1+L2 as a stable prefix, instead of repeating the execution
-// contract in every handoff user message.
-const HephaestusSystemPrompt = `You are Hephaestus — the executor. Carry out Hermes' plan.
-
-## Your partner Hermes
-
-Hermes investigated the codebase. Its file paths and design decisions are
-reliable. Do NOT redesign or question the approach unless reality contradicts
-the plan (wrong path, missing function, incompatible API). Report any
-deviation in complete_step evidence.
-
-## 1. Think Before Coding
-
-- Read the FULL plan before touching any file.
-- Create todo items with todo_write: N steps → N items, first as in_progress.
-- Scan dependencies. Never start before understanding what each step needs.
-
-## 2. Simplicity First
-
-- No features, abstractions, or error handling beyond the plan.
-- No interfaces, base classes, or factories for single-use code.
-- If 50 lines would do, don't write 200.
-- Ask: would a senior engineer call this overcomplicated?
-
-## 3. Surgical Changes
-
-- Touch ONLY the files Hermes listed. Nothing else.
-- Don't "improve" adjacent code, comments, or formatting.
-- Match existing style. Remove only imports/variables YOUR changes orphaned.
-- Test: every changed line traces to a plan step.
-
-## 4. Goal-Driven Execution
-
-TDD cycle per step: write failing test → confirm it fails → minimal code →
-confirm it passes → complete_step with verifiable evidence (build output,
-test results, diff). Never mark a step complete without evidence.
-
-complete_step result field: one-line key output per step, so later steps
-can reference it without re-reading files. Example:
-"新增了 quoteFilePaths，位于 agent_helpers.go:95"
-
-## Parallel first
-
-Scan dependency graph before starting. Any 2+ steps with Depends on met
-and disjoint file lists → dispatch via parallel_tasks, collect results,
-complete_step with aggregates. Serial only when dependencies or shared
-files force it.
-
-## Failure handling
-
-- Reproduce → isolate root cause → fix. Don't guess.
-- 1 retry per failure. 3 failures on same step → STOP, report to Hermes.
-- Never skip a failing step to hide it.
-
-## End-of-turn report
-
-After all steps: [步骤完成情况] — one line per step:
-Step N — ✅/❌ — key output — file paths
-
-- Use the ask tool when you need a real user decision (scope, approach, risk).
-  Don't ask procedural questions — you're already executing.
-- 📌 User note in handoff overrides Hermes' plan when they conflict.`
-
-const hephaestusHandoffMarker = "tianxuan hephaestus handoff"
 
 // Hermes runs two models in separate sessions to keep each one's prompt
 // prefix cache-stable: a low-frequency planner proposes an approach, then the
@@ -185,6 +71,8 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 	}
 	// V10.36: create persistent planner Agent with compaction so the planner
 	// accumulates history across turns without unbounded growth.
+	// V10.58: StrictEvidence is explicitly false — the planner uses read-only
+	// tools and never calls complete_step, so strict verification is meaningless.
 	if readonlyTools != nil {
 		plannerSink := event.FuncSink(func(e event.Event) {
 			// Suppress TurnStarted from the planner agent — Hermes
@@ -208,6 +96,7 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 			Gate:           &autoGate{},
 			DisableVerify:  true,
 			PlannerMode:    true,
+			StrictEvidence: false,
 			ContextWindow:  contextWindow,
 			Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: contextWindow},
 		}, plannerSink)
@@ -271,84 +160,48 @@ func (h *Hermes) SetAsker(a Asker) {
 	}
 }
 
+// ── Run (top-level orchestration) ───────────────────────────────────────
+
 // Run plans with the planner model, then hands the plan to the executor.
 // Returns a merged TurnResult combining the planner's and executor's outcomes.
 func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	h.sink.Emit(event.Event{Kind: event.TurnStarted})
 
-	// V10.31: fast path — skip planner for simple/quick tasks
-	if task, ok := shouldSkipPlanner(input); ok {
-		h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · 快速执行"})
-		return h.hephaestus.Run(ctx, task)
+	// V10.31: fast path — skip planner for simple/quick tasks ("!" prefix).
+	if result, err := h.runFastPath(ctx, input); result != nil || err != nil {
+		return result, err
 	}
 
+	// Normal path: plan → confirm → execute.
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hermesProvider.Name() + " · hermes"})
 	prePlanLen := len(h.hermesSess.Messages)
+	h.injectProjectMap()
 
-	// V10.54: inject ProjectMap into planner session for structural context.
-	if h.wsRoot != "" {
-		pm := codegraph.Analyze(h.wsRoot)
-		pmHash := pm.Hash()
-		if pmHash != h.lastProjectHash {
-			h.hermesSess.Add(provider.Message{
-				Role:    provider.RoleUser,
-				Content: "## 项目代码图谱\n\n" + pm.Format() + "\n\n以上是当前项目的代码结构概览，规划时可直接引用其中的路径和类型名。",
-			})
-			h.lastProjectHash = pmHash
-		}
+	plan, err := h.planWithConfirmation(ctx, input, prePlanLen)
+	if err != nil {
+		return nil, err
+	}
+	if plan == nil {
+		// Hermes answered directly or user chose chat-only — the planner's
+		// text has already been streamed; no executor dispatch needed.
+		// Summary is empty because callers discard TurnResult for this path.
+		return &TurnResult{Plan: input, Success: true}, nil
 	}
 
-	origInput := input // preserve original user input for handoff; replan loop may modify input
-	var userNote, plan string
-	var planErr error
-	// V10.??: replan loop — user clicks "按用户意见修改计划" to revise the plan
-	// with feedback, then the new plan goes through confirmation again.
-	for {
-		plan, planErr = h.plan(ctx, input)
-		if planErr != nil {
-			// Clean up any partial messages the planner may have left in the session.
-			h.hermesSess.Truncate(prePlanLen)
-			return nil, fmt.Errorf("hermes: %w", planErr)
-		}
-		if isAnswerNotAction(plan) {
-			// Hermes answered directly — no Hephaestus needed.
-			// Text has already been streamed by planWithTools/planStream; emitting
-			// the full plan again here would duplicate the output.
-		// direct answer already in hermesSess — no persistence needed
-			return &TurnResult{Summary: plan, Success: true}, nil
-		}
+	return h.executePlan(ctx, input, *plan)
+}
 
-		// Strip preamble, keep <!--plan--> at the beginning
-		if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
-			plan = "<!--plan-->\n" + strings.TrimSpace(plan[idx+len("<!--plan-->"):])
-		}
+// ── Run sub-steps ───────────────────────────────────────────────────────
 
-		var chatOnly, revise bool
-		userNote, chatOnly, revise, planErr = h.confirmPlan(ctx, input, plan)
-		if planErr != nil {
-			// User cancelled — roll back planner session to pre-plan state.
-			h.hermesSess.Truncate(prePlanLen)
-			return nil, planErr
-		}
-		if chatOnly {
-			// User chose "仅聊天" — treat as direct answer, don't dispatch executor.
-		// direct answer already in hermesSess — no persistence needed
-			return &TurnResult{Summary: plan, Success: true}, nil
-		}
-		if revise {
-			// User chose "按用户意见修改计划" — append feedback and re-plan.
-			if userNote != "" {
-				input = input + "\n\n—— User feedback on previous plan ——\n" + userNote
-			}
-			prePlanLen = len(h.hermesSess.Messages) // new baseline for next round
-			continue
-		}
-		break // execute with Hephaestus
+// runFastPath handles the "!" prefix fast path that skips the planner entirely.
+// Returns (nil, nil) when input is not a fast-path candidate.
+func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, error) {
+	task, ok := shouldSkipPlanner(input)
+	if !ok {
+		return nil, nil
 	}
-	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
+	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · 快速执行"})
 	// Suppress the executor's TurnStarted — Hermes already started the turn.
-	// Without this, the redundant TurnStarted resets perTurnPlannerUsage in the
-	// frontend, zeroing out the planner's cost stats.
 	execSink := h.hephaestus.Sink()
 	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
 		if e.Kind == event.TurnStarted {
@@ -357,34 +210,156 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		execSink.Emit(e)
 	}))
 	defer h.hephaestus.SetSink(execSink)
-	// V10.49: pre-inject the original Chinese input before the handoff prompt
-	// so it appears at the right position in the session. History() in
-	// app_session.go skips the handoff message by prefix detection.
+	return h.hephaestus.Run(ctx, task)
+}
+
+// injectProjectMap adds a structural overview to the planner session when the
+// workspace has changed since the last injection.
+func (h *Hermes) injectProjectMap() {
+	if h.wsRoot == "" {
+		return
+	}
+	pm := codegraph.Analyze(h.wsRoot)
+	pmHash := pm.Hash()
+	if pmHash != h.lastProjectHash {
+		h.hermesSess.Add(provider.Message{
+			Role:    provider.RoleUser,
+			Content: "## 项目代码图谱\n\n" + pm.Format() + "\n\n以上是当前项目的代码结构概览，规划时可直接引用其中的路径和类型名。",
+		})
+		h.lastProjectHash = pmHash
+	}
+}
+
+// planWithNote bundles a confirmed plan with any user note from confirmation.
+type planWithNote struct {
+	text     string
+	userNote string
+}
+
+// planWithConfirmation runs the planner in a replan loop: plan → confirm →
+// repeat on revise. Returns the confirmed plan, or nil when Hermes answered
+// directly (no code changes needed) or the user chose chat-only.
+func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlanLen int) (*planWithNote, error) {
+	for {
+		plan, err := h.plan(ctx, input)
+		if err != nil {
+			h.hermesSess.Truncate(prePlanLen)
+			return nil, fmt.Errorf("hermes: %w", err)
+		}
+		if isAnswerNotAction(plan) {
+			return nil, nil // Hermes answered directly
+		}
+
+		// Strip preamble, keep <!--plan--> at the beginning.
+		if idx := strings.Index(plan, "<!--plan-->"); idx >= 0 {
+			plan = "<!--plan-->\n" + strings.TrimSpace(plan[idx+len("<!--plan-->"):])
+		}
+
+		userNote, chatOnly, revise, err := h.confirmPlan(ctx, input, plan)
+		if err != nil {
+			h.hermesSess.Truncate(prePlanLen)
+			return nil, err
+		}
+		if chatOnly {
+			return nil, nil
+		}
+		if revise {
+			if userNote != "" {
+				// V10.58: append to current input (may already contain prior
+				// feedback) instead of resetting to origInput — or the previous
+				// round's feedback would be silently lost.
+				input = input + "\n\n—— User feedback on previous plan ——\n" + userNote
+			}
+			// V10.58: keep the original prePlanLen as the rollback baseline;
+			// advancing it would leave abandoned plan messages in the session
+			// if the re-plan also fails.
+			continue
+		}
+		return &planWithNote{text: plan, userNote: userNote}, nil
+	}
+}
+
+// executePlan dispatches the executor with the confirmed plan, feeds results
+// back to the planner session, and emits TurnResultEvent for the frontend.
+func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNote) (*TurnResult, error) {
+	plan := p.text
+	userNote := p.userNote
+
+	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
+	// Suppress the executor's TurnStarted — Hermes already started the turn.
+	execSink := h.hephaestus.Sink()
+	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
+		if e.Kind == event.TurnStarted {
+			return
+		}
+		execSink.Emit(e)
+	}))
+	defer h.hephaestus.SetSink(execSink)
+
+	// V10.49: pre-inject the original Chinese input before the handoff prompt.
 	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: origInput})
 	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(origInput, plan, userNote))
 
-	// V10.37: executor returns structured TurnResult — no more post-hoc extraction.
-	// Feed the result back into the planner's session so it has context for the next
-	// turn. Include results even on error (e.g. model crashed mid-execution) —
-	// Hermes needs to know that execution failed and what was attempted.
+	// Attach plan to TurnResult so the returned value is self-contained.
 	if execResult != nil {
-		hasContent := execResult.Summary != "" || len(execResult.Errors) > 0 ||
-			len(execResult.FilesCreated) > 0 || len(execResult.FilesModified) > 0
-		if hasContent {
-			h.hermesSess.Add(provider.Message{
-				Role:    provider.RoleUser,
-				Content: formatExecutionFeedback(execResult),
-			})
-		}
+		execResult.Plan = plan
+	}
 
-		// V10.54: detect structural changes (go.mod, package.json, new files under internal/)
-		// and invalidate the project map hash so the next planning turn re-scans.
-		if h.wsRoot != "" && hasStructuralChange(execResult.FilesCreated, execResult.FilesModified) {
-			h.lastProjectHash = ""
+	// Feed results back to the planner and emit TurnResultEvent.
+	if execResult != nil {
+		h.feedResultToPlanner(execResult)
+		h.sink.Emit(event.Event{
+			Kind: event.TurnResultEvent,
+			PlanResult: &event.PlanResult{
+				Plan:          execResult.Plan,
+				FilesCreated:  execResult.FilesCreated,
+				FilesModified: execResult.FilesModified,
+				Success:       execResult.Success,
+				Errors:        execResult.Errors,
+				Summary:       execResult.Summary,
+			},
+		})
+	} else if execErr != nil {
+		synth := &TurnResult{
+			Plan:    plan,
+			Success: false,
+			Errors:  []string{execErr.Error()},
+			Summary: "execution terminated before producing output",
 		}
+		h.hermesSess.Add(provider.Message{
+			Role:    provider.RoleUser,
+			Content: formatExecutionFeedback(synth),
+		})
+		h.sink.Emit(event.Event{
+			Kind: event.TurnResultEvent,
+			PlanResult: &event.PlanResult{
+				Plan:    synth.Plan,
+				Success: false,
+				Errors:  synth.Errors,
+				Summary: synth.Summary,
+			},
+		})
 	}
 	return execResult, execErr
 }
+
+// feedResultToPlanner injects execution feedback into the planner's session
+// and invalidates the project map cache on structural changes.
+func (h *Hermes) feedResultToPlanner(r *TurnResult) {
+	hasContent := r.Summary != "" || len(r.Errors) > 0 ||
+		len(r.FilesCreated) > 0 || len(r.FilesModified) > 0
+	if hasContent {
+		h.hermesSess.Add(provider.Message{
+			Role:    provider.RoleUser,
+			Content: formatExecutionFeedback(r),
+		})
+	}
+	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {
+		h.lastProjectHash = ""
+	}
+}
+
+// ── Formatting helpers ──────────────────────────────────────────────────
 
 // formatExecutionFeedback converts a TurnResult into a structured summary
 // for injection into the planner's session so the planner knows what happened.
@@ -404,7 +379,7 @@ func formatExecutionFeedback(r *TurnResult) string {
 
 	summary := r.Summary
 	if summary == "" {
-		summary = "(no summary)"
+		summary = "(execution produced no summary — check Errors for details)"
 	}
 
 	conclusion := ""
@@ -434,74 +409,13 @@ func hasStructuralChange(created, modified []string) bool {
 	return check(created) || check(modified)
 }
 
-// confirmPlan asks the user to approve the planner's output before handing off to
-// the executor. Returns the user's free-typed note ("" when none), a chatOnly
-// flag, and a revise flag (= user clicked "按用户意见修改计划"), and an error on
-// cancellation. In headless mode (asker == nil) it auto-confirms.
-//
-// The confirmation dialog shows:
-//   ○ 提交执行          — 同意计划，直接交由 Hephaestus 执行
-//   ○ 仅聊天            — 计划误触发，仅作为普通对话回复，不派送执行者
-//   ○ 按用户意见修改计划   — 将修改意见送回 Hermes 重新规划
-//   ○ 取消              — 放弃本次任务
-//   📝 文本框 — 输入修改意见
-//
-// For "按用户意见修改计划", the note text is extracted from Selected[1] (when
-// available) and returned as the first string so the caller can feed it back
-// to Hermes for re-planning.
-func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note string, chatOnly bool, revise bool, err error) {
-	if h.asker == nil {
-		return "", false, false, nil // headless: auto-confirm
-	}
-	answers, err := h.asker.Ask(ctx, []event.AskQuestion{{
-		ID:     "confirm",
-		Header: "计划确认",
-		Prompt: fmt.Sprintf("任务：%s", truncateStr(task, 200)),
-		Plan:   plan, // full plan rendered by PlanCard with Markdown
-		Options: []event.AskOption{
-			{Label: "提交执行", Description: "按计划交由 Hephaestus 立即执行"},
-			{Label: "仅聊天", Description: "计划误触发，仅作为普通对话回复，不派送执行者"},
-			{Label: "按用户意见修改计划", Description: "将修改意见送回 Hermes 重新规划"},
-			{Label: "取消", Description: "放弃本次任务，不做任何更改"},
-		},
-	}})
-	if err != nil {
-		return "", false, false, fmt.Errorf("plan confirmation cancelled: %w", err)
-	}
-	if len(answers) == 0 || len(answers[0].Selected) == 0 {
-		return "", false, false, fmt.Errorf("计划被取消（无回复）")
-	}
-	selected := answers[0].Selected[0]
-	switch selected {
-	case "提交执行":
-		return "", false, false, nil // agree without notes
-	case "仅聊天":
-		return "", true, false, nil // chat-only: don't dispatch to executor
-	case "按用户意见修改计划":
-		feedback := ""
-		if len(answers[0].Selected) > 1 {
-			feedback = answers[0].Selected[1]
-		}
-		return feedback, false, true, nil // revise: re-plan with feedback
-	case "取消":
-		return "", false, false, fmt.Errorf("计划被用户取消")
-	default:
-		// User typed free-text in the input box without selecting a preset option.
-		// Treat as "提交执行" with the typed text as execution notes.
-		return selected, false, false, nil
-	}
-}
-
-
 // ── Plan implementation ──────────────────────────────────────────────────
 
 // plan runs Hermes as an AgentRunner with read-only tools so it can investigate
 // the codebase before proposing a plan. Falls back to planStream (zero-tool stream)
 // when readonlyTools is nil — e.g. in tests or when no read-only registry is wired.
 func (h *Hermes) plan(ctx context.Context, input string) (string, error) {
-	// V10.32+: AgentRunner mode — planner can call read-only tools.
-	// planMaxSteps <= 0 means unlimited (rely on model to stop itself).
-	if h.readonlyTools != nil && h.planMaxSteps >= 0 {
+	if h.readonlyTools != nil {
 		return h.planWithTools(ctx, input)
 	}
 	return h.planStream(ctx, input)
@@ -579,9 +493,6 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if plan == "" {
 		return "", fmt.Errorf("hermes: planner produced no output")
 	}
-	// NOTE: <!--plan--> marker is not stripped — it's an HTML comment, invisible
-	// in rendered Markdown (PlanCard) and harmless in executor prompts.
-
 	return plan, nil
 }
 
@@ -591,13 +502,11 @@ type autoGate struct{}
 func (g *autoGate) Check(_ context.Context, _ string, _ json.RawMessage, _ bool) (bool, string, error) {
 	return true, "", nil
 }
+
 // ── Plan helpers ─────────────────────────────────────────────────────
 
 // shouldSkipPlanner detects tasks that are simple enough to execute directly,
-// V10.34: only the explicit "!" marker skips the planner — simple and read-only
-// tasks now go through Hermes for direct answers instead of bypassing it.
-// Heuristic keyword matching removed: Hermes is better at classifying tasks
-// than a fixed keyword list, and the direct-answer path costs one planner call.
+// V10.34: only the explicit "!" marker skips the planner.
 func shouldSkipPlanner(input string) (string, bool) {
 	if stripped, ok := strings.CutPrefix(input, "!"); ok {
 		return strings.TrimSpace(stripped), true
@@ -607,11 +516,9 @@ func shouldSkipPlanner(input string) (string, bool) {
 
 // isAnswerNotAction checks whether the planner's output is a direct answer
 // that needs no executor. The planner self-marks executable plans with
-// <!--plan--> — if absent, Hermes answered directly. No length short-circuit:
-// even short plans with the <!--plan--> marker trigger confirmation.
+// <!--plan--> — if absent, Hermes answered directly.
 func isAnswerNotAction(plan string) bool {
 	trimmed := strings.TrimSpace(plan)
-	// <!--plan--> marks executable plans; absent means direct answer.
 	return !strings.Contains(trimmed, "<!--plan-->")
 }
 

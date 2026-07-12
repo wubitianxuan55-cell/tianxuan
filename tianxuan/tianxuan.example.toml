@@ -17,6 +17,7 @@ temperature = 0.0
 auto_plan   = "ask"   # off|ask|on; ask/on auto-enter plan mode for complex tasks
 # auto_plan_classifier = "deepseek-flash"   # optional; only used for borderline tasks
 # planner_model = "mimo-pro"   # optional: enable two-model collaboration
+# planner_max_steps = 12       # optional: cap planner tool-call rounds (0 = unlimited)
 # subagent_model = "deepseek-pro"   # optional default for runAs=subagent skills
 # subagent_models = { review = "deepseek-pro", security_review = "deepseek-pro" }   # per-skill overrides
 # output_style = "explanatory"   # persona/tone folded into the prompt: explanatory | learning | concise,

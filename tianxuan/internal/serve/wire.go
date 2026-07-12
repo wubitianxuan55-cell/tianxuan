@@ -17,6 +17,7 @@ type wireEvent struct {
 	Approval   *wireApproval   `json:"approval,omitempty"`
 	Ask        *wireAsk        `json:"ask,omitempty"`
 	Compaction *wireCompaction `json:"compaction,omitempty"`
+	PlanResult *wirePlanResult `json:"planResult,omitempty"`
 	Err        string          `json:"err,omitempty"`
 }
 
@@ -100,6 +101,16 @@ var kindNames = map[event.Kind]string{
 	event.TurnDone:          "turn_done",
 	event.CompactionStarted: "compaction_started",
 	event.CompactionDone:    "compaction_done",
+	event.TurnResultEvent:   "turn_result",
+}
+
+type wirePlanResult struct {
+	Plan          string   `json:"plan"`
+	FilesCreated  []string `json:"filesCreated"`
+	FilesModified []string `json:"filesModified"`
+	Success       bool     `json:"success"`
+	Errors        []string `json:"errors"`
+	Summary       string   `json:"summary"`
 }
 
 // toWireAsk converts an event.Ask into its JSON wire form.
@@ -159,6 +170,14 @@ func toWire(e event.Event) wireEvent {
 	case event.TurnDone:
 		if e.Err != nil {
 			w.Err = e.Err.Error()
+		}
+	case event.TurnResultEvent:
+		if e.PlanResult != nil {
+			w.PlanResult = &wirePlanResult{
+				Plan: e.PlanResult.Plan, FilesCreated: e.PlanResult.FilesCreated,
+				FilesModified: e.PlanResult.FilesModified, Success: e.PlanResult.Success,
+				Errors: e.PlanResult.Errors, Summary: e.PlanResult.Summary,
+			}
 		}
 	}
 	return w

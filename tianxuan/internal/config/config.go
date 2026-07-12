@@ -276,6 +276,9 @@ type AgentConfig struct {
 	// SubagentEffort overrides Effort for task-tool sub-agents.
 	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
 	SubagentEffort string `toml:"subagent_effort"`
+	// PlannerMaxSteps caps the planner model's tool-call rounds per planning
+	// turn. 0 (default) means unlimited — the planner decides when to stop.
+	PlannerMaxSteps int `toml:"planner_max_steps"`
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
 	OutputStyle string `toml:"output_style"`

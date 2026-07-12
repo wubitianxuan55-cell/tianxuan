@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, Brain, ChevronRight } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import type { Item } from "../lib/store";
-import { useItems, useTurnStartAt } from "../lib/store";
+import { useItems } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
@@ -9,16 +9,12 @@ import { ToolGroup, scanGroups } from "./ToolGroup";
 import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
 import { useEntranceAnimation } from "../lib/useEntranceAnimation";
-import { useGSAPCollapse } from "../lib/useGSAPCollapse";
-import { useT } from "../lib/i18n";
-import { useNow } from "../lib/useNow";
 
 // ── Scroll helpers ──────────────────────────────────────────────────────
 const BOTTOM_THRESHOLD_PX = 80;
 const NOOP_SCROLL = () => {};
 function isNearBottom(el: HTMLElement) { return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX; }
 type ToolItem = Extract<Item, { kind: "tool" }>;
-type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
 function scrollVersion(items: Item[]): string {
   const n = items.length; if (n === 0) return "0";
@@ -48,100 +44,6 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
   return out;
 }
 
-// ── TurnCollapse — fold process items, show final answer below ─────────
-// Ported from DeepSeek-Reasonix V1.17.10 partitionTurnItems pattern.
-// The last assistant with text is the "final answer" — rendered below.
-// All tools, intermediate reasoning, and phases before it go into the fold.
-
-interface TurnParts { processItems: Item[]; finalIndex: number }
-
-function partitionTurnItems(items: Item[]): TurnParts {
-  let finalIdx = -1;
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i].kind === "assistant" && (items[i] as AssistantItem).text.trim()) { finalIdx = i; break; }
-  }
-  if (finalIdx < 0) return { processItems: [], finalIndex: -1 };
-  let userIdx = -1;
-  for (let i = finalIdx - 1; i >= 0; i--) {
-    if (items[i].kind === "user") { userIdx = i; break; }
-  }
-  if (userIdx < 0) return { processItems: [], finalIndex: finalIdx };
-  const processItems = items.slice(userIdx + 1, finalIdx).filter(
-    (it) => it.kind !== "user"
-      && !(it.kind === "tool" && (it as ToolItem).parentId)
-      && !(it.kind === "tool" && (it as ToolItem).name === "todo_write")
-  );
-  return { processItems, finalIndex: finalIdx };
-}
-
-function TurnCollapse({
-  items,
-  turnStartAt,
-}: { items: Item[]; turnStartAt?: number }) {
-  const t = useT();
-  const now = useNow();
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  const toolCount = items.filter((it) => it.kind === "tool").length;
-  const hasRunning = items.some((it) =>
-    (it.kind === "tool" && (it as ToolItem).status === "running")
-    || (it.kind === "assistant" && (it as AssistantItem).streaming)
-  );
-
-  const [userToggled, setUserToggled] = useState(false);
-  const [openState, setOpenState] = useState(false);
-  const open = userToggled ? openState : hasRunning;
-
-  useGSAPCollapse(bodyRef, open);
-  const toggleOpen = useCallback(() => { setUserToggled(true); setOpenState((v) => !v); }, []);
-
-  const elapsed = turnStartAt ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
-  const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
-
-  const label = hasRunning
-    ? t("msg.thinkingRunning")
-    : toolCount > 0
-      ? `${toolCount} ${"工具"} · ${elapsedStr}`
-      : t("msg.thinkingDone");
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="turn-collapse my-2" data-entrance={items[0]?.id}>
-      <button
-        type="button"
-        className={`flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border transition-colors ${
-          open ? "border-accent/20 bg-accent/5" : "border-transparent hover:bg-bg-soft"
-        } text-fg-faint text-[12px] cursor-pointer`}
-        onClick={toggleOpen} aria-expanded={open}
-      >
-        {hasRunning
-          ? <span className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
-          : <Brain size={13} className="shrink-0" />}
-        <span className="font-medium">{label}</span>
-        <ChevronRight className={`ml-auto transition-transform duration-200 ${open ? "rotate-90" : ""}`} size={11} />
-      </button>
-      <div ref={bodyRef} style={{ overflow: "hidden" }}>
-        <div className="pt-1.5 space-y-1.5">
-          {items.map((it) => {
-            if (it.kind === "assistant" && (it as AssistantItem).reasoning) {
-              return (
-                <div key={it.id} className="text-fg-dim/70 text-[11px] leading-relaxed whitespace-pre-wrap px-1 border-l-2 border-accent/15 pl-2 ml-1">
-                  {(it as AssistantItem).reasoning}
-                </div>
-              );
-            }
-            if (it.kind === "tool") {
-              return null;
-            }
-            return null;
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Transcript ──────────────────────────────────────────────────────────
 
 export function Transcript({
@@ -159,7 +61,6 @@ export function Transcript({
   meta?: import("../lib/types").Meta;
 }) {
   const items = useItems();
-  const turnStartAt = useTurnStartAt();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const rAF = useRef<number | null>(null);
@@ -199,13 +100,31 @@ export function Transcript({
 
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
-    const ro = new ResizeObserver(() => { if (!stick.current) return; scrollToBottom(); });
-    ro.observe(el); return () => ro.disconnect();
+    let prevScrollHeight = 0;
+    let prevClientHeight = 0;
+    const ro = new ResizeObserver(() => {
+      const sh = el.scrollHeight;
+      const ch = el.clientHeight;
+      if (prevScrollHeight > 0 && sh === prevScrollHeight && ch !== prevClientHeight) {
+        // Layout-only resize (Composer/footer height change, not new content).
+        // Maintain the distance from the bottom so typing doesn't cause jumps.
+        const prevDist = prevScrollHeight - el.scrollTop - prevClientHeight;
+        el.scrollTop = sh - ch - Math.min(prevDist, sh - ch);
+      } else {
+        // Content changed — use normal stick logic.
+        prevScrollHeight = sh;
+        if (!stick.current) { prevClientHeight = ch; return; }
+        scrollToBottom();
+      }
+      prevScrollHeight = sh;
+      prevClientHeight = ch;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [scrollToBottom]);
 
   useEffect(() => { if (items.length === 0) turnEls.current.clear(); }, [items.length]);
   const merged = useMemo(() => mergeConsecutiveReasoning(items), [items]);
-  const parts = useMemo(() => partitionTurnItems(merged), [merged]);
   const grouped = useMemo(() => scanGroups(merged), [merged]);
 
   const turnEls = useRef(new Map<number, HTMLElement>());
@@ -246,10 +165,6 @@ export function Transcript({
 
   const scrollDown = useCallback(() => { stick.current = true; setShowScrollDown(false); scrollToBottom(); }, [scrollToBottom]);
 
-  // Track the final-answer assistant id so the render loop can skip it inside
-  // the TurnCollapse body (it's rendered separately below).
-  const finalAnswerId = parts.finalIndex >= 0 ? merged[parts.finalIndex].id : null;
-
   return (
     <div className="relative flex-1 min-h-0">
     <div className="transcript h-full" ref={scrollRef} onScroll={onScroll}>
@@ -259,26 +174,11 @@ export function Transcript({
         )}
         <StreamingIndicator running={running} items={items} />
 
-        {/* TurnCollapse: process fold above the final answer */}
-        {parts.processItems.length > 0 && !running && (
-          <TurnCollapse items={parts.processItems} turnStartAt={turnStartAt} />
-        )}
-
         {grouped.map((g) => {
           if (g.kind === "group") {
-            // Don't render tool groups that are inside the process fold when turned is done
-            if (parts.processItems.length > 0 && !running) {
-              const allIds = new Set(parts.processItems.map((it) => it.id));
-              if (g.tools.every((t) => allIds.has(t.id))) return null;
-            }
             return <ToolGroup key={g.id} tools={g.tools} onCollapse={scheduleMeasure} />;
           }
           const it = g.item;
-
-          // Hide process items from inline rendering when TurnCollapse is active
-          if (parts.processItems.length > 0 && !running && it.id !== finalAnswerId && finalAnswerId) {
-            if (parts.processItems.some((p) => p.id === it.id)) return null;
-          }
 
           switch (it.kind) {
             case "user": {

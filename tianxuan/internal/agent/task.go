@@ -293,9 +293,13 @@ func (t *TaskTool) WithTranscripts(store *SubagentStore) *TaskTool {
 // non-nil, otherwise creates an ephemeral session). When run is non-nil the session
 // from the store is used directly (supporting continue_from).
 func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *tool.Registry, sink event.Sink, run *SubagentRun, maxSteps int, outputSchema json.RawMessage) (string, error) {
-	// V6.0: sub-agent does NOT inherit parent L1+L2 — uses DefaultTaskSystemPrompt independently.
-	// This saves ~50K tokens per sub-agent call (97% reduction) and keeps cache stats separate.
+	// V10.57: 子代理使用 Fork L1 替代 DefaultTaskSystemPrompt，与父代理共享 L1 字节前缀。
+	// DeepSeek 前缀缓存可命中 L1 部分（~50KB），实际计费 token 仅增量部分。
+	// compiler 不可用时回退到 DefaultTaskSystemPrompt。
 	sysPrompt := t.sysPrompt
+	if t.compiler != nil {
+		sysPrompt = t.compiler.Fork().SystemPrompt()
+	}
 
 	// V5.30 / V10.36: ActiveSchemas sends parent's full tool set to the API so
 	// tools JSON matches — DeepSeek prefix cache hits across parent→sub-agent.
@@ -311,29 +315,25 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 		}
 	}
 
+	opts := Options{
+		MaxSteps:       maxSteps,
+		Temperature:    t.temperature,
+		Pricing:        subPrice,
+		Gate:           t.gate,
+		ContextWindow:  subCtxWin,
+		Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
+		ActiveSchemas:  t.parentReg.Schemas(),   // V10.36: align tools JSON with parent for cache
+		TemplatePrefix: t.templatePrefix,         // V10.57: 同类 task 子代理共享模板前缀
+		RuntimePrompt:  t.runtimePrompt,          // V10.57: 注入 L2 项目/工作区上下文
+	}
+
 	var subUsage provider.Usage
 	var result string
 	var err error
 	if run != nil && run.Session != nil {
-		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, prompt, Options{
-			MaxSteps:       maxSteps,
-			Temperature:    t.temperature,
-			Pricing:        subPrice,
-			Gate:           t.gate,
-			ContextWindow:  subCtxWin,
-			Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
-			ActiveSchemas:  t.parentReg.Schemas(), // V10.36: align tools JSON with parent for cache
-		}, sink, &subUsage)
+		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, prompt, opts, sink, &subUsage)
 	} else {
-		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, prompt, Options{
-			MaxSteps:       maxSteps,
-			Temperature:    t.temperature,
-			Pricing:        subPrice,
-			Gate:           t.gate,
-			ContextWindow:  subCtxWin,
-			Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
-			ActiveSchemas:  t.parentReg.Schemas(), // V10.36: align tools JSON with parent for cache
-		}, sink, &subUsage)
+		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, prompt, opts, sink, &subUsage)
 	}
 	if err == nil && len(outputSchema) > 0 {
 		// output_schema set: verify the result is parseable JSON.
@@ -472,6 +472,11 @@ func runSubAgentInternal(ctx context.Context, prov provider.Provider, reg *tool.
 	// sub-agents don't need orchestrate verify — they execute a single task
 	opts.DisableVerify = true
 	sub := New(prov, reg, sess, opts, sink)
+	// V10.57: 合并 L2 运行时上下文到 system 消息末尾，与父代理共享前缀缓存。
+	// 必须在 sub.Run() 之前调用，确保首轮 API 请求的 system 消息包含完整上下文。
+	if opts.RuntimePrompt != "" {
+		sub.MergeRuntimePrompt(opts.RuntimePrompt)
+	}
 	_, runErr := sub.Run(ctx, prompt)
 	// Populate subUsage from the sub-agent's last usage so SubUsage() reflects
 	// real token counts for cost tracking.

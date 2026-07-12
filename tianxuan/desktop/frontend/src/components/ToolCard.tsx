@@ -52,7 +52,9 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
   const hasOutput = !!item.output;
   const expandable = hasArgs || hasOutput;
 
-  const [open, setOpen] = useState(false);
+  // Expanded mode: running/error tools start open. Compact mode: all collapsed.
+  const defaultOpen = !compact && (item.status === "running" || item.status === "error");
+  const [open, setOpen] = useState(defaultOpen);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   useGSAPCollapse(bodyRef, open && expandable);

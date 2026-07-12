@@ -159,3 +159,178 @@ func TestHandoffTask_ShortMessage(t *testing.T) {
 		t.Fatal("short message should pass through")
 	}
 }
+
+// ── Prompt constants validation ────────────────────────────
+
+func TestSoloSystemPrompt_ContainsEssentials(t *testing.T) {
+	p := SoloSystemPrompt
+	required := []string{
+		"Tianxuan",
+		"plans and executes",
+		"todo_write",
+		"complete_step",
+		"TDD",
+		"Design first",
+		"Surgical",
+		"Defensive",
+		"No placeholders",
+	}
+	for _, kw := range required {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing keyword: %q", kw)
+		}
+	}
+}
+
+func TestHephaestusSystemPrompt_ContainsEssentials(t *testing.T) {
+	p := HephaestusSystemPrompt
+	required := []string{
+		"Hephaestus",
+		"Hermes",
+		"complete_step",
+		"todo_write",
+		"parallel_tasks",
+		"Surgical Changes",
+		"Goal-Driven Execution",
+	}
+	for _, kw := range required {
+		if !strings.Contains(p, kw) {
+			t.Errorf("HephaestusSystemPrompt missing keyword: %q", kw)
+		}
+	}
+}
+
+func TestHermesPrompt_ContainsEssentials(t *testing.T) {
+	p := HermesPrompt
+	required := []string{
+		"Hermes",
+		"planner",
+		"Hephaestus",
+		"<!--plan-->",
+		"read-only",
+		"3–8 steps",
+	}
+	for _, kw := range required {
+		if !strings.Contains(p, kw) {
+			t.Errorf("HermesPrompt missing keyword: %q", kw)
+		}
+	}
+}
+
+func TestPromptsAreDistinct(t *testing.T) {
+	if SoloSystemPrompt == HephaestusSystemPrompt {
+		t.Fatal("SoloSystemPrompt and HephaestusSystemPrompt must differ")
+	}
+	if SoloSystemPrompt == HermesPrompt {
+		t.Fatal("SoloSystemPrompt and HermesPrompt must differ")
+	}
+	if HephaestusSystemPrompt == HermesPrompt {
+		t.Fatal("HephaestusSystemPrompt and HermesPrompt must differ")
+	}
+}
+
+func TestPromptsAreNonEmpty(t *testing.T) {
+	if len(SoloSystemPrompt) == 0 {
+		t.Fatal("SoloSystemPrompt is empty")
+	}
+	if len(HephaestusSystemPrompt) == 0 {
+		t.Fatal("HephaestusSystemPrompt is empty")
+	}
+	if len(HermesPrompt) == 0 {
+		t.Fatal("HermesPrompt is empty")
+	}
+}
+
+func TestSoloPromptContainsTDD(t *testing.T) {
+	if !strings.Contains(SoloSystemPrompt, "TDD") {
+		t.Fatal("SoloSystemPrompt must reference TDD")
+	}
+	if !strings.Contains(SoloSystemPrompt, "todo_write") {
+		t.Fatal("SoloSystemPrompt must reference todo_write")
+	}
+	if !strings.Contains(SoloSystemPrompt, "complete_step") {
+		t.Fatal("SoloSystemPrompt must reference complete_step")
+	}
+}
+
+// ── formatExecutionFeedback ────────────────────────────────
+
+func TestFormatExecutionFeedback_Success(t *testing.T) {
+	r := &TurnResult{
+		Success:       true,
+		Summary:       "all steps done",
+		FilesCreated:  []string{"a.go"},
+		FilesModified: []string{"b.go"},
+	}
+	out := formatExecutionFeedback(r)
+	if !strings.Contains(out, "success") {
+		t.Fatal("success feedback should say success")
+	}
+	if !strings.Contains(out, "任务已完成") {
+		t.Fatal("success feedback should say 任务已完成")
+	}
+	if !strings.Contains(out, "`a.go`") {
+		t.Fatal("success feedback should mention created file")
+	}
+}
+
+func TestFormatExecutionFeedback_Failure(t *testing.T) {
+	r := &TurnResult{
+		Success: false,
+		Errors:  []string{"something broke"},
+		Summary: "step 3 failed",
+	}
+	out := formatExecutionFeedback(r)
+	if !strings.Contains(out, "errors") {
+		t.Fatal("failure feedback should say errors")
+	}
+	if !strings.Contains(out, "任务未完成") {
+		t.Fatal("failure feedback should say 任务未完成")
+	}
+	if !strings.Contains(out, "something broke") {
+		t.Fatal("failure feedback should include error text")
+	}
+}
+
+func TestFormatExecutionFeedback_EmptyResult(t *testing.T) {
+	r := &TurnResult{Success: true}
+	out := formatExecutionFeedback(r)
+	if !strings.Contains(out, "(none)") {
+		t.Fatal("empty result should show (none) for errors")
+	}
+	if !strings.Contains(out, "execution produced no summary") {
+		t.Fatal("empty result should show actionable no-summary message")
+	}
+}
+
+// ── hasStructuralChange ────────────────────────────────────
+
+func TestHasStructuralChange_GoMod(t *testing.T) {
+	if !hasStructuralChange([]string{"go.mod"}, nil) {
+		t.Fatal("go.mod should be structural change")
+	}
+}
+
+func TestHasStructuralChange_PackageJSON(t *testing.T) {
+	if !hasStructuralChange(nil, []string{"package.json"}) {
+		t.Fatal("package.json should be structural change")
+	}
+}
+
+func TestHasStructuralChange_InternalGoFile(t *testing.T) {
+	if !hasStructuralChange([]string{"internal/agent/new.go"}, nil) {
+		t.Fatal("internal/*.go should be structural change")
+	}
+}
+
+func TestHasStructuralChange_NoChange(t *testing.T) {
+	if hasStructuralChange([]string{"main.go", "README.md"}, []string{"config.toml"}) {
+		t.Fatal("non-structural files should not trigger structural change")
+	}
+}
+
+func TestHasStructuralChange_Empty(t *testing.T) {
+	if hasStructuralChange(nil, nil) {
+		t.Fatal("empty should not trigger structural change")
+	}
+}

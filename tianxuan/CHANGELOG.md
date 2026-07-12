@@ -1,3 +1,38 @@
+## [10.57.0] — 2026-07-11
+
+### 🔴 双模型架构深度优化（4 轮，19 项改进）
+
+#### 证据链严格验证
+
+- **StrictEvidence 启用**：双模型模式下 complete_step 的 verification/diff/files 证据与 turn ledger 交叉验证，todo_write 的新 completed 项必须有对应 complete_step receipt
+- **StrictEvidence 配置链路**：`agent_config.go` → `agent.go` New() → `boot.go` 双模型自动启用
+
+#### 代码质量与重构
+
+- **hermes.go 拆分**：736 行 → hermes_prompt.go（134行）+ hermes_confirm.go（62行）+ hermes.go（502行）
+- **Hermes.Run() 重构**：168 行 → 24 行高层编排，提取 `runFastPath`/`injectProjectMap`/`planWithConfirmation`/`executePlan`/`feedResultToPlanner` 子函数
+- **TurnResult.Plan 字段**：统一 TurnResult/PlanResult 结构，PlanResult 构造从 TurnResult 直接读取
+- **配置连通**：`planner_max_steps` 全链路（config → boot → NewHermes），替代硬编码 0
+
+#### 缺陷修复（6 项）
+
+- **快路径双重 TurnStarted**：`!` 前缀现在也抑制 executor 的 TurnStarted，防止前端成本统计归零
+- **planMaxSteps 边界**：移除 `>= 0` 条件，负值不再回退到零工具 planStream
+- **重规划循环会话污染**：prePlanLen 不推进，失败回滚始终到循环入口基线
+- **revise feedback 累积丢失**：`input = input + feedback` 替代 `input = origInput + feedback`
+- **Controller panic 双 TurnDone**：recover 路径设置 panicked 标志，防止双发射
+- **formatExecutionFeedback 冗余**：execErr 路径复用 `formatExecutionFeedback()` 替代内联拼接
+
+#### 措辞与注释
+
+- `"(no summary)"` → `"(execution produced no summary — check Errors for details)"`
+- `V10.??` → `V10.58`，孤行注释缩进对齐，plannerAgent 显式 `StrictEvidence: false`
+- direct answer 路径移除硬编码 `Summary: "direct answer"`
+
+#### 测试覆盖
+
+- **14 个新测试**：Solo/Hephaestus/Hermes 3 个 prompt 常量验证、互异检查、formatExecutionFeedback 3 场景、hasStructuralChange 5 场景
+
 ## [10.56.0] — 2026-07-11
 
 ### 🧠 双模型提示词全面重写

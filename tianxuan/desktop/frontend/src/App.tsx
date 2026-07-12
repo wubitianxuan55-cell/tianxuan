@@ -34,7 +34,6 @@ import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSpla
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { SkillsPanel } from "./components/SkillsPanel";
 import { StatsPanel, useStatsPersistence } from "./components/StatsPanel";
-import { MessageNavigator } from "./components/MessageNavigator";
 import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -150,7 +149,7 @@ export default function App() {
   const [statsReset, setStatsReset] = useState(0);
   const [capsOpen, setCapsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "messages">("stats");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
@@ -460,28 +459,24 @@ export default function App() {
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>
-            {/* 顶栏上下文用量 — Hermes(紫) + Hephaestus(青) */}
+            {/* 顶栏上下文用量 — 规划者(紫) + 执行者(青) */}
             {(state.context.window > 0 || state.context.plannerWindow > 0) && (
-              <div className="flex flex-row gap-2 min-w-[260px] max-w-[360px] flex-1">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
                 {state.context.plannerWindow > 0 && (
-                  <div className="flex-1 min-w-0">
-                    <ContextBar
-                      label="规划"
-                      used={state.context.plannerUsed}
-                      window={state.context.plannerWindow}
-                      color="bg-purple-500/60"
-                    />
-                  </div>
+                  <ContextBar
+                    label="规划"
+                    used={state.context.plannerUsed}
+                    window={state.context.plannerWindow}
+                    color="bg-purple-500/55"
+                  />
                 )}
                 {state.context.window > 0 && (
-                  <div className="flex-1 min-w-0">
-                    <ContextBar
-                      label="执行"
-                      used={state.context.used}
-                      window={state.context.window}
-                      color="bg-cyan-500/60"
-                    />
-                  </div>
+                  <ContextBar
+                    label="执行"
+                    used={state.context.used}
+                    window={state.context.window}
+                    color="bg-cyan-500/55"
+                  />
                 )}
               </div>
             )}
@@ -617,13 +612,6 @@ export default function App() {
               <BarChart3 size={13} />
               <span>统计</span>
             </button>
-            <button
-              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "messages" ? "text-accent border-accent" : ""}`}
-              onClick={() => setRightTab("messages")}
-            >
-              <MessageSquare size={13} />
-              <span>消息</span>
-            </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {rightTab === "files" ? (
@@ -654,9 +642,6 @@ export default function App() {
                 toolCounts={toolCounts}
                 skillCounts={skillCounts}
               />
-            )}
-            {rightTab === "messages" && (
-              <MessageNavigator items={state.items} scrollToTurn={scrollToTurn ?? undefined} />
             )}
           </div>
         </div>

@@ -284,7 +284,17 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		applyCompactToolset(reg)
 	}
 
-	execSess := agent.NewSession(compiler.WithInstructions(agent.HephaestusSystemPrompt))
+	// V10.55: single-model mode uses a unified prompt that covers both
+	// planning and execution. Dual-model mode keeps HephaestusSystemPrompt,
+	// which relies on Hermes for planning.
+	execPrompt := agent.HephaestusSystemPrompt
+	strictEvidence := false
+	if cfg.Agent.PlannerModel == "" {
+		execPrompt = agent.SoloSystemPrompt
+	} else {
+		strictEvidence = true // dual-model: verify evidence against turn ledger
+	}
+	execSess := agent.NewSession(compiler.WithInstructions(execPrompt))
 	executor := agent.New(execProv, reg, execSess, agent.Options{
 		MaxSteps:      maxSteps,
 		Temperature:   cfg.Agent.Temperature,
@@ -294,7 +304,8 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		Jobs:          jm,
 		ContextWindow: entry.ContextWindow,
 		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
-		Dispatcher: toolDispatcher,
+		Dispatcher:    toolDispatcher,
+		StrictEvidence: strictEvidence,
 	}, sink)
 
 	// V7.0: session archive for cross-session Dream/Distill
@@ -448,7 +459,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 				readOnlyReg.Add(t)
 			}
 
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, 0, pe.ContextWindow, config.ArchiveDir(), cwd)
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxSteps, pe.ContextWindow, config.ArchiveDir(), cwd)
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -81,6 +83,17 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 				a.preWG.Add(1)
 				go func(call provider.ToolCall) {
 					defer a.preWG.Done()
+					defer func() {
+						if r := recover(); r != nil {
+							slog.Error("agent: pre-execute panic", "tool", call.Name, "panic", r)
+							a.preMu.Lock()
+							a.preOutcomes[call.ID] = toolOutcome{
+								output: fmt.Sprintf("tool panic during pre-execution: %v", r),
+								errMsg: fmt.Sprintf("panic: %v", r),
+							}
+							a.preMu.Unlock()
+						}
+					}()
 					o := a.executeOne(ctx, call)
 					a.preMu.Lock()
 					a.preOutcomes[call.ID] = o

@@ -256,4 +256,11 @@ export const app = {
   CheckUpdate: async () => null,
   ApplyUpdate: async () => {},
   OpenDownloadPage: async () => {},
+  // Mobile
+  MobileAccessStatus: async () => ({ running: false, url: "", publicUrl: "", token: "", port: 0, usingNgrok: false, ngrokReady: false }),
+  StartMobileAccess: async () => ({ running: false, url: "", publicUrl: "", token: "", port: 0, usingNgrok: false, ngrokReady: false }),
+  StopMobileAccess: async () => {},
+  CheckNgrok: async () => false,
+  AutoStartMobileAccess: async () => null,
+  GetPersistedMobileToken: async () => "",
 };

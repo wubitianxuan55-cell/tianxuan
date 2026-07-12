@@ -591,5 +591,15 @@ export function makeMockApp(): AppBindings {
 成功标准：所有相关文件已检查，潜在问题已记录或修复。
 输出格式：简要摘要 + 文件扫描结果 + 问题/改进列表`;
     },
+    async MobileAccessStatus() {
+      return { running: false, url: "", publicUrl: "", token: "", port: 0, usingNgrok: false, ngrokReady: false };
+    },
+    async StartMobileAccess(_port: number, _ngrokToken: string) {
+      return { running: false, url: "", publicUrl: "", token: "", port: 0, usingNgrok: false, ngrokReady: false };
+    },
+    async StopMobileAccess() {},
+    async CheckNgrok() { return false; },
+    async AutoStartMobileAccess() { return null; },
+    async GetPersistedMobileToken() { return ""; },
   };
 }

@@ -459,3 +459,13 @@ export interface ResultView {
   sessionFile: string;
   duration: number;
 }
+
+export interface MobileAccessView {
+  running: boolean;
+  url: string;
+  publicUrl: string;
+  token: string;
+  port: number;
+  usingNgrok: boolean;
+  ngrokReady: boolean;
+}

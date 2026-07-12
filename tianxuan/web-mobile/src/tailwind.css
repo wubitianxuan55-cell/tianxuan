@@ -1,0 +1,24 @@
+/* 移动端覆盖 — 桌面端组件在手机上需要的额外样式 */
+
+/* 固定全屏布局 */
+html, body, #root {
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--tw-bg, #020203);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 安全区域 */
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* 横屏适配 */
+@media (max-height: 500px) and (orientation: landscape) {
+  html, body { overflow-y: auto; height: auto; min-height: 100dvh; }
+  #root { position: relative; min-height: 100dvh; }
+}
+
+/* 隐藏桌面端侧边栏等移动端不用的元素 */
+@media (max-width: 768px) {
+  .sidebar, .workspace-panel, .status-bar-desktop { display: none !important; }
+}

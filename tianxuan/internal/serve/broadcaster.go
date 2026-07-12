@@ -63,3 +63,16 @@ func (b *Broadcaster) Subscribers() int {
 	defer b.mu.Unlock()
 	return len(b.subs)
 }
+
+// BroadcastRaw delivers a pre-serialised JSON payload to every subscriber.
+// Use for custom events that aren't typed event.Event (e.g. user_message).
+func (b *Broadcaster) BroadcastRaw(data []byte) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for ch := range b.subs {
+		select {
+		case ch <- data:
+		default:
+		}
+	}
+}

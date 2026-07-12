@@ -36,6 +36,8 @@ type Server struct {
 	rebuildFn func() (*control.Controller, error)
 	model     string
 	maxSteps  int
+	token     string // auth token (empty = no auth, localhost mode)
+	public    bool   // bind 0.0.0.0 + wildcard CORS (requires token)
 }
 
 // New builds a Server. bc must be the controller's event sink.
@@ -53,17 +55,41 @@ func (s *Server) WithRebuild(fn func() (*control.Controller, error), model strin
 	return s
 }
 
-// Handler returns the HTTP routes: GET / (browser client), GET /app.css, GET
-// /app.js, GET /events (SSE), GET /history, GET /context, GET /health, and POST
-// command endpoints.
-func (s *Server) Handler() http.Handler {
-	return s.handler()
+// WithToken enables token authentication. When set, all API endpoints require
+// the token via Authorization: Bearer <token> or ?token=<token> query param.
+func (s *Server) WithToken(token string) *Server {
+	s.token = token
+	return s
 }
 
-// HandlerWithCORS returns the same routes as Handler but adds permissive CORS
-// headers so a dev frontend on a different origin (e.g. Vite on :5173) can
-// reach the server. Do NOT use in production — the server has no auth.
+// WithPublic enables public (remote) mode: wildcard CORS headers so any
+// origin can connect. Must be combined with WithToken for security.
+func (s *Server) WithPublic(v bool) *Server {
+	s.public = v
+	return s
+}
+
+// Token returns the configured auth token (empty if auth is disabled).
+func (s *Server) Token() string { return s.token }
+
+// Handler returns the full HTTP handler chain: routes → auth (if configured)
+// → csrf guard → logging. When public mode is on, wildcard CORS wraps
+// everything.
+func (s *Server) Handler() http.Handler {
+	h := s.handler()
+	if s.public {
+		h = corsPublicMiddleware(h)
+	}
+	return h
+}
+
+// HandlerWithCORS returns the same routes as Handler but adds CORS headers
+// for a specific origin (e.g. a dev Vite frontend on :5173). When public
+// mode is on this is equivalent to Handler().
 func (s *Server) HandlerWithCORS(origin string) http.Handler {
+	if s.public {
+		return s.Handler()
+	}
 	return corsMiddleware(s.handler(), origin)
 }
 
@@ -123,7 +149,22 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /mcp/retry", s.retryMCPServer)
 	mux.HandleFunc("POST /mcp/enabled", s.setMCPServerEnabled)
 	mux.Handle("GET /assets/", http.FileServer(http.FS(webDist)))
-	return logMiddleware(csrfGuard(mux))
+
+	// Mobile SPA routes — embedded at build time via go:embed mobileui
+	if mobileDist, ok := tryMobileDist(); ok {
+		mux.HandleFunc("GET /mobile", s.indexMobile)
+		mux.Handle("GET /mobile/", http.StripPrefix("/mobile", http.FileServer(http.FS(mobileDist))))
+	}
+
+	h := http.Handler(mux)
+	// Middleware stack (innermost → outermost):
+	//   1. csrfGuard — require application/json on POST
+	//   2. tokenAuth — validate token (no-op when s.token is empty)
+	//   3. logMiddleware — request logging
+	h = csrfGuard(h)
+	h = tokenAuthMiddleware(s.token, h)
+	h = logMiddleware(h)
+	return h
 }
 
 // csrfGuard rejects state-changing requests that don't carry a JSON content type.
@@ -188,6 +229,17 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(indexHTML)
+}
+
+// indexMobile serves the mobile SPA entrypoint at /mobile. Falls back to
+// 404 when the mobile frontend has not been built (z_embed_mobile.go absent).
+func (s *Server) indexMobile(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if mobileHTML, ok := getMobileIndex(); ok {
+		_, _ = w.Write(mobileHTML)
+		return
+	}
+	http.NotFound(w, nil)
 }
 
 // staticCSS serves the client stylesheet.
@@ -278,6 +330,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 
 // submit runs raw user input as a turn (slash commands and @-references
 // resolved by the controller). Returns 202 — output arrives on the event stream.
+// Also broadcasts the user message to all SSE clients so every connected
+// viewer (desktop web, mobile) sees the input immediately.
 func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Input string `json:"input"`
@@ -287,6 +341,14 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ctrl.Submit(body.Input)
+
+	// Broadcast user message to all SSE clients for real-time sync
+	userMsg, _ := json.Marshal(map[string]string{
+		"kind": "user_message",
+		"text": body.Input,
+	})
+	s.bc.BroadcastRaw(userMsg)
+
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -379,6 +441,22 @@ func corsMiddleware(next http.Handler, origin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// corsPublicMiddleware adds wildcard CORS headers for public (remote) mode.
+// Only used when --public is set AND token auth is active, so the security
+// risk is mitigated by the token requirement.
+func corsPublicMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

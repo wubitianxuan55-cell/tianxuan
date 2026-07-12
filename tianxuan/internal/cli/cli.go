@@ -181,8 +181,27 @@ func runServe(args []string) int {
 	maxSteps := fs.Int("max-steps", 0, "max tool-call rounds (0 = use config/default)")
 	addr := fs.String("addr", "127.0.0.1:8787", "listen address")
 	resume := fs.String("resume", "", "resume a saved session file")
+	tokenFlag := fs.String("token", "", "auth token (auto-generated when empty and --public is set)")
+	public := fs.Bool("public", false, "bind 0.0.0.0 (remote access) — enables token auth + CORS")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+
+	// Resolve token: explicit > auto-generate when public > empty (no auth).
+	token := *tokenFlag
+	if token == "" && *public {
+		var err error
+		token, err = serve.GenerateToken()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, "failed to generate token:", err)
+			return 1
+		}
+	}
+
+	// Resolve bind address: --public forces 0.0.0.0 unless explicitly set.
+	bindAddr := *addr
+	if *public && *addr == "127.0.0.1:8787" {
+		bindAddr = "0.0.0.0:8787"
 	}
 
 	ctx := context.Background()
@@ -206,15 +225,28 @@ func runServe(args []string) int {
 		ctrl.SetSessionPath(agent.NewSessionPath(ctrl.SessionDir(), ctrl.Label()))
 	}
 
-	fmt.Printf("tianxuan serve — %s on http://%s\n", ctrl.Label(), *addr)
+	// Print connection info.
+	fmt.Printf("tianxuan serve — %s\n", ctrl.Label())
+	if *public {
+		fmt.Printf("  🔓 Public mode — anyone with the token can control tianxuan\n")
+		fmt.Printf("  🔑 Token: %s\n", token)
+		fmt.Printf("  💻 Web UI:  http://%s/?token=%s\n", bindAddr, token)
+		fmt.Printf("  📱 Mobile:  http://%s/mobile?token=%s\n", bindAddr, token)
+	} else {
+		fmt.Printf("  💻 Web UI:  http://%s\n", bindAddr)
+	}
+
 	// Use graceful shutdown so SIGINT/SIGTERM drain active connections.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	rebuildFn := func() (*control.Controller, error) {
 		return setup(context.Background(), *model, *maxSteps, true, bc)
 	}
-	srv := serve.New(ctrl, bc).WithRebuild(rebuildFn, *model, *maxSteps)
-	if err := srv.RunGraceful(ctx, *addr); err != nil {
+	srv := serve.New(ctrl, bc).
+		WithRebuild(rebuildFn, *model, *maxSteps).
+		WithToken(token).
+		WithPublic(*public)
+	if err := srv.RunGraceful(ctx, bindAddr); err != nil {
 		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
 		return 1
 	}

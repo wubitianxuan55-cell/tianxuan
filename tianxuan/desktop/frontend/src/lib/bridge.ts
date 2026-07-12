@@ -20,6 +20,7 @@ import type {
   MemoryView,
   MemorySuggestion,
   MemorySuggestionsView,
+  MobileAccessView,
   ResultView,
   ScheduleView,
   SkillSuggestion,
@@ -175,6 +176,13 @@ export interface AppBindings {
   RunScheduleNow(id: string): Promise<ResultView>;
   GetResults(scheduleID: string): Promise<ResultView[]>;
   RefineSchedulePrompt(prompt: string): Promise<string>;
+  // Mobile access (desktop Settings panel).
+  MobileAccessStatus(): Promise<MobileAccessView>;
+  StartMobileAccess(port: number, ngrokToken: string): Promise<MobileAccessView>;
+  StopMobileAccess(): Promise<void>;
+  CheckNgrok(): Promise<boolean>;
+  AutoStartMobileAccess(): Promise<MobileAccessView | null>;
+  GetPersistedMobileToken(): Promise<string>;
 }
 
 interface WailsRuntime {

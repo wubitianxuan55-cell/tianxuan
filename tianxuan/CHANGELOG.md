@@ -1,3 +1,20 @@
+## [10.61.0] — 2026-07-13
+
+### 🎨 消息卡片 UI 全面对齐 DeepSeek-Reasonix
+
+> 参考 DeepSeek-Reasonix main-v2 蒸馏优化，全线消息卡片视觉和交互升级。
+
+- **ToolCard 重写**：Tailwind inline → 语义化 CSS 类体系（`.tool` / `.tool__head` / `.tool__body` / `.tool__label-group`）；状态文本图标（✓✗—）；Shell 输出前 10 行预览 + "显示全部"；子代理嵌套计数（Compass 图标）；错误摘要 + 可展开详情；客户端耗时追踪（useRef 计时 + useNow tick）
+- **ReadOnlyBatch 新增**：连续只读工具（read_file/ls/grep/glob）自动合并为折叠行，减少视觉噪音
+- **TurnCollapse 始终渲染**：不再区分运行时/完成时两套渲染路径，过程卡始终存在——运行时自动展开 + shimmer 扫光，完成后自动折叠；思考块内每个推理可独立折叠（InlineReasoning）
+- **过程分段修复**：每个 assistant 文本作为分界点，形成"过程卡→文本→过程卡→文本"交替结构（对齐 Reasonix partitionTurnItems）
+- **ReasoningProcess 升级**：Lucide Brain → ProcessBrainIcon SVG；Tailwind 按钮 → `reasoning__head` CSS 类 + `data-running` shimmer
+- **PhaseCard 图标化**：新增 ProcessPhaseIcon SVG，阶段分隔带图标
+- **NoticeCard 重写**：TriangleAlert/Info 图标按 level 区分；首行→title + 余文→body 解析；长文本（>200 chars）折叠展开
+- **CompactionCard CSS**：语义化 `.compaction`/`.compaction__head`/`.compaction__body`
+- **CSS 全面同步**：shimmer 三合一（tool__head / reasoning__head / turn-collapse__reasoning-head）；process-sweep + card-body-in 关键帧；reasoning 字体/间距/色值精确对齐；notice-line + diag-line 通知卡片样式体系
+- **全量中文化**：TurnCollapse/InlineReasoning/CompactionCard/ReadOnlyBatch/Shell 预览/Warm 层所有英文标签→简体中文
+
 ## [10.60.0] — 2026-07-13
 
 ### 🧠🔨 双模型架构硬化

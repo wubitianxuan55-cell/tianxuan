@@ -1,163 +1,204 @@
 import { memo, useMemo, useRef, useState } from "react";
-import {
-  Ban,
-  Check,
-  ChevronRight,
-  Loader2,
-  X,
-} from "lucide-react";
+import { ChevronRight, Compass } from "lucide-react";
 import { CodeViewer } from "./CodeViewer";
 import { DiffView } from "./DiffView";
-import { ICONS, mcpOr } from "./tool_icons";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
+import { useNow } from "../lib/useNow";
 import { diffsFor, subjectOf, summarize } from "../lib/tools";
 import type { Item } from "../lib/store";
 
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
+const SUBAGENT_TOOLS = new Set(["task", "run_skill", "explore", "research", "review", "security_review"]);
+
+const SHELL_PREVIEW_LINES = 10;
+const ERROR_SUMMARY_MAX_CHARS = 140;
+
+// ── helpers ──────────────────────────────────────────────────────────
+
 function pretty(json: string): string {
-  try {
-    return JSON.stringify(JSON.parse(json), null, 2);
-  } catch {
-    return json;
-  }
+  try { return JSON.stringify(JSON.parse(json), null, 2); } catch { return json; }
 }
 
-function StatusGlyph({ status, recoverable }: { status: ToolItem["status"]; recoverable?: boolean }) {
-  if (status === "running") return <Loader2 className="animate-spin" size={12} />;
-  if (status === "error") return <X className={recoverable ? "text-fg-faint/60" : "text-err"} size={12} />;
-  if (status === "stopped") return <Ban className="text-fg-faint" size={12} />;
-  return <Check className="text-ok" size={12} />;
+function normalizeErrorText(text: string): string {
+  return text.replace(/\r\n/g, "\n").trim();
 }
+
+function summarizeToolError(text: string): string {
+  const normalized = normalizeErrorText(text).replace(/^error:\s*/i, "");
+  if (!normalized) return "";
+  const firstLine = normalized.split("\n")[0]?.trim() ?? "";
+  if (firstLine.length <= ERROR_SUMMARY_MAX_CHARS) return firstLine;
+  return `${firstLine.slice(0, ERROR_SUMMARY_MAX_CHARS - 1)}…`;
+}
+
+function errorNeedsDetails(text: string, summary: string): boolean {
+  const normalized = normalizeErrorText(text).replace(/^error:\s*/i, "");
+  if (!normalized) return false;
+  return normalized.includes("\n") || normalized.length > 200 || (summary !== "" && normalized !== summary);
+}
+
+function splitPreview(text: string, n: number): { preview: string; total: number; hasMore: boolean } {
+  const lines = text.split("\n");
+  const total = lines.length;
+  if (total <= n) return { preview: text, total, hasMore: false };
+  return { preview: lines.slice(0, n).join("\n"), total, hasMore: true };
+}
+
+// ── ToolCard ──────────────────────────────────────────────────────────
 
 export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
   const t = useT();
   const compact = useCompact();
   const diffs = useMemo(() => diffsFor(item.name, item.args), [item.name, item.args]);
   const subject = useMemo(() => subjectOf(item.name, item.args), [item.name, item.args]);
-  const Icon = ICONS[item.name] ?? mcpOr(item.name);
   const nested = subcalls ?? [];
   const hasNested = nested.length > 0;
+  const isSubagent = SUBAGENT_TOOLS.has(item.name);
+  const now = useNow();
+
+  // Duration tracking: record start time when tool becomes running,
+  // show live timer while running via useNow tick, final value on completion.
+  const startedAtRef = useRef(0);
+  if (item.status === "running" && startedAtRef.current === 0) {
+    startedAtRef.current = Date.now();
+  }
+  const durationMs = item.status === "running"
+    ? (startedAtRef.current > 0 ? Math.max(0, now - startedAtRef.current) : 0)
+    : (startedAtRef.current > 0 ? Math.max(0, Date.now() - startedAtRef.current) : 0);
+  const duration = item.status !== "running" && durationMs > 0
+    ? `${Math.round(durationMs)} ms`
+    : "";
+
+  // All tools default to collapsed; running/error tools open so user sees progress.
+  const defaultOpen = !compact && (hasNested ? item.status === "running" : item.status === "running" || item.status === "error");
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const open = userOpen ?? defaultOpen;
+  const openRef = useRef(open);
+  openRef.current = open;
+
+  const [showAll, setShowAll] = useState(false);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
+
+  // Shell output: split into preview + "show all" toggle.
+  const shellOutput = item.output ?? null;
+  const shellPreview = shellOutput ? splitPreview(shellOutput, SHELL_PREVIEW_LINES) : null;
+  const hasArgs = diffs.length > 0 || !!item.args;
+  const hasOutput = !!item.output;
+  const hasBody = Boolean(diffs.length > 0 || hasNested || shellPreview || hasArgs || hasOutput || item.error);
+  const errorText = item.error ? normalizeErrorText(item.error) : "";
+  const errorSummary = errorText ? summarizeToolError(errorText) : "";
+  const hasErrorDetails = errorText ? errorNeedsDetails(errorText, errorSummary) : false;
+
+  const quiet = item.readOnly && !hasNested && item.status !== "error" && item.status !== "stopped";
 
   const summary =
     item.status === "running"
       ? ""
       : hasNested
         ? t(nested.length === 1 ? "tool.stepOne" : "tool.stepOther", { n: nested.length })
-        : summarize(item.name, item.args, item.output, item.error);
+        : item.error
+          ? errorSummary
+          : summarize(item.name, item.args, item.output, item.error);
 
-  const hasArgs = diffs.length > 0 || !!item.args;
-  const hasOutput = !!item.output;
-  const expandable = hasArgs || hasOutput;
-
-  // Expanded mode: running/error tools start open. Compact mode: all collapsed.
-  const defaultOpen = !compact && (item.status === "running" || item.status === "error");
-  const [open, setOpen] = useState(defaultOpen);
-
-  const bodyRef = useRef<HTMLDivElement>(null);
-  useGSAPCollapse(bodyRef, open && expandable);
-
-  const quiet =
-    item.readOnly && !hasNested && item.status !== "error" && item.status !== "stopped";
-
-  const outputLines = item.output ? item.output.split("\n").length : 0;
-
-  const rowPy = compact ? "py-0" : "py-0.5";
-  const rowPx = compact ? "px-1" : "px-2";
-  const fontSize = compact ? "text-[12px]" : "text-[13px]";
-  const chevronSize = compact ? 11 : 12;
-  const summarySize = compact ? "text-[11px]" : "text-[12px]";
-  const innerPx = compact ? "px-1" : "px-2";
-  const innerPb = compact ? "pb-1" : "pb-1.5";
+  // GSAP-driven collapse/expand
+  const toolBodyRef = useRef<HTMLDivElement>(null);
+  useGSAPCollapse(toolBodyRef, open && hasBody);
 
   return (
-    <div className={`my-px rounded-md overflow-hidden border transition-colors duration-300 ${
-      item.status === "error" && !item.recoverable ? "border-err/40" :
-      item.status === "error" && item.recoverable ? "border-fg-faint/30" :
-      item.status === "running" ? "border-accent/30 bg-accent/[0.02] shadow-[0_0_6px_var(--accent-soft)]" :
-      item.status === "stopped" ? "border-border-soft opacity-70" :
-      "border-border-soft"
-    } ${quiet ? "border-transparent bg-transparent" : ""}`}
-    style={item.status === "error" && !item.recoverable ? {background: "var(--ds-danger-soft)"} : undefined} data-tone={item.status === "error" && !item.recoverable ? "danger" : item.status === "running" ? "info" : item.status === "done" ? "success" : item.status === "stopped" ? "warning" : undefined}>
-      <div
-        className={`flex items-center gap-1.5 ${rowPx} ${rowPy} text-fg-dim ${fontSize} select-none ${
-          expandable ? "cursor-pointer hover:bg-bg-soft" : ""
-        }`}
-        onClick={expandable ? () => setOpen((v) => !v) : undefined}
+    <div className={`tool${quiet ? " tool--quiet" : ""}${isSubagent ? " tool--subagent" : ""}${open && hasBody ? " tool--open" : ""}`} data-entrance={item.id}>
+      <button
+        type="button"
+        className="tool__head"
+        data-running={item.status === "running" ? "" : undefined}
+        onClick={() => hasBody && setUserOpen(!open)}
+        aria-expanded={hasBody ? open : undefined}
       >
-        {expandable ? (
-          <ChevronRight
-            className={`shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-            size={chevronSize}
-          />
-        ) : (
-          <ChevronRight className="shrink-0 invisible" size={chevronSize} />
-        )}
-        <Icon
-          className={`shrink-0 ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-faint/60" : item.status === "running" ? "text-accent" : "text-fg-faint"}`}
-          size={chevronSize + 2}
-        />
-        <span className={`font-mono font-medium truncate ${item.status === "error" && !item.recoverable ? "text-err" : item.status === "error" && item.recoverable ? "text-fg-dim/60 line-through" : "text-fg"} ${compact ? "text-[11px]" : "text-[12px]"}`}>
-          {item.name}
-        </span>
-        {subject && (
-          <span className={`text-fg-faint truncate ${summarySize}`}>{subject}</span>
-        )}
-        {summary && (
-          <span className={`text-fg-faint italic ml-0.5 ${summarySize}`}>{summary}</span>
-        )}
-        <span className="ml-auto shrink-0">
-          <StatusGlyph status={item.status} recoverable={item.recoverable} />
-        </span>
-      </div>
-
-      <div ref={bodyRef} style={{ overflow: "hidden" }}>
-        <div>
-          {diffs.map((d, i) => (
-            <div className={`${innerPx} ${innerPb}`} key={i}>
-              {d.label && <div className="text-[10px] text-fg-faint uppercase tracking-wider mb-0.5">{d.label}</div>}
-              <DiffView original={d.original} modified={d.modified} language={d.lang} maxHeight={220} />
-            </div>
-          ))}
-
+        <span className="tool__label-group">
           {hasNested && (
-            <div className="pl-3 border-l border-border-soft ml-3">
-              {nested.map((c) => (
-                <ToolCard key={c.id} item={c} />
-              ))}
-            </div>
+            <span className="tool__nested-count" aria-label={`${nested.length} nested tool calls`}>
+              <Compass className="tool__nested-icon" size={14} strokeWidth={2} aria-hidden="true" />
+              <span>{nested.length}</span>
+            </span>
           )}
+          {item.status === "error" && <span className="tool__status-icon tool__status-icon--err">✗</span>}
+          {item.status === "done" && <span className="tool__status-icon tool__status-icon--ok">✓</span>}
+          {item.status === "stopped" && <span className="tool__status-icon tool__status-icon--stopped">—</span>}
+          <span className="tool__name">{item.name}</span>
+          {subject && <span className="tool__subject">{subject}</span>}
+        </span>
+        {summary && <span className="tool__summary">{summary}</span>}
+        {duration && <span className="tool__duration">{duration}</span>}
+        {hasBody && (
+          <span className={`tool__chevron${open ? " tool__chevron--open" : ""}`}>
+            <ChevronRight size={12} />
+          </span>
+        )}
+      </button>
 
-          {hasArgs && (
-            <div className={`${innerPx} ${innerPb}`}>
-              {item.args && <CodeViewer value={pretty(item.args)} language="json" maxHeight={60} />}
-            </div>
-          )}
-          {hasOutput && (
-            <div className={`${innerPx} ${innerPb}`}>
-              <div className="text-[9px] text-fg-faint/60 uppercase tracking-wider mb-0.5 select-none">输出 · {outputLines}L</div>
-              <CodeViewer value={item.output!} maxHeight={160} />
-              {item.truncated && (
-                <div className="mt-1 px-2 py-0.5 border border-border-soft rounded bg-bg-soft text-fg-dim text-[11px]">
-                  {t("tool.truncated")}
-                </div>
-              )}
-            </div>
-          )}
+      <div ref={toolBodyRef} className="tool__body">
+        {diffs.map((d, i) => (
+          <div key={i}>
+            {d.label && <div className="tool__difflabel">{d.label}</div>}
+            <DiffView original={d.original} modified={d.modified} language={d.lang} maxHeight={220} />
+          </div>
+        ))}
 
-          {item.error && !item.recoverable && (
-            <div className={`${innerPx} py-1 text-err text-[12px] leading-snug border-t border-err/20`}>
-              {item.error}
-            </div>
-          )}
-          {item.error && item.recoverable && (
-            <div className={`${innerPx} py-1 text-fg-faint/60 text-[12px] leading-snug border-t border-fg-faint/15`}>
-              {item.error}
-            </div>
-          )}
-        </div>
+        {hasNested && (
+          <div className="tool__nested">
+            {nested.map((c) => (
+              <ToolCard key={c.id} item={c} />
+            ))}
+          </div>
+        )}
+
+        {shellPreview && (
+          <>
+            <CodeViewer value={showAll ? shellOutput! : shellPreview.preview} maxHeight={showAll ? 480 : 260} />
+            {shellPreview.hasMore && !showAll && (
+              <button className="tool__showall" onClick={() => setShowAll(true)}>
+          显示全部 {shellPreview.total} 行
+              </button>
+            )}
+            {item.truncated && <div className="tool__note">{t("tool.truncated")}</div>}
+          </>
+        )}
+
+        {!shellPreview && hasArgs && (
+          <div>
+            {item.args && <CodeViewer value={pretty(item.args)} language="json" maxHeight={180} />}
+          </div>
+        )}
+        {!shellPreview && hasOutput && !item.args && (
+          <div>
+            <CodeViewer value={item.output!} maxHeight={260} />
+            {item.truncated && <div className="tool__note">{t("tool.truncated")}</div>}
+          </div>
+        )}
+
+        {errorText && (
+          <div className={`tool__err${hasErrorDetails ? " tool__err--compact" : ""}`}>
+            {hasErrorDetails ? (
+              <>
+                <div className="tool__err-summary">{errorSummary}</div>
+                <button
+                  type="button"
+                  className="tool__err-toggle"
+                  onClick={() => setShowErrorDetails((v) => !v)}
+                  aria-expanded={showErrorDetails}
+                >
+                  <ChevronRight className={`tool__err-toggle-icon${showErrorDetails ? " tool__err-toggle-icon--open" : ""}`} size={12} aria-hidden="true" />
+                  <span>{showErrorDetails ? "隐藏详情" : "显示详情"}</span>
+                </button>
+                {showErrorDetails && <div className="tool__err-details">{errorText}</div>}
+              </>
+            ) : (
+              errorText
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

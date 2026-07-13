@@ -403,6 +403,10 @@ func wrapLauncherCommand(cmd string, sh sandbox.Shell) (string, bool) {
 
 // isLauncher reports whether cmd looks like a long-running server/tunnel/watcher.
 func isLauncher(trimmed, lower string) bool {
+	// start /b is already backgrounded by the user; no wrapping needed.
+	if strings.HasPrefix(lower, "start /b") || strings.HasPrefix(lower, "start /B") {
+		return false
+	}
 	if isStartCmd(trimmed) {
 		return true
 	}
@@ -419,8 +423,11 @@ func isLauncher(trimmed, lower string) bool {
 // they don't match a known prefix. Catches ad-hoc commands like
 // "node server.js", "python app.py --serve", etc.
 func isLauncherByKeywords(lower string) bool {
+	// Normalise common word separators so "server.py" / "bin/server" / "my-app"
+	// all expose the keyword boundaries for " server " etc.
+	normalised := strings.NewReplacer(".", " ", "/", " ", "\\", " ", "-", " ").Replace(lower)
 	// Pad so we can match keywords at the end of the string.
-	padded := lower + " "
+	padded := normalised + " "
 	for _, kw := range launcherKeywords {
 		if strings.Contains(padded, kw) {
 			return true
@@ -430,8 +437,12 @@ func isLauncherByKeywords(lower string) bool {
 }
 
 // launcherKeywords are substrings that strongly indicate a long-running process.
+// Each keyword is padded with spaces so it only matches as a whole word — e.g.
+// " server " matches "python server.py" (after normalising separators) but not
+// "echo observer".
 var launcherKeywords = []string{
 	" serve ", " dev ", " watch ", " start ",
+	" server ", " daemon ", " listen ", " runserver ",
 	" ngrok ", " tunnel ", " proxy ",
 }
 

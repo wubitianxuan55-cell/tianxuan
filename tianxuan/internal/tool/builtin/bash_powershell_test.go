@@ -148,6 +148,24 @@ func TestWrapLauncherCommand(t *testing.T) {
 		{"wails dev", bash, "wails dev &", true},
 		{"go run ./cmd/server", bash, "go run ./cmd/server &", true},
 		{"ngrok http 8080", bash, "ngrok http 8080 &", true},
+		// keyword-based detection — "server" keyword
+		{"python server.py", bash, "python server.py &", true},
+		{"node server.js", bash, "node server.js &", true},
+		{"./bin/my-server --port 8080", bash, "./bin/my-server --port 8080 &", true},
+		// keyword-based detection — "daemon" keyword
+		{"mongod --daemon", bash, "mongod --daemon &", true},
+		// keyword-based detection — "listen" keyword
+		{"./app --listen :8080", bash, "./app --listen :8080 &", true},
+		// keyword-based detection — "runserver" keyword
+		{"python manage.py runserver", bash, "python manage.py runserver &", true},
+		// PowerShell path — keyword-based
+		{"python server.py", ps, `cmd /c start "" "python server.py"`, true},
+		{"node server.js", ps, `cmd /c start "" "node server.js"`, true},
+		// negative: "server" as part of a normal word should NOT match
+		{"echo observer", bash, "", false},
+		// negative: non-launcher commands should still NOT match
+		{"pip install requests", bash, "", false},
+		{"go test ./...", bash, "", false},
 		// normal commands → NOT wrapped
 		{"echo hello", bash, "", false},
 		{"go build ./...", bash, "", false},

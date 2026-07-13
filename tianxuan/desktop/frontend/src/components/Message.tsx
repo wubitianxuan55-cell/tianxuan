@@ -1,5 +1,5 @@
 import { memo, useRef } from "react";
-import { ChevronRight, Brain } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { MemoMarkdown } from "./MemoMarkdown";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
@@ -8,6 +8,7 @@ import { useAutoCollapse } from "../lib/useAutoCollapse";
 import { displayReasoningText } from "../lib/reasoningDisplay";
 import { useNow } from "../lib/useNow";
 import { useTurnStartAt } from "../lib/store";
+import { ProcessBrainIcon } from "./ProcessCard";
 import type { Item } from "../lib/store";
 
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
@@ -117,41 +118,28 @@ export function ReasoningProcess({
     ? `${elapsed}s`
     : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
 
+  const label = reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinking");
+  const meta = reasoningRunning
+    ? elapsedStr
+    : `${reasoningLines} 行 · ${elapsedStr}`;
+
   return (
-    <div className={`reasoning-process ${compact ? "my-1" : "my-2"}`}>
+    <div className={`reasoning${compact ? " reasoning--compact" : ""}`}>
       <button
         type="button"
-        className={`flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg border transition-colors ${
-          open
-            ? "border-accent/20 bg-accent/5"
-            : "border-transparent hover:bg-bg-soft"
-        } text-fg-faint text-[11px] cursor-pointer`}
+        className="reasoning__head"
+        data-running={reasoningRunning ? "" : undefined}
         onClick={toggleOpen}
         aria-expanded={open}
       >
-        <Brain size={13} className="flex-shrink-0" />
-        <span className="font-medium">
-          {reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinkingDone")}
-        </span>
-        <span className="text-fg-faint/50 text-[10px] ml-auto tabular-nums">
-          {reasoningRunning
-            ? elapsedStr
-            : `${reasoningLines} 行 · ${elapsedStr}`}
-        </span>
-        <ChevronRight
-          className={`transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-          size={11}
-        />
+        <ProcessBrainIcon size={12} />
+        <span>{label}</span>
+        {meta && <span className="reasoning__meta">{meta}</span>}
+        <ChevronRight className={`reasoning__chevron${open ? " reasoning__chevron--open" : ""}`} size={12} />
       </button>
-      <div ref={reasoningBodyRef} style={{ overflow: "hidden" }}>
-        <div
-          className={`mt-1 px-2.5 py-1.5 border-l-2 border-accent/20 ml-1 text-fg-dim/80 text-[11px] leading-relaxed whitespace-pre-wrap ${
-            reasoningDisplay.length > 3000 ? "max-h-[200px] overflow-y-auto" : ""
-          }`}
-        >
-          {reasoningDisplay}
-        </div>
-      </div>
+      {open && (
+        <div ref={reasoningBodyRef} className="reasoning__body">{reasoningDisplay}</div>
+      )}
     </div>
   );
 }

@@ -73,6 +73,17 @@ export function ProcessToolIcon(props: IconProps & { tone?: ProcessTone }) {
   );
 }
 
+export function ProcessPhaseIcon(props: IconProps & { tone?: ProcessTone }) {
+  return (
+    <ProcessIcon {...props}>
+      <path d="M4 7h9" />
+      <path d="M4 12h13" />
+      <path d="M4 17h7" />
+      <path d="m17 7 3 3-3 3" />
+    </ProcessIcon>
+  );
+}
+
 /** 根据 ProcessState 返回对应的 tone。 */
 export function processStateToTone(state: ProcessState): ProcessTone {
   switch (state) {

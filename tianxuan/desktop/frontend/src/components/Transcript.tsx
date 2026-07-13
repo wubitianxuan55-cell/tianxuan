@@ -388,11 +388,13 @@ export function Transcript({
         continue;
       }
 
-      // process items (tools, phases, compactions, info notices):
-      // start a new segment if a text answer has already been rendered
+      // process items (tools, compactions, info notices → inside fold;
+      // phases → outside as section headers)
       if (curOutside.length > 0) flush();
-      if (it.kind === "tool" || it.kind === "phase" || it.kind === "compaction" || it.kind === "notice") {
+      if (it.kind === "tool" || it.kind === "compaction" || it.kind === "notice") {
         curProcess.push(it);
+      } else if (it.kind === "phase") {
+        curOutside.push(it);
       } else {
         curOutside.push(it);
       }

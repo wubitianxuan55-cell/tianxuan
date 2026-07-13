@@ -367,15 +367,16 @@ export function Transcript({
         continue;
       }
 
-      // assistant with text: reasoning → process, text → outside.
-      // After this, subsequent process items start a fresh segment.
+      // Each assistant with text starts a new segment:
+      // flush current → reasoning to process → text to outside.
+      // Subsequent process items accumulate until the next text answer.
       if (it.kind === "assistant") {
         if (it.text) {
+          if (curOutside.length > 0) flush();
           if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
           curOutside.push(it);
         } else {
-          // reasoning-only assistant: if outside already has text from
-          // a previous answer, start a new segment for this thought.
+          // reasoning-only: new segment if text already rendered
           if (curOutside.length > 0) flush();
           curProcess.push(it);
         }

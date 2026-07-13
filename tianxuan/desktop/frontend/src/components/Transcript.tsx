@@ -482,7 +482,7 @@ export function Transcript({
         );
       })}
 
-      <div className="max-w-[--maxw] mx-auto px-8" ref={entranceRef}>
+      <div className="max-w-[--maxw] mx-auto px-12" ref={entranceRef}>
         {items.length === 0 && (
           <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
         )}

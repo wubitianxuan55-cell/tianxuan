@@ -4,6 +4,25 @@
 
 > 参考 DeepSeek-Reasonix main-v2 蒸馏优化，全线消息卡片视觉和交互升级。
 
+- **ToolCard 重写**：Tailwind inline → 语义化 CSS 类体系（`.tool` / `.tool__head` / `.tool__body` / `.tool__label-group`）；状态文本图标（✓✗—）；Shell 输出前 10 行预览 + "显示全部"；子代理嵌套计数（Compass 图标）；错误摘要 + 可展开详情；客户端耗时追踪
+- **ReadOnlyBatch 新增**：连续只读工具自动合并为折叠行
+- **TurnCollapse 始终渲染**：过程卡始终存在——运行时自动展开 + shimmer，完成后自动折叠；思考块内每个推理可独立折叠（InlineReasoning）；阶段自动折叠（完成后冻结耗时不再读秒）
+- **过程分段**：每个 assistant 文本作为分界点，形成"过程卡→文本→过程卡→文本"交替结构；思考统一放入过程卡，文本区纯净无重复
+- **ReasoningProcess 升级**：ProcessBrainIcon SVG + `reasoning__head` CSS + `data-running` shimmer
+- **PhaseCard 图标化**：ProcessPhaseIcon；phase 项移出过程卡作为章节标题
+- **NoticeCard 重写**：图标 + title/body 解析 + 长文本折叠
+- **CompactionCard CSS**：语义化样式
+- **CSS 全面同步**：shimmer 三合一；process-sweep + card-body-in；reasoning 精确对齐；notice-line + diag-line
+- **布局优化**：内容最大宽度 960→1100px，两侧留白 px-8→px-12
+- **全量中文化**：所有英文标签→简体中文
+
+### 🔧 热修复
+
+- 移除 useNow 每秒重渲染，改用 Date.now() + ref 冻结耗时
+- TurnCollapse key 从 segIdx→首项 ID 防 React 错配
+- 过滤空 segment 防无内容 TurnCollapse 实例
+- 过程卡左边框线恢复（border-left + padding）
+
 - **ToolCard 重写**：Tailwind inline → 语义化 CSS 类体系（`.tool` / `.tool__head` / `.tool__body` / `.tool__label-group`）；状态文本图标（✓✗—）；Shell 输出前 10 行预览 + "显示全部"；子代理嵌套计数（Compass 图标）；错误摘要 + 可展开详情；客户端耗时追踪（useRef 计时 + useNow tick）
 - **ReadOnlyBatch 新增**：连续只读工具（read_file/ls/grep/glob）自动合并为折叠行，减少视觉噪音
 - **TurnCollapse 始终渲染**：不再区分运行时/完成时两套渲染路径，过程卡始终存在——运行时自动展开 + shimmer 扫光，完成后自动折叠；思考块内每个推理可独立折叠（InlineReasoning）

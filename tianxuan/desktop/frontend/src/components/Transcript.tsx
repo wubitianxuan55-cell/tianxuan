@@ -489,7 +489,7 @@ export function Transcript({
         <StreamingIndicator running={running} items={rawItems} />
 
         {/* Hot zone — always rendered with TurnCollapse wrapping process */}
-        {renderItems.slice(warmEndTurn).map((seg, segIdx, arr) => {
+        {renderItems.slice(warmEndTurn).filter(seg => seg.processItems.length > 0 || seg.outsideItems.length > 0).map((seg, segIdx, arr) => {
           const toolCount = seg.processItems.filter((it) => it.kind === "tool").length;
           const thoughtCount = seg.processItems.filter((it) => it.kind === "assistant" && it.reasoning).length;
           const hasProcess = seg.processItems.length > 0;

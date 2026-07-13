@@ -40,7 +40,7 @@ export function settingsTabLabel(id: SettingsTab, t: ReturnType<typeof useT>): s
 
 export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<typeof useT>): string {
   switch (id) {
-    case "general": return `${s.agent.autoPlan || "off"} · ${s.agent.reasoningLanguage || "auto"}`;
+    case "general": return t("settings.generalMeta");
     case "models": return toRef(s.defaultModel, s) || t("common.none");
     case "providers": return t("settings.providerCount", { n: s.providers.length });
     case "permissions": return s.permissions.mode;
@@ -49,13 +49,13 @@ export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<
     case "network": return s.network?.proxyMode || "off";
     case "appearance": return t("settings.appearanceMeta");
     case "updates": return t("settings.updatesMeta");
-    case "shortcuts": return "12 个";
-    case "mcp": return "服务";
-    case "skills": return "项目";
-    case "subagents": return "配置";
-    case "plugins": return "扩展";
-    case "memory": return "记忆";
-    case "hooks": return "事件";
+    case "shortcuts": return t("settings.shortcutsMeta");
+    case "mcp": return t("settings.mcpMeta");
+    case "skills": return t("settings.skillsMeta");
+    case "subagents": return t("settings.subagentsMeta");
+    case "plugins": return t("settings.pluginsMeta");
+    case "memory": return t("settings.memoryMeta");
+    case "hooks": return t("settings.hooksMeta");
   }
 }
 

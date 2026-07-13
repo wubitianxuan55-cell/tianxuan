@@ -163,6 +163,8 @@ func (a *App) Settings() SettingsView {
 			KeySet:        p.APIKeyEnv != "" && os.Getenv(p.APIKeyEnv) != "",
 			BalanceURL:    p.BalanceURL,
 			ContextWindow: p.ContextWindow,
+			Thinking:      p.Thinking,
+			Effort:        p.Effort,
 		})
 	}
 	return v
@@ -319,6 +321,8 @@ func (a *App) SaveProvider(p ProviderView) error {
 		e := config.ProviderEntry{
 			Name: p.Name, Kind: p.Kind, BaseURL: p.BaseURL,
 			APIKeyEnv: p.APIKeyEnv, BalanceURL: strings.TrimSpace(p.BalanceURL), ContextWindow: p.ContextWindow,
+			Thinking:      p.Thinking,
+			Effort:        p.Effort,
 		}
 		if len(p.Models) > 0 {
 			e.Model = p.Models[0] // also satisfies validateProvider's model requirement

@@ -12,6 +12,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
   const [autoPlan, setAutoPlan] = useState(s.agent.autoPlan || "off");
   const [outputStyle, setOutputStyle] = useState(s.agent.outputStyle || "");
   const [coldResume, setColdResume] = useState(s.agent.coldResumePrune);
+  const [memCompiler, setMemCompiler] = useState(s.agent.memoryCompilerEnabled || false);
 
   return (
     <SettingsPageShell title="通用" desc="智能体运行时行为与偏好设置。">
@@ -103,6 +104,22 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
               const on = v === "true";
               setColdResume(on);
               void apply(() => app.SetColdResumePrune(on));
+            }}
+          />
+        </SettingsField>
+      </SettingsSection>
+      <SettingsSection title="Memory">
+        <SettingsField label="Memory 编译器" hint="启用 v5 执行记忆编译器，自动从历史推理中提炼持久记忆。">
+          <SegmentedButton
+            options={[
+              { value: "false", label: "关闭" },
+              { value: "true", label: "开启" },
+            ]}
+            value={String(memCompiler)}
+            onChange={(v) => {
+              const on = v === "true";
+              setMemCompiler(on);
+              void apply(() => app.SetMemoryCompilerEnabled(on));
             }}
           />
         </SettingsField>

@@ -121,12 +121,12 @@ export function makeMockApp(): AppBindings {
   const settings: SettingsView = {
     defaultModel: "deepseek-flash",
     providers: [
-      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000, thinking: "", effort: "" },
-      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "" },
+      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "" },
+      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "" },
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
-    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "", plannerMaxSteps: 0, maxSubagentDepth: 0, coldResumePrune: false, reasoningLanguage: "", autoPlan: "off", outputStyle: "" },
+    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "", plannerMaxSteps: 0, maxSubagentDepth: 0, coldResumePrune: false, reasoningLanguage: "", autoPlan: "off", memoryCompilerEnabled: false, outputStyle: "" },
     plannerModel: "",
     subagentModel: "",
     subagentModels: {},
@@ -136,6 +136,7 @@ export function makeMockApp(): AppBindings {
     bypass: false,
     language: "",
     network: { proxyMode: "off", proxyUrl: "", noProxy: "" },
+    desktop: { layoutStyle: "classic", displayMode: "standard", closeBehavior: "quit", statusBarStyle: "icon", statusBarItems: ["model","workspace"], checkUpdates: true, telemetry: false, metrics: false },
     permLevel: "ask",
   };
   return {
@@ -533,6 +534,16 @@ export function makeMockApp(): AppBindings {
     async SetOutputStyle(style: string) { settings.agent.outputStyle = style; },
     async SetLanguage(lang: string) { settings.language = lang; },
     async SetNetwork(mode: string, url: string, noProxy: string) { settings.network = { proxyMode: mode, proxyUrl: url, noProxy }; },
+    async SetDesktopLayoutStyle(style: string) { settings.desktop.layoutStyle = style; },
+    async SetDesktopDisplayMode(mode: string) { settings.desktop.displayMode = mode; },
+    async SetDesktopCloseBehavior(behavior: string) { settings.desktop.closeBehavior = behavior; },
+    async SetDesktopCheckUpdates(on: boolean) { settings.desktop.checkUpdates = on; },
+    async SetDesktopTelemetry(on: boolean) { settings.desktop.telemetry = on; },
+    async SetDesktopMetrics(on: boolean) { settings.desktop.metrics = on; },
+    async SetBashTimeoutSeconds(_secs: number) {},
+    async SetMCPCallTimeoutSeconds(_secs: number) {},
+    async SetShellPreference(_shell: string) {},
+    async SetMemoryCompilerEnabled(on: boolean) { settings.agent.memoryCompilerEnabled = on; },
     async SetPermLevel(level: string) {
       settings.permLevel = level;
     },

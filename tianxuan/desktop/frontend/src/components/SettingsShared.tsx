@@ -4,12 +4,12 @@ import { useT } from "../lib/i18n";
 export type SettingsTab =
   | "general" | "models" | "providers" | "permissions" | "sandbox" | "agent"
   | "network" | "appearance" | "updates" | "shortcuts"
-  | "mcp" | "skills" | "subagents" | "plugins" | "memory" | "hooks";
+  | "mcp" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics";
 
 export const SETTINGS_TABS: SettingsTab[] = [
   "general", "models", "providers", "permissions", "sandbox", "agent",
   "network", "appearance", "updates", "shortcuts",
-  "mcp", "skills", "subagents", "plugins", "memory", "hooks",
+  "mcp", "skills", "subagents", "plugins", "memory", "hooks", "diagnostics",
 ];
 
 export type TabGroup = { label: string; tabs: SettingsTab[] };
@@ -17,7 +17,7 @@ export type TabGroup = { label: string; tabs: SettingsTab[] };
 export const TAB_GROUPS: TabGroup[] = [
   { label: "核心", tabs: ["general", "models", "providers", "permissions", "sandbox", "agent"] },
   { label: "环境", tabs: ["network", "appearance", "updates", "shortcuts"] },
-  { label: "能力", tabs: ["mcp", "skills", "subagents", "plugins", "memory", "hooks"] },
+  { label: "能力", tabs: ["mcp", "skills", "subagents", "plugins", "memory", "hooks", "diagnostics"] },
 ];
 
 export type SectionProps = {
@@ -32,7 +32,7 @@ export function settingsTabLabel(id: SettingsTab, t: ReturnType<typeof useT>): s
     sandbox: "沙箱", agent: "智能体", network: "网络", appearance: "外观",
     updates: "更新", shortcuts: "快捷键",
     mcp: "MCP", skills: "技能", subagents: "子代理", plugins: "插件",
-    memory: "记忆", hooks: "钩子",
+    memory: "记忆", hooks: "钩子", diagnostics: "诊断",
   };
   try { return t(`settings.tab.${id}` as any); }
   catch { return fallback[id] || id; }
@@ -56,6 +56,7 @@ export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<
     case "plugins": return t("settings.pluginsMeta");
     case "memory": return t("settings.memoryMeta");
     case "hooks": return t("settings.hooksMeta");
+    case "diagnostics": return "检查";
   }
 }
 

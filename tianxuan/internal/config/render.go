@@ -117,6 +117,39 @@ func RenderTOML(c *Config) string {
 			fmt.Fprintf(&b, "price       = { cache_hit = %v, input = %v, output = %v, currency = %q }   # per 1M tokens\n",
 				p.Price.CacheHit, p.Price.Input, p.Price.Output, p.Price.Symbol())
 		}
+		if p.Thinking != "" {
+			fmt.Fprintf(&b, "thinking    = %q\n", p.Thinking)
+		}
+		if p.Effort != "" {
+			fmt.Fprintf(&b, "effort      = %q\n", p.Effort)
+		}
+		if p.ChatURL != "" {
+			fmt.Fprintf(&b, "chat_url    = %q\n", p.ChatURL)
+		}
+		if p.ModelsURL != "" {
+			fmt.Fprintf(&b, "models_url  = %q\n", p.ModelsURL)
+		}
+		if len(p.Headers) > 0 {
+			fmt.Fprintf(&b, "headers     = %s\n", renderStringMap(p.Headers))
+		}
+		if p.ExtraBody != "" {
+			fmt.Fprintf(&b, "extra_body  = %q\n", p.ExtraBody)
+		}
+		if p.AuthHeader {
+			b.WriteString("auth_header = true\n")
+		}
+		if len(p.VisionModels) > 0 {
+			fmt.Fprintf(&b, "vision_models = %s\n", renderStringArray(p.VisionModels))
+		}
+		if p.ReasoningProtocol != "" {
+			fmt.Fprintf(&b, "reasoning_protocol = %q\n", p.ReasoningProtocol)
+		}
+		if len(p.SupportedEfforts) > 0 {
+			fmt.Fprintf(&b, "supported_efforts = %s\n", renderStringArray(p.SupportedEfforts))
+		}
+		if p.DefaultEffort != "" {
+			fmt.Fprintf(&b, "default_effort = %q\n", p.DefaultEffort)
+		}
 		b.WriteString("\n")
 	}
 

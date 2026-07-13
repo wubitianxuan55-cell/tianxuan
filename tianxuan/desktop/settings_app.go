@@ -33,6 +33,26 @@ type ProviderView struct {
 	ContextWindow int      `json:"contextWindow"`
 	Thinking      string   `json:"thinking"`
 	Effort        string   `json:"effort"`
+	ChatURL       string   `json:"chatUrl"`
+	ModelsURL     string   `json:"modelsUrl"`
+	Headers       map[string]string `json:"headers"`
+	ExtraBody     string   `json:"extraBody"`
+	AuthHeader    bool     `json:"authHeader"`
+	VisionModels  []string `json:"visionModels"`
+	ReasoningProtocol string `json:"reasoningProtocol"`
+	SupportedEfforts  []string `json:"supportedEfforts"`
+	DefaultEffort string   `json:"defaultEffort"`
+}
+
+type DesktopView struct {
+	LayoutStyle    string   `json:"layoutStyle"`
+	DisplayMode    string   `json:"displayMode"`
+	CloseBehavior  string   `json:"closeBehavior"`
+	StatusBarStyle string   `json:"statusBarStyle"`
+	StatusBarItems []string `json:"statusBarItems"`
+	CheckUpdates   bool     `json:"checkUpdates"`
+	Telemetry      bool     `json:"telemetry"`
+	Metrics        bool     `json:"metrics"`
 }
 
 type PermissionsView struct {
@@ -73,6 +93,8 @@ type AgentView struct {
 	ReasoningLanguage string `json:"reasoningLanguage"`
 	// AutoPlan controls auto-plan mode ("off" | "ask" | "on").
 	AutoPlan string `json:"autoPlan"`
+	// MemoryCompilerEnabled toggles the Memory v5 compiler.
+	MemoryCompilerEnabled bool `json:"memoryCompilerEnabled"`
 	// OutputStyle sets the persona/tone folded into the system prompt.
 	OutputStyle string `json:"outputStyle"`
 }
@@ -100,6 +122,8 @@ type SettingsView struct {
 	Language string `json:"language"`
 	// Network is the HTTP proxy configuration.
 	Network NetworkView `json:"network"`
+	// Desktop holds desktop-UI preferences.
+	Desktop DesktopView `json:"desktop"`
 }
 
 // NetworkView exposes network proxy settings.
@@ -143,10 +167,16 @@ func (a *App) Settings() SettingsView {
 			Bash: bash, Network: cfg.Sandbox.Network,
 			WorkspaceRoot: cfg.Sandbox.WorkspaceRoot, AllowWrite: nonNil(cfg.Sandbox.AllowWrite),
 		},
-		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt, PlannerMaxSteps: cfg.Agent.PlannerMaxSteps, MaxSubagentDepth: cfg.Agent.MaxSubagentDepth, ColdResumePrune: cfg.Agent.ColdResumePrune != nil && *cfg.Agent.ColdResumePrune, ReasoningLanguage: cfg.Agent.ReasoningLanguage, AutoPlan: cfg.Agent.AutoPlan, OutputStyle: cfg.Agent.OutputStyle},
+		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt, PlannerMaxSteps: cfg.Agent.PlannerMaxSteps, MaxSubagentDepth: cfg.Agent.MaxSubagentDepth, ColdResumePrune: cfg.Agent.ColdResumePrune != nil && *cfg.Agent.ColdResumePrune, ReasoningLanguage: cfg.Agent.ReasoningLanguage, AutoPlan: cfg.Agent.AutoPlan, MemoryCompilerEnabled: cfg.Agent.MemoryCompilerEnabled, OutputStyle: cfg.Agent.OutputStyle},
 		ConfigPath:    config.SourcePath(),
 		ProviderKinds: provider.Kinds(),
 		Bypass:        a.ctrl != nil && a.ctrl.PermLevel() != "ask",
+		Desktop: DesktopView{
+			LayoutStyle: cfg.Desktop.LayoutStyle, DisplayMode: cfg.Desktop.DisplayMode,
+			CloseBehavior: cfg.Desktop.CloseBehavior, StatusBarStyle: cfg.Desktop.StatusBarStyle,
+			StatusBarItems: cfg.Desktop.StatusBarItems, CheckUpdates: cfg.Desktop.CheckUpdates,
+			Telemetry: cfg.Desktop.Telemetry, Metrics: cfg.Desktop.Metrics,
+		},
 		Language:      cfg.Language,
 		Network: NetworkView{
 			ProxyMode: cfg.Network.ProxyMode,
@@ -165,6 +195,15 @@ func (a *App) Settings() SettingsView {
 			ContextWindow: p.ContextWindow,
 			Thinking:      p.Thinking,
 			Effort:        p.Effort,
+			ChatURL:       p.ChatURL,
+			ModelsURL:     p.ModelsURL,
+			Headers:       p.Headers,
+			ExtraBody:     p.ExtraBody,
+			AuthHeader:    p.AuthHeader,
+			VisionModels:  p.VisionModels,
+			ReasoningProtocol: p.ReasoningProtocol,
+			SupportedEfforts:  p.SupportedEfforts,
+			DefaultEffort: p.DefaultEffort,
 		})
 	}
 	return v
@@ -323,6 +362,15 @@ func (a *App) SaveProvider(p ProviderView) error {
 			APIKeyEnv: p.APIKeyEnv, BalanceURL: strings.TrimSpace(p.BalanceURL), ContextWindow: p.ContextWindow,
 			Thinking:      p.Thinking,
 			Effort:        p.Effort,
+			ChatURL:       p.ChatURL,
+			ModelsURL:     p.ModelsURL,
+			Headers:       p.Headers,
+			ExtraBody:     p.ExtraBody,
+			AuthHeader:    p.AuthHeader,
+			VisionModels:  p.VisionModels,
+			ReasoningProtocol: p.ReasoningProtocol,
+			SupportedEfforts:  p.SupportedEfforts,
+			DefaultEffort: p.DefaultEffort,
 		}
 		if len(p.Models) > 0 {
 			e.Model = p.Models[0] // also satisfies validateProvider's model requirement
@@ -494,6 +542,64 @@ func (a *App) SetNetwork(mode, url, noProxy string) error {
 		c.Network.NoProxy = noProxy
 		return nil
 	})
+}
+
+// SetDesktopLayoutStyle sets the desktop layout: "classic" | "workbench" | "creation".
+func (a *App) SetDesktopLayoutStyle(style string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopLayoutStyle(style) })
+}
+
+// SetDesktopDisplayMode sets the chat density: "standard" | "compact".
+func (a *App) SetDesktopDisplayMode(mode string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopDisplayMode(mode) })
+}
+
+// SetDesktopCloseBehavior sets the window close action: "quit" | "background".
+func (a *App) SetDesktopCloseBehavior(behavior string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopCloseBehavior(behavior) })
+}
+
+// SetDesktopCheckUpdates controls whether the desktop checks for new releases.
+func (a *App) SetDesktopCheckUpdates(on bool) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopCheckUpdates(on) })
+}
+
+// SetDesktopTelemetry enables anonymous launch pings.
+func (a *App) SetDesktopTelemetry(on bool) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopTelemetry(on) })
+}
+
+// SetDesktopMetrics enables aggregated desktop-usage counters.
+func (a *App) SetDesktopMetrics(on bool) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopMetrics(on) })
+}
+
+// SetBashTimeoutSeconds sets the foreground bash timeout. 0 = default.
+func (a *App) SetBashTimeoutSeconds(secs int) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		if secs <= 0 { c.Tools.BashTimeoutSeconds = nil; return nil }
+		c.Tools.BashTimeoutSeconds = &secs
+		return nil
+	})
+}
+
+// SetMCPCallTimeoutSeconds sets the MCP JSON-RPC call timeout. 0 = default.
+func (a *App) SetMCPCallTimeoutSeconds(secs int) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		if secs <= 0 { c.Tools.MCPCallTimeoutSeconds = nil; return nil }
+		c.Tools.MCPCallTimeoutSeconds = &secs
+		return nil
+	})
+}
+
+// SetShellPreference sets the shell interpreter: "auto" | "bash" | "powershell".
+func (a *App) SetShellPreference(shell string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetShellPreference(shell) })
+}
+
+// SetMemoryCompilerEnabled toggles the Memory v5 execution compiler.
+func (a *App) SetMemoryCompilerEnabled(on bool) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetMemoryCompilerEnabled(on) })
 }
 
 // SetSubagentModel sets the default model for sub-agents (task tool). An empty

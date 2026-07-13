@@ -287,6 +287,15 @@ export interface ProviderView {
   contextWindow: number;
   thinking: string;
   effort: string;
+  chatUrl: string;
+  modelsUrl: string;
+  headers: Record<string,string>;
+  extraBody: string;
+  authHeader: boolean;
+  visionModels: string[];
+  reasoningProtocol: string;
+  supportedEfforts: string[];
+  defaultEffort: string;
 }
 
 // BalanceInfo is the wallet-balance readout (desktop/app.go Balance). available
@@ -335,6 +344,7 @@ export interface AgentView {
   coldResumePrune: boolean;
   reasoningLanguage: string;
   autoPlan: string;
+  memoryCompilerEnabled: boolean;
   outputStyle: string;
 }
 
@@ -342,6 +352,17 @@ export interface NetworkView {
   proxyMode: string;
   proxyUrl: string;
   noProxy: string;
+}
+
+export interface DesktopView {
+  layoutStyle: string;
+  displayMode: string;
+  closeBehavior: string;
+  statusBarStyle: string;
+  statusBarItems: string[];
+  checkUpdates: boolean;
+  telemetry: boolean;
+  metrics: boolean;
 }
 
 export interface SettingsView {
@@ -360,6 +381,7 @@ export interface SettingsView {
   permLevel?: string; // live permission level this session ("ask"|"auto"|"yolo")
   language: string;
   network: NetworkView;
+  desktop: DesktopView;
 }
 
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;

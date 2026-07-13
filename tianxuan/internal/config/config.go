@@ -35,6 +35,21 @@ type Config struct {
 	LSP          LSPConfig         `toml:"lsp"`
 	Search       SearchConfig      `toml:"search"`
 	Network      NetworkConfig     `toml:"network"`
+	Desktop      DesktopConfig     `toml:"desktop"`
+}
+
+
+// DesktopConfig holds desktop-UI-only preferences persisted to the user config
+// so they survive across sessions. These do NOT affect the CLI or headless mode.
+type DesktopConfig struct {
+	LayoutStyle    string   `toml:"layout_style"`
+	DisplayMode    string   `toml:"display_mode"`
+	CloseBehavior  string   `toml:"close_behavior"`
+	StatusBarStyle string   `toml:"status_bar_style"`
+	StatusBarItems []string `toml:"status_bar_items"`
+	CheckUpdates   bool     `toml:"check_updates"`
+	Telemetry      bool     `toml:"telemetry"`
+	Metrics        bool     `toml:"metrics"`
 }
 
 // SearchConfig configures web search engines. Resolution order: local SearXNG
@@ -288,6 +303,7 @@ type AgentConfig struct {
 	// AutoPlanClassifier optionally names a provider/model used to classify
 	// borderline auto-plan decisions. Empty keeps the zero-cost heuristic path.
 	AutoPlanClassifier string `toml:"auto_plan_classifier"`
+	MemoryCompilerEnabled bool `toml:"memory_compiler_enabled"`
 	// MaxSubagentDepth caps recursion depth for runAs=subagent skills. 0
 	// (default) means unlimited; the harness stops at-depth agents from spawning
 	// further sub-agents when the counter hits this limit.
@@ -363,6 +379,33 @@ type ProviderEntry struct {
 	// thinking-capable models (e.g. MiMo) and ignores Thinking. Empty = provider default.
 	Thinking string `toml:"thinking"`
 	Effort   string `toml:"effort"`
+	// ChatURL is an optional alternate endpoint for chat completions (e.g. a
+	// proxy or gateway URL). Empty = use BaseURL.
+	ChatURL string `toml:"chat_url"`
+	// ModelsURL is an optional endpoint for fetching the model list from the
+	// provider's API (e.g. "/v1/models"). Empty = no auto-fetch.
+	ModelsURL string `toml:"models_url"`
+	// Headers are extra HTTP headers attached to every request to this provider
+	// (e.g. {"X-Custom": "value"}).
+	Headers map[string]string `toml:"headers"`
+	// ExtraBody is a JSON object merged into every request body (provider-specific
+	// extensions). Empty = none.
+	ExtraBody string `toml:"extra_body"`
+	// AuthHeader toggles Anthropic-compatible x-api-key Authorization header
+	// (instead of the OpenAI-style Bearer token). Default false.
+	AuthHeader bool `toml:"auth_header"`
+	// VisionModels is the subset of Models that support image/video input.
+	// Empty = none explicitly marked; the provider may still auto-detect.
+	VisionModels []string `toml:"vision_models"`
+	// ReasoningProtocol selects the reasoning-content transport: "auto" (detect
+	// from provider kind), "deepseek" (reasoning_content field), "openai"
+	// (reasoning_tokens), or "none" (disable reasoning).
+	ReasoningProtocol string `toml:"reasoning_protocol"`
+	// SupportedEfforts lists the effort levels this provider accepts, e.g.
+	// ["low","medium","high","max"]. Empty = use provider defaults.
+	SupportedEfforts []string `toml:"supported_efforts"`
+	// DefaultEffort is the fallback effort when none is specified per-request.
+	DefaultEffort string `toml:"default_effort"`
 }
 
 // ModelList returns the models this provider exposes: the explicit `models` list,
@@ -413,7 +456,11 @@ type ToolsConfig struct {
 	// Compact enables V6.0 P8 reduced toolset (hides redundant tools from model view).
 	// Hidden tools remain callable by name but don't appear in the schema list,
 	// reducing model cognitive load from ~41 to ~25 visible tools.
-	Compact bool `toml:"compact"`
+	Compact             bool   `toml:"compact"`
+	BashTimeoutSeconds  *int   `toml:"bash_timeout_seconds"`
+	MCPCallTimeoutSeconds *int `toml:"mcp_call_timeout_seconds"`
+	Shell               string `toml:"shell"`
+	SearchEngine        string `toml:"search_engine"`
 }
 
 // PermissionsConfig declares the per-call permission policy (see

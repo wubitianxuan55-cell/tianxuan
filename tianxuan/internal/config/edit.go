@@ -319,6 +319,79 @@ func (c *Config) SetLanguage(lang string) error {
 	return nil
 }
 
+
+// SetDesktopLayoutStyle sets the desktop layout: "classic" | "workbench" | "creation".
+func (c *Config) SetDesktopLayoutStyle(style string) error {
+	style = strings.TrimSpace(style)
+	if style != "" && style != "classic" && style != "workbench" && style != "creation" {
+		return fmt.Errorf("layout_style %q: must be classic|workbench|creation", style)
+	}
+	c.Desktop.LayoutStyle = style
+	return nil
+}
+
+// SetDesktopDisplayMode sets the chat density: "standard" | "compact".
+func (c *Config) SetDesktopDisplayMode(mode string) error {
+	mode = strings.TrimSpace(mode)
+	if mode != "" && mode != "standard" && mode != "compact" {
+		return fmt.Errorf("display_mode %q: must be standard|compact", mode)
+	}
+	c.Desktop.DisplayMode = mode
+	return nil
+}
+
+// SetDesktopCloseBehavior sets the window close action: "quit" | "background".
+func (c *Config) SetDesktopCloseBehavior(behavior string) error {
+	behavior = strings.TrimSpace(behavior)
+	if behavior != "" && behavior != "quit" && behavior != "background" {
+		return fmt.Errorf("close_behavior %q: must be quit|background", behavior)
+	}
+	c.Desktop.CloseBehavior = behavior
+	return nil
+}
+
+// SetDesktopCheckUpdates controls whether the desktop checks for new releases on launch.
+func (c *Config) SetDesktopCheckUpdates(on bool) error {
+	c.Desktop.CheckUpdates = on
+	return nil
+}
+
+// SetDesktopTelemetry enables anonymous launch pings.
+func (c *Config) SetDesktopTelemetry(on bool) error {
+	c.Desktop.Telemetry = on
+	return nil
+}
+
+// SetDesktopMetrics enables aggregated desktop-usage counters.
+func (c *Config) SetDesktopMetrics(on bool) error {
+	c.Desktop.Metrics = on
+	return nil
+}
+
+// SetBashTimeoutSeconds sets the foreground bash timeout in seconds. nil = default (120s).
+func (c *Config) SetBashTimeoutSeconds(secs *int) error {
+	c.Tools.BashTimeoutSeconds = secs
+	return nil
+}
+
+// SetMCPCallTimeoutSeconds sets the MCP JSON-RPC call timeout. nil = default (300s).
+func (c *Config) SetMCPCallTimeoutSeconds(secs *int) error {
+	c.Tools.MCPCallTimeoutSeconds = secs
+	return nil
+}
+
+// SetShellPreference sets the shell interpreter: "auto" | "bash" | "powershell".
+func (c *Config) SetShellPreference(shell string) error {
+	c.Tools.Shell = strings.TrimSpace(shell)
+	return nil
+}
+
+// SetMemoryCompilerEnabled toggles the Memory v5 execution compiler.
+func (c *Config) SetMemoryCompilerEnabled(on bool) error {
+	c.Agent.MemoryCompilerEnabled = on
+	return nil
+}
+
 // SaveTo writes the configuration to path as annotated TOML, atomically: it
 // writes a sibling temp file then renames, so a crash mid-write can't leave a
 // half-written tianxuan.toml that fails to parse on next load. Parent directories

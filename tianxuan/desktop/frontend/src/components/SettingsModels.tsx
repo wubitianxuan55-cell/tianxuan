@@ -3,7 +3,7 @@ import { Cpu, Brain, Bot, ChevronDown, ChevronRight } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { ModelSwitcher } from "./ModelSwitcher";
-import { allRefs, toRef, type SectionProps } from "./SettingsShared";
+import { toRef, type SectionProps } from "./SettingsShared";
 
 function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
   return (
@@ -49,7 +49,6 @@ export function EffortSelect({ value, onChange, busy }: { value: string; onChang
 
 export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProps & { onManageProviders: () => void }) {
   const t = useT();
-  const refs = allRefs(s);
   const defaultRef = toRef(s.defaultModel, s);
   const [defaultProvider, defaultModel] = defaultRef.split("/");
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -62,16 +61,10 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
       <div className="text-fg text-sm font-semibold px-1 pb-3">{t("settings.tab.models")}</div>
 
       <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作">
-        <select
-          className="w-full bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
-          value={toRef(s.defaultModel, s)}
-          disabled={busy}
-          onChange={(e) => void apply(() => app.SetDefaultModel(e.target.value))}
-        >
-          {refs.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+        <ModelSwitcher
+          label={defaultModel || defaultRef}
+          onPick={(ref: string) => void apply(() => app.SetDefaultModel(ref))}
+        />
         <div className="mt-2">
           <EffortSelect
             value={s.agent.effort}

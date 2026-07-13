@@ -162,6 +162,16 @@ export interface AppBindings {
   SetLanguage(lang: string): Promise<void>;
   // SetNetwork sets the HTTP proxy configuration.
   SetNetwork(mode: string, url: string, noProxy: string): Promise<void>;
+  SetDesktopLayoutStyle(style: string): Promise<void>;
+  SetDesktopDisplayMode(mode: string): Promise<void>;
+  SetDesktopCloseBehavior(behavior: string): Promise<void>;
+  SetDesktopCheckUpdates(on: boolean): Promise<void>;
+  SetDesktopTelemetry(on: boolean): Promise<void>;
+  SetDesktopMetrics(on: boolean): Promise<void>;
+  SetBashTimeoutSeconds(secs: number): Promise<void>;
+  SetMCPCallTimeoutSeconds(secs: number): Promise<void>;
+  SetShellPreference(shell: string): Promise<void>;
+  SetMemoryCompilerEnabled(on: boolean): Promise<void>;
   // SetSubagentModel sets the default model for spawned sub-agents. An empty string
   // clears it so sub-agents inherit the parent's provider.
   SetSubagentModel(ref: string): Promise<void>;

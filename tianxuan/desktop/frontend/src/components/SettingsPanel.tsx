@@ -5,7 +5,7 @@ import { applyColorScheme, applyThemeMode, getColorScheme, getThemeMode, type Co
 import type { SettingsView } from "../lib/types";
 import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
 import { ResizableDrawer } from "./ResizableDrawer";
-import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command } from "lucide-react";
+import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command, Search } from "lucide-react";
 import { ModelsSection } from "./SettingsModels";
 import { ProvidersSection } from "./SettingsProviders";
 import { PermissionsSection } from "./SettingsPermissions";
@@ -22,6 +22,7 @@ import { SettingsSubagents } from "./SettingsSubagents";
 import { SettingsPlugins } from "./SettingsPlugins";
 import { SettingsHooks } from "./SettingsHooks";
 import { SettingsShortcuts } from "./SettingsShortcuts";
+import { SettingsDiagnostics } from "./SettingsDiagnostics";
 import { SETTINGS_TABS, TAB_GROUPS, settingsTabLabel, settingsTabMeta, type SettingsTab } from "./SettingsShared";
 
 type TabRenderers = Record<SettingsTab, () => React.ReactNode>;
@@ -53,6 +54,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     plugins: <Puzzle size={14} />,
     memory: <BrainCircuit size={14} />,
     hooks: <Zap size={14} />,
+    diagnostics: <Search size={14} />,
   };
 
   const filteredTabs = query.trim() && s
@@ -90,10 +92,11 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     shortcuts: () => <SettingsShortcuts />,
     mcp: () => <SettingsMcp />,
     skills: () => <SettingsSkills />,
-    subagents: () => <SettingsSubagents />,
+    subagents: () => <SettingsSubagents s={s} busy={busy} apply={apply} />,
     plugins: () => <SettingsPlugins />,
     memory: () => <SettingsMemory />,
     hooks: () => <SettingsHooks />,
+    diagnostics: () => <SettingsDiagnostics />,
   } : null;
 
   const visibleTabs = new Set(filteredTabs);

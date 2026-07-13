@@ -372,13 +372,13 @@ export function Transcript({
         continue;
       }
 
-      // Each assistant with text starts a new segment.
-      // Reasoning stays with the text (shown above it via ReasoningProcess),
-      // NOT duplicated into TurnCollapse as a separate thought.
+      // Assistant with text: reasoning → TurnCollapse, text → outside.
+      // Strip reasoning from outside copy so text area stays clean.
       if (it.kind === "assistant") {
         if (it.text) {
           if (curOutside.length > 0) flush();
-          curOutside.push(it);
+          if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
+          curOutside.push({ ...it, reasoning: "" } as Item);
         } else {
           // reasoning-only: new segment if text already rendered
           if (curOutside.length > 0) flush();

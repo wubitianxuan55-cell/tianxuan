@@ -74,6 +74,12 @@ type Options struct {
 	// where execution follows a structured plan; OFF in single-model
 	// mode where the model manages its own flow.
 	StrictEvidence bool
+	// PlanModeAllowedTools names extra custom tools the plan-mode policy may treat
+	// as safe. Known blocked tools (write_file, bash, etc.) cannot be overridden.
+	PlanModeAllowedTools []string
+	// PlanModeReadOnlyCommands names concrete shell command prefixes that plan mode
+	// treats as read-only (e.g. "gh issue view", "git log").
+	PlanModeReadOnlyCommands []string
 }
 
 // StormBreaker tracks repeated failures to detect death spirals (V3.0 Phase 4).

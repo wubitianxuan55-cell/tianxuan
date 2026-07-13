@@ -9,6 +9,7 @@ import (
 
 	"tianxuan/internal/codegraph"
 	"tianxuan/internal/event"
+	"tianxuan/internal/planmode"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
 )
@@ -158,6 +159,29 @@ func (h *Hermes) SetAsker(a Asker) {
 	if h.plannerAgent != nil {
 		h.plannerAgent.SetAsker(a)
 	}
+}
+
+// SetPlanMode propagates the read-only gate to both planner and executor
+// agents. Ported from DeepSeek-Reasonix Coordinator.
+func (h *Hermes) SetPlanMode(v bool) {
+	if h == nil {
+		return
+	}
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetPlanMode(v)
+	}
+	h.hephaestus.SetPlanMode(v)
+}
+
+// SetPlanModePolicy propagates the plan-mode tool safety policy to both agents.
+func (h *Hermes) SetPlanModePolicy(p planmode.Policy) {
+	if h == nil {
+		return
+	}
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetPlanModePolicy(p)
+	}
+	h.hephaestus.SetPlanModePolicy(p)
 }
 
 // ── Run (top-level orchestration) ───────────────────────────────────────

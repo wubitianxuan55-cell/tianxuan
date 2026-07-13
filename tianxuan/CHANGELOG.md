@@ -1,3 +1,22 @@
+## [10.65.0] — 2026-07-13
+
+### 🔒 安全加固 + 后端核心蒸馏
+
+> 从 DeepSeek-Reasonix-latest 蒸馏 4 个核心子系统：planmode.Policy 安全策略、secrets 密钥脱敏、goal FSM 目标状态机、environment 环境探测。
+
+- **planmode.Policy 工具安全策略**：新建 `internal/planmode/` (policy.go, ~600行) — 11 类工具自动分类（knownBlocked/alwaysAllowed/planSafeAudited/PlanSafeSelfReported）+ bash 参数级写操作检查（`find -exec`/`git --output`/`go -mod=mod` 被拦截）；移植 `shellparse` + `shellsafe` 依赖包（~540 行）；`tool` 包新增 `PlanModeClassifier` / `PlanModeUntrustedReadOnly` 接口
+- **AgentRunner 集成**：`planModeGate` (atomic.Bool) + `SetPlanMode` + `executeOne` 提前检查（在 dispatcher/gate 之前）；`Hermes.SetPlanMode` 双传播方法对齐 DeepSeek Coordinator
+- **secrets 密钥脱敏**：新建 `internal/secrets/` (redact.go, ~200行) — 10 种 token 格式识别脱敏（API_KEY/SECRET/TOKEN/PASSWORD/JWT/OpenAI/GitHub/Slack/AWS/Bearer）；`executeOne` 在工具结果进入模型上下文前自动脱敏
+- **goal FSM 目标状态机**：新建 `internal/goal/` (goal.go, ~330行) — 完整 4 状态机（running/complete/blocked/stopped）+ turn/idle/intercept/strict 管理 + 持久化
+- **environment 环境探测**：新建 `internal/environment/` (probe.go + snapshot.go, ~500行) — 11 工具运行时版本探测 + 5分钟内存缓存 + 24小时快照持久化 + 跨重启稳定合并逻辑
+- **依赖**：新增 `mvdan.cc/sh/v3 v3.13.1`
+
+### 📦 变更统计
+
+- **10 新文件**：shellparse/shellsafe/planmode/secrets/goal/environment（~2,500 行）
+- **5 修改文件**：tool.go/agent.go/agent_config.go/execute_one.go/hermes.go（~180 行）
+- **go vet** 零警告，缓存前缀稳定性验证通过
+
 ## [10.64.0] — 2026-07-13
 
 ### 🚀 5 阶段追赶 Reasonix 设置面板差距

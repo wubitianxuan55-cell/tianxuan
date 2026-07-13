@@ -11,7 +11,9 @@ import (
 	"tianxuan/internal/evidence"
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/memory"
+	"tianxuan/internal/planmode"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/secrets"
 	"tianxuan/internal/tool"
 )
 
@@ -31,6 +33,28 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			output:  out,
 			blocked: true,
 			errMsg:  "blocked by loop guard",
+		}
+	}
+
+	// Plan-mode gate: refuse non-read-only tools while planning.
+	// Ported from DeepSeek-Reasonix planmode.Policy.
+	if a.planModeGate.Load() {
+		safety := planmode.PlanSafetyUnknown
+		if pc, ok2 := t.(tool.PlanModeClassifier); ok2 {
+			if pc.PlanModeSafe() {
+				safety = planmode.PlanSafetySafe
+			}
+		}
+		untrusted := false
+		if u, ok2 := t.(tool.PlanModeUntrustedReadOnly); ok2 {
+			untrusted = u.PlanModeUntrustedReadOnly()
+		}
+		if blocked, msg := a.planModeBlocked(call.Name, t.ReadOnly(), untrusted, safety, json.RawMessage(call.Arguments)); blocked {
+			return toolOutcome{
+				output:  msg,
+				blocked: true,
+				errMsg:  msg,
+			}
 		}
 	}
 
@@ -168,6 +192,9 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	} else {
 		result, err = t.Execute(cctx, json.RawMessage(call.Arguments))
 	}
+	// Redact credential-like values from tool output before it enters model context.
+	// Ported from DeepSeek-Reasonix.
+	result = secrets.RedactToolOutput(result)
 	duration := time.Since(start).Milliseconds()
 
 	// V4.2: cache successful file reads; invalidate writes

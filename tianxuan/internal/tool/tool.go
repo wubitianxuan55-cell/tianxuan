@@ -72,6 +72,21 @@ type Previewer interface {
 	Preview(args json.RawMessage) (diff.Change, error)
 }
 
+// PlanModeClassifier lets a tool declare its plan-mode safety stance. A tool
+// that does NOT implement this interface is treated as PlanSafetyUnknown and
+// falls back to the audited read-only whitelist. Ported from DeepSeek-Reasonix.
+type PlanModeClassifier interface {
+	PlanModeSafe() bool
+}
+
+// PlanModeUntrustedReadOnly marks a tool whose ReadOnly() flag comes from an
+// untrusted external source (e.g. an MCP server's readOnlyHint). Plan mode
+// must not trust such self-reported flags and treats the tool as a writer
+// unless the user explicitly allows it. Ported from DeepSeek-Reasonix.
+type PlanModeUntrustedReadOnly interface {
+	PlanModeUntrustedReadOnly() bool
+}
+
 // --- process-global built-in set (populated by builtin subpackage init) ---
 
 var builtins = map[string]Tool{}

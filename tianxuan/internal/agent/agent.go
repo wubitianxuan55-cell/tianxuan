@@ -17,6 +17,7 @@ import (
 	"tianxuan/internal/learning"
 	"tianxuan/internal/memory"
 	"tianxuan/internal/nilutil"
+	"tianxuan/internal/planmode"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/agent/cache"
 	"tianxuan/internal/tool"
@@ -366,6 +367,13 @@ type AgentRunner struct {
 	// todo rebuild, steer, repeat detection, bg cycle detection,
 	// and grace round (V10.46).
 	plannerMode bool
+
+	// planModeGate, when true, refuses any tool call whose ReadOnly() is false.
+	// Ported from DeepSeek-Reasonix planmode.Policy.
+	planModeGate atomic.Bool
+
+	// planModePolicy carries the policy parameters for plan-mode tool gating.
+	planModePolicy planmode.Policy
 }
 
 // SetActiveSchemas installs a tool subset for this session. Pass nil to revert
@@ -375,6 +383,33 @@ func (a *AgentRunner) SetActiveSchemas(schemas []provider.ToolSchema) {
 	a.activeSchemasMu.Lock()
 	a.activeSchemas = schemas
 	a.activeSchemasMu.Unlock()
+}
+
+// SetPlanMode flips the read-only plan-mode gate. While true, executeOne refuses
+// any non-read-only tool call using planmode.Policy.Decide.
+// Ported from DeepSeek-Reasonix.
+func (a *AgentRunner) SetPlanMode(v bool) {
+	a.planModeGate.Store(v)
+}
+
+// SetPlanModePolicy installs the plan-mode tool safety policy.
+func (a *AgentRunner) SetPlanModePolicy(p planmode.Policy) {
+	a.planModePolicy = p
+}
+
+// planModeBlocked checks whether a tool call is blocked by the plan-mode gate.
+func (a *AgentRunner) planModeBlocked(name string, readOnly, untrusted bool, safety planmode.PlanSafety, args json.RawMessage) (bool, string) {
+	decision := a.planModePolicy.Decide(planmode.Call{
+		Name:      name,
+		ReadOnly:  readOnly,
+		Untrusted: untrusted,
+		Safety:    safety,
+		Args:      args,
+	})
+	if !decision.Blocked {
+		return false, ""
+	}
+	return true, decision.Message
 }
 
 
@@ -590,6 +625,10 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		goal:       opts.Goal,        // V6.0 P7: �ỰĿ��
 		disableVerify: opts.DisableVerify,
 		plannerMode:  opts.PlannerMode,
+		planModePolicy: planmode.Policy{
+			AllowedTools:     opts.PlanModeAllowedTools,
+			ReadOnlyCommands: opts.PlanModeReadOnlyCommands,
+		},
 	}
 	r.evidence.SetStrictVerification(opts.StrictEvidence)
 	// V5.13: �������籩��·��

@@ -372,13 +372,12 @@ export function Transcript({
         continue;
       }
 
-      // Each assistant with text starts a new segment:
-      // flush current → reasoning to process → text to outside.
-      // Subsequent process items accumulate until the next text answer.
+      // Each assistant with text starts a new segment.
+      // Reasoning stays with the text (shown above it via ReasoningProcess),
+      // NOT duplicated into TurnCollapse as a separate thought.
       if (it.kind === "assistant") {
         if (it.text) {
           if (curOutside.length > 0) flush();
-          if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
           curOutside.push(it);
         } else {
           // reasoning-only: new segment if text already rendered

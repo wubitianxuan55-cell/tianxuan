@@ -97,10 +97,18 @@ export function ReasoningProcess({
   const turnStartAt = useTurnStartAt();
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
   const reasoningRunning = !!(item.streaming && !item.text);
+  const finalElapsedRef = useRef(0);
+  const prevRunningRef = useRef(reasoningRunning);
 
   const { open, toggleOpen } = useAutoCollapse(reasoningRunning);
 
   useGSAPCollapse(reasoningBodyRef, open);
+
+  // Freeze elapsed when reasoning ends
+  if (!reasoningRunning && prevRunningRef.current) {
+    finalElapsedRef.current = turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0;
+  }
+  prevRunningRef.current = reasoningRunning;
 
   const reasoningDisplay = displayReasoningText(item.reasoning ?? "", {
     streaming: item.streaming ?? false,
@@ -109,9 +117,9 @@ export function ReasoningProcess({
   const reasoningLines = item.reasoning
     ? item.reasoning.split("\n").filter((l) => l.trim()).length
     : 0;
-  const elapsed = turnStartAt > 0
-    ? Math.max(0, Date.now() - turnStartAt)
-    : 0;
+  const elapsed = reasoningRunning
+    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
+    : finalElapsedRef.current;
   const elapsedStr = elapsed < 60000
     ? `${Math.round(elapsed / 1000)}s`
     : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`;

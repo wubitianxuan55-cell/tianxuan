@@ -73,6 +73,7 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
   const bodyRef = useRef<HTMLDivElement>(null);
   const display = useMemo(() => collapseDisplayItems(items), [items]);
   const turnStartAt = useTurnStartAt();
+  const finalElapsedRef = useRef(0);
 
   useGSAPCollapse(bodyRef, open);
 
@@ -85,8 +86,10 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
       if (!userOverridden.current) setOpen(true);
     } else if (wasRunning && !userOverridden.current) {
       setOpen(false);
+      // Freeze elapsed at completion moment
+      finalElapsedRef.current = turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0;
     }
-  }, [running]);
+  }, [running, turnStartAt]);
 
   if (display.length === 0) return null;
 
@@ -94,8 +97,10 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
   if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
   if (thoughtCount > 0) labelParts.push(`${thoughtCount} 次思考`);
 
-  // Elapsed time
-  const elapsed = turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0;
+  // Elapsed: live while running, frozen after completion
+  const elapsed = running
+    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
+    : finalElapsedRef.current;
   const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
   const label = labelParts.length > 0
     ? (elapsedStr ? `${labelParts.join(" · ")} · ${elapsedStr}` : labelParts.join(" · "))

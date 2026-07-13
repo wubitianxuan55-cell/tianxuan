@@ -10,7 +10,6 @@ import { ErrorCard } from "./ErrorCard";
 import { Welcome } from "./Welcome";
 import { useEntranceAnimation } from "../lib/useEntranceAnimation";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
-import { useNow } from "../lib/useNow";
 import { ReadOnlyBatch } from "./ReadOnlyBatch";
 import { ProcessBrainIcon, ProcessPhaseIcon } from "./ProcessCard";
 import { displayReasoningText } from "../lib/reasoningDisplay";
@@ -73,7 +72,6 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
   const prevRunningRef = useRef(running);
   const bodyRef = useRef<HTMLDivElement>(null);
   const display = useMemo(() => collapseDisplayItems(items), [items]);
-  const now = useNow();
   const turnStartAt = useTurnStartAt();
 
   useGSAPCollapse(bodyRef, open);
@@ -96,9 +94,9 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
   if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
   if (thoughtCount > 0) labelParts.push(`${thoughtCount} 次思考`);
 
-  // Elapsed time (ticks during running via useNow)
-  const elapsed = turnStartAt > 0 ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
-  const elapsedStr = elapsed > 0 ? (elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`) : "";
+  // Elapsed time
+  const elapsed = turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0;
+  const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
   const label = labelParts.length > 0
     ? (elapsedStr ? `${labelParts.join(" · ")} · ${elapsedStr}` : labelParts.join(" · "))
     : (running ? "处理中…" : elapsedStr);
@@ -489,9 +487,12 @@ export function Transcript({
           const thoughtCount = seg.processItems.filter((it) => it.kind === "assistant" && it.reasoning).length;
           const hasProcess = seg.processItems.length > 0;
           const isLast = segIdx === arr.length - 1;
+          // Stable key: use first process item's id to avoid React remounting
+          // when segments shift. Falls back to segIdx for empty/edge cases.
+          const segKey = seg.processItems[0]?.id ?? seg.outsideItems[0]?.id ?? `seg${segIdx}`;
 
           return (
-            <div key={segIdx}>
+            <div key={segKey}>
               {/* 过程在上 — TurnCollapse always wraps, auto-expands when running */}
               {hasProcess && (
                 <TurnCollapse items={seg.processItems} toolCount={toolCount} thoughtCount={thoughtCount} running={running && isLast} />

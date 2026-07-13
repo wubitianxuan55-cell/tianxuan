@@ -6,7 +6,6 @@ import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { useAutoCollapse } from "../lib/useAutoCollapse";
 import { displayReasoningText } from "../lib/reasoningDisplay";
-import { useNow } from "../lib/useNow";
 import { useTurnStartAt } from "../lib/store";
 import { ProcessBrainIcon } from "./ProcessCard";
 import type { Item } from "../lib/store";
@@ -95,7 +94,6 @@ export function ReasoningProcess({
 }) {
   const compact = useCompact();
   const t = useT();
-  const now = useNow();
   const turnStartAt = useTurnStartAt();
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
   const reasoningRunning = !!(item.streaming && !item.text);
@@ -112,11 +110,11 @@ export function ReasoningProcess({
     ? item.reasoning.split("\n").filter((l) => l.trim()).length
     : 0;
   const elapsed = turnStartAt > 0
-    ? Math.max(0, now - Math.floor(turnStartAt / 1000))
+    ? Math.max(0, Date.now() - turnStartAt)
     : 0;
-  const elapsedStr = elapsed < 60
-    ? `${elapsed}s`
-    : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+  const elapsedStr = elapsed < 60000
+    ? `${Math.round(elapsed / 1000)}s`
+    : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`;
 
   const label = reasoningRunning ? t("msg.thinkingRunning") : t("msg.thinking");
   const meta = reasoningRunning

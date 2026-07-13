@@ -5,7 +5,6 @@ import { DiffView } from "./DiffView";
 import { useT } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
-import { useNow } from "../lib/useNow";
 import { diffsFor, subjectOf, summarize } from "../lib/tools";
 import type { Item } from "../lib/store";
 
@@ -57,20 +56,17 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
   const nested = subcalls ?? [];
   const hasNested = nested.length > 0;
   const isSubagent = SUBAGENT_TOOLS.has(item.name);
-  const now = useNow();
 
-  // Duration tracking: record start time when tool becomes running,
-  // show live timer while running via useNow tick, final value on completion.
+  // Duration tracking: record start time on first running render.
+  // Only show final duration after completion to avoid per-second re-renders.
   const startedAtRef = useRef(0);
   if (item.status === "running" && startedAtRef.current === 0) {
     startedAtRef.current = Date.now();
   }
-  const durationMs = item.status === "running"
-    ? (startedAtRef.current > 0 ? Math.max(0, now - startedAtRef.current) : 0)
-    : (startedAtRef.current > 0 ? Math.max(0, Date.now() - startedAtRef.current) : 0);
-  const duration = item.status !== "running" && durationMs > 0
-    ? `${Math.round(durationMs)} ms`
-    : "";
+  const durationMs = (item.status !== "running" && startedAtRef.current > 0)
+    ? Math.max(0, Date.now() - startedAtRef.current)
+    : 0;
+  const duration = durationMs > 0 ? `${Math.round(durationMs)} ms` : "";
 
   // All tools default to collapsed; running/error tools open so user sees progress.
   const defaultOpen = !compact && (hasNested ? item.status === "running" : item.status === "running" || item.status === "error");

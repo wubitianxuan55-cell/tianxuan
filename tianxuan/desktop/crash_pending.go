@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"runtime/debug"
+	"strings"
 
 	"tianxuan/internal/config"
+	"tianxuan/internal/event"
 )
 
 // crash_pending.go captures Go-side panics to disk and ships them on the next
@@ -99,7 +101,28 @@ func (a *App) flushPendingCrash() {
 		return
 	}
 	_ = os.Remove(path)
-	// Log the crash for diagnostics; a production build would POST it to a
-	// crash-reporting endpoint. For now we just log and clear.
-	println("[crash] recovered from prior session:", string(body))
+	// Log and surface to the user so they know what happened.
+	slog.Error("desktop: recovered crash from prior session", "path", path)
+	bodyStr := string(body)
+	println("[crash] recovered from prior session:", bodyStr)
+	// If we have a sink, emit a notice so the user sees it in the UI.
+	if a.sink != nil {
+		a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+			Text: "检测到上一次会话崩溃。截取部分堆栈：" + crashSummary(bodyStr)})
+	}
+}
+
+// crashSummary extracts the first meaningful line from a crash dump.
+func crashSummary(raw string) string {
+	for _, line := range strings.Split(raw, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "goroutine ") {
+			continue
+		}
+		if strings.Contains(t, "panic(") || strings.Contains(t, ".go:") {
+			if len(t) > 200 { t = t[:197] + "..." }
+			return t
+		}
+	}
+	return "(无法解析崩溃堆栈)"
 }

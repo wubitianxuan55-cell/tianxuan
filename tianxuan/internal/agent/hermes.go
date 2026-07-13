@@ -210,7 +210,7 @@ func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, er
 		execSink.Emit(e)
 	}))
 	defer h.hephaestus.SetSink(execSink)
-	return h.hephaestus.Run(ctx, task)
+	return h.hephaestus.Run(ctx, formatHandoff(task, task, ""))
 }
 
 // injectProjectMap adds a structural overview to the planner session when the

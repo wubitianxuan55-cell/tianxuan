@@ -42,6 +42,15 @@ func RenderTOML(c *Config) string {
 	if c.Agent.SubagentTemperature > 0 {
 		fmt.Fprintf(&b, "subagent_temperature = %s   # override for task sub-agents (0 = use temperature)\n", formatFloat(c.Agent.SubagentTemperature))
 	}
+	if c.Agent.Effort != "" {
+		fmt.Fprintf(&b, "effort = %q   # executor reasoning: high | max (empty = off)\n", c.Agent.Effort)
+	}
+	if c.Agent.PlannerEffort != "" {
+		fmt.Fprintf(&b, "planner_effort = %q   # override for Hermes (empty = inherit effort)\n", c.Agent.PlannerEffort)
+	}
+	if c.Agent.SubagentEffort != "" {
+		fmt.Fprintf(&b, "subagent_effort = %q   # override for sub-agents (empty = inherit effort)\n", c.Agent.SubagentEffort)
+	}
 	if c.Agent.PlannerModel != "" {
 		fmt.Fprintf(&b, "planner_model = %q   # low-frequency planner (two-model collaboration)\n", c.Agent.PlannerModel)
 	} else {

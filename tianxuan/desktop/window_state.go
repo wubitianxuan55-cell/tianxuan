@@ -90,9 +90,20 @@ func (a *App) saveWindowStateSync() {
 				"panic", r)
 		}
 	}()
-	w, h := runtime.WindowGetSize(a.ctx)
-	x, y := runtime.WindowGetPosition(a.ctx)
-	max := runtime.WindowIsMaximised(a.ctx)
+	var w, h, x, y int
+	var max bool
+	func() {
+		defer func() { recover() }()
+		w, h = runtime.WindowGetSize(a.ctx)
+	}()
+	func() {
+		defer func() { recover() }()
+		x, y = runtime.WindowGetPosition(a.ctx)
+	}()
+	func() {
+		defer func() { recover() }()
+		max = runtime.WindowIsMaximised(a.ctx)
+	}()
 	_ = a.SaveWindowState(DesktopWindowState{
 		Width:     w,
 		Height:    h,

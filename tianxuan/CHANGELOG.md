@@ -1,3 +1,20 @@
+## [10.60.0] — 2026-07-13
+
+### 🧠🔨 双模型架构硬化
+
+- **L1/L2 解耦**：AGENTS.md 剥离双模型/单模型专属规则，只保留通用编码铁律；模式专属行为由各自 L2 系统提示词独立定义
+- **Hephaestus 提示词重构**：去掉「从 Hermes 或系统直传」等实现细节，统一为「Hermes 发送计划→执行」；补充 dual-model architecture 身份声明
+- **快速路径消息统一**：`!` 前缀的快速执行路径改用 `formatHandoff` 包装消息，Hephaestus 始终收到一致的手交格式
+- **Ask 工具全系统强制**：AGENTS.md + HephaestusSystemPrompt + SoloSystemPrompt 三层覆盖 🔴 级 ask 工具规则，杜绝纯文本提问导致的轮次中断
+- **SoloSystemPrompt 清理**：移除误加的 Hermes 引用行，ask 规则从弱提示升级为 Core Principles 🔴 条目
+
+### 🖥️ 桌面端改进
+
+- **崩溃恢复通知**：崩溃堆栈提取摘要并通过 sink 发送 UI 通知（`[crash]` → 用户可见），补充 slog 日志记录
+- **窗口状态容错**：`WindowGetSize`/`WindowGetPosition`/`WindowIsMaximised` 各自包裹 recover 保护，WebView2 nil 崩溃不再阻止状态保存
+- **推理深度标签**：「推理→思考」重命名；关闭/标准/深度三档增加 hint tooltip 说明
+- **配置渲染**：`config render` 支持 `effort`/`planner_effort`/`subagent_effort` 字段输出
+
 ## [10.59.0] — 2026-07-12
 
 ### 🎯 MCP 工具精简

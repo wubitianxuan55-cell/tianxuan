@@ -21,16 +21,16 @@ function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; tit
 }
 
 const EFFORT_LEVELS = [
-  { key: "", label: "关闭" },
-  { key: "high", label: "标准" },
-  { key: "max", label: "深度" },
+  { key: "", label: "关闭", hint: "直接输出，不显示思考过程" },
+  { key: "high", label: "标准", hint: "适度推理，日常任务推荐" },
+  { key: "max", label: "深度", hint: "扩展推理链，复杂逻辑任务" },
 ] as const;
 
 export function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: string) => void; busy: boolean }) {
   const v = value ?? ""; // normalize undefined → ""
   return (
     <div className="flex items-center gap-1">
-      <span className="text-fg-faint text-[11px] shrink-0 mr-0.5">推理</span>
+      <span className="text-fg-faint text-[11px] shrink-0 mr-0.5">思考</span>
       {EFFORT_LEVELS.map((l) => (
         <button key={l.key}
           className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${
@@ -39,6 +39,7 @@ export function EffortSelect({ value, onChange, busy }: { value: string; onChang
               : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"
           }`}
           disabled={busy}
+          title={l.hint}
           onClick={() => onChange(l.key)}
         >{l.label}</button>
       ))}

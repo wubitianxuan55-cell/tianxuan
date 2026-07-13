@@ -1,3 +1,26 @@
+## [10.64.0] — 2026-07-13
+
+### 🚀 5 阶段追赶 Reasonix 设置面板差距
+
+> 从 7 Tab → 17 Tab，补齐 Provider 高级字段、DesktopConfig、ToolsConfig、MemoryCompiler、预设系统、诊断面板。
+
+- **阶段1: Provider 高级字段（9字段）**：`ProviderEntry` 新增 ChatURL/ModelsURL/Headers/ExtraBody/AuthHeader/VisionModels/ReasoningProtocol/SupportedEfforts/DefaultEffort；`render.go` 完整 TOML 渲染；前后端完整读写闭环
+- **阶段2: DesktopConfig + Tools扩展 + MemoryCompiler**：新增 `[desktop]` 配置段（8字段）控制布局/显示/关闭/状态栏/遥测；`[tools]` 扩展 bash超时/MCP超时/shell/搜索引擎；`AgentConfig.MemoryCompilerEnabled`；edit.go 10新 mutation + settings_app 10新 setter + DesktopView
+- **阶段3: 纯前端追赶**：默认模型选择器从原生 `<select>` 升级为 ModelSwitcher（搜索+分组+Check标记）；Subagents 面板从占位升级为真实数据面板（全局设置+按技能覆盖）；字体/缩放/Zoom；Hooks 9事件类型说明
+- **阶段4: Provider 预设**：7 模板一键填表（DeepSeek/OpenAI/Anthropic/Kimi/Qwen/GLM/Ollama）+ 快速添加下拉 + 自动填充 ProviderEditor 表单
+- **阶段5: Diagnostics 诊断面板**：MCP服务器/Skills/Memory/Version/Context 5项实时检查，带绿/黄/红状态指示
+
+### 🔧 设置面板全面重构 (v10.63.0)
+
+> P1-P4 四阶段对齐 DeepSeek-Reasonix，16 Tab 全部就位，零编译错误。
+
+- **后端**：AgentConfig 新增 MaxSubagentDepth/ColdResumePrune/ReasoningLanguage；edit.go 7 新 mutation；settings_app 9 新 setter；ProviderView 扩展 Thinking/Effort
+- **前端**：11 新组件（SettingsGeneral/SettingsNetwork/SettingsMcp/SettingsSkills/SettingsMemory/SettingsSubagents/SettingsPlugins/SettingsHooks/SettingsPageShell/SettingsShortcuts）；分组导航+搜索+Record映射表渲染；16 Tab 全部就位零占位
+- **Appearance 增强**：字体大小/显示缩放/布局风格（classic/workbench/creation）/关闭行为/状态栏
+- **i18n**：en/zh/zh-TW 各新增 18 个 settings.* 键 + 全量 settingsTabMeta 使用 t() 调用
+- **快捷键**：12 个全局快捷键列表 + 作用域说明
+- **Provider Thinking/Effort**：前后端完整读写闭环
+
 ## [10.62.0] — 2026-07-13
 
 ### 🎨 思考卡/工具卡/过程卡 样式全面优化

@@ -146,6 +146,22 @@ export interface AppBindings {
   SetPlannerEffort(effort: string): Promise<void>;
   // SetSubagentEffort sets the reasoning effort for sub-agents. "" = inherit from Effort.
   SetSubagentEffort(effort: string): Promise<void>;
+  // SetPlannerMaxSteps caps the planner's tool-call rounds per turn. 0 = unlimited.
+  SetPlannerMaxSteps(n: number): Promise<void>;
+  // SetMaxSubagentDepth caps recursion depth for runAs=subagent skills. 0 = unlimited.
+  SetMaxSubagentDepth(n: number): Promise<void>;
+  // SetColdResumePrune enables or disables pruning of expired tool results on cold resume.
+  SetColdResumePrune(on: boolean): Promise<void>;
+  // SetReasoningLanguage sets the language for model reasoning/thinking text.
+  SetReasoningLanguage(lang: string): Promise<void>;
+  // SetAutoPlan controls whether interactive turns auto-start in plan mode.
+  SetAutoPlan(mode: string): Promise<void>;
+  // SetOutputStyle sets the persona/tone folded into the system prompt.
+  SetOutputStyle(style: string): Promise<void>;
+  // SetLanguage sets the ui/model language tag. Empty = auto-detect.
+  SetLanguage(lang: string): Promise<void>;
+  // SetNetwork sets the HTTP proxy configuration.
+  SetNetwork(mode: string, url: string, noProxy: string): Promise<void>;
   // SetSubagentModel sets the default model for spawned sub-agents. An empty string
   // clears it so sub-agents inherit the parent's provider.
   SetSubagentModel(ref: string): Promise<void>;

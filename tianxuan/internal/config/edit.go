@@ -257,6 +257,68 @@ func validatePlugin(e PluginEntry) error {
 	return nil
 }
 
+// SetPlannerMaxSteps caps the planner's tool-call rounds per turn. 0 = unlimited.
+func (c *Config) SetPlannerMaxSteps(n int) error {
+	if n < 0 {
+		return fmt.Errorf("planner_max_steps must be >= 0, got %d", n)
+	}
+	c.Agent.PlannerMaxSteps = n
+	return nil
+}
+
+// SetMaxSubagentDepth caps recursion depth for runAs=subagent skills. 0 = unlimited.
+func (c *Config) SetMaxSubagentDepth(n int) error {
+	if n < 0 {
+		return fmt.Errorf("max_subagent_depth must be >= 0, got %d", n)
+	}
+	c.Agent.MaxSubagentDepth = n
+	return nil
+}
+
+// SetColdResumePrune enables or disables pruning of expired tool results on cold resume.
+func (c *Config) SetColdResumePrune(on bool) error {
+	c.Agent.ColdResumePrune = &on
+	return nil
+}
+
+// SetReasoningLanguage sets the language preference for model reasoning/thinking text.
+// Valid values: "" (auto), "zh", "en", "auto".
+func (c *Config) SetReasoningLanguage(lang string) error {
+	lang = strings.TrimSpace(lang)
+	switch lang {
+	case "", "auto", "zh", "en":
+		c.Agent.ReasoningLanguage = lang
+		return nil
+	default:
+		return fmt.Errorf("reasoning_language %q: must be auto|zh|en", lang)
+	}
+}
+
+// SetAutoPlan controls whether interactive turns auto-start in plan mode.
+// Valid values: "off", "ask", "on".
+func (c *Config) SetAutoPlan(mode string) error {
+	mode = strings.TrimSpace(mode)
+	switch mode {
+	case "off", "ask", "on":
+		c.Agent.AutoPlan = mode
+		return nil
+	default:
+		return fmt.Errorf("auto_plan %q: must be off|ask|on", mode)
+	}
+}
+
+// SetOutputStyle sets the persona/tone folded into the system prompt.
+func (c *Config) SetOutputStyle(style string) error {
+	c.Agent.OutputStyle = strings.TrimSpace(style)
+	return nil
+}
+
+// SetLanguage sets the ui/model language tag (e.g. "zh"). Empty = auto-detect.
+func (c *Config) SetLanguage(lang string) error {
+	c.Language = strings.TrimSpace(lang)
+	return nil
+}
+
 // SaveTo writes the configuration to path as annotated TOML, atomically: it
 // writes a sibling temp file then renames, so a crash mid-write can't leave a
 // half-written tianxuan.toml that fails to parse on next load. Parent directories

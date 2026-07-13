@@ -288,6 +288,18 @@ type AgentConfig struct {
 	// AutoPlanClassifier optionally names a provider/model used to classify
 	// borderline auto-plan decisions. Empty keeps the zero-cost heuristic path.
 	AutoPlanClassifier string `toml:"auto_plan_classifier"`
+	// MaxSubagentDepth caps recursion depth for runAs=subagent skills. 0
+	// (default) means unlimited; the harness stops at-depth agents from spawning
+	// further sub-agents when the counter hits this limit.
+	MaxSubagentDepth int `toml:"max_subagent_depth"`
+	// ColdResumePrune trims tool-result messages whose executor session has
+	// exited when resuming a cold conversation. nil (default) = off (preserve
+	// full history); true = prune expired tool results to save context.
+	ColdResumePrune *bool `toml:"cold_resume_prune"`
+	// ReasoningLanguage sets the language preference for the model's visible
+	// reasoning/thinking text. "" (default) means auto-detect from Language or
+	// $LANG; valid values: "zh", "en", "auto".
+	ReasoningLanguage string `toml:"reasoning_language"`
 }
 
 // PlannerTemp returns the effective temperature for the Hermes planner.

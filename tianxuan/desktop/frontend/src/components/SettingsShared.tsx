@@ -1,9 +1,24 @@
 import type { SettingsView } from "../lib/types";
 import { useT } from "../lib/i18n";
 
-export type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
+export type SettingsTab =
+  | "general" | "models" | "providers" | "permissions" | "sandbox" | "agent"
+  | "network" | "appearance" | "updates" | "shortcuts"
+  | "mcp" | "skills" | "subagents" | "plugins" | "memory" | "hooks";
 
-export const SETTINGS_TABS: SettingsTab[] = ["models", "providers", "permissions", "sandbox", "agent", "appearance", "updates"];
+export const SETTINGS_TABS: SettingsTab[] = [
+  "general", "models", "providers", "permissions", "sandbox", "agent",
+  "network", "appearance", "updates", "shortcuts",
+  "mcp", "skills", "subagents", "plugins", "memory", "hooks",
+];
+
+export type TabGroup = { label: string; tabs: SettingsTab[] };
+
+export const TAB_GROUPS: TabGroup[] = [
+  { label: "核心", tabs: ["general", "models", "providers", "permissions", "sandbox", "agent"] },
+  { label: "环境", tabs: ["network", "appearance", "updates", "shortcuts"] },
+  { label: "能力", tabs: ["mcp", "skills", "subagents", "plugins", "memory", "hooks"] },
+];
 
 export type SectionProps = {
   s: SettingsView;
@@ -12,52 +27,44 @@ export type SectionProps = {
 };
 
 export function settingsTabLabel(id: SettingsTab, t: ReturnType<typeof useT>): string {
-  switch (id) {
-    case "models":
-      return t("settings.tab.models");
-    case "providers":
-      return t("settings.tab.providers");
-    case "permissions":
-      return t("settings.tab.permissions");
-    case "sandbox":
-      return t("settings.tab.sandbox");
-    case "agent":
-      return t("settings.tab.agent");
-    case "appearance":
-      return t("settings.tab.appearance");
-    case "updates":
-      return t("settings.tab.updates");
-  }
+  const fallback: Record<string, string> = {
+    general: "通用", models: "模型", providers: "模型服务", permissions: "权限",
+    sandbox: "沙箱", agent: "智能体", network: "网络", appearance: "外观",
+    updates: "更新", shortcuts: "快捷键",
+    mcp: "MCP", skills: "技能", subagents: "子代理", plugins: "插件",
+    memory: "记忆", hooks: "钩子",
+  };
+  try { return t(`settings.tab.${id}` as any); }
+  catch { return fallback[id] || id; }
 }
 
 export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<typeof useT>): string {
   switch (id) {
-    case "models":
-      return toRef(s.defaultModel, s) || t("common.none");
-    case "providers":
-      return t("settings.providerCount", { n: s.providers.length });
-    case "permissions":
-      return s.permissions.mode;
-    case "sandbox":
-      return s.sandbox.bash;
-    case "agent":
-      return t("settings.agentMeta", { temp: s.agent.temperature, steps: s.agent.maxSteps || "∞" });
-    case "appearance":
-      return t("settings.appearanceMeta");
-    case "updates":
-      return t("settings.updatesMeta");
+    case "general": return `${s.agent.autoPlan || "off"} · ${s.agent.reasoningLanguage || "auto"}`;
+    case "models": return toRef(s.defaultModel, s) || t("common.none");
+    case "providers": return t("settings.providerCount", { n: s.providers.length });
+    case "permissions": return s.permissions.mode;
+    case "sandbox": return s.sandbox.bash;
+    case "agent": return t("settings.agentMeta", { temp: s.agent.temperature, depth: s.agent.maxSubagentDepth || 0, steps: s.agent.maxSteps || "∞" });
+    case "network": return s.network?.proxyMode || "off";
+    case "appearance": return t("settings.appearanceMeta");
+    case "updates": return t("settings.updatesMeta");
+    case "shortcuts": return "12 个";
+    case "mcp": return "服务";
+    case "skills": return "项目";
+    case "subagents": return "配置";
+    case "plugins": return "扩展";
+    case "memory": return "记忆";
+    case "hooks": return "事件";
   }
 }
 
-// allRefs flattens providers into "provider/model" refs for the model selectors.
 export function allRefs(s: SettingsView): string[] {
   const out: string[] = [];
   for (const p of s.providers) for (const m of p.models) out.push(`${p.name}/${m}`);
   return out;
 }
 
-// toRef normalises a stored model id (a provider name, a bare model, or a ref) to
-// a "provider/model" ref so a <select> of refs can show it selected.
 export function toRef(model: string, s: SettingsView): string {
   if (!model) return "";
   if (model.includes("/")) return model;

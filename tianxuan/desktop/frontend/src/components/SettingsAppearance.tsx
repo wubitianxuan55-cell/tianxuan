@@ -27,13 +27,28 @@ export function AppearanceSection({
 }) {
   const { t, pref, setPref } = useI18n();
 
-  // 字体偏好
   const [uiFont, setUiFont] = useState(() => {
     try { return localStorage.getItem("tianxuan.uiFont") || ""; } catch { return ""; }
   });
   const [monoFont, setMonoFont] = useState(() => {
     try { return localStorage.getItem("tianxuan.monoFont") || ""; } catch { return ""; }
   });
+  const [textSize, setTextSize] = useState(() => {
+    try { return localStorage.getItem("tianxuan.textSize") || "default"; } catch { return "default"; }
+  });
+  const [zoom, setZoom] = useState(() => {
+    try { return Number(localStorage.getItem("tianxuan.zoom")) || 100; } catch { return 100; }
+  });
+  const [layout, setLayout] = useState(() => {
+    try { return localStorage.getItem("tianxuan.layoutStyle") || "classic"; } catch { return "classic"; }
+  });
+  const [close, setClose] = useState(() => {
+    try { return localStorage.getItem("tianxuan.closeBehavior") || "quit"; } catch { return "quit"; }
+  });
+  const applyZoom = (z: number) => {
+    localStorage.setItem("tianxuan.zoom", String(z));
+    document.documentElement.style.fontSize = `${z}%`;
+  };
   const applyFont = (kind: "ui" | "mono", value: string) => {
     const attr = kind === "ui" ? "data-font-family" : "data-mono-font-family";
     if (value) {
@@ -127,6 +142,91 @@ export function AppearanceSection({
           <option value="jetbrains">JetBrains Mono</option>
           <option value="sfmono">SF Mono</option>
         </select>
+      </div>
+
+      {/* ── 字体大小 ── */}
+      <div className="mb-4">
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">字体大小</label>
+        <div className="inline-flex border border-border-soft rounded-md overflow-hidden">
+          {[
+            { value: "small", label: "小" },
+            { value: "default", label: "默认" },
+            { value: "large", label: "大" },
+            { value: "xlarge", label: "加大" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] hover:text-fg hover:bg-bg-soft last:border-r-0 ${textSize === value ? "bg-accent-soft text-accent" : ""}`}
+              onClick={() => {
+                localStorage.setItem("tianxuan.textSize", value);
+                document.documentElement.setAttribute("data-text-size", value);
+                setTextSize(value);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 显示缩放 ── */}
+      <div className="mb-4">
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">显示缩放</label>
+        <div className="flex items-center gap-2">
+          <button className="w-6 h-6 rounded border border-border-soft bg-transparent text-fg-dim text-xs cursor-pointer hover:bg-bg-soft flex items-center justify-center"
+            onClick={() => { const n = Math.max(70, zoom - 10); setZoom(n); applyZoom(n); }}>−</button>
+          <input type="range" min="70" max="150" step="5" value={zoom}
+            onChange={(e) => { const v = Number(e.target.value); setZoom(v); applyZoom(v); }}
+            className="w-[120px] accent-accent h-1" />
+          <button className="w-6 h-6 rounded border border-border-soft bg-transparent text-fg-dim text-xs cursor-pointer hover:bg-bg-soft flex items-center justify-center"
+            onClick={() => { const n = Math.min(150, zoom + 10); setZoom(n); applyZoom(n); }}>+</button>
+          <span className="text-[11px] text-fg-faint min-w-[36px]">{zoom}%</span>
+          <button className="px-2 py-1 text-[11px] rounded border border-border-soft bg-transparent text-fg-dim cursor-pointer hover:bg-bg-soft"
+            onClick={() => { setZoom(100); applyZoom(100); }}>重置</button>
+        </div>
+      </div>
+
+      {/* ── 桌面布局 ── */}
+      <div className="mb-4">
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">布局风格</label>
+        <div className="inline-flex border border-border-soft rounded-md overflow-hidden">
+          {[
+            { value: "classic", label: "经典" },
+            { value: "workbench", label: "工作台" },
+            { value: "creation", label: "创作" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] hover:text-fg hover:bg-bg-soft last:border-r-0 ${layout === value ? "bg-accent-soft text-accent" : ""}`}
+              onClick={() => {
+                localStorage.setItem("tianxuan.layoutStyle", value);
+                document.documentElement.setAttribute("data-layout-style", value);
+                setLayout(value);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 关闭行为 ── */}
+      <div className="mb-4">
+        <label className="text-fg-dim text-[13px] font-medium mb-2 block">关闭行为</label>
+        <div className="inline-flex border border-border-soft rounded-md overflow-hidden">
+          {[
+            { value: "quit", label: "退出" },
+            { value: "background", label: "最小化到托盘" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              className={`px-3 py-1.5 bg-transparent border-0 border-r border-border-soft text-fg-dim text-xs cursor-pointer transition-[color,background] hover:text-fg hover:bg-bg-soft last:border-r-0 ${close === value ? "bg-accent-soft text-accent" : ""}`}
+              onClick={() => { localStorage.setItem("tianxuan.closeBehavior", value); setClose(value); }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── 语言 ── */}

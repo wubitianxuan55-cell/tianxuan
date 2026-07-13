@@ -121,12 +121,12 @@ export function makeMockApp(): AppBindings {
   const settings: SettingsView = {
     defaultModel: "deepseek-flash",
     providers: [
-      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000 },
-      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000 },
+      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000, thinking: "", effort: "" },
+      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "" },
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
-    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "" },
+    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "", plannerMaxSteps: 0, maxSubagentDepth: 0, coldResumePrune: false, reasoningLanguage: "", autoPlan: "off", outputStyle: "" },
     plannerModel: "",
     subagentModel: "",
     subagentModels: {},
@@ -134,6 +134,8 @@ export function makeMockApp(): AppBindings {
     configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
     providerKinds: ["openai"],
     bypass: false,
+    language: "",
+    network: { proxyMode: "off", proxyUrl: "", noProxy: "" },
     permLevel: "ask",
   };
   return {
@@ -523,6 +525,14 @@ export function makeMockApp(): AppBindings {
     async SetSubagentEffort(effort: string) {
       settings.agent.subagentEffort = effort;
     },
+    async SetPlannerMaxSteps(n: number) { settings.agent.plannerMaxSteps = n; },
+    async SetMaxSubagentDepth(n: number) { settings.agent.maxSubagentDepth = n; },
+    async SetColdResumePrune(on: boolean) { settings.agent.coldResumePrune = on; },
+    async SetReasoningLanguage(lang: string) { settings.agent.reasoningLanguage = lang; },
+    async SetAutoPlan(mode: string) { settings.agent.autoPlan = mode; },
+    async SetOutputStyle(style: string) { settings.agent.outputStyle = style; },
+    async SetLanguage(lang: string) { settings.language = lang; },
+    async SetNetwork(mode: string, url: string, noProxy: string) { settings.network = { proxyMode: mode, proxyUrl: url, noProxy }; },
     async SetPermLevel(level: string) {
       settings.permLevel = level;
     },

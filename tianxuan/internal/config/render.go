@@ -76,6 +76,21 @@ func RenderTOML(c *Config) string {
 	} else {
 		b.WriteString("# output_style = \"explanatory\"   # explanatory | learning | concise | custom; empty = default\n")
 	}
+	if c.Agent.MaxSubagentDepth > 0 {
+		fmt.Fprintf(&b, "max_subagent_depth = %d   # cap recursion for runAs=subagent (0 = unlimited)\n", c.Agent.MaxSubagentDepth)
+	} else {
+		b.WriteString("# max_subagent_depth = 2   # cap recursion for runAs=subagent (0 = unlimited)\n")
+	}
+	if c.Agent.ColdResumePrune != nil && *c.Agent.ColdResumePrune {
+		b.WriteString("cold_resume_prune = true   # trim expired tool results on cold resume\n")
+	} else {
+		b.WriteString("# cold_resume_prune = false   # trim expired tool results on cold resume\n")
+	}
+	if c.Agent.ReasoningLanguage != "" {
+		fmt.Fprintf(&b, "reasoning_language = %q   # zh | en | auto\n", c.Agent.ReasoningLanguage)
+	} else {
+		b.WriteString("# reasoning_language = \"auto\"   # zh | en | auto; empty = auto-detect\n")
+	}
 	b.WriteString("\n")
 
 	for _, p := range c.Providers {

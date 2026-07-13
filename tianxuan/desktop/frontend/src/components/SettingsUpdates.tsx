@@ -2,65 +2,73 @@ import { useEffect, useState } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { useUpdater } from "../lib/useUpdater";
+import { SettingsPageShell } from "./SettingsPageShell";
 
 const MB = 1024 * 1024;
 const mb = (n: number) => (n / MB).toFixed(1);
 
-// UpdatesSection is the manual side of the auto-updater: it shows the running
-// version and a Check button, then the same state machine the top banner uses
-// (useUpdater) — available → install/download, with progress and errors inline.
 export function UpdatesSection({ configPath }: { configPath: string }) {
   const t = useT();
   const { status, check, apply } = useUpdater();
   const [version, setVersion] = useState("");
-  useEffect(() => {
-    app.Version().then(setVersion).catch(() => {});
-  }, []);
+  useEffect(() => { app.Version().then(setVersion).catch(() => {}); }, []);
 
-  const busy =
-    status.kind === "checking" || status.kind === "downloading" || status.kind === "verifying" || status.kind === "applying";
+  const busy = status.kind === "checking" || status.kind === "downloading" || status.kind === "verifying" || status.kind === "applying";
 
   return (
-    <section className="mb-3">
-      <div className="text-fg text-sm font-semibold">{t("updater.title")}</div>
-      <div className="flex items-center gap-3 mb-2.5">
-        <label className="text-fg-dim text-[13px] shrink-0">{t("updater.currentVersion", { v: version || "…" })}</label>
-        <span className="flex-1" />
-        <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => void check()}>
-          {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
-        </button>
-      </div>
-      {status.kind === "upToDate" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.upToDate")}</div>}
-      {status.kind === "available" && (
-        <>
-          <div className="flex items-center gap-3 mb-2.5">
-            <span className="text-fg-dim text-[13px] shrink-0">{t("updater.available", { v: status.info.latest })}</span>
-            <span className="flex-1" />
-            <button className="btn--primary" onClick={() => apply(status.info)}>
-              {status.info.canSelfUpdate ? t("updater.installNow") : t("updater.goToDownload")}
-            </button>
+    <SettingsPageShell title="更新" desc="检查 tianxuan 桌面端新版本并在线更新。">
+      {/* 当前版本 */}
+      <div className="bg-bg-soft border border-border-soft rounded-lg px-4 py-3 mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[12px] text-fg-faint">{t("updater.currentVersion", { v: version || "…" })}</div>
+            {status.kind === "upToDate" && <div className="text-[11px] text-[#22C55E] mt-0.5">{t("updater.upToDate")}</div>}
           </div>
-          {!status.info.canSelfUpdate && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.macHint")}</div>}
-        </>
-      )}
-      {status.kind === "downloading" && (
-        <div className="text-fg-faint text-[10px] mt-1 px-1">
-          {t("updater.downloading", {
-            done: mb(status.received),
-            total: mb(status.total),
-            pct: status.total > 0 ? Math.round((status.received / status.total) * 100) : 0,
-          })}
+          <button className="px-3 py-1.5 text-[12px] rounded-md border border-border-soft bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors"
+            disabled={busy}
+            onClick={() => void check()}>
+            {status.kind === "checking" ? t("updater.checking") : t("updater.checkButton")}
+          </button>
         </div>
-      )}
-      {status.kind === "verifying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.verifying")}</div>}
-      {status.kind === "applying" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.applying")}</div>}
-      {status.kind === "done" && <div className="text-fg-faint text-[10px] mt-1 px-1">{t("updater.done")}</div>}
-      {status.kind === "error" && <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("updater.failed", { msg: status.message })}</div>}
-      {configPath && (
-        <div className="text-fg-faint text-[10px] mt-1 px-1 font-mono truncate" title={configPath}>
-          {t("settings.config", { path: configPath })}
-        </div>
-      )}
-    </section>
+
+        {status.kind === "available" && (
+          <div className="mt-3 pt-3 border-t border-border-soft">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-fg font-medium">{t("updater.available", { v: status.info.latest })}</span>
+              <button className="px-3 py-1.5 text-[12px] rounded-md bg-accent text-white border-0 cursor-pointer hover:opacity-90"
+                onClick={() => apply(status.info)}>
+                {status.info.canSelfUpdate ? t("updater.installNow") : t("updater.goToDownload")}
+              </button>
+            </div>
+            {status.info.notes && (
+              <div className="mt-2 text-[11px] text-fg-faint whitespace-pre-wrap">{status.info.notes}</div>
+            )}
+            {!status.info.canSelfUpdate && <div className="text-[11px] text-fg-faint mt-1">{t("updater.macHint")}</div>}
+          </div>
+        )}
+
+        {(status.kind === "downloading" || status.kind === "verifying" || status.kind === "applying") && (
+          <div className="mt-3 pt-3 border-t border-border-soft">
+            {status.kind === "downloading" && (
+              <div className="text-[12px] text-fg-faint">
+                {t("updater.downloading", { done: mb(status.received), total: mb(status.total), pct: status.total > 0 ? Math.round((status.received / status.total) * 100) : 0 })}
+              </div>
+            )}
+            {status.kind === "verifying" && <div className="text-[12px] text-fg-faint">{t("updater.verifying")}</div>}
+            {status.kind === "applying" && <div className="text-[12px] text-fg-faint">{t("updater.applying")}</div>}
+          </div>
+        )}
+
+        {status.kind === "error" && (
+          <div className="mt-2 px-3 py-2 text-[12px] bg-del-bg text-err rounded-md">{t("updater.failed", { msg: status.message })}</div>
+        )}
+      </div>
+
+      {/* 配置文件路径 */}
+      <div className="bg-bg-soft border border-border-soft rounded-lg px-4 py-3">
+        <div className="text-[12px] text-fg-faint mb-1">配置文件</div>
+        <div className="text-[12px] text-fg font-mono break-all">{configPath || "~/.config/tianxuan/config.toml"}</div>
+      </div>
+    </SettingsPageShell>
   );
 }

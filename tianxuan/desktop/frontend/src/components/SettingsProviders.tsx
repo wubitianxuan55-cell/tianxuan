@@ -99,6 +99,8 @@ function ProviderEditor({
   // Empty when unset so the placeholder (and its "0 = default" hint) reads instead
   // of a bare "0"; saved back as 0.
   const [ctx, setCtx] = useState(initial?.contextWindow ? String(initial.contextWindow) : "");
+  const [thinking, setThinking] = useState(initial?.thinking ?? "");
+  const [effort, setEffort] = useState(initial?.effort ?? "");
 
   // Offer the kinds the kernel actually registered; if the stored kind is a
   // legacy/unknown one, keep it as an option so editing doesn't silently change it.
@@ -119,6 +121,8 @@ function ProviderEditor({
       keySet: initial?.keySet ?? false,
       balanceUrl: balanceUrl.trim(),
       contextWindow: Number(ctx) || 0,
+      thinking: thinking.trim(),
+      effort: effort.trim(),
     });
   };
 
@@ -152,6 +156,10 @@ function ProviderEditor({
           <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerContextWindow")}</label>
           <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
           <div className="text-fg-faint text-[10px]">{t("settings.contextWindowHint")}</div>
+          <label className="text-fg-dim text-[13px] shrink-0">Thinking 模式</label>
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="enabled / disabled / adaptive（留空=默认）" value={thinking} onChange={(e) => setThinking(e.target.value)} />
+          <label className="text-fg-dim text-[13px] shrink-0">Effort 力度</label>
+          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="low / medium / high / max（留空=默认）" value={effort} onChange={(e) => setEffort(e.target.value)} />
         </div>
       </fieldset>
       <div className="flex gap-2 mt-2">

@@ -285,6 +285,8 @@ export interface ProviderView {
   keySet: boolean; // the env var currently resolves to a value
   balanceUrl: string; // optional wallet-balance endpoint; "" disables the readout
   contextWindow: number;
+  thinking: string;
+  effort: string;
 }
 
 // BalanceInfo is the wallet-balance readout (desktop/app.go Balance). available
@@ -328,6 +330,18 @@ export interface AgentView {
   effort: string;
   plannerEffort: string;
   subagentEffort: string;
+  plannerMaxSteps: number;
+  maxSubagentDepth: number;
+  coldResumePrune: boolean;
+  reasoningLanguage: string;
+  autoPlan: string;
+  outputStyle: string;
+}
+
+export interface NetworkView {
+  proxyMode: string;
+  proxyUrl: string;
+  noProxy: string;
 }
 
 export interface SettingsView {
@@ -343,7 +357,9 @@ export interface SettingsView {
   configPath: string;
   providerKinds: string[]; // provider implementations the kernel registered (for the kind picker)
   bypass: boolean; // DEPRECATED — use permLevel instead
-  permLevel?: string; // live permission level this session (\"ask\"|\"auto\"|\"yolo\")
+  permLevel?: string; // live permission level this session ("ask"|"auto"|"yolo")
+  language: string;
+  network: NetworkView;
 }
 
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;

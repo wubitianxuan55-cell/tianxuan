@@ -14,6 +14,9 @@ func TestRenderTOMLRoundTrips(t *testing.T) {
 	orig.Language = "zh"
 	orig.Agent.AutoPlanClassifier = "deepseek-flash"
 	orig.Agent.SubagentModel = "mimo-pro"
+	orig.Agent.MaxSubagentDepth = 3
+	orig.Agent.ColdResumePrune = boolPtr(true)
+	orig.Agent.ReasoningLanguage = "zh"
 	orig.Agent.SubagentModels = map[string]string{"review": "deepseek-pro"}
 	orig.Permissions = PermissionsConfig{
 		Mode:  "deny",
@@ -58,6 +61,15 @@ func TestRenderTOMLRoundTrips(t *testing.T) {
 	}
 	if got.Agent.SubagentModels["review"] != "deepseek-pro" {
 		t.Errorf("subagent_models.review = %q, want deepseek-pro", got.Agent.SubagentModels["review"])
+	}
+	if got.Agent.MaxSubagentDepth != 3 {
+		t.Errorf("max_subagent_depth = %d, want 3", got.Agent.MaxSubagentDepth)
+	}
+	if got.Agent.ColdResumePrune == nil || !*got.Agent.ColdResumePrune {
+		t.Errorf("cold_resume_prune = %v, want true", got.Agent.ColdResumePrune)
+	}
+	if got.Agent.ReasoningLanguage != "zh" {
+		t.Errorf("reasoning_language = %q, want zh", got.Agent.ReasoningLanguage)
 	}
 	if g, _ := got.Provider("mimo-pro"); g == nil || g.BaseURL != "http://localhost:8000/v1" {
 		t.Errorf("mimo-pro base_url not preserved: %+v", g)

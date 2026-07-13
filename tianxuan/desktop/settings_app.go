@@ -31,6 +31,8 @@ type ProviderView struct {
 	KeySet        bool     `json:"keySet"` // the env var currently resolves to a non-empty value
 	BalanceURL    string   `json:"balanceUrl"`
 	ContextWindow int      `json:"contextWindow"`
+	Thinking      string   `json:"thinking"`
+	Effort        string   `json:"effort"`
 }
 
 type PermissionsView struct {
@@ -61,6 +63,18 @@ type AgentView struct {
 	PlannerEffort string `json:"plannerEffort"`
 	// SubagentEffort overrides reasoning effort for sub-agents ("" = inherit Effort).
 	SubagentEffort string `json:"subagentEffort"`
+	// PlannerMaxSteps caps the planner's tool-call rounds per turn (0 = unlimited).
+	PlannerMaxSteps int `json:"plannerMaxSteps"`
+	// MaxSubagentDepth caps recursion depth for sub-agents (0 = unlimited).
+	MaxSubagentDepth int `json:"maxSubagentDepth"`
+	// ColdResumePrune trims expired tool results on cold resume.
+	ColdResumePrune bool `json:"coldResumePrune"`
+	// ReasoningLanguage sets the language preference for reasoning/thinking text.
+	ReasoningLanguage string `json:"reasoningLanguage"`
+	// AutoPlan controls auto-plan mode ("off" | "ask" | "on").
+	AutoPlan string `json:"autoPlan"`
+	// OutputStyle sets the persona/tone folded into the system prompt.
+	OutputStyle string `json:"outputStyle"`
 }
 
 // SettingsView is the whole Settings panel payload.
@@ -82,6 +96,17 @@ type SettingsView struct {
 	// Bypass is the live YOLO state (runtime-only, not from config), so the panel's
 	// toggle reflects whether approvals are currently being skipped this session.
 	Bypass bool `json:"bypass"`
+	// Language is the ui/model language tag (e.g. "zh"). Empty = auto-detect.
+	Language string `json:"language"`
+	// Network is the HTTP proxy configuration.
+	Network NetworkView `json:"network"`
+}
+
+// NetworkView exposes network proxy settings.
+type NetworkView struct {
+	ProxyMode string `json:"proxyMode"` // "auto" | "env" | "custom" | "off"
+	ProxyURL  string `json:"proxyUrl"`
+	NoProxy   string `json:"noProxy"`
 }
 
 func nonNil(s []string) []string {
@@ -118,10 +143,16 @@ func (a *App) Settings() SettingsView {
 			Bash: bash, Network: cfg.Sandbox.Network,
 			WorkspaceRoot: cfg.Sandbox.WorkspaceRoot, AllowWrite: nonNil(cfg.Sandbox.AllowWrite),
 		},
-		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt},
+		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt, PlannerMaxSteps: cfg.Agent.PlannerMaxSteps, MaxSubagentDepth: cfg.Agent.MaxSubagentDepth, ColdResumePrune: cfg.Agent.ColdResumePrune != nil && *cfg.Agent.ColdResumePrune, ReasoningLanguage: cfg.Agent.ReasoningLanguage, AutoPlan: cfg.Agent.AutoPlan, OutputStyle: cfg.Agent.OutputStyle},
 		ConfigPath:    config.SourcePath(),
 		ProviderKinds: provider.Kinds(),
 		Bypass:        a.ctrl != nil && a.ctrl.PermLevel() != "ask",
+		Language:      cfg.Language,
+		Network: NetworkView{
+			ProxyMode: cfg.Network.ProxyMode,
+			ProxyURL:  cfg.Network.ProxyURL,
+			NoProxy:   cfg.Network.NoProxy,
+		},
 	}
 	for i := range cfg.Providers {
 		p := &cfg.Providers[i]
@@ -398,6 +429,65 @@ func (a *App) SetPlannerEffort(effort string) error {
 func (a *App) SetSubagentEffort(effort string) error {
 	return a.applyConfigChange(func(c *config.Config) error {
 		c.Agent.SubagentEffort = effort
+		return nil
+	})
+}
+
+// SetPlannerMaxSteps caps the planner's tool-call rounds per turn.
+func (a *App) SetPlannerMaxSteps(n int) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetPlannerMaxSteps(n)
+	})
+}
+
+// SetMaxSubagentDepth caps recursion depth for runAs=subagent skills.
+func (a *App) SetMaxSubagentDepth(n int) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetMaxSubagentDepth(n)
+	})
+}
+
+// SetColdResumePrune enables or disables pruning of expired tool results.
+func (a *App) SetColdResumePrune(on bool) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetColdResumePrune(on)
+	})
+}
+
+// SetReasoningLanguage sets the language preference for reasoning/thinking text.
+func (a *App) SetReasoningLanguage(lang string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetReasoningLanguage(lang)
+	})
+}
+
+// SetAutoPlan controls whether interactive turns auto-start in plan mode.
+func (a *App) SetAutoPlan(mode string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetAutoPlan(mode)
+	})
+}
+
+// SetOutputStyle sets the persona/tone folded into the system prompt.
+func (a *App) SetOutputStyle(style string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetOutputStyle(style)
+	})
+}
+
+// SetLanguage sets the ui/model language tag. Empty = auto-detect.
+func (a *App) SetLanguage(lang string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetLanguage(lang)
+	})
+}
+
+// SetNetwork sets the HTTP proxy configuration.
+func (a *App) SetNetwork(mode, url, noProxy string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		c.Network.ProxyMode = mode
+		c.Network.ProxyURL = url
+		c.Network.NoProxy = noProxy
 		return nil
 	})
 }

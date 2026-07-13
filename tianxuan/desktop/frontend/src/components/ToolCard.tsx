@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState } from "react";
-import { ChevronRight, Compass } from "lucide-react";
+import { ChevronRight, Compass, Wrench } from "lucide-react";
 import { CodeViewer } from "./CodeViewer";
 import { DiffView } from "./DiffView";
 import { useT } from "../lib/i18n";
@@ -122,6 +122,7 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
           {item.status === "error" && <span className="tool__status-icon tool__status-icon--err">✗</span>}
           {item.status === "done" && <span className="tool__status-icon tool__status-icon--ok">✓</span>}
           {item.status === "stopped" && <span className="tool__status-icon tool__status-icon--stopped">—</span>}
+          <Wrench size={11} className="tool__type-icon" />
           <span className="tool__name">{item.name}</span>
           {subject && <span className="tool__subject">{subject}</span>}
         </span>

@@ -20,7 +20,6 @@ import type {
   MemoryView,
   MemorySuggestion,
   MemorySuggestionsView,
-  MobileAccessView,
   ResultView,
   ScheduleView,
   SkillSuggestion,
@@ -176,13 +175,6 @@ export interface AppBindings {
   RunScheduleNow(id: string): Promise<ResultView>;
   GetResults(scheduleID: string): Promise<ResultView[]>;
   RefineSchedulePrompt(prompt: string): Promise<string>;
-  // Mobile access (desktop Settings panel).
-  MobileAccessStatus(): Promise<MobileAccessView>;
-  StartMobileAccess(port: number, ngrokToken: string): Promise<MobileAccessView>;
-  StopMobileAccess(): Promise<void>;
-  CheckNgrok(): Promise<boolean>;
-  AutoStartMobileAccess(): Promise<MobileAccessView | null>;
-  GetPersistedMobileToken(): Promise<string>;
 }
 
 interface WailsRuntime {
@@ -281,4 +273,4 @@ import {
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 
 type AssertNever<T extends never> = T;
-export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel">>;
+export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel" | "StartMobileAccess" | "StopMobileAccess" | "MobileAccessStatus" | "CheckNgrok" | "AutoStartMobileAccess" | "GetPersistedMobileToken">>;

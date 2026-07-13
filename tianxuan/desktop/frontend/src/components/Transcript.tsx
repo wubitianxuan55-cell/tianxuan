@@ -91,22 +91,8 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
     }
   }, [running, turnStartAt]);
 
-  if (display.length === 0) return null;
-
-  const labelParts: string[] = [];
-  if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
-  if (thoughtCount > 0) labelParts.push(`${thoughtCount} 次思考`);
-
-  // Elapsed: live while running, frozen after completion
-  const elapsed = running
-    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
-    : finalElapsedRef.current;
-  const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
-  const label = labelParts.length > 0
-    ? (elapsedStr ? `${labelParts.join(" · ")} · ${elapsedStr}` : labelParts.join(" · "))
-    : (running ? "处理中…" : elapsedStr);
-
   // Pre-compute body: batch consecutive completed read-only tools into ReadOnlyBatch
+  // MUST be before the early return so hook count is stable across renders.
   const body = useMemo(() => {
     const nodes: React.ReactNode[] = [];
     const roBatch: ToolItem[] = [];
@@ -137,12 +123,27 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
     return nodes;
   }, [display]);
 
+  if (display.length === 0) return null;
+
+  const labelParts: string[] = [];
+  if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
+  if (thoughtCount > 0) labelParts.push(`${thoughtCount} 次思考`);
+
+  // Elapsed: live while running, frozen after completion
+  const elapsed = running
+    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
+    : finalElapsedRef.current;
+  const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
+  const label = labelParts.length > 0
+    ? (elapsedStr ? `${labelParts.join(" · ")} · ${elapsedStr}` : labelParts.join(" · "))
+    : (running ? "处理中…" : elapsedStr);
+
   const toggle = () => { userOverridden.current = true; setOpen((v) => !v); };
 
   return (
     <div className={`turn-collapse${open ? " turn-collapse--open" : ""}`}>
       <button
-        className="reasoning__head"
+        className="turn-collapse__head"
         data-running={running ? "" : undefined}
         onClick={toggle}
         aria-expanded={open}
@@ -482,7 +483,7 @@ export function Transcript({
         );
       })}
 
-      <div className="max-w-[--maxw] mx-auto px-12" ref={entranceRef}>
+      <div className="max-w-[--maxw] mx-auto px-24" ref={entranceRef}>
         {items.length === 0 && (
           <Welcome onPrompt={onPrompt} cwd={cwd} cwdName={cwdName} sessions={sessions} onResumeSession={onResumeSession} meta={meta} />
         )}

@@ -281,7 +281,7 @@ export function Composer({
   }, [disabled, running, queueLen, cwd, workspaceName, t]);
 
   return (
-    <div className="relative max-w-[--maxw] mx-auto">
+    <div className="relative max-w-[--maxw] mx-auto px-20">
       {/* ── 工作区切换菜单 ── */}
       {workspaceMenuOpen && cwd && (
         <div

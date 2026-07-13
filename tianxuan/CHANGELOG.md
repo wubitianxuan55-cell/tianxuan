@@ -1,3 +1,22 @@
+## [10.62.0] — 2026-07-13
+
+### 🎨 思考卡/工具卡/过程卡 样式全面优化
+
+- **思考卡 (Reasoning)**：字体 11.5→12px；头部增加 transition + active:scale 点击反馈；内容区增加微妙背景渐变 + 圆角边框；BrainIcon 增强 stroke 可见性；shimmer 动画节奏优化（5s→4s，220%→240%）
+- **工具卡 (ToolCard)**：头部增加 transition + hover/active 三态反馈；Wrench 图标区分工具类型；内容区半透明边框 + 圆角；工具名称独立颜色层次；错误展示左边框强调 + 半透明底色；嵌套工具 70% 透明边框层级；diff 标签加粗对齐
+- **过程卡 (TurnCollapse)**：独立 `turn-collapse__head` 样式（hover/active/transition）；内容区微妙渐变 + 圆角 + 间距优化；子思考卡 hover 高亮 + 圆角 + padding；inline-reasoning 75% 透明边框 + 圆角；compaction hover 边框过渡
+- **React #310 热修复**：TurnCollapse 内 `useMemo(body)` 移到提前 `return null` 之前，确保 hooks 数量在所有渲染路径中一致（9→10）
+- **布局**：对话区 padding px-12→px-24；输入框同步对齐 px-20（含 footer px-4 合计 96px）
+
+### 🗑️ 移除移动端访问功能
+
+- 删除 `desktop/mobile_access.go`（329行）— HTTP/SSE/ngrok 移动端远程访问
+- 删除 `SettingsMobile.tsx` — 设置面板移动端标签页
+- 清理 `app.go` 中 `serve.Broadcaster`、SSE 转发、FIXME 注释
+- 清理 `bridge.ts`/`types.ts`/`mock.ts` 中 6 个移动端 API
+- 清理 locales 中 6 个移动端 i18n key
+- **二进制体积：23.6MB → 16.3MB（-31%）** — 移除 `internal/serve`（webui + mobileui 嵌入资源）及 ngrok/qrcode 依赖
+
 ## [10.61.0] — 2026-07-13
 
 ### 🎨 消息卡片 UI 全面对齐 DeepSeek-Reasonix

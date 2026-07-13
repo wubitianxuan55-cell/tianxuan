@@ -1,9 +1,9 @@
 import type { SettingsView } from "../lib/types";
 import { useT } from "../lib/i18n";
 
-export type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates" | "mobile";
+export type SettingsTab = "models" | "providers" | "permissions" | "sandbox" | "agent" | "appearance" | "updates";
 
-export const SETTINGS_TABS: SettingsTab[] = ["models", "providers", "permissions", "sandbox", "agent", "appearance", "updates", "mobile"];
+export const SETTINGS_TABS: SettingsTab[] = ["models", "providers", "permissions", "sandbox", "agent", "appearance", "updates"];
 
 export type SectionProps = {
   s: SettingsView;
@@ -27,8 +27,6 @@ export function settingsTabLabel(id: SettingsTab, t: ReturnType<typeof useT>): s
       return t("settings.tab.appearance");
     case "updates":
       return t("settings.tab.updates");
-    case "mobile":
-      return t("settings.tab.mobile");
   }
 }
 
@@ -48,8 +46,6 @@ export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<
       return t("settings.appearanceMeta");
     case "updates":
       return t("settings.updatesMeta");
-    case "mobile":
-      return t("settings.mobileMeta");
   }
 }
 

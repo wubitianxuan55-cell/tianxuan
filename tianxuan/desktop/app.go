@@ -17,7 +17,6 @@ import (
 	"tianxuan/internal/i18n"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/schedule"
-	"tianxuan/internal/serve"
 )
 
 // eventChannel is the Wails runtime event name the frontend subscribes to for the
@@ -241,10 +240,6 @@ func (a *App) buildController() {
 	// ContextUsage, and History.
 	runtime.EventsEmit(ctx, "agent:ready")
 
-	// Auto-start mobile access if previously configured.
-	// FIXME: re-enable after root-causing desktop crash on executor execution.
-	// a.AutoStartMobileAccess()
-
 	// Persist the default tab so a relaunch can restore it.
 	a.saveTabs()
 }
@@ -279,7 +274,6 @@ func (a *App) shutdown(context.Context) {
 type eventSink struct {
 	ctx context.Context
 	app *App // optional back-reference for tab ID injection
-	bc  *serve.Broadcaster // optional: mobile SSE broadcaster (set by StartMobileAccess)
 }
 
 func (s *eventSink) Emit(e event.Event) {
@@ -298,17 +292,6 @@ func (s *eventSink) Emit(e event.Event) {
 		runtime.EventsEmit(s.ctx, eventChannel, toWireTab(e, tabID))
 	} else {
 		runtime.EventsEmit(s.ctx, eventChannel, toWire(e))
-	}
-	// Also forward to the mobile SSE broadcaster if active.
-	if s.bc != nil {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("desktop: eventSink mobile broadcast panic", "panic", r)
-				}
-			}()
-			s.bc.Emit(e)
-		}()
 	}
 }
 

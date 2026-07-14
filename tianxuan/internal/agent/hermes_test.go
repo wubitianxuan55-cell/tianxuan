@@ -51,6 +51,56 @@ func TestShouldSkipPlanner_BangWithSpaces(t *testing.T) {
 	}
 }
 
+func TestShouldSkipPlanner_AfterComposeBlocks(t *testing.T) {
+	// Simulates Compose() prepending <memory-update> and <background-jobs>
+	// blocks before the user's "!build desktop" input.
+	input := `<memory-update>
+The following project-memory changes were just made and apply from now on:
+- Saved memory "foo"
+</memory-update>
+
+<background-jobs>
+job bash-1 finished
+</background-jobs>
+
+!build desktop`
+	s, ok := shouldSkipPlanner(input)
+	if !ok {
+		t.Fatal("expected true for ! prefix after Compose blocks")
+	}
+	if s != "build desktop" {
+		t.Fatalf("got %q, want %q", s, "build desktop")
+	}
+}
+
+func TestShouldSkipPlanner_AfterMemoryRules(t *testing.T) {
+	// Simulates Compose() prepending procedural rules.
+	input := `Procedural rule line 1
+Procedural rule line 2
+
+!run tests`
+	s, ok := shouldSkipPlanner(input)
+	if !ok {
+		t.Fatal("expected true for ! after procedural rules")
+	}
+	if s != "run tests" {
+		t.Fatalf("got %q, want %q", s, "run tests")
+	}
+}
+
+func TestShouldSkipPlanner_NoBangInMiddle(t *testing.T) {
+	// "!" inside a message (not at a paragraph boundary) should NOT trigger.
+	input := `<memory-update>
+something
+</memory-update>
+
+help me fix the !important CSS bug`
+	_, ok := shouldSkipPlanner(input)
+	if ok {
+		t.Fatal("should NOT trigger on ! in middle of text")
+	}
+}
+
 // ── isAnswerNotAction ──────────────────────────────────────
 
 func TestIsAnswerNotAction_Short(t *testing.T) {

@@ -529,9 +529,17 @@ func (g *autoGate) Check(_ context.Context, _ string, _ json.RawMessage, _ bool)
 
 // shouldSkipPlanner detects tasks that are simple enough to execute directly,
 // V10.34: only the explicit "!" marker skips the planner.
+// V10.72: Compose() may prepend <memory-update>, <background-jobs>, etc.
+// before the user's input (separated by "\n\n"). We check both the raw
+// beginning and after the last "\n\n!" paragraph boundary.
 func shouldSkipPlanner(input string) (string, bool) {
 	if stripped, ok := strings.CutPrefix(input, "!"); ok {
 		return strings.TrimSpace(stripped), true
+	}
+	// Compose-prepended blocks end with "\n\n" before user input.
+	const sep = "\n\n!"
+	if idx := strings.LastIndex(input, sep); idx >= 0 {
+		return strings.TrimSpace(input[idx+3:]), true
 	}
 	return "", false
 }

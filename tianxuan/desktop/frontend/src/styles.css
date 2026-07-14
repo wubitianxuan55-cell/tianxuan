@@ -2728,9 +2728,12 @@ body::after {
 .tool__body {
   overflow: hidden;
   border-left: 2px solid color-mix(in srgb, var(--border) 85%, transparent);
-  padding: 4px 0 2px 14px;
+  padding: 0;
   margin-left: 5px;
   border-radius: 0 3px 3px 0;
+}
+.tool--open > .tool__body {
+  padding: 4px 0 2px 14px;
 }
 .tool__note {
   font-size: var(--font-caption);

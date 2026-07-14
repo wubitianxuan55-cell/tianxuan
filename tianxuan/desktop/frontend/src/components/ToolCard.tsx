@@ -3,7 +3,6 @@ import { ChevronRight, Compass, Wrench } from "lucide-react";
 import { CodeViewer } from "./CodeViewer";
 import { DiffView } from "./DiffView";
 import { useT } from "../lib/i18n";
-import { useCompact } from "../hooks/useCompact";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { diffsFor, subjectOf, summarize } from "../lib/tools";
 import type { Item } from "../lib/store";
@@ -50,7 +49,6 @@ function splitPreview(text: string, n: number): { preview: string; total: number
 
 export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolItem; subcalls?: ToolItem[] }) {
   const t = useT();
-  const compact = useCompact();
   const diffs = useMemo(() => diffsFor(item.name, item.args), [item.name, item.args]);
   const subject = useMemo(() => subjectOf(item.name, item.args), [item.name, item.args]);
   const nested = subcalls ?? [];
@@ -68,8 +66,8 @@ export const ToolCard = memo(function ToolCard({ item, subcalls }: { item: ToolI
     : 0;
   const duration = durationMs > 0 ? `${Math.round(durationMs)} ms` : "";
 
-  // All tools default to collapsed; running/error tools open so user sees progress.
-  const defaultOpen = !compact && (hasNested ? item.status === "running" : item.status === "running" || item.status === "error");
+  // All tools default to collapsed — user clicks to expand.
+  const defaultOpen = false;
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const open = userOpen ?? defaultOpen;
   const openRef = useRef(open);

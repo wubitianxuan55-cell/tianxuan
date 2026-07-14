@@ -91,12 +91,28 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 	for _, batch := range partitionToolCalls(a.tools, calls) {
 		if batch.parallel && batch.end-batch.start > 1 {
 			runParallel(batch.start, batch.end, run)
+			// After a parallel batch, check if context was cancelled before
+			// proceeding to next batch — stop button during a parallel batch
+			// should prevent subsequent serial calls from running.
+			select {
+			case <-ctx.Done():
+				goto drain
+			default:
+			}
 			continue
 		}
 		for i := batch.start; i < batch.end; i++ {
+			// Fast path: if context is already cancelled (stop button), skip
+			// remaining tool calls in this batch instead of blocking on them.
+			select {
+			case <-ctx.Done():
+				goto drain
+			default:
+			}
 			run(i)
 		}
 	}
+drain:
 
 	for i, c := range calls {
 		o := outcomes[i]

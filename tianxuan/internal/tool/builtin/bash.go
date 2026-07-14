@@ -360,9 +360,14 @@ var launcherPrefixes = []string{
 	// Wails / Tauri / Electron
 	"wails dev", "wails serve",
 	// Docker
-	"docker compose up", "docker-compose up",
+	"docker compose up", "docker-compose up", "docker run ",
 	// Tunnels / proxies
 	"ngrok ", "cloudflared tunnel", "localtunnel ",
+	// Java / JVM
+	"java -jar ", "mvn spring-boot:run", "mvnw spring-boot:run",
+	"gradle bootrun", "gradlew bootrun",
+	// Elixir / Phoenix
+	"iex -S mix", "mix phx.server",
 	// Watchers / live-reload
 	"nodemon ", "ts-node-dev ", "tsx watch",
 	// .NET
@@ -372,6 +377,8 @@ var launcherPrefixes = []string{
 	// Misc
 	"vite", "webpack-dev-server", "next dev", "nuxt dev",
 	"hugo server", "jekyll serve", "mkdocs serve",
+	// Python env managers running servers
+	"pipenv run ", "poetry run ",
 }
 
 // wrapLauncherCommand detects whether cmd starts a long-running process and
@@ -388,13 +395,14 @@ func wrapLauncherCommand(cmd string, sh sandbox.Shell) (string, bool) {
 		return cmd, false
 	}
 
-	// PowerShell: "start"/"Start-Process" is already non-blocking.
-	// For other launcher commands, wrap via cmd /c start.
+	// PowerShell: use cmd /c start /b so the process launches in background
+	// WITHOUT a visible cmd window. start /b means "same window, background" —
+	// the server process runs but cmd exits immediately, never blocking bash.
 	if sh.Kind == sandbox.ShellPowerShell {
 		if isStartCmd(trimmed) {
 			return cmd, false // already non-blocking
 		}
-		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
+		return fmt.Sprintf(`cmd /c start /b "" %s`, escapeCmdArg(cmd)), true
 	}
 
 	// Bash / POSIX shell: append " &" to background the command.
@@ -441,9 +449,10 @@ func isLauncherByKeywords(lower string) bool {
 // " server " matches "python server.py" (after normalising separators) but not
 // "echo observer".
 var launcherKeywords = []string{
-	" serve ", " dev ", " watch ", " start ",
-	" server ", " daemon ", " listen ", " runserver ",
+	" serve ", " dev ", " watch ", " start ", " runserver ",
+	" server ", " daemon ", " listen ",
 	" ngrok ", " tunnel ", " proxy ",
+	" start-server ", " run-server ", " serve-app ",
 }
 
 // isStartCmd reports whether cmd starts with "start " (PowerShell alias for

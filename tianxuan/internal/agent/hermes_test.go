@@ -192,6 +192,9 @@ func TestHephaestusSystemPrompt_ContainsEssentials(t *testing.T) {
 		"parallel_tasks",
 		"Surgical Changes",
 		"Goal-Driven Execution",
+		"NEVER re-explore",
+		"not plans, not confirmations, not investigations",
+		"Hermes handles replanning",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -209,6 +212,7 @@ func TestHermesPrompt_ContainsEssentials(t *testing.T) {
 		"<!--plan-->",
 		"read-only",
 		"3–8 steps",
+		"will NOT re-explore",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {

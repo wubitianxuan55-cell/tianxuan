@@ -10,6 +10,7 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.67.0 | 2026-07-14 | 从 Reasonix 蒸馏补齐设置面板 — ModelPicker/StepLimitControl/General增强/Shortcuts录制/Hooks管理/Sandbox Shell |
 | V10.66.0 | 2026-07-14 | 5 项后端 BUG 清理 — goroutine泄漏/可取消ctx/错误日志 |
 | V10.52.2 | 2026-07-09 | 双模型 Prompt 全面重写 + 执行契约 L2 化 + 整体优化 |
 | V10.52.1 | 2026-07-09 | parallel_tasks 工具 + 品牌图标统一 + 系统提示并行指引 |

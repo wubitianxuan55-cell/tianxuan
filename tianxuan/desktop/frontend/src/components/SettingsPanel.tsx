@@ -100,7 +100,7 @@ search: <Search size={15} />,
 
   return (
     <Modal onClose={onClose} wide>
-      <header className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border-soft">
+      <header className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border-soft bg-bg-soft/50">
         <span className="text-[15px] font-semibold text-fg">{t("settings.title")}</span>
         <CloseButton onClick={onClose} />
       </header>
@@ -108,9 +108,9 @@ search: <Search size={15} />,
         <div className="flex-1 flex items-center justify-center text-fg-faint text-[13px]">{t("settings.loading")}</div>
       ) : (
         <div className="flex-1 min-h-0 flex">
-          <nav className="flex flex-col gap-0.5 w-[224px] py-3 px-2 border-r border-border-soft overflow-y-auto shrink-0 scrollbar-thin">
+          <nav className="flex flex-col gap-0.5 w-[224px] py-3 px-2 border-r border-border-soft overflow-y-auto shrink-0 scrollbar-thin bg-sidebar-bg">
             <div className="relative mb-2.5 px-0.5">
-              <input className="w-full bg-bg border border-border rounded-md text-fg text-[12px] pl-7 pr-2.5 py-1.5 outline-none placeholder:text-fg-faint/40 focus:border-accent transition-colors"
+              <input className="w-full bg-sidebar-hover border border-border rounded-md text-fg text-[12px] pl-7 pr-2.5 py-1.5 outline-none placeholder:text-fg-faint/40 focus:border-accent transition-colors"
                 placeholder="搜索…" value={query} onChange={(e) => setQuery(e.target.value)} />
               <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint/40" />
             </div>
@@ -121,15 +121,15 @@ search: <Search size={15} />,
             ) : (
               visibleGroups.map((group) => (
                 <div key={group.label} className="mb-2">
-                  <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-widest text-fg-faint/45">{group.label}</div>
+                  <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-widest text-fg-faint/60">{group.label}</div>
                   {group.tabs.map((id) => <NavButton key={id} id={id} s={s} t={t} active={tab===id} icons={TAB_ICONS} onClick={()=>setTab(id)} />)}
                 </div>
               ))
             )}
           </nav>
-          <main className="flex-1 min-w-0 overflow-y-auto px-6 py-4">
+          <main className="flex-1 min-w-0 overflow-y-auto px-7 py-5">
             {err && <div className="shrink-0 px-4 py-2 mb-3 text-[12.5px] bg-del-bg text-err rounded-md border border-err/20">{err}</div>}
-            {renderers?.[tab]?.()}
+            <div key={tab} className="animate-[fadeIn_150ms_ease-out]">{renderers?.[tab]?.()}</div>
           </main>
         </div>
       )}
@@ -144,12 +144,12 @@ function NavButton({ id, s, t, active, icons, onClick }: {
     <button className={
       "relative flex items-center gap-2.5 w-full px-2.5 py-1.5 border-0 rounded-md bg-transparent text-left cursor-pointer transition-all duration-[var(--dur-fast)] group " +
       (active
-        ? "text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent"
+        ? "bg-accent/20 text-accent font-bold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[4px] before:rounded-full before:bg-accent"
         : "text-fg-dim hover:text-fg hover:bg-sidebar-hover"
       )
     }
       onClick={onClick}>
-      <span className="shrink-0 opacity-70 group-hover:opacity-90 transition-opacity">{icons[id]}</span>
+      <span className={`shrink-0 transition-opacity ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-90'}`}>{icons[id]}</span>
       <div className="flex flex-col gap-0.5 min-w-0">
         <span className="text-[13px] font-medium">{settingsTabLabel(id, t)}</span>
         <small className="text-[11px] text-fg-faint truncate">{settingsTabMeta(id, s, t)}</small>

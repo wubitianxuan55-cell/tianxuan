@@ -13,7 +13,7 @@ export function SettingsNetwork({ s, busy: _busy, apply }: SectionProps) {
   const save = () => apply(() => app.SetNetwork(mode, url, noProxy));
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Globe size={15} />网络代理</span>} desc="配置 HTTP/HTTPS 代理，影响模型 API 和 web_fetch 等工具的出站流量。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Globe size={15} className="text-accent" />网络代理</span>} desc="配置 HTTP/HTTPS 代理，影响模型 API 和 web_fetch 等工具的出站流量。">
       <SettingsSection title="代理模式">
         <SettingsField label="代理模式" hint="选择出站流量的代理策略。">
           <SegmentedButton
@@ -32,7 +32,7 @@ export function SettingsNetwork({ s, busy: _busy, apply }: SectionProps) {
           <>
             <SettingsField label="代理 URL" hint="http://host:port 或 socks5://host:port">
               <input
-                className="bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 w-[260px] outline-none focus:border-accent transition-colors"
+                className="bg-bg border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 w-[260px] outline-none focus:border-accent transition-colors"
                 placeholder="http://127.0.0.1:7890"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -41,7 +41,7 @@ export function SettingsNetwork({ s, busy: _busy, apply }: SectionProps) {
 
             <SettingsField label="NoProxy" hint="逗号分隔的直连域名/主机，绕过代理">
               <input
-                className="bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 w-[260px] outline-none focus:border-accent transition-colors"
+                className="bg-bg border border-border-soft rounded-md text-fg text-[12px] px-2.5 py-1.5 w-[260px] outline-none focus:border-accent transition-colors"
                 placeholder="localhost,127.0.0.1,.local"
                 value={noProxy}
                 onChange={(e) => setNoProxy(e.target.value)}

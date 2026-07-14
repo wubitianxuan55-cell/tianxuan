@@ -29,7 +29,7 @@ export function SettingsMcp() {
   };
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Wrench size={15} />MCP 服务器</span>} desc="管理 Model Context Protocol 服务器连接与工具发现。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Wrench size={15} className="text-accent" />MCP 服务器</span>} desc="管理 Model Context Protocol 服务器连接与工具发现。">
       <div className="flex items-center justify-between mb-3">
         <span />
         <button className="btn btn--ghost btn--tiny" onClick={() => void reload()} disabled={loading} type="button">
@@ -37,12 +37,14 @@ export function SettingsMcp() {
         </button>
       </div>
 
-      {loading ? <p className="text-[13px] text-fg-faint">加载中…</p> :
+      {loading ? <div className="bg-bg-soft border border-border-soft rounded-xl p-6 text-center"><p className="text-[13px] text-fg-faint">加载中…</p></div> :
        err ? <p className="text-[13px] text-err">{err}</p> :
        servers.length === 0 ? (
-         <div className="flex flex-col items-center py-8 text-fg-faint">
-           <Server size={32} className="mb-3 text-fg-faint/30" />
+         <div className="bg-bg-soft border border-border-soft rounded-xl p-6">
+         <div className="flex flex-col items-center py-4 text-fg-faint">
+           <Server size={32} className="mb-3 text-fg-faint/50" />
            <p className="text-[13px] text-center max-w-[280px]">未配置 MCP 服务器。用 `tianxuan setup` 或编辑 config.toml 的 [[plugins]] 段添加。</p>
+         </div>
          </div>
        ) : (
          <SettingsSection title={<span>{servers.length} 个服务器</span>}>
@@ -50,7 +52,7 @@ export function SettingsMcp() {
              {servers.map((s) => {
                const st = status(s.status);
                return (
-                 <div key={s.name} className="flex items-center gap-3 bg-bg-soft border border-border-soft rounded-lg px-3 py-2.5 hover:border-fg-faint/30 transition-colors">
+                 <div key={s.name} className="flex items-center gap-3 bg-bg border border-border rounded-lg px-3 py-2.5 hover:border-fg-faint/30 transition-colors">
                    <span className={`shrink-0 w-2.5 h-2.5 rounded-full ${st.cls}`} title={st.label} />
                    <div className="flex-1 min-w-0">
                      <div className="flex items-center gap-2">

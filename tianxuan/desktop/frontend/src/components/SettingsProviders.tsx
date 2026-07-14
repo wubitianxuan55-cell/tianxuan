@@ -26,7 +26,7 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
   const [quickPreset, setQuickPreset] = useState<typeof PROVIDER_PRESETS[0] | null>(null); // provider name, or "__new__"
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Plug size={15} />模型服务</span>} desc="管理 LLM 服务商连接，支持 OpenAI 兼容 API。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Plug size={15} className="text-accent" />模型服务</span>} desc="管理 LLM 服务商连接，支持 OpenAI 兼容 API。">
       {editing !== "__new__" && (
         <div className="mb-3">
           <button className="px-3 py-1.5 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => setEditing("__new__")}>
@@ -47,7 +47,7 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
               onSave={(pv) => apply(() => app.SaveProvider(pv)).then(() => setEditing(null))}
             />
           ) : (
-            <div className="border border-border-soft rounded-lg p-3 mb-2" key={p.name}>
+            <div className="bg-bg border border-border-soft rounded-lg p-3 mb-2" key={p.name}>
               <div className="flex items-center gap-2">
                 <span className="text-fg text-[13px] font-semibold">{p.name}</span>
                 <span className={`badge ${p.keySet ? "badge--success" : "badge--warning"}`}>
@@ -82,13 +82,13 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
           <div className="text-fg text-[13px] font-semibold mb-1">选择预设模板</div>
           <div className="grid grid-cols-3 gap-2">
             {PROVIDER_PRESETS.map(p => (
-              <button key={p.name} className="text-left bg-bg-soft border border-border-soft rounded-md p-2.5 cursor-pointer hover:border-accent hover:bg-accent-soft/10 transition-colors"
+              <button key={p.name} className="text-left bg-bg border border-border-soft rounded-md p-2.5 cursor-pointer hover:border-accent hover:bg-accent-soft/10 transition-colors"
                 onClick={() => setQuickPreset(p)}>
                 <div className="text-[12px] font-medium text-fg">{p.name}</div>
                 <div className="text-[10px] text-fg-faint font-mono mt-1">{p.models}</div>
               </button>
             ))}
-            <button className="text-left bg-bg-soft border border-border-soft rounded-md p-2.5 cursor-pointer hover:border-accent hover:bg-accent-soft/10 transition-colors"
+            <button className="text-left bg-bg border border-border-soft rounded-md p-2.5 cursor-pointer hover:border-accent hover:bg-accent-soft/10 transition-colors"
               onClick={() => setQuickPreset({name:"",kind:"openai",baseUrl:"",models:"",apiEnv:"",ctx:0})}>
               <div className="text-[12px] font-medium text-fg">自定义</div>
               <div className="text-[10px] text-fg-faint mt-1">手动填写</div>
@@ -176,43 +176,43 @@ function ProviderEditor({
   return (
     <div className="flex flex-col gap-2 p-3 border border-border-soft rounded-lg mb-2">
       {/* 基本设置 */}
-      <fieldset className="border border-border-soft rounded-md p-2.5">
-        <legend className="text-fg-faint text-[10px] font-medium px-1">基本设置</legend>
+      <fieldset className="bg-bg border border-border-soft rounded-md p-2.5">
+        <legend className="text-fg-dim text-[10px] font-medium px-1">基本设置</legend>
         <div className="flex flex-col gap-2">
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerName")} value={name} onChange={(e) => setName(e.target.value)} disabled={!!initial} />
           <div className="flex items-center gap-3">
             <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerKind")}</label>
-            <select className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <select className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent" value={kind} onChange={(e) => setKind(e.target.value)}>
               {kindOptions.map((k) => (
                 <option key={k} value={k}>{k}</option>
               ))}
             </select>
           </div>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerBaseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerModels")} value={models} onChange={(e) => setModels(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.providerApiKeyEnv")} value={apiKeyEnv} onChange={(e) => setApiKeyEnv(e.target.value)} />
         </div>
       </fieldset>
       {/* 高级设置 */}
-      <fieldset className="border border-border-soft rounded-md p-2.5">
-        <legend className="text-fg-faint text-[10px] font-medium px-1">高级设置</legend>
+      <fieldset className="bg-bg border border-border-soft rounded-md p-2.5">
+        <legend className="text-fg-dim text-[10px] font-medium px-1">高级设置</legend>
         <div className="flex flex-col gap-2">
           <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerBalanceUrl")}</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.balanceUrlPlaceholder")} value={balanceUrl} onChange={(e) => setBalanceUrl(e.target.value)} />
           <div className="text-fg-faint text-[10px]">{t("settings.balanceUrlHint")}</div>
           <label className="text-fg-dim text-[13px] shrink-0">{t("settings.providerContextWindow")}</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder={t("settings.contextWindowPlaceholder")} value={ctx} onChange={(e) => setCtx(e.target.value)} inputMode="numeric" />
           <div className="text-fg-faint text-[10px]">{t("settings.contextWindowHint")}</div>
           <label className="text-fg-dim text-[13px] shrink-0">Thinking 模式</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="enabled / disabled / adaptive（留空=默认）" value={thinking} onChange={(e) => setThinking(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="enabled / disabled / adaptive（留空=默认）" value={thinking} onChange={(e) => setThinking(e.target.value)} />
           <label className="text-fg-dim text-[13px] shrink-0">Effort 力度</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="low / medium / high / max（留空=默认）" value={effort} onChange={(e) => setEffort(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="low / medium / high / max（留空=默认）" value={effort} onChange={(e) => setEffort(e.target.value)} />
           <label className="text-fg-dim text-[13px] shrink-0">推理协议</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="auto / deepseek / openai / none" value={reasoningProtocol} onChange={(e) => setReasoningProtocol(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="auto / deepseek / openai / none" value={reasoningProtocol} onChange={(e) => setReasoningProtocol(e.target.value)} />
           <label className="text-fg-dim text-[13px] shrink-0">Chat URL</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="独立 Chat 端点（留空=BaseURL）" value={chatUrl} onChange={(e) => setChatUrl(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="独立 Chat 端点（留空=BaseURL）" value={chatUrl} onChange={(e) => setChatUrl(e.target.value)} />
           <label className="text-fg-dim text-[13px] shrink-0">默认 Effort</label>
-          <input className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="low / medium / high / max（留空=全局默认）" value={defaultEffort} onChange={(e) => setDefaultEffort(e.target.value)} />
+          <input className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent" placeholder="low / medium / high / max（留空=全局默认）" value={defaultEffort} onChange={(e) => setDefaultEffort(e.target.value)} />
         </div>
       </fieldset>
       <div className="flex gap-2 mt-2">
@@ -234,7 +234,7 @@ function KeyField({ apiKeyEnv, busy, onSet }: { apiKeyEnv: string; busy: boolean
   return (
     <div className="flex items-center gap-2 mt-2">
       <input
-        className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
+        className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent"
         type="password"
         placeholder={t("settings.setKey", { env: apiKeyEnv })}
         value={val}

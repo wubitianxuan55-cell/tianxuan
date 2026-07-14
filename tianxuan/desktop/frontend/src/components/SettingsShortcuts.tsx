@@ -100,7 +100,7 @@ export function SettingsShortcuts() {
   const resolved = (id: string): string => customMap[id] || SHORTCUTS.find((s) => s.id === id)?.defaultKeys || "";
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Command size={15} />快捷键</span>} desc="tianxuan 桌面端的全局键盘快捷键。点击快捷键按钮进入录制模式，按新的组合键替换。⌘ = Mac Command, Ctrl = Windows/Linux。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Command size={15} className="text-accent" />快捷键</span>} desc="tianxuan 桌面端的全局键盘快捷键。点击快捷键按钮进入录制模式，按新的组合键替换。⌘ = Mac Command, Ctrl = Windows/Linux。">
       {conflict && (
         <div className="px-3 py-2 mb-3 text-[12px] text-red-500 bg-red-500/10 border border-red-500/30 rounded-md" role="alert">
           {conflict}
@@ -110,7 +110,7 @@ export function SettingsShortcuts() {
         <div className="overflow-hidden rounded-lg border border-border-soft">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="bg-bg-soft text-left">
+              <tr className="bg-bg text-left">
                 <th className="px-3 py-2 font-medium text-fg-dim w-[160px]">快捷键</th>
                 <th className="px-3 py-2 font-medium text-fg-dim">操作</th>
                 <th className="px-3 py-2 font-medium text-fg-dim w-[90px]">作用域</th>
@@ -146,7 +146,7 @@ export function SettingsShortcuts() {
                         className={`font-mono text-fg px-2 py-0.5 rounded border text-[11px] cursor-pointer transition-colors ${
                           isRecording
                             ? "bg-accent/20 border-accent text-accent animate-pulse"
-                            : "bg-bg-soft border-border-soft hover:border-fg-faint"
+                            : "bg-bg border-border-soft hover:border-fg-faint"
                         }`}
                         disabled={false}
                         aria-label={isRecording ? "录制中，按新组合键..." : comboLabel(combo)}

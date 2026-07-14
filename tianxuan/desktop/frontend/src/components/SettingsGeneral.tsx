@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Globe, Palette, Wrench, Bot, BrainCircuit } from "lucide-react";
 import type { SectionProps } from "./SettingsShared";
-import { SettingsSection, SettingsField, SegmentedButton } from "./SettingsPageShell";
+import { SettingsPageShell, SettingsSection, SettingsField, SegmentedButton } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
 import { useI18n } from "../lib/i18n";
 
@@ -22,7 +22,7 @@ function CollapsibleSection(p: {
     <div className="mb-1">
       <button
         type="button"
-        className="flex items-center gap-1.5 w-full text-left bg-transparent border-0 text-fg-dim text-[12px] font-medium py-1 cursor-pointer hover:text-fg transition-colors"
+        className="flex items-center gap-1.5 w-full text-left bg-transparent border-0 text-fg-dim text-[12px] font-medium py-1 cursor-pointer hover:text-fg transition-colors pt-0.5 border-t border-border-soft/40 mt-1"
         onClick={p.onToggle}
       >
         {p.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -31,7 +31,7 @@ function CollapsibleSection(p: {
           <span className="text-fg-faint text-[11px] font-normal truncate ml-1">· {p.summary}</span>
         )}
       </button>
-      {p.expanded && <div className="pl-4 space-y-2">{p.children}</div>}
+      {p.expanded && <div className="pl-3 ml-1 border-l-2 border-border-soft bg-bg/40 rounded-r-md p-2.5 space-y-2">{p.children}</div>}
     </div>
   );
 }
@@ -86,10 +86,11 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
     : `${soundPref === "synth" ? "成功提示" : ""}${soundPref === "synth" && attentionPref === "synth" ? " · " : ""}${attentionPref === "synth" ? "注意提示" : ""}`;
 
   return (
-    <div className="space-y-5">
+    <SettingsPageShell title="通用" desc="界面语言、工具参数、智能体行为与记忆管理等基础设置。">
+      <div className="space-y-5">
       {/* ── 语言 ── */}
       <SettingsSection title={
-        <span className="flex items-center gap-1.5"><Globe size={14} className="text-fg-faint" />语言</span>
+        <span className="flex items-center gap-1.5"><Globe size={14} className="text-accent" />语言</span>
       }>
         <SettingsField label="界面语言" hint="桌面界面的显示语言，自动 = 跟随系统。">
           <SegmentedButton
@@ -107,7 +108,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
 
       {/* ── 外观与布局 ── */}
       <SettingsSection title={
-        <span className="flex items-center gap-1.5"><Palette size={14} className="text-fg-faint" />外观与布局</span>
+        <span className="flex items-center gap-1.5"><Palette size={14} className="text-accent" />外观与布局</span>
       }>
         <SettingsField label="布局风格" hint="桌面窗口的整体布局样式。">
           <SegmentedButton
@@ -220,7 +221,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
 
       {/* ── 工具 ── */}
       <SettingsSection title={
-        <span className="flex items-center gap-1.5"><Wrench size={14} className="text-fg-faint" />工具</span>
+        <span className="flex items-center gap-1.5"><Wrench size={14} className="text-accent" />工具</span>
       }>
         <SettingsField label="工具审批模式" hint="工具写入前是否需要确认。">
           <SegmentedButton
@@ -247,7 +248,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         <SettingsField label="Bash 超时" hint="命令执行超时秒数，0 = 默认 (120s)。">
           <input
             type="number" min="0" max="600" step="10"
-            className="w-24 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
+            className="w-24 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
             placeholder="默认"
             value={bashTimeout}
             onChange={(e) => {
@@ -261,7 +262,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         <SettingsField label="MCP 超时" hint="MCP 调用超时秒数，0 = 默认 (300s)。">
           <input
             type="number" min="0" max="3600" step="30"
-            className="w-24 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
+            className="w-24 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
             placeholder="默认"
             value={mcpTimeout}
             onChange={(e) => {
@@ -276,7 +277,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
 
       {/* ── 智能体 ── */}
       <SettingsSection title={
-        <span className="flex items-center gap-1.5"><Bot size={14} className="text-fg-faint" />智能体</span>
+        <span className="flex items-center gap-1.5"><Bot size={14} className="text-accent" />智能体</span>
       }>
         <SettingsField label="自动规划" hint="多步任务自动启用规划模式。off=手动 / ask=询问 / on=自动。">
           <SegmentedButton
@@ -347,7 +348,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
 
       {/* ── 记忆与上下文 ── */}
       <SettingsSection title={
-        <span className="flex items-center gap-1.5"><BrainCircuit size={14} className="text-fg-faint" />记忆与上下文</span>
+        <span className="flex items-center gap-1.5"><BrainCircuit size={14} className="text-accent" />记忆与上下文</span>
       }>
         <SettingsField label="冷恢复修剪" hint="冷启动恢复时自动移除过期工具结果以节省上下文。">
           <SegmentedButton
@@ -379,5 +380,6 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         </SettingsField>
       </SettingsSection>
     </div>
+    </SettingsPageShell>
   );
 }

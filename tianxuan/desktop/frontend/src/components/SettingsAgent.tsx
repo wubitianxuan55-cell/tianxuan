@@ -25,8 +25,8 @@ function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: 
           key={l.key}
           className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${
             v === l.key
-              ? "text-accent border-accent bg-accent/15 font-semibold ring-1 ring-accent/30"
-              : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"
+              ? "text-accent border-accent bg-accent/15 font-semibold ring-2 ring-accent/50 shadow-sm"
+              : "text-fg-dim border-border-soft bg-bg-soft/60 hover:bg-bg-soft hover:text-fg hover:border-border"
           }`}
           disabled={busy}
           title={l.hint}
@@ -39,7 +39,7 @@ function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: 
 
 function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
   return (
-    <div className="bg-bg-soft border border-border-soft rounded-lg p-3.5">
+    <div className="bg-bg border border-border rounded-lg p-3.5">
       <div className="flex items-center gap-2 mb-2.5">
         <span className="text-accent shrink-0">{icon}</span>
         <div>
@@ -75,7 +75,7 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
     <SettingsPageShell title={t("settings.tab.agent")} desc="配置模型、子代理、推理参数与系统提示词。">
       <div className="space-y-5">
         {/* ── 模型配置 ── */}
-        <SettingsSection title={<span className="flex items-center gap-1.5"><Cpu size={14} className="text-fg-faint" />模型配置</span>}>
+        <SettingsSection title={<span className="flex items-center gap-1.5"><Cpu size={14} className="text-accent" />模型配置</span>}>
           <div className="grid grid-cols-2 gap-3">
             <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作。">
               <ModelPicker
@@ -156,7 +156,7 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
         </SettingsSection>
 
         {/* ── 步数与推理 ── */}
-        <SettingsSection title={<span className="flex items-center gap-1.5"><SettingsIcon size={14} className="text-fg-faint" />步数与推理</span>}>
+        <SettingsSection title={<span className="flex items-center gap-1.5"><SettingsIcon size={14} className="text-accent" />步数与推理</span>}>
           <SettingsField label="规划器步数" hint="规划阶段工具调用轮数上限。0 = 不限。">
             <StepLimitControl
               value={s.agent.plannerMaxSteps || 0}
@@ -212,10 +212,10 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
         </SettingsSection>
 
         {/* ── 系统提示词 ── */}
-        <SettingsSection title={<span className="flex items-center gap-1.5"><SettingsIcon size={14} className="text-fg-faint" />系统提示词</span>}>
+        <SettingsSection title={<span className="flex items-center gap-1.5"><SettingsIcon size={14} className="text-accent" />系统提示词</span>}>
           <div className="text-fg-faint text-[11px] mb-1.5">自定义系统提示词，覆盖默认的智能体行为指令。留空则使用内置模板。</div>
           <textarea
-            className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] p-2.5 outline-none resize-y min-h-[140px] focus:border-accent"
+            className="w-full bg-bg border border-border-soft rounded-md text-fg text-[13px] p-2.5 outline-none resize-y min-h-[140px] focus:border-accent"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={busy}

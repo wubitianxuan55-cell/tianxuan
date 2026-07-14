@@ -39,9 +39,9 @@ export function SettingsSkills() {
   const pathsText = paths.join("\n");
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} />技能</span>} desc="可发现的智能体技能，按作用域分组。自定义路径在 config.toml [skills] 中配置。">
-      {loading ? <p className="text-[13px] text-fg-faint">加载中…</p> :
-       skills.length === 0 ? <p className="text-[13px] text-fg-faint">未发现技能。</p> :
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} className="text-accent" />技能</span>} desc="可发现的智能体技能，按作用域分组。自定义路径在 config.toml [skills] 中配置。">
+      {loading ? <div className="bg-bg-soft border border-border-soft rounded-xl p-6 text-center"><p className="text-[13px] text-fg-faint">加载中…</p></div> :
+       skills.length === 0 ? <div className="bg-bg-soft border border-border-soft rounded-xl p-6 text-center"><p className="text-[13px] text-fg-faint">未发现技能。</p></div> :
        <>
          <div className="mb-3">
            <div className="mem-search">
@@ -61,7 +61,7 @@ export function SettingsSkills() {
              {filtered.map((s) => {
                const scope = SCOPE_LABEL[s.scope] || { label: s.scope, cls: "text-fg-faint bg-bg-elev" };
                return (
-                 <div key={s.name} className="flex items-center gap-3 bg-bg-soft border border-border-soft rounded-lg px-3 py-2.5 hover:border-fg-faint/30 transition-colors">
+                 <div key={s.name} className="flex items-center gap-3 bg-bg border border-border-soft rounded-lg px-3 py-2.5 hover:border-fg-faint/30 transition-colors">
                    <div className="flex-1 min-w-0">
                      <div className="flex items-center gap-2">
                        <span className="text-[13px] font-semibold text-fg font-mono">{s.name}</span>

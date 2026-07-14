@@ -21,11 +21,11 @@ export function SandboxSection({ s, busy, apply }: SectionProps) {
   ];
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Box size={15} />沙箱</span>} desc="控制子进程执行环境、网络访问和工作区根目录。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Box size={15} className="text-accent" />沙箱</span>} desc="控制子进程执行环境、网络访问和工作区根目录。">
       <SettingsSection title="Shell">
         <SettingsField label="Shell 类型" hint="选择子进程使用的 shell 解释器。">
           <select
-            className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent min-w-[140px]"
+            className="bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent min-w-[140px]"
             value={sb.bash || "auto"}
             disabled={busy}
             onChange={(e) => {
@@ -43,7 +43,7 @@ export function SandboxSection({ s, busy, apply }: SectionProps) {
 
       <SettingsSection title="运行环境">
         <SettingsField label="沙箱模式" hint="enforce=强制沙箱隔离 / off=关闭沙箱。">
-          <select className="bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent min-w-[160px]"
+          <select className="bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent min-w-[160px]"
             value={sb.bash} disabled={busy}
             onChange={(e) => void set({ bash: e.target.value })}>
             <option value="enforce">{t("settings.bashEnforce")}</option>
@@ -61,7 +61,7 @@ export function SandboxSection({ s, busy, apply }: SectionProps) {
 
         <SettingsField label="工作区根目录" hint="子进程可见的文件系统根目录。">
           <input
-            className="flex-1 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent w-full"
+            className="flex-1 bg-bg border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none placeholder:text-fg-faint focus:border-accent w-full"
             placeholder={t("settings.workspaceDefault")}
             value={root}
             disabled={busy}

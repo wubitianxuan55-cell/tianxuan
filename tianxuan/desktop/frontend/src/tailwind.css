@@ -304,3 +304,74 @@
 .ds-pulse {
   animation: status-pulse 2s ease-in-out infinite;
 }
+
+/* ── btn--small — secondary inline button ────────────────────────────── */
+@utility btn--small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.btn--small:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg-faint);
+  background: var(--color-bg-soft);
+}
+.btn--small:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── btn--ghost — transparent ghost button ──────────────────────────── */
+@utility btn--ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-fg-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.btn--ghost:hover {
+  color: var(--color-fg);
+  background: var(--color-bg-soft);
+}
+.btn--ghost:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── btn--tiny — micro button (icon-only or one-word) ──────────────── */
+@utility btn--tiny {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-fg-faint);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.btn--tiny:hover {
+  color: var(--color-fg);
+  background: var(--color-bg-soft);
+}
+.btn--tiny:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

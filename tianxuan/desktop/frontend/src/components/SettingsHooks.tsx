@@ -111,14 +111,14 @@ export function SettingsHooks() {
 
   if (!loaded) {
     return (
-      <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。">
+      <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} className="text-accent" />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。">
         <div className="text-fg-faint text-[13px] py-8 text-center">加载中…</div>
       </SettingsPageShell>
     );
   }
 
   return (
-    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。保存后立即生效。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} className="text-accent" />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。保存后立即生效。">
       {error && (
         <div className="bg-red-900/20 border border-red-500/30 rounded-md text-red-300 text-[12px] px-3 py-2 mb-3">
           {error}
@@ -138,7 +138,7 @@ export function SettingsHooks() {
               const key = event + "-" + idx;
               const isExpanded = expanded === key;
               return (
-                <div key={key} className="bg-bg-soft border border-border-soft rounded-lg p-3 mb-2">
+                <div key={key} className="bg-bg border border-border rounded-lg p-3 mb-2">
                   {/* Preview row */}
                   <div
                     className="flex items-center justify-between cursor-pointer"
@@ -240,7 +240,7 @@ export function SettingsHooks() {
           {VALID_EVENTS.filter(e => !hooks[e] || hooks[e].length === 0).map(event => (
             <button
               key={event}
-              className="text-[11px] bg-bg-soft border border-border-soft rounded-md px-2.5 py-1 cursor-pointer hover:border-accent/50 hover:text-accent text-fg-dim"
+              className="text-[11px] bg-bg border border-border-soft rounded-md px-2.5 py-1 cursor-pointer hover:border-accent/50 hover:text-accent text-fg-dim"
               onClick={() => { addHook(event); }}
             >
               <Plus size={10} className="inline mr-1" />
@@ -257,7 +257,7 @@ export function SettingsHooks() {
       <SettingsSection title="JSON 导入/导出">
         <div className="flex gap-2 mb-2">
           <button
-            className="flex items-center gap-1 text-[12px] bg-bg-soft border border-border-soft rounded-md px-3 py-1.5 cursor-pointer hover:border-accent/50 text-fg-dim"
+            className="flex items-center gap-1 text-[12px] bg-bg border border-border-soft rounded-md px-3 py-1.5 cursor-pointer hover:border-accent/50 text-fg-dim"
             onClick={exportJSON}
           >
             <Download size={13} /> 导出 JSON
@@ -287,7 +287,7 @@ export function SettingsHooks() {
       <SettingsSection title="可用事件 (11)">
         <div className="grid grid-cols-3 gap-1.5 text-[11px]">
           {VALID_EVENTS.map(e => (
-            <div key={e} className={`bg-bg-soft rounded px-2 py-1 ${hooks[e]?.length ? "text-accent" : "text-fg-dim"}`}>
+            <div key={e} className={`bg-bg rounded px-2 py-1 ${hooks[e]?.length ? "text-accent" : "text-fg-dim"}`}>
               {e}
               {hooks[e]?.length ? <span className="ml-1 text-fg-faint">({hooks[e].length})</span> : null}
             </div>

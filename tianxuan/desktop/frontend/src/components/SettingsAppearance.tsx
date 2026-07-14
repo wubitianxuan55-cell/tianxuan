@@ -54,7 +54,7 @@ function FontChipGroup(p: {
             type="button"
             className={`px-2.5 py-1 text-[11px] rounded border transition-colors ${
               active
-                ? "border-accent bg-accent-soft text-accent font-semibold"
+                ? "border-accent bg-accent-soft text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
                 : "border-border-soft bg-transparent text-fg-dim hover:border-fg-faint hover:text-fg"
             }`}
             onClick={() => p.onChange(f.value)}
@@ -65,7 +65,7 @@ function FontChipGroup(p: {
         type="button"
         className={`px-2.5 py-1 text-[11px] rounded border transition-colors ${
           isCurCustom
-            ? "border-accent bg-accent-soft text-accent font-semibold"
+            ? "border-accent bg-accent-soft text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
             : "border-border-soft bg-transparent text-fg-dim hover:border-fg-faint hover:text-fg"
         }`}
         onClick={() => p.onChange("custom")}
@@ -145,7 +145,7 @@ export function AppearanceSection({ s, busy: _busy, apply }: SectionProps) {
   return (
     <SettingsPageShell title="外观" desc="配色方案、字体与显示缩放。">
       {/* ── 配色方案 ── */}
-      <SettingsSection title={<span className="flex items-center gap-1.5"><Palette size={14} className="text-fg-faint" />配色方案</span>}>
+      <SettingsSection title={<span className="flex items-center gap-1.5"><Palette size={14} className="text-accent" />配色方案</span>}>
         <SettingsField label="主题风格" hint="选择界面主色调。">
           <div className="grid grid-cols-4 gap-2">
             {SCHEMES.map((s) => {
@@ -155,8 +155,8 @@ export function AppearanceSection({ s, busy: _busy, apply }: SectionProps) {
                 <button
                   key={s}
                   onClick={() => updateScheme(s)}
-                  className={`text-left bg-bg-soft border rounded-lg p-2 cursor-pointer transition-all hover:-translate-y-px hover:shadow-lg ${
-                    isActive ? "border-accent ring-1 ring-accent/50" : "border-border-soft hover:border-fg-faint/30"
+                  className={`text-left bg-bg border rounded-lg p-2 cursor-pointer transition-all hover:-translate-y-px hover:shadow-lg ${
+                    isActive ? "border-accent ring-2 ring-accent/50 shadow-md scale-[1.03]" : "border-border-soft hover:border-fg-faint/30"
                   }`}
                 >
                   <div className="rounded-md mb-1.5 overflow-hidden" style={{ background: `linear-gradient(135deg, ${c.bg} 0%, ${c.accent}40 100%)` }}>
@@ -192,7 +192,7 @@ export function AppearanceSection({ s, busy: _busy, apply }: SectionProps) {
       </SettingsSection>
 
       {/* ── 字体与缩放 ── */}
-      <SettingsSection title={<span className="flex items-center gap-1.5"><Type size={14} className="text-fg-faint" />字体与缩放</span>}>
+      <SettingsSection title={<span className="flex items-center gap-1.5"><Type size={14} className="text-accent" />字体与缩放</span>}>
         <SettingsField label="界面字体" hint="整体界面的显示字体。">
           <FontChipGroup fonts={UI_FONTS} current={uiFont} known={KNOWN_UI} onChange={(v) => {
             if (v === "custom") setUiCustomVal("");

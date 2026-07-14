@@ -39,8 +39,8 @@ func TestComposeDrainsQueuedMemory(t *testing.T) {
 	if !strings.Contains(got, "<memory-update>") || !strings.Contains(got, "user's balance is in RMB") {
 		t.Fatalf("queued memory should ride the turn: %q", got)
 	}
-	if !strings.HasSuffix(got, "hello") {
-		t.Fatalf("user text should follow the memory block: %q", got)
+	if !strings.HasPrefix(got, "hello") {
+		t.Fatalf("user text should come before the memory block: %q", got)
 	}
 	if got2 := c.Compose("again"); got2 != "again" {
 		t.Fatalf("pendingMemory should drain after one turn, got %q", got2)

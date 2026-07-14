@@ -29,8 +29,8 @@ func (c *Controller) Compose(text string) string {
 		for _, n := range notes {
 			b.WriteString("- " + n + "\n")
 		}
-		b.WriteString("</memory-update>\n\n")
-		text = b.String() + text
+		b.WriteString("</memory-update>")
+		text = text + "\n\n" + b.String()
 	}
 
 	// Session facts — temporary memories saved with session=true. These persist
@@ -43,8 +43,8 @@ func (c *Controller) Compose(text string) string {
 		for _, f := range sessionFacts {
 			fmt.Fprintf(&b, "- [%s] %s: %s\n", f.Name, f.Title, f.Description)
 		}
-		b.WriteString("</session-facts>\n\n")
-		text = b.String() + text
+		b.WriteString("</session-facts>")
+		text = text + "\n\n" + b.String()
 	}
 
 	// Background jobs that finished since the last turn ride the turn too, so the
@@ -52,7 +52,7 @@ func (c *Controller) Compose(text string) string {
 	// its context. Like memory, this never touches the cache-stable prefix.
 	if c.jobs != nil {
 		if note := c.jobs.DrainCompletedNote(); note != "" {
-			text = "<background-jobs>\n" + note + "\n</background-jobs>\n\n" + text
+			text = text + "\n\n" + "<background-jobs>\n" + note + "\n</background-jobs>"
 		}
 	}
 	// V10.18+: LangMem-inspired kind-aware memory injection.
@@ -60,11 +60,11 @@ func (c *Controller) Compose(text string) string {
 	// Episodic memories → injected when user input matches trigger tags.
 	if c.mem != nil {
 		if rules := c.mem.ProceduralBlock(); rules != "" {
-			text = rules + "\n\n" + text
+			text = text + "\n\n" + rules
 		}
 		if episodic := c.mem.EpisodicMatches(text); len(episodic) > 0 {
 			if block := memory.EpisodicBlock(episodic); block != "" {
-				text = block + "\n\n" + text
+				text = text + "\n\n" + block
 			}
 		}
 	}

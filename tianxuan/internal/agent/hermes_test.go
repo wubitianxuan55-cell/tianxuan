@@ -51,50 +51,21 @@ func TestShouldSkipPlanner_BangWithSpaces(t *testing.T) {
 	}
 }
 
-func TestShouldSkipPlanner_AfterComposeBlocks(t *testing.T) {
-	// Simulates Compose() prepending <memory-update> and <background-jobs>
-	// blocks before the user's "!build desktop" input.
-	input := `<memory-update>
-The following project-memory changes were just made and apply from now on:
-- Saved memory "foo"
-</memory-update>
-
-<background-jobs>
-job bash-1 finished
-</background-jobs>
-
-!build desktop`
+func TestShouldSkipPlanner_WithTrailingBlocks(t *testing.T) {
+	// Compose() now appends blocks AFTER user input, so ! always at position 0.
+	input := "!build desktop\n\n<memory-update>\n- Saved memory \"foo\"\n</memory-update>"
 	s, ok := shouldSkipPlanner(input)
 	if !ok {
-		t.Fatal("expected true for ! prefix after Compose blocks")
+		t.Fatal("expected true for ! prefix with trailing blocks")
 	}
 	if s != "build desktop" {
 		t.Fatalf("got %q, want %q", s, "build desktop")
 	}
 }
 
-func TestShouldSkipPlanner_AfterMemoryRules(t *testing.T) {
-	// Simulates Compose() prepending procedural rules.
-	input := `Procedural rule line 1
-Procedural rule line 2
-
-!run tests`
-	s, ok := shouldSkipPlanner(input)
-	if !ok {
-		t.Fatal("expected true for ! after procedural rules")
-	}
-	if s != "run tests" {
-		t.Fatalf("got %q, want %q", s, "run tests")
-	}
-}
-
-func TestShouldSkipPlanner_NoBangInMiddle(t *testing.T) {
-	// "!" inside a message (not at a paragraph boundary) should NOT trigger.
-	input := `<memory-update>
-something
-</memory-update>
-
-help me fix the !important CSS bug`
+func TestShouldSkipPlanner_NoBangWithBlocks(t *testing.T) {
+	// "!" in middle of text should NOT trigger, even with trailing Compose blocks.
+	input := "help me fix the !important CSS bug\n\n<memory-update>\nsomething\n</memory-update>"
 	_, ok := shouldSkipPlanner(input)
 	if ok {
 		t.Fatal("should NOT trigger on ! in middle of text")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
-import { Plus, Trash2, Download, Upload } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Zap } from "lucide-react";
 import { app } from "../lib/bridge";
 import type { HookConfigView, HooksSettingsView } from "../lib/types";
 
@@ -111,14 +111,14 @@ export function SettingsHooks() {
 
   if (!loaded) {
     return (
-      <SettingsPageShell title="钩子" desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。">
+      <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。">
         <div className="text-fg-faint text-[13px] py-8 text-center">加载中…</div>
       </SettingsPageShell>
     );
   }
 
   return (
-    <SettingsPageShell title="钩子" desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。保存后立即生效。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Zap size={15} />钩子</span>} desc="事件驱动的脚本钩子，在会话生命周期特定时刻自动执行。保存后立即生效。">
       {error && (
         <div className="bg-red-900/20 border border-red-500/30 rounded-md text-red-300 text-[12px] px-3 py-2 mb-3">
           {error}

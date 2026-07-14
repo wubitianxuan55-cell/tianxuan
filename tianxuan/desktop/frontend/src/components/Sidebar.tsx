@@ -1,7 +1,7 @@
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useState, useEffect, useMemo } from "react";
 import {
-  SquarePen, Brain, Blocks, MessageSquare,
+  SquarePen, Brain, MessageSquare,
   PanelLeftClose, PanelLeftOpen,
   Settings as SettingsIcon, CalendarDays, X,
 } from "lucide-react";
@@ -26,8 +26,7 @@ export interface SidebarProps {
   onRenameSession: (path: string, title: string) => void;
   onOpenHistory: () => void;
   onOpenMemory: () => void;
-  onOpenCaps: () => void;
-  onOpenSettings: () => void;
+onOpenSettings: () => void;
   onOpenSchedule: () => void;
   context: ContextInfo;
   startResize: (e: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -53,8 +52,7 @@ export function Sidebar({
   onRenameSession,
   onOpenHistory,
   onOpenMemory,
-  onOpenCaps,
-  onOpenSettings,
+onOpenSettings,
   onOpenSchedule,
   context,
   startResize,
@@ -288,14 +286,7 @@ export function Sidebar({
             <Brain size={15} />
             {!collapsed && <span>{t("topbar.memory")}</span>}
           </button>
-          <button
-            className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-base no-drag transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
-            onClick={() => onOpenCaps()}
-            title={t("caps.title")}
-          >
-            <Blocks size={15} />
-            {!collapsed && <span>{t("caps.title")}</span>}
-          </button>
+
           <button
             className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-fg-faint text-base no-drag transition-[color,background,transform] duration-150 hover:text-fg hover:bg-sidebar-hover active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${collapsed ? "justify-center w-10 !p-0 !gap-0" : ""}`}
             onClick={() => onOpenSchedule()}

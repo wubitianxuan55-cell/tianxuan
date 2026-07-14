@@ -270,8 +270,9 @@ export interface MemoryView {
   facts: MemoryFact[];
   scopes: MemoryScope[];
   storeDir: string;
+  storeGlobalDir?: string;
   available: boolean;
-  archives?: MemoryArchive[];
+  archives: MemoryArchive[];
 }
 
 // Settings panel payloads (desktop/settings_app.go).

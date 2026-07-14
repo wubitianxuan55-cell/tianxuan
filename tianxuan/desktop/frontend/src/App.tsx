@@ -9,7 +9,6 @@ import { useT } from "./lib/i18n";
 import { sessionTitle, sessionTime } from "./lib/session";
 import { applyColorScheme, applyThemeMode } from "./lib/theme";
 import { useController } from "./lib/store";
-import { app } from "./lib/bridge";
 import { Transcript } from "./components/Transcript";
 import { JumpBar } from "./components/JumpBar";
 import { ToastProvider, useToast } from "./components/Toast";
@@ -23,10 +22,8 @@ import { ToolbarButton } from "./components/ToolbarButton";
 import { StatusBar } from "./components/StatusBar";
 import { ModelSwitcher } from "./components/ModelSwitcher";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-const MemoryPanel = lazy(() => import("./components/MemoryPanel").then(m => ({ default: m.MemoryPanel })));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({ default: m.HistoryPanel })));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
-const CapabilitiesPanel = lazy(() => import("./components/CapabilitiesPanel").then(m => ({ default: m.CapabilitiesPanel })));
 const SchedulePanel = lazy(() => import("./components/SchedulePanel").then(m => ({ default: m.SchedulePanel })));
 import { RuntimePanel } from "./components/RuntimePanel";
 import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
@@ -37,7 +34,7 @@ import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { downloadMarkdown, exportAsMarkdown } from "./lib/export";
-import type { MemorySuggestion, MemorySuggestionsView, MemoryView, SessionMeta, SkillSuggestion } from "./lib/types";
+import type { SessionMeta } from "./lib/types";
 import { useTodoExtractor } from "./hooks/useTodoExtractor";
 import { useModeManager } from "./hooks/useModeManager";
 import { useSessionManager } from "./hooks/useSessionManager";
@@ -51,6 +48,7 @@ import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_DEFAULT_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH,
 } from "./hooks/useLayoutSizes";
+import type { SettingsTab } from "./components/SettingsShared";
 import CompactContext from "./hooks/useCompact";
 import { fmtTokens } from "./lib/stats";
 import { useNow } from "./lib/useNow";
@@ -131,23 +129,16 @@ export default function App() {
     switchWorkspace,
     rewind,
     setModel,
-    fetchMemory,
-    remember,
-    forget,
-    saveDoc,
-    updateFact,
-    changeFactType,
   } = useController();
   const t = useT();
   const { permLevel, setPermLevel, colorScheme, setColorScheme, themeMode, setThemeMode, switchingModel, switchModel } = useModeManager(ctrlSetPermLevel, setModel);
-  const [memView, setMemView] = useState<MemoryView | null>(null);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [histView, setHistView] = useState<SessionMeta[] | null>(null);
   const { sidebarSessions, sidebarQuery, setSidebarQuery, newSessionDone, refreshSessions, startNewSession, loadMore, hasMore, handleResumeSession, handleDeleteSession, handleRenameSession } = useSessionManager(newSession, listSessions, resumeSession, deleteSession, renameSession);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
-  const [capsOpen, setCapsOpen] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
@@ -178,13 +169,11 @@ export default function App() {
 
   const { todoItem, todos, showTodos, setDismissedTodo } = useTodoExtractor(state.items);
 
-  // Memory drawer: opening fetches a fresh snapshot; writes re-fetch so the
-  // panel reflects what landed on disk.
-  const openMemory = useCallback(async () => {
-    setMemView(await fetchMemory());
-  }, [fetchMemory]);
-
-  const closeMemory = useCallback(() => setMemView(null), []);
+  // Memory: opens the Settings panel directly to the memory tab.
+  const openMemory = useCallback(() => {
+    setSettingsTab("memory");
+    setSettingsOpen(true);
+  }, []);
 
   // handleSend intercepts the slash commands that need a desktop-native action
   // before they reach the backend: "/model <ref>" rebuilds on that model, and
@@ -265,61 +254,6 @@ export default function App() {
     return picked;
   }, [pickWorkspace, switchWorkspace, refreshSessions]);
 
-  const onRemember = useCallback(
-    async (scope: string, note: string) => {
-      await remember(scope, note);
-      setMemView(await fetchMemory());
-    },
-    [remember, fetchMemory],
-  );
-
-  const onForget = useCallback(
-    async (name: string) => {
-      await forget(name);
-      setMemView(await fetchMemory());
-    },
-    [forget, fetchMemory],
-  );
-
-  const onSaveDoc = useCallback(
-    async (path: string, body: string) => {
-      await saveDoc(path, body);
-      setMemView(await fetchMemory());
-    },
-    [saveDoc, fetchMemory],
-  );
-
-  const onSaveFact = useCallback(
-    async (name: string, body: string) => {
-      await updateFact(name, body);
-      setMemView(await fetchMemory());
-    },
-    [updateFact, fetchMemory],
-  );
-
-  const onAcceptMemorySuggestion = useCallback(
-    async (candidate: MemorySuggestion) => {
-      await app.AcceptMemorySuggestion(candidate);
-      setMemView(await fetchMemory());
-    },
-    [fetchMemory],
-  );
-
-  const onAcceptSkillSuggestion = useCallback(
-    async (candidate: SkillSuggestion) => {
-      await app.AcceptSkillSuggestion(candidate);
-    },
-    [],
-  );
-
-  const onRefreshSuggestions = useCallback(async (): Promise<MemorySuggestionsView | null> => {
-    try {
-      return await app.MemorySuggestions();
-    } catch {
-      return null;
-    }
-  }, []);
-
   useEffect(() => { void refreshSessions(); }, [cwd, refreshSessions]);
 
   // 全局快捷键
@@ -329,10 +263,8 @@ export default function App() {
       const mod = ke.ctrlKey || ke.metaKey, t = ke.target as HTMLElement;
       const inInput = t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable;
       if (ke.key === "Escape" && !inInput && !state.running) {
-        if (capsOpen) { ke.preventDefault(); setCapsOpen(false); return; }
-        if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); return; }
+if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(null); return; }
         if (scheduleOpen) { ke.preventDefault(); setScheduleOpen(false); return; }
-        if (memView !== null) { ke.preventDefault(); setMemView(null); return; }
         if (histView !== null) { ke.preventDefault(); setHistView(null); return; }
         if (workspacePanelOpen) { ke.preventDefault(); setWorkspacePanel(false); return; }
         return;
@@ -348,7 +280,7 @@ export default function App() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [state.running, capsOpen, settingsOpen, memView, histView, scheduleOpen, workspacePanelOpen]);
+  }, [state.running, settingsOpen, histView, scheduleOpen, workspacePanelOpen]);
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
@@ -442,8 +374,7 @@ export default function App() {
           onRenameSession={handleRenameSession}
           onOpenHistory={openHistory}
           onOpenMemory={openMemory}
-          onOpenCaps={() => setCapsOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
+onOpenSettings={() => setSettingsOpen(true)}
           onOpenSchedule={() => setScheduleOpen(true)}
           context={state.context}
           startResize={startSidebarResize}
@@ -651,22 +582,6 @@ export default function App() {
       ))}
 
       <Suspense fallback={null}>
-        {memView !== null && (
-          <MemoryPanel
-            onClose={closeMemory}
-            onRemember={onRemember}
-            onForget={onForget}
-            onSaveDoc={onSaveDoc}
-            onSaveFact={onSaveFact}
-            onChangeType={changeFactType}
-            onAcceptMemorySuggestion={onAcceptMemorySuggestion}
-            onAcceptSkillSuggestion={onAcceptSkillSuggestion}
-            onRefreshSuggestions={onRefreshSuggestions}
-          />
-        )}
-      </Suspense>
-
-      <Suspense fallback={null}>
         {histView !== null && (
           <HistoryPanel
             sessions={histView}
@@ -679,14 +594,10 @@ export default function App() {
       </Suspense>
 
       <Suspense fallback={null}>
-        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} onChanged={() => void refreshMeta()} />}
+        {settingsOpen && <SettingsPanel onClose={() => { setSettingsOpen(false); setSettingsTab(null); }} onChanged={() => void refreshMeta()} initialTab={settingsTab ?? undefined} />}
       </Suspense>
 
-      <Suspense fallback={null}>
-        {capsOpen && <CapabilitiesPanel onClose={() => setCapsOpen(false)} />}
-      </Suspense>
-
-      <Suspense fallback={null}>
+<Suspense fallback={null}>
         {scheduleOpen && <SchedulePanel onClose={() => setScheduleOpen(false)} />}
       </Suspense>
 

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { app } from "../lib/bridge";
+import { Plug } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { toRef, type SectionProps } from "./SettingsShared";
+import { SettingsPageShell } from "./SettingsPageShell";
 
 const PROVIDER_PRESETS = [
   { name: "deepseek", kind: "openai", baseUrl: "https://api.deepseek.com", models: "deepseek-chat", apiEnv: "DEEPSEEK_API_KEY", ctx: 1000000 },
@@ -24,15 +26,14 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
   const [quickPreset, setQuickPreset] = useState<typeof PROVIDER_PRESETS[0] | null>(null); // provider name, or "__new__"
 
   return (
-    <section className="mb-3">
-      <div className="flex items-center justify-between px-1 pb-1.5">
-        <div className="text-fg text-sm font-semibold">{t("settings.tab.providers")}</div>
-        {editing !== "__new__" && (
-          <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => setEditing("__new__")}>
-            {t("settings.addProvider")}
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Plug size={15} />模型服务</span>} desc="管理 LLM 服务商连接，支持 OpenAI 兼容 API。">
+      {editing !== "__new__" && (
+        <div className="mb-3">
+          <button className="px-3 py-1.5 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" disabled={busy} onClick={() => setEditing("__new__")}>
+            + {t("settings.addProvider")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {s.providers.map((p) =>
@@ -104,7 +105,7 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
           onSave={(pv) => apply(() => app.SaveProvider(pv)).then(() => setEditing(null))}
         />
       )}
-    </section>
+    </SettingsPageShell>
   );
 }
 

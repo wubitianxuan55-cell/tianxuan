@@ -1,4 +1,38 @@
-## [10.65.0] — 2026-07-13
+## [10.84.0] — 2026-07-14
+
+### 🎨 设置面板全面 UI 重构（ui-ux-pro-max 驱动）
+
+> 14 个设置标签页全部统一为 SettingsPageShell 包装 + Lucide 图标 + 设计系统优化。
+> 使用 ui-ux-pro-max search.py --design-system 获取 Swiss Modernism 2.0 / Aurora UI / Exaggerated Minimalism 等 4 套设计系统数据。
+
+- **设置面板精简**：20→14 个标签页。删除 plugins（与 MCP 重复）、diagnostics；models+subagents 合并入 agent 智能体标签
+- **通用面板**：10 个散落 Section 合并为 5 组（语言/外观与布局/工具/智能体/记忆与上下文）；声音和状态栏改用 chevron 折叠面板；Section 标题加图标
+- **智能体面板**：Swiss Modernism 2.0 网格布局；3 个 ModelCard（执行/规划/子代理）+ ModelPicker + EffortSelect；步数/温度/推理用 SettingsField 统一
+- **外观面板**：Aurora UI 渐变配色 swatch；亮暗模式 emoji→Sun/Moon/Monitor 图标；字体选择 <select>→FontChipGroup 胶囊按钮
+- **权限面板**：SettingsPageShell + Shield 图标；🚫❓✅ emoji→ShieldBan/Question/Check 彩色图标
+- **沙箱面板**：SettingsPageShell + Box 图标；裸字段→SettingsSection 重组
+- **MCP 面板**：Wrench 图标 + 状态灯 pulse 动画；空状态 Server 图标居中引导
+- **技能面板**：Zap 图标 + scope 彩色标签（蓝/绿/琥珀/紫）+ 搜索过滤
+- **记忆面板**：Bookmark/Archive/FileText 子标签图标；Marketplace 统计概览条；快速添加 chevron 折叠
+- **其余面板**：Providers/Network/Updates/Shortcuts/Hooks + 对应图标；Search/LSP/Codegraph 图标+中文标题
+- **共享组件**：SettingsPageShell/SettingsSection title 类型 string→ReactNode
+
+### 🧠 记忆功能补齐
+
+- **Go 后端**：MemoryView 新增 StoreGlobalDir + Archives 字段；Memory/MemoryForTab 填充归档记忆数据
+- **TS 类型**：MemoryView 新增 storeGlobalDir，archives 从可选改为必选
+- **输入统一**：左侧记忆按钮→直接打开设置面板 memory 标签页；删除独立 MemoryPanel 抽屉（-625行）
+
+### 🗑️ 代码清理
+
+- 删除 CapabilitiesPanel（MCP+技能独立抽屉，-625行），能力配置统一到设置面板
+- 移除 App.tsx 中 8 个 memory 回调 + capsOpen 状态，净减 ~120 行
+- 修复 settings_advanced.go 缺少 package main + config 导入 + API 字段名
+
+### 📦 构建
+
+- 桌面端构建通过：tianxuan-desktop.exe 16.7 MB
+- TypeScript 编译零错误
 
 ### 🔒 安全加固 + 后端核心蒸馏
 

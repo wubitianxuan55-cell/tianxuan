@@ -404,6 +404,7 @@ export function makeMockApp(): AppBindings {
       return {
         available: true,
         storeDir: "~/.config/tianxuan/projects/-mock/memory",
+        storeGlobalDir: "~/.config/tianxuan/memory",
         docs: [
           {
             path: "REASONIX.md",
@@ -424,6 +425,17 @@ export function makeMockApp(): AppBindings {
             body: "Indent with tabs.",
           },
         ],
+        archives: [
+          {
+            name: "old-convention",
+            title: "Old naming convention",
+            description: "We used to use PascalCase for everything",
+            type: "project",
+            body: "Old rule: use PascalCase everywhere.",
+            path: "~/.config/tianxuan/projects/-mock/memory/.archive/old-convention.md",
+            archivedAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+          },
+        ],
         scopes: [
           { scope: "user", path: "~/.config/tianxuan/REASONIX.md" },
           { scope: "project", path: "REASONIX.md" },
@@ -442,7 +454,7 @@ export function makeMockApp(): AppBindings {
       emit({ kind: "notice", level: "info", text: `forgot → ${name}` });
     },
     async MemoryForTab(_tabID: string) {
-      return { docs: [], facts: [], scopes: [], storeDir: "", available: false };
+      return { docs: [], facts: [], scopes: [], storeDir: "", archives: [], available: false };
     },
     async SaveDoc(path: string, _body: string) {
       emit({ kind: "notice", level: "info", text: `saved → ${path}` });

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { SettingsView } from "../lib/types";
+import { Search } from "lucide-react";
 import { CloseButton } from "./CloseButton";
 import { Modal } from "./Modal";
-import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command, Search, Code2, Monitor } from "lucide-react";
-import { ModelsSection } from "./SettingsModels";
+import { Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Zap, BrainCircuit, Command, Code2, Monitor } from "lucide-react";
 import { ProvidersSection } from "./SettingsProviders";
 import { PermissionsSection } from "./SettingsPermissions";
 import { SandboxSection } from "./SettingsSandbox";
@@ -17,11 +17,8 @@ import { SettingsNetwork } from "./SettingsNetwork";
 import { SettingsMcp } from "./SettingsMcp";
 import { SettingsSkills } from "./SettingsSkills";
 import { SettingsMemory } from "./SettingsMemory";
-import { SettingsSubagents } from "./SettingsSubagents";
-import { SettingsPlugins } from "./SettingsPlugins";
 import { SettingsHooks } from "./SettingsHooks";
 import { SettingsShortcuts } from "./SettingsShortcuts";
-import { SettingsDiagnostics } from "./SettingsDiagnostics";
 import { SettingsSearch } from "./SettingsSearch";
 import { SettingsLsp } from "./SettingsLsp";
 import { SettingsCodegraph } from "./SettingsCodegraph";
@@ -29,18 +26,20 @@ import { SETTINGS_TABS, TAB_GROUPS, settingsTabLabel, settingsTabMeta, type Sett
 
 type TabRenderers = Record<SettingsTab, () => React.ReactNode>;
 
-export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+export function SettingsPanel({ onClose, onChanged, initialTab }: { onClose: () => void; onChanged: () => void; initialTab?: SettingsTab }) {
   const t = useT();
   const [s, setS] = useState<SettingsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>("general");
+  const [tab, setTab] = useState<SettingsTab>(initialTab || "general");
   const [query, setQuery] = useState("");
+
+  // reset to initialTab when the panel reopens with a new target
+  useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   const TAB_ICONS: Record<SettingsTab, React.ReactNode> = {
     general: <Cog size={15} />,
-    models: <Cpu size={15} />,
-    providers: <Plug size={15} />,
+providers: <Plug size={15} />,
     permissions: <Shield size={15} />,
     sandbox: <Box size={15} />,
     agent: <Bot size={15} />,
@@ -50,12 +49,9 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     shortcuts: <Command size={15} />,
     mcp: <Wrench size={15} />,
     skills: <Zap size={15} />,
-    subagents: <Braces size={15} />,
-    plugins: <Puzzle size={15} />,
     memory: <BrainCircuit size={15} />,
     hooks: <Zap size={15} />,
-    diagnostics: <Search size={15} />,
-    search: <Search size={15} />,
+search: <Search size={15} />,
     lsp: <Code2 size={15} />,
     codegraph: <Monitor size={15} />,
   };
@@ -80,7 +76,6 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
 
   const renderers: TabRenderers | null = s ? {
     general: () => <SettingsGeneral s={s} busy={busy} apply={apply} />,
-    models: () => <ModelsSection s={s} busy={busy} apply={apply} onManageProviders={() => setTab("providers")} />,
     providers: () => <ProvidersSection s={s} busy={busy} apply={apply} />,
     permissions: () => <PermissionsSection s={s} busy={busy} apply={apply} />,
     sandbox: () => <SandboxSection s={s} busy={busy} apply={apply} />,
@@ -91,11 +86,8 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     shortcuts: () => <SettingsShortcuts />,
     mcp: () => <SettingsMcp />,
     skills: () => <SettingsSkills />,
-    subagents: () => <SettingsSubagents s={s} busy={busy} apply={apply} />,
-    plugins: () => <SettingsPlugins />,
     memory: () => <SettingsMemory />,
     hooks: () => <SettingsHooks />,
-    diagnostics: () => <SettingsDiagnostics />,
     search: () => <SettingsSearch />,
     lsp: () => <SettingsLsp />,
     codegraph: () => <SettingsCodegraph />,
@@ -120,7 +112,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
             <div className="relative mb-2.5 px-0.5">
               <input className="w-full bg-bg border border-border rounded-md text-fg text-[12px] pl-7 pr-2.5 py-1.5 outline-none placeholder:text-fg-faint/40 focus:border-accent transition-colors"
                 placeholder="搜索…" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <svg className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint/40" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint/40" />
             </div>
             {query.trim() ? (
               filteredTabs.length === 0

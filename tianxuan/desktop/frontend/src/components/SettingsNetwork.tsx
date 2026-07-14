@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Globe } from "lucide-react";
 import type { SectionProps } from "./SettingsShared";
 import { SettingsPageShell, SettingsSection, SettingsField, SegmentedButton } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
@@ -12,7 +13,7 @@ export function SettingsNetwork({ s, busy: _busy, apply }: SectionProps) {
   const save = () => apply(() => app.SetNetwork(mode, url, noProxy));
 
   return (
-    <SettingsPageShell title="网络代理" desc="配置 HTTP/HTTPS 代理，影响模型 API 和 web_fetch 等工具的出站流量。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Globe size={15} />网络代理</span>} desc="配置 HTTP/HTTPS 代理，影响模型 API 和 web_fetch 等工具的出站流量。">
       <SettingsSection title="代理模式">
         <SettingsField label="代理模式" hint="选择出站流量的代理策略。">
           <SegmentedButton

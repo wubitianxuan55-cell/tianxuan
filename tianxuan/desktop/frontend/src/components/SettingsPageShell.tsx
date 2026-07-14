@@ -1,5 +1,5 @@
 // SettingsPageShell wraps a settings page with a title and optional description.
-export function SettingsPageShell({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
+export function SettingsPageShell({ title, desc, children }: { title: React.ReactNode; desc?: string; children: React.ReactNode }) {
   return (
     <div className="settings-page">
       <h2 className="text-[15px] font-semibold mb-1">{title}</h2>
@@ -10,7 +10,7 @@ export function SettingsPageShell({ title, desc, children }: { title: string; de
 }
 
 // SettingsSection groups related fields under a section header.
-export function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function SettingsSection({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="mb-5">
       <h3 className="text-[12.5px] font-semibold text-fg-dim uppercase tracking-wide mb-2">{title}</h3>

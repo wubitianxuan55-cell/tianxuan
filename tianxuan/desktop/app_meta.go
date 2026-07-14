@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"time"
 
 	"tianxuan/internal/agent"
 	"tianxuan/internal/boot"
@@ -110,14 +111,28 @@ type MemoryScope struct {
 	Path  string `json:"path"`
 }
 
+// MemoryArchive is one saved-and-then-deleted auto-memory, kept on disk for
+// traceability.
+type MemoryArchive struct {
+	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Body        string `json:"body"`
+	Path        string `json:"path,omitempty"`
+	ArchivedAt  string `json:"archivedAt,omitempty"`
+}
+
 // MemoryView is the whole memory panel payload: hierarchical docs, saved facts,
-// and the writable scopes for the quick-add selector.
+// stored archives, and the writable scopes for the quick-add selector.
 type MemoryView struct {
-	Docs      []MemoryDoc   `json:"docs"`
-	Facts     []MemoryFact  `json:"facts"`
-	Scopes    []MemoryScope `json:"scopes"`
-	StoreDir  string        `json:"storeDir"`
-	Available bool          `json:"available"`
+	Docs           []MemoryDoc     `json:"docs"`
+	Facts          []MemoryFact    `json:"facts"`
+	Scopes         []MemoryScope   `json:"scopes"`
+	StoreDir       string          `json:"storeDir"`
+	StoreGlobalDir string          `json:"storeGlobalDir,omitempty"`
+	Archives       []MemoryArchive `json:"archives"`
+	Available      bool            `json:"available"`
 }
 
 // writableScopes are the quick-add targets the panel offers, broad → specific.
@@ -379,7 +394,7 @@ func (a *App) SetModel(name string) error {
 func (a *App) Memory() MemoryView {
 	// Always return non-nil slices: a nil Go slice marshals to JSON `null`, which
 	// would crash the panel's `view.facts.length` / `.map`.
-	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}}
+	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}}
 	a.mu.RLock()
 	ctrl := a.ctrl
 	a.mu.RUnlock()
@@ -391,6 +406,7 @@ func (a *App) Memory() MemoryView {
 		return view
 	}
 	view.StoreDir = set.Store.Dir
+	view.StoreGlobalDir = set.Store.GlobalDir
 	view.Available = true
 	for _, d := range set.Docs {
 		view.Docs = append(view.Docs, MemoryDoc{Path: d.Path, Scope: string(d.Scope), Body: d.Body})
@@ -398,6 +414,13 @@ func (a *App) Memory() MemoryView {
 	for _, f := range set.Store.List() {
 		view.Facts = append(view.Facts, MemoryFact{
 			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+		})
+	}
+	for _, a := range set.Store.ListArchived() {
+		view.Archives = append(view.Archives, MemoryArchive{
+			Name: a.Name, Title: a.Title, Description: a.Description,
+			Type: string(a.Type), Body: a.Body,
+			Path: a.Path, ArchivedAt: a.ArchivedAt.Format(time.RFC3339),
 		})
 	}
 	for _, sc := range writableScopes {
@@ -424,7 +447,7 @@ func (a *App) Remember(scope, note string) (string, error) {
 // MemoryForTab returns memory for a specific tab. When tabID is empty, uses
 // the active tab.
 func (a *App) MemoryForTab(tabID string) MemoryView {
-	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}}
+	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}}
 	ctrl := a.ctrlByTabID(tabID)
 	if ctrl == nil {
 		return view
@@ -434,6 +457,7 @@ func (a *App) MemoryForTab(tabID string) MemoryView {
 		return view
 	}
 	view.StoreDir = set.Store.Dir
+	view.StoreGlobalDir = set.Store.GlobalDir
 	view.Available = true
 	for _, d := range set.Docs {
 		view.Docs = append(view.Docs, MemoryDoc{Path: d.Path, Scope: string(d.Scope), Body: d.Body})
@@ -441,6 +465,13 @@ func (a *App) MemoryForTab(tabID string) MemoryView {
 	for _, f := range set.Store.List() {
 		view.Facts = append(view.Facts, MemoryFact{
 			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+		})
+	}
+	for _, a := range set.Store.ListArchived() {
+		view.Archives = append(view.Archives, MemoryArchive{
+			Name: a.Name, Title: a.Title, Description: a.Description,
+			Type: string(a.Type), Body: a.Body,
+			Path: a.Path, ArchivedAt: a.ArchivedAt.Format(time.RFC3339),
 		})
 	}
 	for _, sc := range writableScopes {

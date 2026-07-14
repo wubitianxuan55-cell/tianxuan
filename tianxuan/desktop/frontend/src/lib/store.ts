@@ -291,7 +291,7 @@ export function useController() {
   const switchWorkspace = useCallback(async (path: string): Promise<string> => { const n = await app.SwitchWorkspace(path).catch(() => ""); if (n) { dispatch({ type: "reset" }); try { dispatch({ type: "meta", meta: await app.Meta() }); dispatch({ type: "context", context: await app.ContextUsage() }); } catch {} } return n; }, [dispatch]);
   const compact = useCallback(() => { app.Compact().catch(() => {}); }, []);
   const setModel = useCallback(async (name: string) => { await app.SetModel(name).catch(() => {}); try { dispatch({ type: "meta", meta: await app.Meta() }); dispatch({ type: "context", context: await app.ContextUsage() }); } catch {} }, [dispatch]);
-  const fetchMemory = useCallback((): Promise<MemoryView> => app.Memory().catch(() => ({ docs: [], facts: [], scopes: [], storeDir: "", available: false } as MemoryView)), []);
+  const fetchMemory = useCallback((): Promise<MemoryView> => app.Memory().catch(() => ({ docs: [], facts: [], scopes: [], storeDir: "", archives: [], available: false } as MemoryView)), []);
   const remember = useCallback(async (scope: string, note: string) => { await app.Remember(scope, note).catch(() => {}); }, []);
   const forget = useCallback(async (name: string) => { await app.Forget(name).catch(() => {}); }, []);
   const saveDoc = useCallback(async (path: string, body: string) => { await app.SaveDoc(path, body).catch(() => {}); }, []);

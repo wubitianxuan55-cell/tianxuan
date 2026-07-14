@@ -1,3 +1,7 @@
+package main
+
+import "tianxuan/internal/config"
+
 // --- Search settings ---
 
 type SearchSettingsView struct {
@@ -27,8 +31,8 @@ func (a *App) SearchSettings() SearchSettingsView {
 func (a *App) SaveSearchSettings(v SearchSettingsView) error {
 	return a.applyConfigChange(func(c *config.Config) error {
 		c.Search.LocalSearXNGURL = v.LocalSearXNGURL
-		c.Search.TavilyAPIKeyEnv = v.TavilyApiKeyEnv
-		c.Search.BraveAPIKeyEnv = v.BraveApiKeyEnv
+		c.Search.TavilyAPIKeyEnv = v.TavilyAPIKeyEnv
+		c.Search.BraveAPIKeyEnv = v.BraveAPIKeyEnv
 		c.Search.TimeoutSeconds = v.TimeoutSeconds
 		c.Search.AllowDomains = v.AllowDomains
 		c.Search.DenyDomains = v.DenyDomains

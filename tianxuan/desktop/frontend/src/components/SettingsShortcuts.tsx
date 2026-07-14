@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SettingsPageShell, SettingsSection } from "./SettingsPageShell";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Command } from "lucide-react";
 
 interface ShortcutItem { id: string; keys: string; action: string; context: string; defaultKeys: string }
 
@@ -100,7 +100,7 @@ export function SettingsShortcuts() {
   const resolved = (id: string): string => customMap[id] || SHORTCUTS.find((s) => s.id === id)?.defaultKeys || "";
 
   return (
-    <SettingsPageShell title="快捷键" desc="tianxuan 桌面端的全局键盘快捷键。点击快捷键按钮进入录制模式，按新的组合键替换。⌘ = Mac Command, Ctrl = Windows/Linux。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Command size={15} />快捷键</span>} desc="tianxuan 桌面端的全局键盘快捷键。点击快捷键按钮进入录制模式，按新的组合键替换。⌘ = Mac Command, Ctrl = Windows/Linux。">
       {conflict && (
         <div className="px-3 py-2 mb-3 text-[12px] text-red-500 bg-red-500/10 border border-red-500/30 rounded-md" role="alert">
           {conflict}

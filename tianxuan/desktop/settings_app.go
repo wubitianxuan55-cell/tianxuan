@@ -18,7 +18,7 @@ import (
 // settings_app.go is the desktop Settings panel's command surface: it reads the
 // resolved config and applies edits through internal/config/edit.go (the
 // purpose-built mutation API), then rebuilds the controller so the change takes
-// effect live â€?the same snapshotâ†’reloadâ†’resume pattern as SetModel. Secrets are
+// effect live - the same snapshot-reload-resume pattern as SetModel. Secrets are
 // the exception: they go to ./.env (upsertDotEnv), since config stores only the
 // env-var name, not the key.
 
@@ -122,7 +122,7 @@ type SettingsView struct {
 	ConfigPath   string          `json:"configPath"`
 	// ProviderKinds lists the provider implementations the kernel actually
 	// registered (provider.Kinds()), so the editor's "kind" picker offers only
-	// kinds that resolve â€?selecting an unregistered one would fail the rebuild.
+	// kinds that resolve ï¿½?selecting an unregistered one would fail the rebuild.
 	ProviderKinds []string `json:"providerKinds"`
 	// Bypass is the live YOLO state (runtime-only, not from config), so the panel's
 	// toggle reflects whether approvals are currently being skipped this session.
@@ -756,11 +756,11 @@ func (a *App) HooksSettings() HooksSettingsView {
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return v // file doesn't exist yet â€?return empty
+		return v // file doesn't exist yet ï¿½?return empty
 	}
 	var s hook.Settings
 	if err := json.Unmarshal(b, &s); err != nil {
-		return v // malformed â†?empty
+		return v // malformed ï¿½?empty
 	}
 	if s.Hooks == nil {
 		return v
@@ -825,7 +825,7 @@ func (a *App) SaveHooksSettings(hooks map[string][]HookConfigView) error {
 		return fmt.Errorf("write hooks: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		// On Windows, Rename fails across volumes â€?fall back to copy.
+		// On Windows, Rename fails across volumes ï¿½?fall back to copy.
 		if err2 := copyFile(tmp, path); err2 != nil {
 			os.Remove(tmp)
 			return fmt.Errorf("save hooks: %w (copy fallback: %w)", err, err2)

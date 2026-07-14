@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
 import type { SearchSettingsView } from "../lib/types";
@@ -16,10 +17,10 @@ export function SettingsSearch() {
     try { await app.SaveSearchSettings(next); setErr(null); } catch (e: any) { setErr(String(e)); }
   };
 
-  if (!v) return <SettingsPageShell title="Search" desc="Web search engine configuration."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;
+  if (!v) return <SettingsPageShell title={<span className="flex items-center gap-1.5"><Search size={15} />搜索</span>} desc="Web 搜索引擎配置。"><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;
 
   return (
-    <SettingsPageShell title="Search" desc="Configure SearXNG, Tavily, and Brave search engines.">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Search size={15} />搜索</span>} desc="配置 SearXNG、Tavily 和 Brave 搜索引擎。">
       {err && <div className="bg-red-900/20 border border-red-500/30 rounded-md text-red-300 text-[12px] px-3 py-2 mb-3">{err}</div>}
       <SettingsSection title="Engines">
         <SettingsField label="SearXNG URL" hint="Self-hosted SearXNG instance URL">

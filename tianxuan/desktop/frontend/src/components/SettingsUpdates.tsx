@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
+import { CloudUpload } from "lucide-react";
 import { useUpdater } from "../lib/useUpdater";
 import { SettingsPageShell } from "./SettingsPageShell";
 
@@ -16,7 +17,7 @@ export function UpdatesSection({ configPath }: { configPath: string }) {
   const busy = status.kind === "checking" || status.kind === "downloading" || status.kind === "verifying" || status.kind === "applying";
 
   return (
-    <SettingsPageShell title="更新" desc="检查 tianxuan 桌面端新版本并在线更新。">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><CloudUpload size={15} />更新</span>} desc="检查 tianxuan 桌面端新版本并在线更新。">
       {/* 当前版本 */}
       <div className="bg-bg-soft border border-border-soft rounded-lg px-4 py-3 mb-4">
         <div className="flex items-center justify-between">

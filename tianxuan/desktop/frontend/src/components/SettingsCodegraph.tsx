@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Monitor } from "lucide-react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
 import type { CodegraphSettingsView } from "../lib/types";
@@ -16,10 +17,10 @@ export function SettingsCodegraph() {
     try { await app.SaveCodegraphSettings(next); } catch (e: any) { setErr(String(e)); }
   };
 
-  if (!v) return <SettingsPageShell title="Codegraph" desc="Code knowledge graph configuration."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;
+  if (!v) return <SettingsPageShell title={<span className="flex items-center gap-1.5"><Monitor size={15} />Codegraph</span>} desc="代码知识图谱配置。"><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;
 
   return (
-    <SettingsPageShell title="Codegraph" desc="Code knowledge graph for symbol search and relationship analysis.">
+    <SettingsPageShell title={<span className="flex items-center gap-1.5"><Monitor size={15} />Codegraph</span>} desc="代码知识图谱，用于符号搜索和关系分析。">
       {err && <div className="bg-red-900/20 border border-red-500/30 rounded-md text-red-300 text-[12px] px-3 py-2 mb-3">{err}</div>}
       <SettingsSection title="Codegraph">
         <SettingsField label="Enable" hint="Index code symbols and relationships">

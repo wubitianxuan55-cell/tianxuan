@@ -368,6 +368,18 @@ func (c *Config) SetDesktopMetrics(on bool) error {
 	return nil
 }
 
+// SetStatusBarStyle sets the status bar display style: "icon" | "text".
+func (c *Config) SetStatusBarStyle(style string) error {
+	c.Desktop.StatusBarStyle = style
+	return nil
+}
+
+// SetStatusBarItems sets the ordered list of visible status bar item IDs.
+func (c *Config) SetStatusBarItems(items []string) error {
+	c.Desktop.StatusBarItems = items
+	return nil
+}
+
 // SetBashTimeoutSeconds sets the foreground bash timeout in seconds. nil = default (120s).
 func (c *Config) SetBashTimeoutSeconds(secs *int) error {
 	c.Tools.BashTimeoutSeconds = secs

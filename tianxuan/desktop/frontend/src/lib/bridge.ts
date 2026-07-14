@@ -168,6 +168,8 @@ export interface AppBindings {
   SetDesktopCheckUpdates(on: boolean): Promise<void>;
   SetDesktopTelemetry(on: boolean): Promise<void>;
   SetDesktopMetrics(on: boolean): Promise<void>;
+  SetStatusBarStyle(style: string): Promise<void>;
+  SetStatusBarItems(items: string[]): Promise<void>;
   SetBashTimeoutSeconds(secs: number): Promise<void>;
   SetMCPCallTimeoutSeconds(secs: number): Promise<void>;
   SetShellPreference(shell: string): Promise<void>;

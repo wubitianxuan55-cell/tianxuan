@@ -3,8 +3,12 @@ import type { SectionProps } from "./SettingsShared";
 import { SettingsPageShell, SettingsSection, SettingsField, SegmentedButton } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
 
-// SettingsGeneral contains Agent runtime parameters: auto-plan, reasoning language,
-// planner/executor max steps, sub-agent depth, cold resume prune, and output style.
+// Sound preference type
+type SoundPref = "off" | "synth";
+
+// Status bar item IDs
+const STATUS_BAR_ITEMS = ["model", "workspace", "gitBranch", "cache", "tokens", "jobs", "balance"];
+
 export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
   const [depth, setDepth] = useState(s.agent.maxSubagentDepth);
   const [plannerSteps, setPlannerSteps] = useState(s.agent.plannerMaxSteps || 0);
@@ -14,8 +18,169 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
   const [coldResume, setColdResume] = useState(s.agent.coldResumePrune);
   const [memCompiler, setMemCompiler] = useState(s.agent.memoryCompilerEnabled || false);
 
+  // Desktop settings
+  const desk = s.desktop;
+  const [layoutStyle, setLayoutStyle] = useState(desk.layoutStyle || "classic");
+  const [closeBehavior, setCloseBehavior] = useState(desk.closeBehavior || "quit");
+  const [statusBarStyle, setStatusBarStyle] = useState(desk.statusBarStyle || "icon");
+  const [statusBarItems, setStatusBarItems] = useState<string[]>(desk.statusBarItems?.length ? desk.statusBarItems : STATUS_BAR_ITEMS);
+  const [statusBarExpanded, setStatusBarExpanded] = useState(false);
+  const [toolApprovalMode, setToolApprovalMode] = useState(s.permissions.mode || "ask");
+
+  // Sound preferences (localStorage)
+  const [soundPref, setSoundPref] = useState<SoundPref>(() => {
+    try { return (localStorage.getItem("tianxuan.soundSuccess") as SoundPref) || "synth"; } catch { return "synth"; }
+  });
+  const [attentionPref, setAttentionPref] = useState<SoundPref>(() => {
+    try { return (localStorage.getItem("tianxuan.soundAttention") as SoundPref) || "synth"; } catch { return "synth"; }
+  });
+  const [soundExpanded, setSoundExpanded] = useState(false);
+
+  // Display mode (localStorage)
+  const [displayMode, setDisplayMode] = useState(() => {
+    try { return localStorage.getItem("tianxuan.displayMode") || "standard"; } catch { return "standard"; }
+  });
+
   return (
-    <SettingsPageShell title="通用" desc="智能体运行时行为与偏好设置。">
+    <SettingsPageShell title="通用" desc="桌面布局、显示偏好与智能体运行时行为。">
+      {/* Desktop Layout */}
+      <SettingsSection title="桌面布局">
+        <SettingsField label="布局风格" hint="桌面窗口的整体布局样式。">
+          <SegmentedButton
+            options={[
+              { value: "classic", label: "经典" },
+              { value: "workbench", label: "工作台" },
+              { value: "creation", label: "创作" },
+            ]}
+            value={layoutStyle}
+            onChange={(v) => { setLayoutStyle(v); void apply(() => app.SetDesktopLayoutStyle(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="关闭行为" hint="点击关闭按钮时触发的操作。">
+          <SegmentedButton
+            options={[
+              { value: "quit", label: "退出" },
+              { value: "minimize", label: "最小化到托盘" },
+            ]}
+            value={closeBehavior}
+            onChange={(v) => { setCloseBehavior(v); void apply(() => app.SetDesktopCloseBehavior(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="显示模式" hint="对话区域的紧凑程度。">
+          <SegmentedButton
+            options={[
+              { value: "standard", label: "标准" },
+              { value: "compact", label: "紧凑" },
+            ]}
+            value={displayMode}
+            onChange={(v) => {
+              setDisplayMode(v);
+              try { localStorage.setItem("tianxuan.displayMode", v); } catch {}
+            }}
+          />
+        </SettingsField>
+      </SettingsSection>
+
+      {/* Status Bar */}
+      <SettingsSection title="状态栏">
+        <SettingsField label="显示样式" hint="状态栏项目的呈现方式。">
+          <SegmentedButton
+            options={[
+              { value: "icon", label: "图标" },
+              { value: "text", label: "文字" },
+            ]}
+            value={statusBarStyle}
+            onChange={(v) => { setStatusBarStyle(v); void apply(() => app.SetStatusBarStyle(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="状态栏项目" hint="选择状态栏上显示的项目，拖拽排序。">
+          <button
+            className="text-[11px] text-fg-dim bg-transparent border border-border-soft rounded px-2 py-1 cursor-pointer hover:text-fg"
+            onClick={() => setStatusBarExpanded((v) => !v)}
+          >
+            {statusBarExpanded ? "收起" : `${statusBarItems.length} 个项目`}
+          </button>
+        </SettingsField>
+        {statusBarExpanded && (
+          <div className="pl-2 space-y-1 mt-1">
+            {STATUS_BAR_ITEMS.map((id) => {
+              const checked = statusBarItems.includes(id);
+              return (
+                <label key={id} className="flex items-center gap-2 text-[12px] text-fg-dim cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={_busy}
+                    onChange={() => {
+                      const next = checked
+                        ? statusBarItems.filter((x) => x !== id)
+                        : [...statusBarItems, id];
+                      setStatusBarItems(next);
+                      void apply(() => app.SetStatusBarItems(next));
+                    }}
+                  />
+                  <span>{id}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </SettingsSection>
+
+      {/* Tools */}
+      <SettingsSection title="工具">
+        <SettingsField label="工具审批模式" hint="工具写入前是否需要确认。">
+          <SegmentedButton
+            options={[
+              { value: "ask", label: "询问" },
+              { value: "auto", label: "自动" },
+              { value: "yolo", label: "YOLO" },
+            ]}
+            value={toolApprovalMode}
+            onChange={(v) => { setToolApprovalMode(v); void apply(() => app.SetPermissionMode(v)); }}
+          />
+        </SettingsField>
+      </SettingsSection>
+
+      {/* Sound */}
+      <SettingsSection title="声音">
+        <SettingsField label="提示音" hint="操作完成或需要关注时的声音反馈。">
+          <button
+            className="text-[11px] text-fg-dim bg-transparent border border-border-soft rounded px-2 py-1 cursor-pointer hover:text-fg"
+            onClick={() => setSoundExpanded((v) => !v)}
+          >
+            {soundExpanded ? "收起" : "配置提示音"}
+          </button>
+        </SettingsField>
+        {soundExpanded && (
+          <div className="pl-2 space-y-2 mt-1">
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-fg-dim w-20">成功提示</span>
+              <SegmentedButton
+                options={[
+                  { value: "off", label: "关闭" },
+                  { value: "synth", label: "合成音" },
+                ]}
+                value={soundPref}
+                onChange={(v) => { setSoundPref(v as SoundPref); try { localStorage.setItem("tianxuan.soundSuccess", v); } catch {} }}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-fg-dim w-20">注意提示</span>
+              <SegmentedButton
+                options={[
+                  { value: "off", label: "关闭" },
+                  { value: "synth", label: "合成音" },
+                ]}
+                value={attentionPref}
+                onChange={(v) => { setAttentionPref(v as SoundPref); try { localStorage.setItem("tianxuan.soundAttention", v); } catch {} }}
+              />
+            </div>
+          </div>
+        )}
+      </SettingsSection>
+
+      {/* 规划 — existing */}
       <SettingsSection title="规划">
         <SettingsField label="自动规划" hint="多步任务自动启用规划模式。off=手动 / ask=询问 / on=自动。">
           <SegmentedButton
@@ -28,7 +193,6 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             onChange={(v) => { setAutoPlan(v); void apply(() => app.SetAutoPlan(v)); }}
           />
         </SettingsField>
-
         <SettingsField label="规划器最大步数" hint="规划阶段工具调用轮数上限。0 = 不限。">
           <SegmentedButton
             options={[
@@ -47,6 +211,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         </SettingsField>
       </SettingsSection>
 
+      {/* 子代理 — existing */}
       <SettingsSection title="子代理">
         <SettingsField label="递归深度限制" hint="限制子代理嵌套层数。0 = 不限。">
           <SegmentedButton
@@ -66,6 +231,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         </SettingsField>
       </SettingsSection>
 
+      {/* 推理 — existing */}
       <SettingsSection title="推理">
         <SettingsField label="推理语言" hint="控制模型思考文本的语言偏好。">
           <SegmentedButton
@@ -78,7 +244,6 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             onChange={(v) => { setReasoningLang(v); void apply(() => app.SetReasoningLanguage(v)); }}
           />
         </SettingsField>
-
         <SettingsField label="输出风格" hint="影响智能体回复的语气和详细程度。">
           <SegmentedButton
             options={[
@@ -92,6 +257,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
         </SettingsField>
       </SettingsSection>
 
+      {/* 上下文 — existing */}
       <SettingsSection title="上下文">
         <SettingsField label="冷恢复修剪" hint="冷启动恢复时自动移除过期工具结果以节省上下文。">
           <SegmentedButton
@@ -108,6 +274,8 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
           />
         </SettingsField>
       </SettingsSection>
+
+      {/* Memory — existing */}
       <SettingsSection title="Memory">
         <SettingsField label="Memory 编译器" hint="启用 v5 执行记忆编译器，自动从历史推理中提炼持久记忆。">
           <SegmentedButton

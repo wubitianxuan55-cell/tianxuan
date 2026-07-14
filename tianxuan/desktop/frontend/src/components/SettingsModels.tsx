@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Cpu, Brain, Bot, ChevronDown, ChevronRight } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
-import { ModelSwitcher } from "./ModelSwitcher";
+import { ModelPicker } from "./ModelPicker";
+import { StepLimitControl } from "./StepLimitControl";
 import { toRef, type SectionProps } from "./SettingsShared";
 
 function ModelCard({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
@@ -27,7 +28,7 @@ const EFFORT_LEVELS = [
 ] as const;
 
 export function EffortSelect({ value, onChange, busy }: { value: string; onChange: (e: string) => void; busy: boolean }) {
-  const v = value ?? ""; // normalize undefined → ""
+  const v = value ?? "";
   return (
     <div className="flex items-center gap-1">
       <span className="text-fg-faint text-[11px] shrink-0 mr-0.5">思考</span>
@@ -52,17 +53,20 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
   const defaultRef = toRef(s.defaultModel, s);
   const [defaultProvider, defaultModel] = defaultRef.split("/");
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const subagentLabel = s.subagentModel || t("settings.subagentInherit");
   const subagentModels = s.subagentModels || {};
-  const plannerLabel = s.plannerModel || t("settings.plannerNone");
+
+  const allRefs = s.providers.flatMap((p: any) => (p.models || []).map((m: string) => p.name + "/" + m));
 
   return (
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold px-1 pb-3">{t("settings.tab.models")}</div>
 
       <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作">
-        <ModelSwitcher
-          label={defaultModel || defaultRef}
+        <ModelPicker
+          s={s}
+          refs={allRefs}
+          value={defaultRef}
+          disabled={busy}
           onPick={(ref: string) => void apply(() => app.SetDefaultModel(ref))}
         />
         <div className="mt-2">
@@ -75,10 +79,12 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
       </ModelCard>
 
       <ModelCard icon={<Brain size={18} />} title="规划模型 (Hermes)" desc="只读研究代码、制定执行计划。留空则使用单模型模式">
-        <ModelSwitcher
-          label={plannerLabel}
-          allowInherit
-          inheritLabel={t("settings.plannerNone")}
+        <ModelPicker
+          s={s}
+          refs={allRefs}
+          value={s.plannerModel || ""}
+          disabled={busy}
+          emptyOptionLabel={t("settings.plannerNone")}
           onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
         />
         <div className="mt-2">
@@ -91,10 +97,12 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
       </ModelCard>
 
       <ModelCard icon={<Bot size={18} />} title="子代理模型" desc="task / explore / review 等子任务使用的模型">
-        <ModelSwitcher
-          label={subagentLabel}
-          allowInherit
-          inheritLabel={t("settings.subagentInherit")}
+        <ModelPicker
+          s={s}
+          refs={allRefs}
+          value={s.subagentModel || ""}
+          disabled={busy}
+          emptyOptionLabel={t("settings.subagentInherit")}
           onPick={(ref: string) => void apply(() => app.SetSubagentModel(ref))}
         />
         <div className="mt-2">
@@ -119,15 +127,16 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
                   const skillRef = subagentModels[skill] || "";
                   const globalRef = s.subagentModel;
                   const inheritText = globalRef ? `继承全局: ${globalRef}` : t("settings.subagentInherit");
-                  const skillLabel = skillRef || inheritText;
                   return (
                     <div key={skill} className="flex items-center gap-2">
                       <label className="text-fg-dim text-[11px] w-[90px] shrink-0 font-mono">{skill}</label>
                       <div className="flex-1">
-                        <ModelSwitcher
-                          label={skillLabel}
-                          allowInherit
-                          inheritLabel={inheritText}
+                        <ModelPicker
+                          s={s}
+                          refs={allRefs}
+                          value={skillRef}
+                          disabled={busy}
+                          emptyOptionLabel={inheritText}
                           onPick={(ref: string) => void apply(() => app.SetSubagentModelForSkill(skill, ref))}
                         />
                       </div>
@@ -139,6 +148,31 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
           </div>
         )}
       </ModelCard>
+
+      {/* Step limits */}
+      <div className="px-3 py-2 mb-3 border border-border-soft rounded-lg">
+        <div className="text-fg-dim text-[11px] font-semibold uppercase tracking-wide mb-2">步数限制</div>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <div className="text-fg-faint text-[11px] mb-1">规划器步数</div>
+            <StepLimitControl
+              value={s.agent.plannerMaxSteps || 0}
+              presets={[6, 12, 25, 0]}
+              busy={busy}
+              onChange={(n) => void apply(() => app.SetPlannerMaxSteps(n))}
+            />
+          </div>
+          <div className="flex-1">
+            <div className="text-fg-faint text-[11px] mb-1">执行器步数</div>
+            <StepLimitControl
+              value={s.agent.maxSteps || 0}
+              presets={[10, 25, 50, 0]}
+              busy={busy}
+              onChange={(n) => void apply(() => app.SetAgentParams(s.agent.temperature, n, s.agent.systemPrompt))}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 px-3 py-2 border border-border-soft rounded-lg">
         <span className="text-fg-faint text-[11px] shrink-0">当前: {defaultProvider || t("common.none")} · {defaultModel || defaultRef || t("common.none")}</span>

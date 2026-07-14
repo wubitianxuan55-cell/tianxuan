@@ -540,6 +540,8 @@ export function makeMockApp(): AppBindings {
     async SetDesktopCheckUpdates(on: boolean) { settings.desktop.checkUpdates = on; },
     async SetDesktopTelemetry(on: boolean) { settings.desktop.telemetry = on; },
     async SetDesktopMetrics(on: boolean) { settings.desktop.metrics = on; },
+    async SetStatusBarStyle(style: string) { settings.desktop.statusBarStyle = style; },
+    async SetStatusBarItems(items: string[]) { settings.desktop.statusBarItems = items; },
     async SetBashTimeoutSeconds(_secs: number) {},
     async SetMCPCallTimeoutSeconds(_secs: number) {},
     async SetShellPreference(_shell: string) {},

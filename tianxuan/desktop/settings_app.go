@@ -574,6 +574,16 @@ func (a *App) SetDesktopMetrics(on bool) error {
 	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopMetrics(on) })
 }
 
+// SetStatusBarStyle sets the status bar display style: "icon" | "text".
+func (a *App) SetStatusBarStyle(style string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetStatusBarStyle(style) })
+}
+
+// SetStatusBarItems sets the ordered list of visible status bar item IDs.
+func (a *App) SetStatusBarItems(items []string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetStatusBarItems(items) })
+}
+
 // SetBashTimeoutSeconds sets the foreground bash timeout. 0 = default.
 func (a *App) SetBashTimeoutSeconds(secs int) error {
 	return a.applyConfigChange(func(c *config.Config) error {

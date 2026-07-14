@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
-
-interface AgentAdvancedView {
-  systemPromptFile: string;
-  autoPlanClassifier: string;
-}
+import type { AgentAdvancedView } from "../lib/types";
 
 export function SettingsAgentAdvanced() {
   const [v, setV] = useState<AgentAdvancedView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    (app as any).AgentAdvancedSettings().then(setV).catch((e: any) => setErr(String(e)));
+    app.AgentAdvancedSettings().then(setV).catch((e: any) => setErr(String(e)));
   }, []);
 
   const save = async (next: AgentAdvancedView) => {
     setV(next);
-    try { await (app as any).SaveAgentAdvancedSettings(next); } catch (e: any) { setErr(String(e)); }
+    try { await app.SaveAgentAdvancedSettings(next); } catch (e: any) { setErr(String(e)); }
   };
 
   if (!v) return <SettingsPageShell title="Agent Advanced" desc="Advanced agent runtime parameters."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;

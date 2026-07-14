@@ -1,23 +1,24 @@
 import { useEffect, useState } from "react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
-
-interface LSPSettingsView { enabled: boolean; servers: Record<string, {command:string;args:string[];languageId:string;extensions:string[];installHint:string}> }
+import type { LSPSettingsView } from "../lib/types";
 
 export function SettingsLsp() {
   const [v, setV] = useState<LSPSettingsView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    (app as any).LSPSettings().then(setV).catch((e: any) => setErr(String(e)));
+    app.LSPSettings().then(setV).catch((e: any) => setErr(String(e)));
   }, []);
 
   const save = async (next: LSPSettingsView) => {
     setV(next);
-    try { await (app as any).SaveLSPSettings(next); } catch (e: any) { setErr(String(e)); }
+    try { await app.SaveLSPSettings(next); } catch (e: any) { setErr(String(e)); }
   };
 
   if (!v) return <SettingsPageShell title="LSP" desc="Language Server Protocol configuration."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;
+
+  const count = Object.keys(v.servers||{}).length;
 
   return (
     <SettingsPageShell title="LSP" desc="Configure language servers for symbol navigation, diagnostics, and hover.">
@@ -31,7 +32,7 @@ export function SettingsLsp() {
           </label>
         </SettingsField>
         <div className="mt-3 text-fg-faint text-[11px]">
-          {Object.keys(v.servers||{}).length} language server(s) configured in config.toml [lsp.servers].
+          {count} language server(s) configured in config.toml [lsp.servers].
         </div>
       </SettingsSection>
     </SettingsPageShell>

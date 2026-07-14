@@ -6,8 +6,6 @@ import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPag
 const SCOPE_LABEL: Record<string, string> = { builtin: "builtin", project: "project", custom: "custom", global: "global" };
 const RUN_LABEL: Record<string, string> = { inline: "inline", subagent: "subagent" };
 
-interface SkillsSettingsView { paths: string[] }
-
 export function SettingsSkills() {
   const [skills, setSkills] = useState<SkillView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,12 +14,12 @@ export function SettingsSkills() {
 
   useEffect(() => {
     app.Capabilities().then((c) => setSkills(c.skills)).finally(() => setLoading(false));
-    (app as any).SkillsSettingsAdvanced().then((v: SkillsSettingsView) => setPaths(v.paths || [])).catch(() => {});
+    app.SkillsSettingsAdvanced().then((v) => setPaths(v.paths || [])).catch(() => {});
   }, []);
 
   const savePaths = async (next: string[]) => {
     setPaths(next);
-    try { await (app as any).SaveSkillsSettings({ paths: next }); setPathsErr(null); } catch (e: any) { setPathsErr(String(e)); }
+    try { await app.SaveSkillsSettings({ paths: next }); setPathsErr(null); } catch (e: any) { setPathsErr(String(e)); }
   };
 
   const pathsText = paths.join("\n");

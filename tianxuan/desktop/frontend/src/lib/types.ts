@@ -420,6 +420,49 @@ export interface PluginEntryView {
   autoStart: boolean | null;
 }
 
+// Search settings (settings_advanced.go).
+export interface SearchSettingsView {
+  localSearXNGUrl: string;
+  tavilyApiKeyEnv: string;
+  braveApiKeyEnv: string;
+  timeoutSeconds: number;
+  allowDomains: string[];
+  denyDomains: string[];
+}
+
+// LSP settings (settings_advanced.go).
+export interface LSPEntryView {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  languageId: string;
+  extensions: string[];
+  installHint: string;
+}
+
+export interface LSPSettingsView {
+  enabled: boolean;
+  servers: Record<string, LSPEntryView>;
+}
+
+// Codegraph settings (settings_advanced.go).
+export interface CodegraphSettingsView {
+  enabled: boolean;
+  autoInstall: boolean;
+  path: string;
+}
+
+// Skills advanced settings (settings_advanced.go).
+export interface SkillsSettingsView {
+  paths: string[];
+}
+
+// Agent advanced settings (settings_advanced.go).
+export interface AgentAdvancedView {
+  systemPromptFile: string;
+  autoPlanClassifier: string;
+}
+
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;
 // UpdateProgress streams on the "updater:progress" event during ApplyUpdate.
 export interface UpdateInfo {

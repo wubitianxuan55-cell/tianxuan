@@ -1,27 +1,19 @@
 import { useEffect, useState } from "react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
-
-interface SearchSettingsView {
-  localSearXNGUrl: string;
-  tavilyApiKeyEnv: string;
-  braveApiKeyEnv: string;
-  timeoutSeconds: number;
-  allowDomains: string[];
-  denyDomains: string[];
-}
+import type { SearchSettingsView } from "../lib/types";
 
 export function SettingsSearch() {
   const [v, setV] = useState<SearchSettingsView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    (app as any).SearchSettings().then(setV).catch((e: any) => setErr(String(e)));
+    app.SearchSettings().then(setV).catch((e: any) => setErr(String(e)));
   }, []);
 
   const save = async (next: SearchSettingsView) => {
     setV(next);
-    try { await (app as any).SaveSearchSettings(next); setErr(null); } catch (e: any) { setErr(String(e)); }
+    try { await app.SaveSearchSettings(next); setErr(null); } catch (e: any) { setErr(String(e)); }
   };
 
   if (!v) return <SettingsPageShell title="Search" desc="Web search engine configuration."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;

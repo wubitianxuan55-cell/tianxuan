@@ -651,7 +651,31 @@ export function makeMockApp(): AppBindings {
     },
     async SetPluginEnabled(name: string, enabled: boolean) {
       const p = mockPlugins.find(x => x.name === name);
-      if (p) p.autoStart = enabled ? null : false;
+      if (p) {
+        // Mirror Go: AutoStart = &enabled (nil when true, &false when false).
+        p.autoStart = enabled ? null : false;
+      }
     },
+    // Advanced settings mocks.
+    async SearchSettings() {
+      return { localSearXNGUrl: "", tavilyApiKeyEnv: "", braveApiKeyEnv: "", timeoutSeconds: 10, allowDomains: [], denyDomains: [] };
+    },
+    async SaveSearchSettings(_v: import("./types").SearchSettingsView) {},
+    async LSPSettings() {
+      return { enabled: false, servers: {} };
+    },
+    async SaveLSPSettings(_v: import("./types").LSPSettingsView) {},
+    async CodegraphSettings() {
+      return { enabled: false, autoInstall: false, path: "" };
+    },
+    async SaveCodegraphSettings(_v: import("./types").CodegraphSettingsView) {},
+    async SkillsSettingsAdvanced() {
+      return { paths: [] };
+    },
+    async SaveSkillsSettings(_v: import("./types").SkillsSettingsView) {},
+    async AgentAdvancedSettings() {
+      return { systemPromptFile: "", autoPlanClassifier: "" };
+    },
+    async SaveAgentAdvancedSettings(_v: import("./types").AgentAdvancedView) {},
   };
 }

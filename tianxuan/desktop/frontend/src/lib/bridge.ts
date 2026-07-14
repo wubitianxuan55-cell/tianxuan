@@ -38,6 +38,11 @@ import type {
   HookConfigView,
   HooksSettingsView,
   PluginEntryView,
+  SearchSettingsView,
+  LSPSettingsView,
+  CodegraphSettingsView,
+  SkillsSettingsView,
+  AgentAdvancedView,
 } from "./types";
 
 // AppBindings mirrors desktop/app.go's exported method set. Keep in sync by hand
@@ -221,6 +226,17 @@ export interface AppBindings {
   SavePlugin(p: PluginEntryView): Promise<void>;
   RemovePlugin(name: string): Promise<void>;
   SetPluginEnabled(name: string, enabled: boolean): Promise<void>;
+  // Search/LSP/Codegraph/Skills/Agent-advanced settings (settings_advanced.go).
+  SearchSettings(): Promise<SearchSettingsView>;
+  SaveSearchSettings(v: SearchSettingsView): Promise<void>;
+  LSPSettings(): Promise<LSPSettingsView>;
+  SaveLSPSettings(v: LSPSettingsView): Promise<void>;
+  CodegraphSettings(): Promise<CodegraphSettingsView>;
+  SaveCodegraphSettings(v: CodegraphSettingsView): Promise<void>;
+  SkillsSettingsAdvanced(): Promise<SkillsSettingsView>;
+  SaveSkillsSettings(v: SkillsSettingsView): Promise<void>;
+  AgentAdvancedSettings(): Promise<AgentAdvancedView>;
+  SaveAgentAdvancedSettings(v: AgentAdvancedView): Promise<void>;
 }
 
 interface WailsRuntime {

@@ -21,7 +21,7 @@ export function SettingsPlugins() {
 
   const reload = async () => {
     try {
-      const list: PluginEntryView[] = await (app as any).Plugins();
+      const list: PluginEntryView[] = await app.Plugins();
       setPlugins(list || []);
       setError(null);
     } catch (e: any) {
@@ -35,7 +35,7 @@ export function SettingsPlugins() {
   const save = async (p: PluginEntryView) => {
     setBusy(true);
     try {
-      await (app as any).SavePlugin(p);
+      await app.SavePlugin(p);
       setEditPlugin(null);
       await reload();
     } catch (e: any) {
@@ -48,7 +48,7 @@ export function SettingsPlugins() {
   const remove = async (name: string) => {
     setBusy(true);
     try {
-      await (app as any).RemovePlugin(name);
+      await app.RemovePlugin(name);
       await reload();
     } catch (e: any) {
       setError(String(e));
@@ -60,7 +60,7 @@ export function SettingsPlugins() {
   const toggleEnabled = async (name: string, enabled: boolean) => {
     setBusy(true);
     try {
-      await (app as any).SetPluginEnabled(name, enabled);
+      await app.SetPluginEnabled(name, enabled);
       await reload();
     } catch (e: any) {
       setError(String(e));

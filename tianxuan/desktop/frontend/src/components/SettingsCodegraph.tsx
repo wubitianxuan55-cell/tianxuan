@@ -1,20 +1,19 @@
 import { useEffect, useState } from "react";
 import { SettingsPageShell, SettingsSection, SettingsField } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
-
-interface CodegraphSettingsView { enabled: boolean; autoInstall: boolean; path: string; }
+import type { CodegraphSettingsView } from "../lib/types";
 
 export function SettingsCodegraph() {
   const [v, setV] = useState<CodegraphSettingsView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    (app as any).CodegraphSettings().then(setV).catch((e: any) => setErr(String(e)));
+    app.CodegraphSettings().then(setV).catch((e: any) => setErr(String(e)));
   }, []);
 
   const save = async (next: CodegraphSettingsView) => {
     setV(next);
-    try { await (app as any).SaveCodegraphSettings(next); } catch (e: any) { setErr(String(e)); }
+    try { await app.SaveCodegraphSettings(next); } catch (e: any) { setErr(String(e)); }
   };
 
   if (!v) return <SettingsPageShell title="Codegraph" desc="Code knowledge graph configuration."><div className="text-fg-faint py-8 text-center">Loading...</div></SettingsPageShell>;

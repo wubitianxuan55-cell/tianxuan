@@ -51,6 +51,7 @@ require (
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
+	mvdan.cc/sh/v3 v3.13.1 // indirect
 )
 
 replace tianxuan => ../

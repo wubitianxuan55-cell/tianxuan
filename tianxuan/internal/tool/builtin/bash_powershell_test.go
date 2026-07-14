@@ -131,11 +131,11 @@ func TestWrapLauncherCommand(t *testing.T) {
 		{"start /B server.exe", ps, "", false},
 		// Start-Process → already non-blocking, no wrap needed
 		{"Start-Process notepad", ps, "", false},
-		// npm / wails / go → wrapped via cmd /c start /b
-		{"npm start", ps, `cmd /c start /b "" "npm start"`, true},
-		{"npm run dev", ps, `cmd /c start /b "" "npm run dev"`, true},
-		{"wails dev", ps, `cmd /c start /b "" "wails dev"`, true},
-		{"go run ./cmd/server", ps, `cmd /c start /b "" "go run ./cmd/server"`, true},
+		// npm / wails / go → wrapped via cmd /c start
+		{"npm start", ps, `cmd /c start "" "npm start"`, true},
+		{"npm run dev", ps, `cmd /c start "" "npm run dev"`, true},
+		{"wails dev", ps, `cmd /c start "" "wails dev"`, true},
+		{"go run ./cmd/server", ps, `cmd /c start "" "go run ./cmd/server"`, true},
 		// normal commands → NOT wrapped
 		{"echo hello", ps, "", false},
 		{"go build ./...", ps, "", false},
@@ -158,9 +158,9 @@ func TestWrapLauncherCommand(t *testing.T) {
 		{"./app --listen :8080", bash, "./app --listen :8080 &", true},
 		// keyword-based detection — "runserver" keyword
 		{"python manage.py runserver", bash, "python manage.py runserver &", true},
-		// PowerShell path — keyword-based (start /b)
-		{"python server.py", ps, `cmd /c start /b "" "python server.py"`, true},
-		{"node server.js", ps, `cmd /c start /b "" "node server.js"`, true},
+		// PowerShell path — keyword-based
+		{"python server.py", ps, `cmd /c start "" "python server.py"`, true},
+		{"node server.js", ps, `cmd /c start "" "node server.js"`, true},
 		// negative: "server" as part of a normal word should NOT match
 		{"echo observer", bash, "", false},
 		// negative: non-launcher commands should still NOT match

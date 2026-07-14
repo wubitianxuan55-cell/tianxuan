@@ -395,14 +395,16 @@ func wrapLauncherCommand(cmd string, sh sandbox.Shell) (string, bool) {
 		return cmd, false
 	}
 
-	// PowerShell: use cmd /c start /b so the process launches in background
-	// WITHOUT a visible cmd window. start /b means "same window, background" —
-	// the server process runs but cmd exits immediately, never blocking bash.
+	// PowerShell: wrap launcher commands via cmd /c start so the process
+	// launches independently and exits immediately, never blocking bash.
+	// Shell will briefly flash a cmd window; start /b was tried but
+	// triggers "Windows cannot find file" ShellExecute popups on commands
+	// containing quoted arguments (V10.71→V10.75 regression).
 	if sh.Kind == sandbox.ShellPowerShell {
 		if isStartCmd(trimmed) {
 			return cmd, false // already non-blocking
 		}
-		return fmt.Sprintf(`cmd /c start /b "" %s`, escapeCmdArg(cmd)), true
+		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
 	}
 
 	// Bash / POSIX shell: append " &" to background the command.

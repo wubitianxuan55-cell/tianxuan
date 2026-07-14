@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
-import { applyColorScheme, applyThemeMode, getColorScheme, getThemeMode, type ColorScheme, type ThemeMode } from "../lib/theme";
 import type { SettingsView } from "../lib/types";
 import { CloseButton } from "./CloseButton";
 import { Modal } from "./Modal";
@@ -32,8 +31,6 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
   const [s, setS] = useState<SettingsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [scheme, setSchemeState] = useState<ColorScheme>(getColorScheme());
-  const [mode, setModeState] = useState<ThemeMode>(getThemeMode());
   const [tab, setTab] = useState<SettingsTab>("general");
   const [query, setQuery] = useState("");
 
@@ -83,11 +80,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     sandbox: () => <SandboxSection s={s} busy={busy} apply={apply} />,
     agent: () => <AgentSection s={s} busy={busy} apply={apply} />,
     network: () => <SettingsNetwork s={s} busy={busy} apply={apply} />,
-    appearance: () => (
-      <AppearanceSection scheme={scheme} mode={mode}
-        onScheme={(sc) => { applyColorScheme(sc); setSchemeState(sc); }}
-        onMode={(m) => { applyThemeMode(m); setModeState(m); }} />
-    ),
+    appearance: () => <AppearanceSection s={s} busy={busy} apply={apply} />,
     updates: () => <UpdatesSection configPath={s.configPath} />,
     shortcuts: () => <SettingsShortcuts />,
     mcp: () => <SettingsMcp />,

@@ -136,7 +136,8 @@ export function makeMockApp(): AppBindings {
     bypass: false,
     language: "",
     network: { proxyMode: "off", proxyUrl: "", noProxy: "" },
-    desktop: { layoutStyle: "classic", displayMode: "standard", closeBehavior: "quit", statusBarStyle: "icon", statusBarItems: ["model","workspace"], checkUpdates: true, telemetry: false, metrics: false },
+    desktop: { layoutStyle: "classic", displayMode: "standard", closeBehavior: "quit", statusBarStyle: "icon", statusBarItems: ["model","workspace"], checkUpdates: true, telemetry: false, metrics: false, theme: "", themeStyle: "", textSize: "default", zoomFactor: 100, fontFamily: "", monoFontFamily: "" },
+    tools: { shell: "auto", bashTimeoutSeconds: 0, mcpCallTimeoutSeconds: 0 },
     permLevel: "ask",
   };
   return {
@@ -540,6 +541,13 @@ export function makeMockApp(): AppBindings {
     async SetDesktopCheckUpdates(on: boolean) { settings.desktop.checkUpdates = on; },
     async SetDesktopTelemetry(on: boolean) { settings.desktop.telemetry = on; },
     async SetDesktopMetrics(on: boolean) { settings.desktop.metrics = on; },
+    async SetDesktopTheme(theme: string) { settings.desktop.theme = theme; },
+    async SetDesktopThemeStyle(style: string) { settings.desktop.themeStyle = style; },
+    async SetDesktopTextSize(size: string) { settings.desktop.textSize = size; },
+    async SetDesktopZoomFactor(z: number) { settings.desktop.zoomFactor = z; },
+    async SetDesktopFontFamily(font: string) { settings.desktop.fontFamily = font; },
+    async SetDesktopMonoFontFamily(font: string) { settings.desktop.monoFontFamily = font; },
+    async SetDesktopLanguage(lang: string) { settings.language = lang; },
     async SetStatusBarStyle(style: string) { settings.desktop.statusBarStyle = style; },
     async SetStatusBarItems(items: string[]) { settings.desktop.statusBarItems = items; },
     async SetBashTimeoutSeconds(_secs: number) {},

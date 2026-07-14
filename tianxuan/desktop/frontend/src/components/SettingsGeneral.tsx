@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SectionProps } from "./SettingsShared";
 import { SettingsPageShell, SettingsSection, SettingsField, SegmentedButton } from "./SettingsPageShell";
 import { app } from "../lib/bridge";
+import { useI18n } from "../lib/i18n";
 
 // Sound preference type
 type SoundPref = "off" | "synth";
@@ -10,6 +11,8 @@ type SoundPref = "off" | "synth";
 const STATUS_BAR_ITEMS = ["model", "workspace", "gitBranch", "cache", "tokens", "jobs", "balance"];
 
 export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
+  const { t, pref, setPref } = useI18n();
+
   const [depth, setDepth] = useState(s.agent.maxSubagentDepth);
   const [plannerSteps, setPlannerSteps] = useState(s.agent.plannerMaxSteps || 0);
   const [reasoningLang, setReasoningLang] = useState(s.agent.reasoningLanguage || "auto");
@@ -41,8 +44,34 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
     try { return localStorage.getItem("tianxuan.displayMode") || "standard"; } catch { return "standard"; }
   });
 
+  // Shell & timeout
+  const [shellPref, setShellPref] = useState(s.tools?.shell || "auto");
+  const [bashTimeout, setBashTimeout] = useState(s.tools?.bashTimeoutSeconds ? String(s.tools.bashTimeoutSeconds) : "");
+  const [mcpTimeout, setMcpTimeout] = useState(s.tools?.mcpCallTimeoutSeconds ? String(s.tools.mcpCallTimeoutSeconds) : "");
+
+  const updateLanguage = (lang: "" | "en" | "zh" | "zh-TW") => {
+    setPref(lang);
+    void apply(() => app.SetDesktopLanguage(lang));
+  };
+
   return (
     <SettingsPageShell title="通用" desc="桌面布局、显示偏好与智能体运行时行为。">
+      {/* Language */}
+      <SettingsSection title="语言">
+        <SettingsField label="界面语言" hint="桌面界面的显示语言，自动 = 跟随系统。">
+          <SegmentedButton
+            options={[
+              { value: "" as const, label: t("settings.langAuto") },
+              { value: "zh" as const, label: "简体中文" },
+              { value: "zh-TW" as const, label: "繁體中文" },
+              { value: "en" as const, label: "English" },
+            ]}
+            value={pref}
+            onChange={updateLanguage}
+          />
+        </SettingsField>
+      </SettingsSection>
+
       {/* Desktop Layout */}
       <SettingsSection title="桌面布局">
         <SettingsField label="布局风格" hint="桌面窗口的整体布局样式。">
@@ -60,7 +89,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
           <SegmentedButton
             options={[
               { value: "quit", label: "退出" },
-              { value: "minimize", label: "最小化到托盘" },
+              { value: "background", label: "最小化到托盘" },
             ]}
             value={closeBehavior}
             onChange={(v) => { setCloseBehavior(v); void apply(() => app.SetDesktopCloseBehavior(v)); }}
@@ -76,6 +105,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             onChange={(v) => {
               setDisplayMode(v);
               try { localStorage.setItem("tianxuan.displayMode", v); } catch {}
+              void apply(() => app.SetDesktopDisplayMode(v));
             }}
           />
         </SettingsField>
@@ -138,6 +168,49 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             ]}
             value={toolApprovalMode}
             onChange={(v) => { setToolApprovalMode(v); void apply(() => app.SetPermissionMode(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="Shell 偏好" hint="执行命令时使用的 Shell 解释器。">
+          <SegmentedButton
+            options={[
+              { value: "auto", label: "自动" },
+              { value: "bash", label: "Bash" },
+              { value: "powershell", label: "PowerShell" },
+            ]}
+            value={shellPref}
+            onChange={(v) => { setShellPref(v); void apply(() => app.SetShellPreference(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="Bash 超时" hint="命令执行超时秒数，0 = 默认 (120s)。">
+          <input
+            type="number" min="0" max="600" step="10"
+            className="w-24 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
+            placeholder="默认"
+            value={bashTimeout}
+            onChange={(e) => {
+              const v = e.target.value;
+              setBashTimeout(v);
+              const n = parseInt(v, 10);
+              if (!isNaN(n) && n >= 0) {
+                void apply(() => app.SetBashTimeoutSeconds(n));
+              }
+            }}
+          />
+        </SettingsField>
+        <SettingsField label="MCP 超时" hint="MCP 调用超时秒数，0 = 默认 (300s)。">
+          <input
+            type="number" min="0" max="3600" step="30"
+            className="w-24 bg-bg-soft border border-border-soft rounded-md text-fg text-[13px] px-2.5 py-1.5 outline-none focus:border-accent"
+            placeholder="默认"
+            value={mcpTimeout}
+            onChange={(e) => {
+              const v = e.target.value;
+              setMcpTimeout(v);
+              const n = parseInt(v, 10);
+              if (!isNaN(n) && n >= 0) {
+                void apply(() => app.SetMCPCallTimeoutSeconds(n));
+              }
+            }}
           />
         </SettingsField>
       </SettingsSection>

@@ -3121,7 +3121,15 @@ body::after {
 .jump-text { display: block; overflow: hidden; text-overflow: ellipsis; }
 @keyframes jump-bar-in { to { opacity: 1; transform: translate(0, -50%); } }
 
-
-
+/* ── data-text-size: override base font-size per user preference ── */
+[data-text-size="small"] {
+  --font-size-base: 13px;
+}
+[data-text-size="large"] {
+  --font-size-base: 15px;
+}
+[data-text-size="xlarge"] {
+  --font-size-base: 16px;
+}
 
 

@@ -404,6 +404,58 @@ func (c *Config) SetMemoryCompilerEnabled(on bool) error {
 	return nil
 }
 
+// SetDesktopTheme sets the desktop color scheme: "auto" | "dark" | "light".
+func (c *Config) SetDesktopTheme(theme string) error {
+	switch strings.ToLower(strings.TrimSpace(theme)) {
+	case "", "auto":
+		c.Desktop.Theme = "auto"
+	case "dark":
+		c.Desktop.Theme = "dark"
+	case "light":
+		c.Desktop.Theme = "light"
+	default:
+		return fmt.Errorf("desktop theme %q: must be auto|dark|light", theme)
+	}
+	return nil
+}
+
+// SetDesktopThemeStyle sets the desktop theme variant name.
+func (c *Config) SetDesktopThemeStyle(style string) error {
+	c.Desktop.ThemeStyle = strings.TrimSpace(style)
+	return nil
+}
+
+// SetDesktopTextSize sets the UI font size: "small" | "default" | "large" | "xlarge".
+func (c *Config) SetDesktopTextSize(size string) error {
+	size = strings.TrimSpace(size)
+	if size != "" && size != "small" && size != "default" && size != "large" && size != "xlarge" {
+		return fmt.Errorf("desktop text_size %q: must be small|default|large|xlarge", size)
+	}
+	c.Desktop.TextSize = size
+	return nil
+}
+
+// SetDesktopZoomFactor sets the UI zoom percentage (70-150). 0 = default 100.
+func (c *Config) SetDesktopZoomFactor(z int) error {
+	if z != 0 && (z < 70 || z > 150) {
+		return fmt.Errorf("desktop zoom_factor %d: must be 70-150", z)
+	}
+	c.Desktop.ZoomFactor = z
+	return nil
+}
+
+// SetDesktopFontFamily sets the UI font family. Empty = system default.
+func (c *Config) SetDesktopFontFamily(font string) error {
+	c.Desktop.FontFamily = strings.TrimSpace(font)
+	return nil
+}
+
+// SetDesktopMonoFontFamily sets the monospace font family. Empty = system default.
+func (c *Config) SetDesktopMonoFontFamily(font string) error {
+	c.Desktop.MonoFontFamily = strings.TrimSpace(font)
+	return nil
+}
+
 // SaveTo writes the configuration to path as annotated TOML, atomically: it
 // writes a sibling temp file then renames, so a crash mid-write can't leave a
 // half-written tianxuan.toml that fails to parse on next load. Parent directories

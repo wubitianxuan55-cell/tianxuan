@@ -168,6 +168,13 @@ export interface AppBindings {
   SetDesktopCheckUpdates(on: boolean): Promise<void>;
   SetDesktopTelemetry(on: boolean): Promise<void>;
   SetDesktopMetrics(on: boolean): Promise<void>;
+  SetDesktopTheme(theme: string): Promise<void>;
+  SetDesktopThemeStyle(style: string): Promise<void>;
+  SetDesktopTextSize(size: string): Promise<void>;
+  SetDesktopZoomFactor(z: number): Promise<void>;
+  SetDesktopFontFamily(font: string): Promise<void>;
+  SetDesktopMonoFontFamily(font: string): Promise<void>;
+  SetDesktopLanguage(lang: string): Promise<void>;
   SetStatusBarStyle(style: string): Promise<void>;
   SetStatusBarItems(items: string[]): Promise<void>;
   SetBashTimeoutSeconds(secs: number): Promise<void>;

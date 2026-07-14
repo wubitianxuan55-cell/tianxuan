@@ -363,8 +363,19 @@ export interface DesktopView {
   checkUpdates: boolean;
   telemetry: boolean;
   metrics: boolean;
+  theme: string;
+  themeStyle: string;
+  textSize: string;
+  zoomFactor: number;
+  fontFamily: string;
+  monoFontFamily: string;
 }
 
+export interface ToolsConfigView {
+  shell: string;
+  bashTimeoutSeconds: number;
+  mcpCallTimeoutSeconds: number;
+}
 export interface SettingsView {
   defaultModel: string;
   plannerModel: string;
@@ -382,6 +393,7 @@ export interface SettingsView {
   language: string;
   network: NetworkView;
   desktop: DesktopView;
+  tools: ToolsConfigView;
 }
 
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;

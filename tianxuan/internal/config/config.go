@@ -50,6 +50,18 @@ type DesktopConfig struct {
 	CheckUpdates   bool     `toml:"check_updates"`
 	Telemetry      bool     `toml:"telemetry"`
 	Metrics        bool     `toml:"metrics"`
+	// Theme is the color scheme: "auto" | "dark" | "light". Empty = auto.
+	Theme string `toml:"theme"`
+	// ThemeStyle is the theme variant name (e.g. "default", "warm", "ice", etc.).
+	ThemeStyle string `toml:"theme_style"`
+	// TextSize controls UI font size: "small" | "default" | "large" | "xlarge".
+	TextSize string `toml:"text_size"`
+	// ZoomFactor is the UI zoom percentage (70-150). 0 = default 100.
+	ZoomFactor int `toml:"zoom_factor"`
+	// FontFamily is the UI font family name. Empty = system default.
+	FontFamily string `toml:"font_family"`
+	// MonoFontFamily is the monospace font family name. Empty = system default.
+	MonoFontFamily string `toml:"mono_font_family"`
 }
 
 // SearchConfig configures web search engines. Resolution order: local SearXNG

@@ -53,6 +53,12 @@ type DesktopView struct {
 	CheckUpdates   bool     `json:"checkUpdates"`
 	Telemetry      bool     `json:"telemetry"`
 	Metrics        bool     `json:"metrics"`
+	Theme          string   `json:"theme"`
+	ThemeStyle     string   `json:"themeStyle"`
+	TextSize       string   `json:"textSize"`
+	ZoomFactor     int      `json:"zoomFactor"`
+	FontFamily     string   `json:"fontFamily"`
+	MonoFontFamily string   `json:"monoFontFamily"`
 }
 
 type PermissionsView struct {
@@ -124,6 +130,8 @@ type SettingsView struct {
 	Network NetworkView `json:"network"`
 	// Desktop holds desktop-UI preferences.
 	Desktop DesktopView `json:"desktop"`
+	// Tools holds tool runtime config (shell, timeouts).
+	Tools ToolsConfigView `json:"tools"`
 }
 
 // NetworkView exposes network proxy settings.
@@ -133,6 +141,13 @@ type NetworkView struct {
 	NoProxy   string `json:"noProxy"`
 }
 
+// ToolsConfigView exposes tool runtime config (shell, timeouts).
+type ToolsConfigView struct {
+	Shell                 string `json:"shell"`
+	BashTimeoutSeconds    int    `json:"bashTimeoutSeconds"`
+	MCPCallTimeoutSeconds int    `json:"mcpCallTimeoutSeconds"`
+}
+
 func nonNil(s []string) []string {
 	if s == nil {
 		return []string{}
@@ -140,6 +155,13 @@ func nonNil(s []string) []string {
 	return s
 }
 
+// toolTimeout dereferences a *int, returning 0 for nil (meaning "use default").
+func toolTimeout(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
 // Settings returns the current configuration for the Settings panel.
 func (a *App) Settings() SettingsView {
 	cfg, err := config.Load()
@@ -176,6 +198,9 @@ func (a *App) Settings() SettingsView {
 			CloseBehavior: cfg.Desktop.CloseBehavior, StatusBarStyle: cfg.Desktop.StatusBarStyle,
 			StatusBarItems: cfg.Desktop.StatusBarItems, CheckUpdates: cfg.Desktop.CheckUpdates,
 			Telemetry: cfg.Desktop.Telemetry, Metrics: cfg.Desktop.Metrics,
+			Theme: cfg.Desktop.Theme, ThemeStyle: cfg.Desktop.ThemeStyle,
+			TextSize: cfg.Desktop.TextSize, ZoomFactor: cfg.Desktop.ZoomFactor,
+			FontFamily: cfg.Desktop.FontFamily, MonoFontFamily: cfg.Desktop.MonoFontFamily,
 		},
 		Language:      cfg.Language,
 		Network: NetworkView{
@@ -183,6 +208,11 @@ func (a *App) Settings() SettingsView {
 			ProxyURL:  cfg.Network.ProxyURL,
 			NoProxy:   cfg.Network.NoProxy,
 		},
+		Tools: ToolsConfigView{
+			Shell:                 cfg.Tools.Shell,
+			BashTimeoutSeconds:    toolTimeout(cfg.Tools.BashTimeoutSeconds),
+			MCPCallTimeoutSeconds: toolTimeout(cfg.Tools.MCPCallTimeoutSeconds),
+	},
 	}
 	for i := range cfg.Providers {
 		p := &cfg.Providers[i]
@@ -572,6 +602,41 @@ func (a *App) SetDesktopTelemetry(on bool) error {
 // SetDesktopMetrics enables aggregated desktop-usage counters.
 func (a *App) SetDesktopMetrics(on bool) error {
 	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopMetrics(on) })
+}
+
+// SetDesktopTheme sets the desktop color scheme: "auto" | "dark" | "light".
+func (a *App) SetDesktopTheme(theme string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopTheme(theme) })
+}
+
+// SetDesktopThemeStyle sets the desktop theme variant name.
+func (a *App) SetDesktopThemeStyle(style string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopThemeStyle(style) })
+}
+
+// SetDesktopTextSize sets the UI font size: "small" | "default" | "large" | "xlarge".
+func (a *App) SetDesktopTextSize(size string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopTextSize(size) })
+}
+
+// SetDesktopZoomFactor sets the UI zoom percentage (70-150). 0 = default 100.
+func (a *App) SetDesktopZoomFactor(z int) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopZoomFactor(z) })
+}
+
+// SetDesktopFontFamily sets the UI font family. Empty = system default.
+func (a *App) SetDesktopFontFamily(font string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopFontFamily(font) })
+}
+
+// SetDesktopMonoFontFamily sets the monospace font family. Empty = system default.
+func (a *App) SetDesktopMonoFontFamily(font string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetDesktopMonoFontFamily(font) })
+}
+
+// SetDesktopLanguage persists the language preference and updates the runtime.
+func (a *App) SetDesktopLanguage(lang string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return c.SetLanguage(lang) })
 }
 
 // SetStatusBarStyle sets the status bar display style: "icon" | "text".

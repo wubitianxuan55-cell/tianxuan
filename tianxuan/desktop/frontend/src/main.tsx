@@ -6,9 +6,29 @@ import { initTheme } from "./lib/theme";
 import "./styles.css";
 import "./tailwind.css";
 
+// Restore saved font, text size, and zoom from localStorage before paint.
+function initAppearance(): void {
+  try {
+    const zoom = localStorage.getItem("tianxuan.zoom");
+    if (zoom) document.documentElement.style.fontSize = `${zoom}%`;
+
+    const uiFont = localStorage.getItem("tianxuan.uiFont");
+    if (uiFont) document.documentElement.setAttribute("data-font-family", uiFont);
+
+    const monoFont = localStorage.getItem("tianxuan.monoFont");
+    if (monoFont) document.documentElement.setAttribute("data-mono-font-family", monoFont);
+
+    const textSize = localStorage.getItem("tianxuan.textSize");
+    if (textSize) document.documentElement.setAttribute("data-text-size", textSize);
+  } catch {
+    // localStorage unavailable (private mode / no storage) — silent.
+  }
+}
+
 // Apply the saved appearance (auto/light/dark) before the first paint.
 initTheme();
-
+// Restore saved font, text size, and zoom from localStorage.
+initAppearance();
 // Inside the Wails shell, suppress the webview's default right-click menu — its
 // Reload / Back / Inspect entries are easy to hit by accident and can reset or
 // navigate away from the app. Text inputs keep their native Cut/Copy/Paste menu.

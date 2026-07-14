@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -247,7 +248,9 @@ func (c *Conn) serveRequest(ctx context.Context, id json.RawMessage, method stri
 		c.writeError(id, ErrInternal, "marshal result: "+err.Error())
 		return
 	}
-	_ = c.write(outbound{JSONRPC: "2.0", ID: id, Result: raw})
+	if err := c.write(outbound{JSONRPC: "2.0", ID: id, Result: raw}); err != nil {
+		slog.Warn("acp: write result", "id", id, "err", err)
+	}
 }
 
 // resolve delivers a response to the goroutine waiting on its outbound request.

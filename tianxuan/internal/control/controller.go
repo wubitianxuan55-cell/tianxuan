@@ -73,6 +73,12 @@ type Controller struct {
 	reg       *tool.Registry
 	pluginCtx context.Context
 
+	// bgCtx / bgCancel governs background operations started by Submit
+	// (/compact, /dream, /distill, /new). Calling Close cancels them so
+	// there are no orphaned goroutines during shutdown.
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
+
 	ctxMgr            *tiancontext.ContextManager     // V3.0 Phase 5
 
 	// Checkpoints (snapshot-based rewind). cp is the per-session store rebound when
@@ -201,6 +207,8 @@ func New(opts Options) *Controller {
 		asks:         map[string]chan []event.AskAnswer{},
 		granted:      map[string]bool{},
 	}
+	c.bgCtx, c.bgCancel = context.WithCancel(context.Background())
+
 	// Checkpoints: bind a store to the session and route writer pre-edits into it.
 	c.rebindCheckpoints(opts.SessionPath)
 	if c.executor != nil {
@@ -838,6 +846,9 @@ func (c *Controller) Close() {
 	c.mu.Unlock()
 	if started {
 		c.hooks.SessionEnd(context.Background())
+	}
+	if c.bgCancel != nil {
+		c.bgCancel()
 	}
 	if c.jobs != nil {
 		c.jobs.Close() // cancel any still-running background jobs

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -445,7 +446,9 @@ func (t *TaskTool) finalizeRun(result string, err error, run *SubagentRun) (stri
 		return result, err
 	}
 	if err != nil {
-		_ = t.transcripts.SaveFailed(run)
+		if saveErr := t.transcripts.SaveFailed(run); saveErr != nil {
+		slog.Warn("subagent: save failed transcript", "ref", run.Ref, "err", saveErr)
+	}
 		return result, err
 	}
 	if saveErr := t.transcripts.SaveCompleted(run); saveErr != nil {

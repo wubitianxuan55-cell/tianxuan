@@ -4,7 +4,7 @@ import { useT } from "../lib/i18n";
 import type { SettingsView } from "../lib/types";
 import { CloseButton } from "./CloseButton";
 import { Modal } from "./Modal";
-import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command, Search } from "lucide-react";
+import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command, Search, Code2, Monitor } from "lucide-react";
 import { ModelsSection } from "./SettingsModels";
 import { ProvidersSection } from "./SettingsProviders";
 import { PermissionsSection } from "./SettingsPermissions";
@@ -22,6 +22,9 @@ import { SettingsPlugins } from "./SettingsPlugins";
 import { SettingsHooks } from "./SettingsHooks";
 import { SettingsShortcuts } from "./SettingsShortcuts";
 import { SettingsDiagnostics } from "./SettingsDiagnostics";
+import { SettingsSearch } from "./SettingsSearch";
+import { SettingsLsp } from "./SettingsLsp";
+import { SettingsCodegraph } from "./SettingsCodegraph";
 import { SETTINGS_TABS, TAB_GROUPS, settingsTabLabel, settingsTabMeta, type SettingsTab } from "./SettingsShared";
 
 type TabRenderers = Record<SettingsTab, () => React.ReactNode>;
@@ -52,6 +55,9 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     memory: <BrainCircuit size={15} />,
     hooks: <Zap size={15} />,
     diagnostics: <Search size={15} />,
+    search: <Search size={15} />,
+    lsp: <Code2 size={15} />,
+    codegraph: <Monitor size={15} />,
   };
 
   const filteredTabs = query.trim() && s
@@ -90,6 +96,9 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
     memory: () => <SettingsMemory />,
     hooks: () => <SettingsHooks />,
     diagnostics: () => <SettingsDiagnostics />,
+    search: () => <SettingsSearch />,
+    lsp: () => <SettingsLsp />,
+    codegraph: () => <SettingsCodegraph />,
   } : null;
 
   const visibleTabs = new Set(filteredTabs);

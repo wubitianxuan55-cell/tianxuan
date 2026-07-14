@@ -4,6 +4,7 @@ import { useT } from "../lib/i18n";
 export type SettingsTab =
   | "general" | "models" | "providers" | "permissions" | "sandbox" | "agent"
   | "network" | "appearance" | "updates" | "shortcuts"
+  | "search" | "lsp" | "codegraph"
   | "mcp" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics";
 
 export const SETTINGS_TABS: SettingsTab[] = [
@@ -31,6 +32,7 @@ export function settingsTabLabel(id: SettingsTab, t: ReturnType<typeof useT>): s
     general: "通用", models: "模型", providers: "模型服务", permissions: "权限",
     sandbox: "沙箱", agent: "智能体", network: "网络", appearance: "外观",
     updates: "更新", shortcuts: "快捷键",
+    search: "搜索", lsp: "LSP", codegraph: "Codegraph",
     mcp: "MCP", skills: "技能", subagents: "子代理", plugins: "插件",
     memory: "记忆", hooks: "钩子", diagnostics: "诊断",
   };
@@ -57,6 +59,9 @@ export function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<
     case "memory": return t("settings.memoryMeta");
     case "hooks": return t("settings.hooksMeta");
     case "diagnostics": return "检查";
+    case "search": return "search";
+    case "lsp": return "lsp";
+    case "codegraph": return "codegraph";
   }
 }
 

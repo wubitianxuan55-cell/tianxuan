@@ -4,6 +4,7 @@ package proc
 
 import (
 	"os/exec"
+	"log/slog"
 	"strconv"
 	"syscall"
 	"unsafe"
@@ -68,17 +69,27 @@ func assignJob(cmd *exec.Cmd) uintptr {
 	}
 	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
 		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
-		_ = windows.CloseHandle(job)
+		if err := windows.CloseHandle(job); err != nil {
+			slog.Warn("proc: close job handle", "err", err)
+		}
 		return 0
 	}
 	h, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(cmd.Process.Pid))
 	if err != nil {
-		_ = windows.CloseHandle(job)
+		if err := windows.CloseHandle(job); err != nil {
+			slog.Warn("proc: close job handle", "err", err)
+		}
 		return 0
 	}
-	defer func() { _ = windows.CloseHandle(h) }()
+	defer func() {
+		if err := windows.CloseHandle(h); err != nil {
+			slog.Warn("proc: close process handle", "err", err)
+		}
+	}()
 	if err := windows.AssignProcessToJobObject(job, h); err != nil {
-		_ = windows.CloseHandle(job)
+		if err := windows.CloseHandle(job); err != nil {
+			slog.Warn("proc: close job handle", "err", err)
+		}
 		return 0
 	}
 	return uintptr(job)
@@ -91,7 +102,11 @@ func resumeProcess(pid uint32) {
 	if err != nil {
 		return
 	}
-	defer func() { _ = windows.CloseHandle(snap) }()
+	defer func() {
+		if err := windows.CloseHandle(snap); err != nil {
+			slog.Warn("proc: close snapshot handle", "err", err)
+		}
+	}()
 	var te windows.ThreadEntry32
 	te.Size = uint32(unsafe.Sizeof(te))
 	for err := windows.Thread32First(snap, &te); err == nil; err = windows.Thread32Next(snap, &te) {
@@ -102,8 +117,12 @@ func resumeProcess(pid uint32) {
 		if err != nil {
 			continue
 		}
-		_, _ = windows.ResumeThread(th)
-		_ = windows.CloseHandle(th)
+		if _, err := windows.ResumeThread(th); err != nil {
+			slog.Warn("proc: resume thread", "tid", te.ThreadID, "err", err)
+		}
+		if err := windows.CloseHandle(th); err != nil {
+			slog.Warn("proc: close thread handle", "err", err)
+		}
 	}
 }
 
@@ -112,8 +131,12 @@ func resumeProcess(pid uint32) {
 // then catches anything spawned in the gap before the job was assigned.
 func KillTracked(cmd *exec.Cmd, job uintptr) {
 	if job != 0 {
-		_ = windows.TerminateJobObject(windows.Handle(job), 1)
-		_ = windows.CloseHandle(windows.Handle(job))
+		if err := windows.TerminateJobObject(windows.Handle(job), 1); err != nil {
+			slog.Warn("proc: terminate job object", "err", err)
+		}
+		if err := windows.CloseHandle(windows.Handle(job)); err != nil {
+			slog.Warn("proc: close job handle", "err", err)
+		}
 	}
 	KillTree(cmd)
 }

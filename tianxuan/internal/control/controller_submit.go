@@ -23,7 +23,7 @@ func (c *Controller) Submit(input string) {
 				c.notice("cannot compact while a turn is running")
 				return
 			}
-			if err := c.Compact(context.Background(), focus); err != nil {
+			if err := c.Compact(c.bgCtx, focus); err != nil {
 				c.notice("compaction failed: " + err.Error())
 			} else {
 				c.notice("compacted")
@@ -49,7 +49,7 @@ func (c *Controller) Submit(input string) {
 				text := c.dreamText(dir)
 				c.notice(text)
 			case sub == "extract" || strings.HasPrefix(sub, "extract "):
-				if err := c.Dream(context.Background()); err != nil {
+				if err := c.Dream(c.bgCtx); err != nil {
 					c.notice("dream extract failed: " + err.Error())
 				} else {
 					c.notice("dream: knowledge extracted to memory")
@@ -147,7 +147,7 @@ func (c *Controller) Submit(input string) {
 				created := c.createSkillTemplates(patterns)
 				c.notice("distill: " + fmt.Sprintf("%d", created) + " skill templates created in .tianxuan/skills/")
 			default:
-				if err := c.Distill(context.Background()); err != nil {
+				if err := c.Distill(c.bgCtx); err != nil {
 					c.notice("distill failed: " + err.Error())
 				} else {
 					c.notice("distill complete — patterns saved to memory")

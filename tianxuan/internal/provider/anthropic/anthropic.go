@@ -101,8 +101,8 @@ func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provi
 		return nil, err
 	}
 
-	out := make(chan provider.Chunk)
-	go c.readStream(resp, out)
+	out := make(chan provider.Chunk, 16)
+	go c.readStream(ctx, resp, out)
 	return out, nil
 }
 
@@ -291,9 +291,24 @@ func (c *client) buildRequest(req provider.Request) anthRequest {
 // and a complete ChunkToolCall when the block closes; usage is assembled from
 // message_start (input/cache) + message_delta (output + stop_reason) and emitted
 // once before ChunkDone.
-func (c *client) readStream(resp *http.Response, out chan<- provider.Chunk) {
+func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<- provider.Chunk) {
 	defer resp.Body.Close()
 	defer close(out)
+
+	// Close the response body when the context is canceled so scanner.Scan()
+	// unblocks instead of hanging indefinitely on a stalled connection.
+	// Also exits when readStream completes normally (idleDone) to avoid
+	// leaking this goroutine until ctx expires.
+	idleDone := make(chan struct{})
+	defer close(idleDone)
+	go func() {
+		select {
+		case <-ctx.Done():
+			resp.Body.Close()
+		case <-idleDone:
+			// readStream exited normally; nothing to clean up.
+		}
+	}()
 
 	tools := map[int]*provider.ToolCall{} // tool_use blocks, keyed by content index
 	var inTok, outTok, cacheCreate, cacheRead int

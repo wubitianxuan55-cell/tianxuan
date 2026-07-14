@@ -125,18 +125,18 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
 
   if (display.length === 0) return null;
 
-  const labelParts: string[] = [];
-  if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
-  if (thoughtCount > 0) labelParts.push(`${thoughtCount} 次思考`);
-
-  // Elapsed: live while running, frozen after completion
   const elapsed = running
     ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
     : finalElapsedRef.current;
   const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
+
+  const labelParts: string[] = [];
+  if (elapsedStr) labelParts.push(`已工作 ${elapsedStr}`);
+  if (toolCount > 0) labelParts.push(`${toolCount} 个工具`);
+  if (thoughtCount > 0) labelParts.push(`${thoughtCount} 段思考`);
   const label = labelParts.length > 0
-    ? (elapsedStr ? `${labelParts.join(" · ")} · ${elapsedStr}` : labelParts.join(" · "))
-    : (running ? "处理中…" : elapsedStr);
+    ? labelParts.join(" - ")
+    : (running ? "处理中…" : "");
 
   const toggle = () => { userOverridden.current = true; setOpen((v) => !v); };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ChevronRight, Wrench } from "lucide-react";
 import type { Item } from "../lib/store";
 import { useItems, useTurnStartAt } from "../lib/store";
@@ -124,41 +124,52 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
     }
   }, [running, turnStartAt]);
 
-  const { toolNodes, thoughtNodes, stats } = useMemo(() => {
-    const tnodes: React.ReactNode[] = [];
-    const hnodes: React.ReactNode[] = [];
+type Segment = { kind: "thought"; nodes: React.ReactNode[] } | { kind: "tools"; nodes: React.ReactNode[]; stats: { read: number; write: number; run: number } };
+  const segments = useMemo(() => {
+    const out: Segment[] = [];
     const roBatch: ToolItem[] = [];
-    let s = { read: 0, write: 0, run: 0 };
-    const flushRO = () => {
+    const flushROTo = (target: React.ReactNode[]) => {
       if (roBatch.length === 0) return;
-      tnodes.push(<ReadOnlyBatch key={`rob-${roBatch[0].id}`} items={[...roBatch]} />);
+      target.push(<ReadOnlyBatch key={`rob-${roBatch[0].id}`} items={[...roBatch]} />);
       roBatch.length = 0;
+    };
+    let curTools: React.ReactNode[] = [];
+    let curStats = { read: 0, write: 0, run: 0 };
+    const flushTools = () => {
+      if (curTools.length === 0) return;
+      out.push({ kind: "tools", nodes: curTools, stats: { ...curStats } });
+      curTools = []; curStats = { read: 0, write: 0, run: 0 };
     };
     for (const it of display) {
       if (it.kind === "tool" && it.status === "done" && it.readOnly) {
         roBatch.push(it);
         continue;
       }
-      flushRO();
+      if (it.kind === "assistant") {
+        flushROTo(curTools);
+        flushTools();
+        out.push({ kind: "thought", nodes: [<InlineReasoning key={it.id} item={it as AssistantItem} />] });
+        continue;
+      }
+      flushROTo(curTools);
       switch (it.kind) {
-        case "assistant":
-          hnodes.push(<InlineReasoning key={it.id} item={it as AssistantItem} />);
-          break;
         case "tool": {
           const cat = toolCategory(it.name);
-          if (cat === "read") s.read++;
-          else if (cat === "write") s.write++;
-          else if (cat === "run") s.run++;
-          tnodes.push(<ToolCard key={it.id} item={it} />);
+          if (cat === "read") curStats.read++;
+          else if (cat === "write") curStats.write++;
+          else if (cat === "run") curStats.run++;
+          curTools.push(<ToolCard key={it.id} item={it} />);
           break;
         }
         case "phase":
-          hnodes.push(<div key={it.id} className="phase"><ProcessPhaseIcon size={12} /><span>{it.text}</span></div>);
+          flushTools();
+          out.push({ kind: "thought", nodes: [<div key={it.id} className="phase"><ProcessPhaseIcon size={12} /><span>{it.text}</span></div>] });
           break;
       }
     }
-    flushRO();
-    return { toolNodes: tnodes, thoughtNodes: hnodes, stats: s };
+    flushROTo(curTools);
+    flushTools();
+    return out;
   }, [display]);
 
   if (display.length === 0) return null;
@@ -178,11 +189,10 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
 
   const toggle = () => { userOverridden.current = true; setOpen((v) => !v); };
 
-  const body = (
-    <>
-      {thoughtNodes.length > 0 && thoughtNodes}
-      {toolNodes.length > 0 && <ToolBatch nodes={toolNodes} stats={stats} />}
-    </>
+  const body = segments.map((seg, i) =>
+    seg.kind === "thought"
+      ? <React.Fragment key={i}>{seg.nodes}</React.Fragment>
+      : <ToolBatch key={i} nodes={seg.nodes} stats={seg.stats} />
   );
 
   return (

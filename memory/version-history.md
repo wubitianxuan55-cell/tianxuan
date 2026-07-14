@@ -6,11 +6,11 @@ metadata:
   type: reference
 ---
 
-## 版本历史
-| V10.68.0 | 2026-07-14 | Prompt 约束强化 — 禁止执行者重新探索/推翻计划 + 桌面端构建 |
-
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.86.0 | 2026-07-14 | 8 项代码审查修复 — Bug修复+内存泄漏+CSS变量+架构守卫 |
+| V10.85.0 | 2026-07-14 | 6 轮设置面板 UI 打磨详情 |
+| V10.68.0 | 2026-07-14 | Prompt 约束强化 — 禁止执行者重新探索/推翻计划 + 桌面端构建 |
 | V10.67.0 | 2026-07-14 | 从 Reasonix 蒸馏补齐设置面板 — ModelPicker/StepLimitControl/General增强/Shortcuts录制/Hooks管理/Sandbox Shell |
 | V10.66.0 | 2026-07-14 | 5 项后端 BUG 清理 — goroutine泄漏/可取消ctx/错误日志 |
 | V10.52.2 | 2026-07-09 | 双模型 Prompt 全面重写 + 执行契约 L2 化 + 整体优化 |
@@ -37,7 +37,6 @@ metadata:
 | V10.8.1 | — | 会话体验优化 |
 | V10.8.0 | — | 3 项智能化优化 |
 | V7.5.0 | — | 初始提交 |
-
 ## V10.20.0 详情
 
 - **产物**: `release/v10.20.0/tianxuan-desktop.exe`
@@ -141,7 +140,33 @@ metadata:
 4. 文件：`agent.go`, `agent_run.go`, `hermes.go`, `app_session.go`
 
 ### 历史显示补齐
+### 历史显示补齐
 
 - `History()` 增加 `StripTransientBlocks` 调用
 - extractOriginalTask 函数提取 handoff 中的原始任务
 - Compaction summary 跳过逻辑保留并正确整合
+
+## V10.86.0 详情
+
+- **产物**: `release/tianxuan-v10.86.0-desktop.exe`
+- **SHA256**: `3575dea003c4a80974f2158aff2b78b3e0adf08d3a823eb01e422983303837e8`
+- **构建命令**: `cd tianxuan/desktop && wails build -ldflags "-s -w -H windowsgui" -o tianxuan-desktop.exe`
+- **变更**: 20 文件，+146/-79 行
+- **提交**: `3d6f637`
+
+### 🔴 严重（3 项）
+
+1. ProcessCard 图标不可见 — 10 处 `--ds-` 前缀移除
+2. CSS 变量未定义 — ErrorBoundary/CapabilitiesPanel/Composer/Sidebar 修复
+3. finalReadinessCheck 缺少 plannerMode 守卫
+
+### 🟡 中等（3 项）
+
+4. Modal setTimeout 泄漏
+5. LSP client pipe fd 泄漏 + close() 错误日志
+6. Transcript setTimeout 泄漏
+
+### 🔵 低（2 项）
+
+7. ApprovalModal inline DOM 操作 → CSS hover
+8. LSP close() 静默吞错误 → slog.Warn

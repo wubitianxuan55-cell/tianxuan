@@ -2871,6 +2871,33 @@ body::after {
 }
 .turn-collapse__body > * { margin-bottom: 8px; }
 .turn-collapse__body > *:last-child { margin-bottom: 0; }
+
+/* ── ToolBatch: collapsible tool summary card ─────────────────────── */
+.tool-batch {
+  margin: 4px 0;
+}
+.tool-batch__head {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 26px; padding: 3px 8px; border: none; background: var(--bg-soft);
+  color: var(--fg-dim); font-family: inherit; font-size: 12px;
+  cursor: pointer; border-radius: 6px;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.tool-batch__head:hover { color: var(--fg); background: var(--bg-elev); }
+.tool-batch__chevron {
+  transition: transform var(--duration-fast);
+}
+.tool-batch__chevron--open { transform: rotate(90deg); }
+.tool-batch__body {
+  overflow: hidden;
+  padding: 0;
+}
+.tool-batch--open .tool-batch__body {
+  padding: 6px 0 2px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--border) 60%, transparent);
+  margin-left: 4px;
+}
+
 .turn-collapse__reasoning-phase {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
 }

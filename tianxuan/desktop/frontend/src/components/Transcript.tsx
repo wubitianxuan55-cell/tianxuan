@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ChevronRight } from "lucide-react";
+import { ArrowDown, ChevronRight, Wrench } from "lucide-react";
 import type { Item } from "../lib/store";
 import { useItems, useTurnStartAt } from "../lib/store";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -54,6 +54,41 @@ function mergeConsecutiveReasoning(items: Item[]): Item[] {
   return out;
 }
 
+// ── Tool category helpers ─────────────────────────────────────────────
+const READ_TOOLS = new Set(["read_file", "grep", "glob", "ls", "code_index", "lsp_definition", "lsp_hover", "lsp_references", "lsp_diagnostics", "web_search", "web_fetch", "git_status", "git_diff", "git_log", "memory_search", "read_skill", "read_only_skill"]);
+const WRITE_TOOLS = new Set(["write_file", "edit_file", "multi_edit", "delete_range", "delete_symbol", "move_file", "notebook_edit"]);
+const RUN_TOOLS = new Set(["bash", "task", "complete_step", "install_skill", "remember", "forget", "run_skill", "ask"]);
+
+function toolCategory(name: string): "read" | "write" | "run" | "" {
+  if (READ_TOOLS.has(name)) return "read";
+  if (WRITE_TOOLS.has(name)) return "write";
+  if (RUN_TOOLS.has(name)) return "run";
+  if (name.startsWith("mcp__codegraph__")) return "read";
+  return "";
+}
+
+// ── ToolBatch: collapsible wrapper around all tool cards ──────────────
+function ToolBatch({ nodes, stats, defaultOpen = false }: { nodes: React.ReactNode[]; stats: { read: number; write: number; run: number }; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useGSAPCollapse(bodyRef, open);
+  const parts: string[] = [];
+  if (stats.read > 0) parts.push(`已读 ${stats.read} 文件`);
+  if (stats.write > 0) parts.push(`已写 ${stats.write} 文件`);
+  if (stats.run > 0) parts.push(`已运行 ${stats.run} 命令`);
+  if (parts.length === 0) return <>{nodes}</>;
+  return (
+    <div className={`tool-batch${open ? " tool-batch--open" : ""}`}>
+      <button type="button" className="tool-batch__head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <ChevronRight size={12} className={`tool-batch__chevron${open ? " tool-batch__chevron--open" : ""}`} />
+        <Wrench size={11} />
+        <span>{parts.join(" - ")}</span>
+      </button>
+      <div ref={bodyRef} className="tool-batch__body">{nodes}</div>
+    </div>
+  );
+}
+
 // ── TurnCollapse: fold completed process steps ──────────────────────────
 function collapseDisplayItems(items: Item[]): Item[] {
   return items.filter((it) => {
@@ -77,7 +112,6 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
 
   useGSAPCollapse(bodyRef, open);
 
-  // Auto-open during running, auto-close when done (unless user toggled)
   useEffect(() => {
     const wasRunning = prevRunningRef.current;
     prevRunningRef.current = running;
@@ -86,19 +120,18 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
       if (!userOverridden.current) setOpen(true);
     } else if (wasRunning && !userOverridden.current) {
       setOpen(false);
-      // Freeze elapsed at completion moment
       finalElapsedRef.current = turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0;
     }
   }, [running, turnStartAt]);
 
-  // Pre-compute body: batch consecutive completed read-only tools into ReadOnlyBatch
-  // MUST be before the early return so hook count is stable across renders.
-  const body = useMemo(() => {
-    const nodes: React.ReactNode[] = [];
+  const { toolNodes, thoughtNodes, stats } = useMemo(() => {
+    const tnodes: React.ReactNode[] = [];
+    const hnodes: React.ReactNode[] = [];
     const roBatch: ToolItem[] = [];
+    let s = { read: 0, write: 0, run: 0 };
     const flushRO = () => {
       if (roBatch.length === 0) return;
-      nodes.push(<ReadOnlyBatch key={`rob-${roBatch[0].id}`} items={[...roBatch]} />);
+      tnodes.push(<ReadOnlyBatch key={`rob-${roBatch[0].id}`} items={[...roBatch]} />);
       roBatch.length = 0;
     };
     for (const it of display) {
@@ -109,18 +142,23 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
       flushRO();
       switch (it.kind) {
         case "assistant":
-          nodes.push(<InlineReasoning key={it.id} item={it as AssistantItem} />);
+          hnodes.push(<InlineReasoning key={it.id} item={it as AssistantItem} />);
           break;
-        case "tool":
-          nodes.push(<ToolCard key={it.id} item={it} />);
+        case "tool": {
+          const cat = toolCategory(it.name);
+          if (cat === "read") s.read++;
+          else if (cat === "write") s.write++;
+          else if (cat === "run") s.run++;
+          tnodes.push(<ToolCard key={it.id} item={it} />);
           break;
+        }
         case "phase":
-          nodes.push(<div key={it.id} className="phase"><ProcessPhaseIcon size={12} /><span>{it.text}</span></div>);
+          hnodes.push(<div key={it.id} className="phase"><ProcessPhaseIcon size={12} /><span>{it.text}</span></div>);
           break;
       }
     }
     flushRO();
-    return nodes;
+    return { toolNodes: tnodes, thoughtNodes: hnodes, stats: s };
   }, [display]);
 
   if (display.length === 0) return null;
@@ -139,6 +177,13 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
     : (running ? "处理中…" : "");
 
   const toggle = () => { userOverridden.current = true; setOpen((v) => !v); };
+
+  const body = (
+    <>
+      {thoughtNodes.length > 0 && thoughtNodes}
+      {toolNodes.length > 0 && <ToolBatch nodes={toolNodes} stats={stats} />}
+    </>
+  );
 
   return (
     <div className={`turn-collapse${open ? " turn-collapse--open" : ""}`}>
@@ -328,7 +373,6 @@ export function Transcript({
     return map;
   }, [items]);
 
-  // Question navigation
   const questions = useMemo<QuestionAnchor[]>(() =>
     turnGroups.map((tg, i) => ({
       id: questionAnchorId(tg.userItem.id),
@@ -348,11 +392,6 @@ export function Transcript({
 
   const scrollDown = useCallback(() => { stick.current = true; setShowScrollDown(false); scrollToBottom(); }, [scrollToBottom]);
 
-  // Partition items into (process, outside) segments.
-  // Each assistant answer text acts as a segment boundary: process items
-  // before the text fold into one TurnCollapse, text renders outside,
-  // then subsequent process items start a new TurnCollapse.
-  // Pattern ported from DeepSeek-Reasonix partitionTurnItems.
   const renderItems = useMemo(() => {
     const segments: { processItems: Item[]; outsideItems: Item[] }[] = [];
     let curProcess: Item[] = [];
@@ -366,30 +405,22 @@ export function Transcript({
     };
 
     for (const it of items) {
-      // User messages always flush and start a new segment
       if (it.kind === "user") {
         flush();
         segments.push({ processItems: [], outsideItems: [it] });
         continue;
       }
-
-      // Assistant with text: reasoning → TurnCollapse, text → outside.
-      // Strip reasoning from outside copy so text area stays clean.
       if (it.kind === "assistant") {
         if (it.text) {
           if (curOutside.length > 0) flush();
           if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
           curOutside.push({ ...it, reasoning: "" } as Item);
         } else {
-          // reasoning-only: new segment if text already rendered
           if (curOutside.length > 0) flush();
           curProcess.push(it);
         }
         continue;
       }
-
-      // process items (tools, compactions, info notices → inside fold;
-      // phases → outside as section headers)
       if (curOutside.length > 0) flush();
       if (it.kind === "tool" || it.kind === "compaction" || it.kind === "notice") {
         curProcess.push(it);
@@ -456,14 +487,12 @@ export function Transcript({
   return (
     <div className="transcript-shell relative flex-1 min-h-0">
     <div className="transcript h-full" ref={scrollRef} onScroll={onScroll}>
-      {/* Warm zone — older history pagination */}
       {coldTurnCount > 0 && (
         <button className="warm-collapse" onClick={() => setWarmState((s) => warmLayerWithNextColdPage(s, ""))}>
           显示更早的 {Math.min(coldTurnCount, WARM_PAGE_SIZE)} 轮对话
         </button>
       )}
 
-      {/* Warm turns (folded) */}
       {warmStartTurn < warmEndTurn && turnGroups.slice(warmStartTurn, warmEndTurn).map((tg, i) => {
         const turnNum = warmStartTurn + i;
         const isExpanded = warmState.expandedWarmTurns.has(turnNum);
@@ -489,23 +518,18 @@ export function Transcript({
         )}
         <StreamingIndicator running={running} items={rawItems} />
 
-        {/* Hot zone — always rendered with TurnCollapse wrapping process */}
         {renderItems.slice(warmEndTurn).filter(seg => seg.processItems.length > 0 || seg.outsideItems.length > 0).map((seg, segIdx, arr) => {
           const toolCount = seg.processItems.filter((it) => it.kind === "tool").length;
           const thoughtCount = seg.processItems.filter((it) => it.kind === "assistant" && it.reasoning).length;
           const hasProcess = seg.processItems.length > 0;
           const isLast = segIdx === arr.length - 1;
-          // Stable key: use first process item's id to avoid React remounting
-          // when segments shift. Falls back to segIdx for empty/edge cases.
           const segKey = seg.processItems[0]?.id ?? seg.outsideItems[0]?.id ?? `seg${segIdx}`;
 
           return (
             <div key={segKey}>
-              {/* 过程在上 — TurnCollapse always wraps, auto-expands when running */}
               {hasProcess && (
                 <TurnCollapse items={seg.processItems} toolCount={toolCount} thoughtCount={thoughtCount} running={running && isLast} />
               )}
-              {/* 文本在下 */}
               {seg.outsideItems.length > 0 && renderSegmentGroups(seg.outsideItems)}
             </div>
           );
@@ -513,7 +537,6 @@ export function Transcript({
       </div>
     </div>
 
-    {/* Jump bar */}
     {items.length > 0 && showQuestionNav && (
       <QuestionJumpBar questions={questions} onJump={handleJumpToQuestion} />
     )}

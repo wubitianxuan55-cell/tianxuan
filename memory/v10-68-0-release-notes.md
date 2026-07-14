@@ -27,3 +27,15 @@ metadata:
 - `go test ./internal/agent/... -count=1` — 全部通过
 - `go vet ./internal/agent/...` — 零警告
 - `go build ./...` — 编译通过
+
+### 桌面端构建
+
+| 项目 | 值 |
+|------|-----|
+| 构建时间 | 2026-07-14 10:51 |
+| 产物路径 | `build/bin/tianxuan-desktop.exe` |
+| 安装路径 | `%APPDATA%	ianxuanin	ianxuan.exe` |
+| 文件大小 | 17,452,032 bytes (~17.5 MB) |
+| SHA256 | `cfe683e1218d50f442f76098d88626e6825dd3fa41dc26453bdb16d7b4d8805f` |
+| Wails CLI | v2.13.0 |
+| 编译平台 | windows/amd64 |

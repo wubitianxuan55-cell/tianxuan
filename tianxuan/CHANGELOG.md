@@ -1,3 +1,20 @@
+## [10.85.0] — 2026-07-15
+
+### 🎨 设置面板六轮深度 UI 打磨（ui-ux-pro-max 驱动）
+
+> 基于前三轮结构重构后的精细化打磨：对比层次、高亮选择、动画过渡、按钮补齐。
+
+- **R1 卡片化**：SettingsSection 从纯文本分组改为 `bg-bg-soft` 卡片容器 + `shadow` 微阴影 + `rounded-xl`；SettingsField 字段间添加 `border-b` 微分隔线
+- **R2 嵌套对比链**：`bg-elev`（内容区）→ `bg-bg-soft`（Section 卡片）→ `bg-bg`（内部控件/输入框/子卡片）三层深度对比
+- **R3 深度打磨**：卡片添加 `shadow-[0_1px_3px_rgba(0,0,0,0.2)]` 浮起感；页面标题加 `border-b` 底部分隔；CollapsibleSection 展开区加 `border-l-2` 左侧标记+`bg-bg/40` 微背景；子卡片 border 从 `border-soft` 升级到 `border`
+- **R4 高亮选择**：SegmentedButton 激活项加 `ring-1 ring-accent/40 scale-[1.02]`；EffortSelect 升级 `ring-2 shadow-sm`；FontChip 加 `ring-1 shadow-sm`；配色方案色块 `ring-2 shadow-md scale-[1.03]`；NavButton 激活态 `bg-accent/20 font-bold w-[4px]`
+- **R5 按钮补齐**：`btn--small`/`btn--ghost`/`btn--tiny` 三个 `@utility` 修复实际样式缺失 bug（5 页面引用但从不生效）；全部 SettingsSection 标题图标统一 `text-accent` 色
+- **R6 动画打磨**：标签页切换添加 `animate-[fadeIn_150ms_ease-out]` 淡入动画；空态/加载态包裹卡片容器；Modal header 加 `bg-bg-soft/50` 微背景；SettingsGeneral 包裹 SettingsPageShell 获得统一标题栏
+- **Sidebar**：移除设置按钮 `running` 禁用限制，允许运行中打开设置面板
+
+### 📁 文件变更
+- 16 files: 14 Settings*.tsx + SettingsPageShell.tsx + tailwind.css + Sidebar.tsx
+
 ## [10.84.0] — 2026-07-14
 
 ### 🎨 设置面板全面 UI 重构（ui-ux-pro-max 驱动）

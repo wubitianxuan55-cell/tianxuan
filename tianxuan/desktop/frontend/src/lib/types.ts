@@ -396,6 +396,30 @@ export interface SettingsView {
   tools: ToolsConfigView;
 }
 
+export interface HookConfigView {
+  match: string;
+  command: string;
+  description: string;
+  timeout: number;
+  cwd: string;
+}
+
+export interface HooksSettingsView {
+  hooks: Record<string, HookConfigView[]>;
+  path: string;
+}
+
+export interface PluginEntryView {
+  name: string;
+  type: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  url: string;
+  headers: Record<string, string>;
+  autoStart: boolean | null;
+}
+
 // Auto-updater payloads (desktop/updater.go). UpdateInfo drives the update banner;
 // UpdateProgress streams on the "updater:progress" event during ApplyUpdate.
 export interface UpdateInfo {

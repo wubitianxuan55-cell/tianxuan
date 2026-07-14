@@ -140,6 +140,12 @@ export function makeMockApp(): AppBindings {
     tools: { shell: "auto", bashTimeoutSeconds: 0, mcpCallTimeoutSeconds: 0 },
     permLevel: "ask",
   };
+  // Hooks mock storage.
+  const mockHooks: Record<string, import("./types").HookConfigView[]> = {};
+  // Plugins mock storage.
+  const mockPlugins: import("./types").PluginEntryView[] = [
+    { name: "codegraph", type: "stdio", command: "codegraph-mcp", args: [], env: {}, url: "", headers: {}, autoStart: null },
+  ];
   return {
     async Submit(input) {
       cancelled = false;
@@ -621,6 +627,31 @@ export function makeMockApp(): AppBindings {
 
 成功标准：所有相关文件已检查，潜在问题已记录或修复。
 输出格式：简要摘要 + 文件扫描结果 + 问题/改进列表`;
+    },
+    // Hooks settings mock — persists in memory within this session.
+    async HooksSettings() {
+      return { hooks: JSON.parse(JSON.stringify(mockHooks)), path: "~/.tianxuan/settings.json (mock)" };
+    },
+    async SaveHooksSettings(hooks: Record<string, import("./types").HookConfigView[]>) {
+      for (const k of Object.keys(mockHooks)) delete mockHooks[k];
+      Object.assign(mockHooks, hooks);
+    },
+    // Plugins mock — persists in memory.
+    async Plugins() {
+      return mockPlugins.map(p => ({ ...p, args: [...p.args], env: { ...p.env }, headers: { ...p.headers } }));
+    },
+    async SavePlugin(p: import("./types").PluginEntryView) {
+      const idx = mockPlugins.findIndex(x => x.name === p.name);
+      if (idx >= 0) mockPlugins[idx] = { ...p, args: [...(p.args||[])], env: {...(p.env||{})}, headers: {...(p.headers||{})} };
+      else mockPlugins.push({ ...p, args: [...(p.args||[])], env: {...(p.env||{})}, headers: {...(p.headers||{})} });
+    },
+    async RemovePlugin(name: string) {
+      const idx = mockPlugins.findIndex(x => x.name === name);
+      if (idx >= 0) mockPlugins.splice(idx, 1);
+    },
+    async SetPluginEnabled(name: string, enabled: boolean) {
+      const p = mockPlugins.find(x => x.name === name);
+      if (p) p.autoStart = enabled ? null : false;
     },
   };
 }

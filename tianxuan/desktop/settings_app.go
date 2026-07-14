@@ -1,21 +1,24 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"tianxuan/internal/agent"
 	"tianxuan/internal/boot"
 	"tianxuan/internal/config"
+	"tianxuan/internal/hook"
 	"tianxuan/internal/provider"
 )
 
 // settings_app.go is the desktop Settings panel's command surface: it reads the
 // resolved config and applies edits through internal/config/edit.go (the
 // purpose-built mutation API), then rebuilds the controller so the change takes
-// effect live â€” the same snapshotâ†’reloadâ†’resume pattern as SetModel. Secrets are
+// effect live â€?the same snapshotâ†’reloadâ†’resume pattern as SetModel. Secrets are
 // the exception: they go to ./.env (upsertDotEnv), since config stores only the
 // env-var name, not the key.
 
@@ -119,7 +122,7 @@ type SettingsView struct {
 	ConfigPath   string          `json:"configPath"`
 	// ProviderKinds lists the provider implementations the kernel actually
 	// registered (provider.Kinds()), so the editor's "kind" picker offers only
-	// kinds that resolve â€” selecting an unregistered one would fail the rebuild.
+	// kinds that resolve â€?selecting an unregistered one would fail the rebuild.
 	ProviderKinds []string `json:"providerKinds"`
 	// Bypass is the live YOLO state (runtime-only, not from config), so the panel's
 	// toggle reflects whether approvals are currently being skipped this session.
@@ -727,4 +730,174 @@ func copyMap(m map[string]string) map[string]string {
 // subagentSkillNames returns the builtin sub-agent skill identifiers.
 func subagentSkillNames() []string {
 	return []string{"explore", "research", "review", "security-review"}
+}
+
+// --- Hooks settings (settings.json) ---
+
+// HookConfigView mirrors hook.HookConfig for the frontend bridge.
+type HookConfigView struct {
+	Match       string `json:"match"`
+	Command     string `json:"command"`
+	Description string `json:"description"`
+	Timeout     int    `json:"timeout"`
+	Cwd         string `json:"cwd"`
+}
+
+// HooksSettingsView is the full hooks payload sent to the frontend.
+type HooksSettingsView struct {
+	Hooks map[string][]HookConfigView `json:"hooks"`
+	Path  string                      `json:"path"`
+}
+
+// HooksSettings returns the current contents of the global settings.json.
+func (a *App) HooksSettings() HooksSettingsView {
+	path := hook.GlobalSettingsPath("")
+	v := HooksSettingsView{Path: path, Hooks: map[string][]HookConfigView{}}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return v // file doesn't exist yet â€?return empty
+	}
+	var s hook.Settings
+	if err := json.Unmarshal(b, &s); err != nil {
+		return v // malformed â†?empty
+	}
+	if s.Hooks == nil {
+		return v
+	}
+	for event, configs := range s.Hooks {
+		views := make([]HookConfigView, 0, len(configs))
+		for _, cfg := range configs {
+			views = append(views, HookConfigView{
+				Match:       cfg.Match,
+				Command:     cfg.Command,
+				Description: cfg.Description,
+				Timeout:     cfg.Timeout,
+				Cwd:         cfg.Cwd,
+			})
+		}
+		v.Hooks[string(event)] = views
+	}
+	return v
+}
+
+// SaveHooksSettings writes the hooks map to the global settings.json.
+// It receives the full map keyed by event name (e.g. "PreToolUse").
+func (a *App) SaveHooksSettings(hooks map[string][]HookConfigView) error {
+	path := hook.GlobalSettingsPath("")
+	if path == "" {
+		return fmt.Errorf("cannot resolve hooks settings path")
+	}
+
+	s := hook.Settings{Hooks: map[hook.Event][]hook.HookConfig{}}
+	for eventName, views := range hooks {
+		event := hook.Event(eventName)
+		configs := make([]hook.HookConfig, 0, len(views))
+		for _, v := range views {
+			if strings.TrimSpace(v.Command) == "" {
+				continue // skip hooks with no command
+			}
+			configs = append(configs, hook.HookConfig{
+				Match:       v.Match,
+				Command:     v.Command,
+				Description: v.Description,
+				Timeout:     v.Timeout,
+				Cwd:         v.Cwd,
+			})
+		}
+		if len(configs) > 0 {
+			s.Hooks[event] = configs
+		}
+	}
+
+	// Write atomically: temp file then rename.
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create hooks dir: %w", err)
+	}
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal hooks: %w", err)
+	}
+
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return fmt.Errorf("write hooks: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		// On Windows, Rename fails across volumes â€?fall back to copy.
+		if err2 := copyFile(tmp, path); err2 != nil {
+			os.Remove(tmp)
+			return fmt.Errorf("save hooks: %w (copy fallback: %w)", err, err2)
+		}
+		os.Remove(tmp)
+	}
+
+	slog.Info("desktop: hooks settings saved", "path", path)
+	return a.rebuild()
+}
+
+// copyFile is a fallback for atomic file saves across volume boundaries (Windows).
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o600)
+}
+
+// --- Plugins ([[plugins]] in config.toml) ---
+
+// PluginEntryView mirrors config.PluginEntry for the frontend.
+type PluginEntryView struct {
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Command   string            `json:"command"`
+	Args      []string          `json:"args"`
+	Env       map[string]string `json:"env"`
+	URL       string            `json:"url"`
+	Headers   map[string]string `json:"headers"`
+	AutoStart *bool             `json:"autoStart"`
+}
+
+// Plugins returns all configured plugins from config.toml's [[plugins]].
+func (a *App) Plugins() []PluginEntryView {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil
+	}
+	out := make([]PluginEntryView, 0, len(cfg.Plugins))
+	for _, p := range cfg.Plugins {
+		out = append(out, PluginEntryView{
+			Name: p.Name, Type: p.Type, Command: p.Command,
+			Args: nonNil(p.Args), Env: p.Env, URL: p.URL,
+			Headers: p.Headers, AutoStart: p.AutoStart,
+		})
+	}
+	return out
+}
+
+// SavePlugin adds or updates a plugin entry in [[plugins]] and rebuilds.
+func (a *App) SavePlugin(p PluginEntryView) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.UpsertPlugin(config.PluginEntry{
+			Name: p.Name, Type: p.Type, Command: p.Command,
+			Args: p.Args, Env: p.Env, URL: p.URL,
+			Headers: p.Headers, AutoStart: p.AutoStart,
+		})
+	})
+}
+
+// RemovePlugin deletes a plugin entry and rebuilds.
+func (a *App) RemovePlugin(name string) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		if !c.RemovePlugin(name) { return fmt.Errorf("plugin %q not found", name) }; return nil
+	})
+}
+
+// SetPluginEnabled toggles auto_start for a plugin and rebuilds.
+func (a *App) SetPluginEnabled(name string, enabled bool) error {
+	return a.applyConfigChange(func(c *config.Config) error {
+		return c.SetPluginEnabled(name, enabled)
+	})
 }

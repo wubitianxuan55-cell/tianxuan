@@ -456,6 +456,19 @@ func (c *Config) SetDesktopMonoFontFamily(font string) error {
 	return nil
 }
 
+// SetPluginEnabled toggles auto_start for a plugin by name.
+// enabled=true → auto_start=true; enabled=false → auto_start=false.
+func (c *Config) SetPluginEnabled(name string, enabled bool) error {
+	for i, p := range c.Plugins {
+		if p.Name == name {
+			v := enabled
+			c.Plugins[i].AutoStart = &v
+			return nil
+		}
+	}
+	return fmt.Errorf("plugin %q not found", name)
+}
+
 // SaveTo writes the configuration to path as annotated TOML, atomically: it
 // writes a sibling temp file then renames, so a crash mid-write can't leave a
 // half-written tianxuan.toml that fails to parse on next load. Parent directories

@@ -35,6 +35,9 @@ import type {
   UpdateProgress,
   WireEvent,
   WorkspaceView,
+  HookConfigView,
+  HooksSettingsView,
+  PluginEntryView,
 } from "./types";
 
 // AppBindings mirrors desktop/app.go's exported method set. Keep in sync by hand
@@ -210,6 +213,14 @@ export interface AppBindings {
   RunScheduleNow(id: string): Promise<ResultView>;
   GetResults(scheduleID: string): Promise<ResultView[]>;
   RefineSchedulePrompt(prompt: string): Promise<string>;
+  // Hooks settings (settings.json).
+  HooksSettings(): Promise<HooksSettingsView>;
+  SaveHooksSettings(hooks: Record<string, HookConfigView[]>): Promise<void>;
+  // Plugin management ([[plugins]] in config.toml).
+  Plugins(): Promise<PluginEntryView[]>;
+  SavePlugin(p: PluginEntryView): Promise<void>;
+  RemovePlugin(name: string): Promise<void>;
+  SetPluginEnabled(name: string, enabled: boolean): Promise<void>;
 }
 
 interface WailsRuntime {

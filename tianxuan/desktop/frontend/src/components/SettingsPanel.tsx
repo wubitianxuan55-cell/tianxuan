@@ -3,8 +3,8 @@ import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { applyColorScheme, applyThemeMode, getColorScheme, getThemeMode, type ColorScheme, type ThemeMode } from "../lib/theme";
 import type { SettingsView } from "../lib/types";
-import { DrawerHeader, DrawerTitle } from "./DrawerHeader";
-import { ResizableDrawer } from "./ResizableDrawer";
+import { CloseButton } from "./CloseButton";
+import { Modal } from "./Modal";
 import { Cpu, Shield, Box, Bot, Palette, CloudUpload, Plug, Cog, Globe, Wrench, Puzzle, Braces, Zap, BrainCircuit, Command, Search } from "lucide-react";
 import { ModelsSection } from "./SettingsModels";
 import { ProvidersSection } from "./SettingsProviders";
@@ -105,10 +105,16 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
   })).filter((g) => g.tabs.length > 0);
 
   return (
-    <ResizableDrawer onClose={onClose} wide>
-      <DrawerHeader onClose={onClose}><DrawerTitle text={t("settings.title")} /></DrawerHeader>
-      {!s ? <div className="empty-state">{t("settings.loading")}</div> : (
-        <div className="flex-1 min-h-0 flex h-full overflow-y-auto"><div className="flex h-full">
+    <Modal onClose={onClose} wide>
+      {/* 标题栏 */}
+      <header className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border-soft">
+        <span className="text-[15px] font-semibold text-fg">{t("settings.title")}</span>
+        <CloseButton onClick={onClose} />
+      </header>
+      {!s ? (
+        <div className="flex-1 flex items-center justify-center text-fg-faint text-[13px]">{t("settings.loading")}</div>
+      ) : (
+        <div className="flex-1 min-h-0 flex overflow-y-auto"><div className="flex h-full">
           <nav className="flex flex-col gap-1 w-[220px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0">
             <div className="relative mb-2">
               <input className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] pl-7 pr-2 py-1.5 outline-none placeholder:text-fg-faint/50 focus:border-accent transition-colors"
@@ -134,10 +140,9 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
           </main>
         </div></div>
       )}
-    </ResizableDrawer>
+    </Modal>
   );
 }
-
 function NavButton({ id, s, t, active, icons, onClick }: {
   id: SettingsTab; s: SettingsView; t: ReturnType<typeof useT>; active: boolean;
   icons: Record<SettingsTab, React.ReactNode>; onClick: () => void;

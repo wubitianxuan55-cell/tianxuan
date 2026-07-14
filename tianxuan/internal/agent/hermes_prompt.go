@@ -48,6 +48,13 @@ After execution you receive [上一轮执行结果] with created/modified files,
 per-step ✅/❌, and a summary. Trust the file list; re-read only when the
 summary flags unresolved issues.
 
+## Parallel dispatch
+
+When investigating, dispatch independent read-only sub-tasks in parallel:
+- explore — for wide-net codebase surveys across many files
+- research — for combining code reading with external web reference
+- review / security_review — for reviewing pending diffs before planning
+
 ## UI design
 
 When the task involves any visual output — pages, components, layout,
@@ -126,6 +133,10 @@ and disjoint file lists → dispatch via parallel_tasks, collect results,
 complete_step with aggregates. Serial only when dependencies or shared
 files force it.
 
+Explore/review tools are for execution: use them to find edit anchors, verify
+file context, or review your own diffs — never to question or re-evaluate
+Hermes' plan.
+
 ## Failure handling
 
 - Reproduce → isolate root cause → fix. Don't guess.
@@ -191,11 +202,27 @@ For any non-trivial task, follow this cycle:
 - If 50 lines would do, don't write 200.
 - Ask: would a senior engineer call this overcomplicated?
 
+## Sub-agents
+
+Use sub-agent tools for heavy investigation and review:
+- Need 3+ files read → explore sub-agent returns distilled findings
+- Need code + external docs → research sub-agent
+- Before finalising a plan or merging → review sub-agent checks diff
+- Security-sensitive changes → security_review sub-agent
+Sub-agents run in isolated contexts — their work never expands yours.
+
 ## Parallel first
 
-When 2+ steps are independent (disjoint files, no shared state) →
-dispatch via parallel_tasks, collect, complete_step with aggregates.
-Serial only when dependencies force it.
+When 2+ investigation tasks are independent (disjoint files, no shared
+state), dispatch them in parallel:
+- parallel_tasks — for arbitrary read-only or write sub-agent tasks
+- parallel_skills — for named skill invocations (explore, review, research,
+  security_review) that each need an isolated sub-agent
+- bash run_in_background — for long-running commands (servers, watchers,
+  builds) that you start now and check later with bash_output or wait
+
+Serial only when dependencies or shared files force it. When in doubt,
+default to parallel — sub-agents run in isolated sessions.
 
 ## Failure handling
 

@@ -2019,6 +2019,12 @@ body::after {
 .anim-drawer-out {
   animation: drawer-out var(--dur-fast) var(--ease-out) forwards;
 }
+.anim-modal-in {
+  animation: modal-in var(--dur-base) var(--ease-out);
+}
+.anim-modal-out {
+  animation: modal-out var(--dur-fast) var(--ease-out) forwards;
+}
 .anim-menu-in {
   animation: menu-in var(--dur-fast) ease;
 }

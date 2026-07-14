@@ -38,23 +38,23 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
   const [query, setQuery] = useState("");
 
   const TAB_ICONS: Record<SettingsTab, React.ReactNode> = {
-    general: <Cog size={14} />,
-    models: <Cpu size={14} />,
-    providers: <Plug size={14} />,
-    permissions: <Shield size={14} />,
-    sandbox: <Box size={14} />,
-    agent: <Bot size={14} />,
-    network: <Globe size={14} />,
-    appearance: <Palette size={14} />,
-    updates: <CloudUpload size={14} />,
-    shortcuts: <Command size={14} />,
-    mcp: <Wrench size={14} />,
-    skills: <Zap size={14} />,
-    subagents: <Braces size={14} />,
-    plugins: <Puzzle size={14} />,
-    memory: <BrainCircuit size={14} />,
-    hooks: <Zap size={14} />,
-    diagnostics: <Search size={14} />,
+    general: <Cog size={15} />,
+    models: <Cpu size={15} />,
+    providers: <Plug size={15} />,
+    permissions: <Shield size={15} />,
+    sandbox: <Box size={15} />,
+    agent: <Bot size={15} />,
+    network: <Globe size={15} />,
+    appearance: <Palette size={15} />,
+    updates: <CloudUpload size={15} />,
+    shortcuts: <Command size={15} />,
+    mcp: <Wrench size={15} />,
+    skills: <Zap size={15} />,
+    subagents: <Braces size={15} />,
+    plugins: <Puzzle size={15} />,
+    memory: <BrainCircuit size={15} />,
+    hooks: <Zap size={15} />,
+    diagnostics: <Search size={15} />,
   };
 
   const filteredTabs = query.trim() && s
@@ -106,7 +106,6 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
 
   return (
     <Modal onClose={onClose} wide>
-      {/* 标题栏 */}
       <header className="flex items-center justify-between shrink-0 px-5 py-3.5 border-b border-border-soft">
         <span className="text-[15px] font-semibold text-fg">{t("settings.title")}</span>
         <CloseButton onClick={onClose} />
@@ -114,10 +113,10 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
       {!s ? (
         <div className="flex-1 flex items-center justify-center text-fg-faint text-[13px]">{t("settings.loading")}</div>
       ) : (
-        <div className="flex-1 min-h-0 flex overflow-y-auto"><div className="flex h-full">
-          <nav className="flex flex-col gap-1 w-[220px] py-2.5 px-2 border-r border-border-soft overflow-y-auto shrink-0">
-            <div className="relative mb-2">
-              <input className="w-full bg-bg-soft border border-border-soft rounded-md text-fg text-[12px] pl-7 pr-2 py-1.5 outline-none placeholder:text-fg-faint/50 focus:border-accent transition-colors"
+        <div className="flex-1 min-h-0 flex">
+          <nav className="flex flex-col gap-0.5 w-[224px] py-3 px-2 border-r border-border-soft overflow-y-auto shrink-0 scrollbar-thin">
+            <div className="relative mb-2.5 px-0.5">
+              <input className="w-full bg-bg border border-border rounded-md text-fg text-[12px] pl-7 pr-2.5 py-1.5 outline-none placeholder:text-fg-faint/40 focus:border-accent transition-colors"
                 placeholder="搜索…" value={query} onChange={(e) => setQuery(e.target.value)} />
               <svg className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint/40" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             </div>
@@ -128,7 +127,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
             ) : (
               visibleGroups.map((group) => (
                 <div key={group.label} className="mb-2">
-                  <div className="px-3 py-1 text-[10.5px] font-semibold uppercase tracking-widest text-fg-faint/50">{group.label}</div>
+                  <div className="px-3 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-widest text-fg-faint/45">{group.label}</div>
                   {group.tabs.map((id) => <NavButton key={id} id={id} s={s} t={t} active={tab===id} icons={TAB_ICONS} onClick={()=>setTab(id)} />)}
                 </div>
               ))
@@ -138,7 +137,7 @@ export function SettingsPanel({ onClose, onChanged }: { onClose: () => void; onC
             {err && <div className="shrink-0 px-4 py-2 mb-3 text-[12.5px] bg-del-bg text-err rounded-md border border-err/20">{err}</div>}
             {renderers?.[tab]?.()}
           </main>
-        </div></div>
+        </div>
       )}
     </Modal>
   );
@@ -148,9 +147,15 @@ function NavButton({ id, s, t, active, icons, onClick }: {
   icons: Record<SettingsTab, React.ReactNode>; onClick: () => void;
 }) {
   return (
-    <button className={`flex items-center gap-2.5 w-full px-3 py-2 border-0 rounded-lg bg-transparent text-left cursor-pointer transition-[color,background] duration-[var(--dur-fast)] ${active?"text-accent bg-accent-soft":"text-fg-dim hover:text-fg hover:bg-bg-soft"}`}
+    <button className={
+      "relative flex items-center gap-2.5 w-full px-2.5 py-1.5 border-0 rounded-md bg-transparent text-left cursor-pointer transition-all duration-[var(--dur-fast)] group " +
+      (active
+        ? "text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-accent"
+        : "text-fg-dim hover:text-fg hover:bg-sidebar-hover"
+      )
+    }
       onClick={onClick}>
-      <span className="shrink-0 opacity-70">{icons[id]}</span>
+      <span className="shrink-0 opacity-70 group-hover:opacity-90 transition-opacity">{icons[id]}</span>
       <div className="flex flex-col gap-0.5 min-w-0">
         <span className="text-[13px] font-medium">{settingsTabLabel(id, t)}</span>
         <small className="text-[11px] text-fg-faint truncate">{settingsTabMeta(id, s, t)}</small>

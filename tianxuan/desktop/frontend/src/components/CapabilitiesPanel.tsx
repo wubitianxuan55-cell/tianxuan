@@ -315,7 +315,7 @@ function FailedServersNotice({
 }) {
   const t = useT();
   return (
-    <div className="mb-3 p-3 border border-err/20 rounded-lg" role="status" style={{background: "var(--ds-danger-soft)"}}>
+    <div className="mb-3 p-3 border border-err/20 rounded-lg" role="status" style={{background: "color-mix(in srgb, var(--err) 14%, transparent)"}}>
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-err text-sm font-semibold">{t("caps.failureTitle", { failed: servers.length })}</div>

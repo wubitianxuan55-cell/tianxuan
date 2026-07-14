@@ -54,7 +54,7 @@ function FontChipGroup(p: {
             type="button"
             className={`px-2.5 py-1 text-[11px] rounded border transition-colors ${
               active
-                ? "border-accent bg-accent-soft text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
+                ? "border-accent bg-accent/22 text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
                 : "border-border-soft bg-transparent text-fg-dim hover:border-fg-faint hover:text-fg"
             }`}
             onClick={() => p.onChange(f.value)}
@@ -65,7 +65,7 @@ function FontChipGroup(p: {
         type="button"
         className={`px-2.5 py-1 text-[11px] rounded border transition-colors ${
           isCurCustom
-            ? "border-accent bg-accent-soft text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
+            ? "border-accent bg-accent/22 text-accent font-semibold ring-1 ring-accent/40 shadow-sm"
             : "border-border-soft bg-transparent text-fg-dim hover:border-fg-faint hover:text-fg"
         }`}
         onClick={() => p.onChange("custom")}
@@ -156,7 +156,7 @@ export function AppearanceSection({ s, busy: _busy, apply }: SectionProps) {
                   key={s}
                   onClick={() => updateScheme(s)}
                   className={`text-left bg-bg border rounded-lg p-2 cursor-pointer transition-all hover:-translate-y-px hover:shadow-lg ${
-                    isActive ? "border-accent ring-2 ring-accent/50 shadow-md scale-[1.03]" : "border-border-soft hover:border-fg-faint/30"
+                    isActive ? "border-accent bg-accent/12 ring-2 ring-accent/50 shadow-md" : "border-border-soft hover:border-fg-faint/30"
                   }`}
                 >
                   <div className="rounded-md mb-1.5 overflow-hidden" style={{ background: `linear-gradient(135deg, ${c.bg} 0%, ${c.accent}40 100%)` }}>

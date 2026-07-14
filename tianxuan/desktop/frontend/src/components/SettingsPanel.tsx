@@ -144,7 +144,7 @@ function NavButton({ id, s, t, active, icons, onClick }: {
     <button className={
       "relative flex items-center gap-2.5 w-full px-2.5 py-1.5 border-0 rounded-md bg-transparent text-left cursor-pointer transition-all duration-[var(--dur-fast)] group " +
       (active
-        ? "bg-accent/20 text-accent font-bold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[4px] before:rounded-full before:bg-accent"
+        ? "bg-accent/22 text-accent font-bold ring-1 ring-accent/40 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[4px] before:rounded-full before:bg-accent"
         : "text-fg-dim hover:text-fg hover:bg-sidebar-hover"
       )
     }

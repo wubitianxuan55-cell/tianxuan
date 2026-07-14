@@ -287,7 +287,7 @@ export function Transcript({
   const rAF = useRef<number | null>(null);
 
   useEffect(() => { onThreadEl?.(scrollRef.current); return () => onThreadEl?.(null); }, [onThreadEl]);
-  useEffect(() => { return () => { if (rAF.current !== null) cancelAnimationFrame(rAF.current); }; }, []);
+  useEffect(() => { return () => { if (rAF.current !== null) cancelAnimationFrame(rAF.current); clearTimeout(measureTimer.current); }; }, []);
 
   const [showScrollDown, setShowScrollDown] = useState(false);
   const onScroll = useCallback(() => {
@@ -353,12 +353,14 @@ export function Transcript({
   });
   useEffect(() => { onScrollToTurnReady?.(scrollToTurnRef.current); return () => onScrollToTurnReady?.(NOOP_SCROLL); }, [onScrollToTurnReady]);
 
+  const measureTimer = useRef<ReturnType<typeof setTimeout>>();
+
   const scheduleMeasure = useCallback(() => {
     const el = scrollRef.current; if (!el) return;
     const savedTop = el.scrollTop;
-    setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = savedTop; }, 250);
+    clearTimeout(measureTimer.current);
+    measureTimer.current = setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = savedTop; }, 250);
   }, []);
-
   const entranceRef = useEntranceAnimation<HTMLDivElement>(
     items.length > 0 ? `${items[0].id}|${items[items.length - 1].id}` : undefined, items.length,
   );

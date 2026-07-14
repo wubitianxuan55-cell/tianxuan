@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Modal — 居中弹窗容器
@@ -20,11 +20,13 @@ export function Modal({
   wide?: boolean;
 }) {
   const [exiting, setExiting] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const handleClose = () => {
     if (exiting) return;
     setExiting(true);
-    setTimeout(() => onClose(), 120);
+    clearTimeout(exitTimer.current);
+    exitTimer.current = setTimeout(() => onClose(), 120);
   };
 
   useEffect(() => {
@@ -32,7 +34,10 @@ export function Modal({
       if (e.key === "Escape") handleClose();
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      clearTimeout(exitTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -228,26 +228,31 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			}
 
 			// Gate 1: task gate — check against task completion state
+			// V10.85: plannerMode skips task/goal/readiness gates — the planner
+			// uses todo_write to maintain plan structure (per planmode.Marker),
+			// not execution todos; gating on incomplete todos would cause a loop.
 
-			if a.taskGate() {
+			if !a.plannerMode && a.taskGate() {
 				continue
 			}
 			// Gate 2: goal gate — judge model goal verification
-			if a.goalGate() {
+			if !a.plannerMode && a.goalGate() {
 				continue
 			}
 			// verify gate merged into taskGate — no separate call needed
 			// final-answer readiness gate — verify evidence before accepting completion
-			if blocked, reason := a.finalReadinessCheck(); blocked {
-				finalReadinessBlocks++
-				if finalReadinessBlocks >= maxFinalReadinessBlocks {
-					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
+			if !a.plannerMode {
+				if blocked, reason := a.finalReadinessCheck(); blocked {
+					finalReadinessBlocks++
+					if finalReadinessBlocks >= maxFinalReadinessBlocks {
+						return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
+					}
+					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+						Text: "final-answer readiness blocked: " + reason})
+					a.session.Add(provider.Message{Role: provider.RoleUser, Content: finalReadinessRetryMessage(reason)})
+					a.maybeCompact(ctx, usage)
+					continue
 				}
-				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-					Text: "final-answer readiness blocked: " + reason})
-				a.session.Add(provider.Message{Role: provider.RoleUser, Content: finalReadinessRetryMessage(reason)})
-				a.maybeCompact(ctx, usage)
-				continue
 			}
 			if a.steerQueueLen() > 0 {
 				continue // more steers pending — another pass

@@ -16,7 +16,7 @@ export function TabBar(p: {
           key={tab.id}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] whitespace-nowrap border-0 cursor-pointer transition-colors ${
             tab.id === activeTabId
-              ? "bg-accent/15 text-accent font-semibold"
+              ? "bg-accent/20 text-accent font-semibold ring-1 ring-accent/35"
               : "bg-transparent text-fg-faint hover:text-fg hover:bg-bg-soft"
           }`}
           onClick={() => onSelect(tab.id)}

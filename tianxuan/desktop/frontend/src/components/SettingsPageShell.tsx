@@ -46,7 +46,7 @@ export function SegmentedButton<T extends string>({ options, value, onChange }: 
         <button
           key={opt.value}
           className={`px-3 py-1 border-0 bg-transparent cursor-pointer transition-colors ${
-            value === opt.value ? "bg-accent text-white font-semibold shadow-sm ring-1 ring-accent/40 scale-[1.02]" : "text-fg-dim hover:bg-bg hover:text-fg"
+            value === opt.value ? "bg-accent/22 text-accent font-semibold ring-1 ring-accent/40" : "text-fg-dim hover:bg-bg hover:text-fg"
           }`}
           onClick={() => onChange(opt.value)}
         >

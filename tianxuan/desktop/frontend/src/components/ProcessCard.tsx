@@ -9,20 +9,20 @@ export type ProcessTone = "default" | "success" | "warning" | "danger" | "accent
 export type ProcessState = "running" | "done" | "failed" | "waiting" | "stopped";
 
 const TONE_COLORS: Record<ProcessTone, string> = {
-  default: "var(--ds-fg-faint)",
-  success: "var(--ds-ok)",
-  warning: "var(--ds-warn)",
-  danger: "var(--ds-err)",
-  accent: "var(--ds-accent)",
+  default: "var(--fg-faint)",
+  success: "var(--ok)",
+  warning: "var(--warn)",
+  danger: "var(--err)",
+  accent: "var(--accent)",
   violet: "#8b5cf6",
 };
 
 const STATE_COLORS: Record<ProcessState, string> = {
-  running: "var(--ds-accent)",
-  done: "var(--ds-ok)",
-  failed: "var(--ds-err)",
-  waiting: "var(--ds-fg-faint)",
-  stopped: "var(--ds-warn)",
+  running: "var(--accent)",
+  done: "var(--ok)",
+  failed: "var(--err)",
+  waiting: "var(--fg-faint)",
+  stopped: "var(--warn)",
 };
 
 function ProcessIcon({ size = 14, tone = "default", children, ...rest }: IconProps & { tone?: ProcessTone; children: ReactNode }) {

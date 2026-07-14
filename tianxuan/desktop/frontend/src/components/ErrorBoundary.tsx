@@ -48,8 +48,8 @@ export class ErrorBoundary extends Component<Props, State> {
           height: "100vh",
           gap: "12px",
           padding: "24px",
-          color: "var(--ds-fg, #d4d4d8)",
-          background: "var(--ds-bg, #1a1a2e)",
+          color: "var(--fg, #d4d4d8)",
+          background: "var(--bg, #1a1a2e)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -75,9 +75,9 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: "6px 16px",
             fontSize: "12px",
             borderRadius: "6px",
-            border: "1px solid var(--ds-border-soft, #333)",
-            background: "var(--ds-bg-soft, #252540)",
-            color: "var(--ds-fg, #d4d4d8)",
+            border: "1px solid var(--border-soft, #333)",
+            background: "var(--bg-soft, #252540)",
+            color: "var(--fg, #d4d4d8)",
             cursor: "pointer",
           }}
         >

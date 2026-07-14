@@ -60,10 +60,8 @@ export function ApprovalModal({
     <div className="plan-approval-dock" aria-live="polite">
       <div
         ref={cardRef}
-        className="border border-border rounded-xl bg-bg-elev p-4 outline-none focus-visible:border-accent transition-shadow duration-200"
+        className="border border-border rounded-xl bg-bg-elev p-4 outline-none focus-visible:border-accent transition-shadow duration-200 hover:shadow-[var(--ds-shadow-card-hover)]"
         style={{boxShadow: "var(--ds-shadow-card)"}}
-        onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.boxShadow = "var(--ds-shadow-card-hover)"}
-        onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.boxShadow = "var(--ds-shadow-card)"}
         role="dialog" aria-modal="false" tabIndex={-1}
         aria-labelledby="tool-approval-title"
       >

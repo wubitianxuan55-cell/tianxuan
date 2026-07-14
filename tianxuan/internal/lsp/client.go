@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"tianxuan/internal/proc"
 )
 
 // docState tracks what we last sent the server for a document, so ensureSynced
@@ -46,6 +48,7 @@ func startClient(ctx context.Context, bin string, args []string, env map[string]
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), envSlice(env)...)
 	cmd.Stderr = io.Discard
+	proc.HideWindow(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -53,9 +56,12 @@ func startClient(ctx context.Context, bin string, args []string, env map[string]
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		stdin.Close()
 		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
+		stdin.Close()
+		stdout.Close()
 		return nil, err
 	}
 
@@ -276,12 +282,20 @@ func (c *client) rename(ctx context.Context, uri string, pos Position, newName s
 func (c *client) close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, _ = c.conn.call(ctx, "shutdown", nil)
-	_ = c.conn.notify("exit", nil)
-	if c.cmd.Process != nil {
-		_ = c.cmd.Process.Kill()
+	if _, err := c.conn.call(ctx, "shutdown", nil); err != nil {
+		slog.Warn("lsp: shutdown error", "err", err)
 	}
-	_ = c.cmd.Wait()
+	if err := c.conn.notify("exit", nil); err != nil {
+		slog.Warn("lsp: exit notify error", "err", err)
+	}
+	if c.cmd.Process != nil {
+		if err := c.cmd.Process.Kill(); err != nil {
+			slog.Warn("lsp: kill error", "err", err)
+		}
+	}
+	if err := c.cmd.Wait(); err != nil {
+		slog.Warn("lsp: wait error", "err", err)
+	}
 }
 
 func envSlice(env map[string]string) []string {

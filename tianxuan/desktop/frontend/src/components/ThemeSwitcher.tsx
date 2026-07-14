@@ -52,7 +52,7 @@ export function ThemeSwitcher({
               <button
                 key={s}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-left bg-transparent border-0 text-fg-dim text-[12px] cursor-pointer transition-colors hover:bg-bg-soft hover:text-fg ${
-                  scheme === s ? "text-accent bg-accent-soft" : ""
+                  scheme === s ? "text-accent bg-accent/22 ring-1 ring-accent/40" : ""
                 }`}
                 onClick={() => { onScheme(s); setOpen(false); }}
               >
@@ -75,7 +75,7 @@ export function ThemeSwitcher({
                   <button
                     key={value}
                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 bg-transparent border-0 text-fg-dim text-[11px] cursor-pointer transition-colors hover:text-fg hover:bg-bg-soft ${
-                      mode === value ? "bg-accent-soft text-accent" : ""
+                      mode === value ? "bg-accent/22 text-accent ring-1 ring-accent/40" : ""
                     }`}
                     onClick={() => onMode(value)}
                   >

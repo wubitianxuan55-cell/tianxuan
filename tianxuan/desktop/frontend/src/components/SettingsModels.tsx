@@ -36,7 +36,7 @@ export function EffortSelect({ value, onChange, busy }: { value: string; onChang
         <button key={l.key}
           className={`px-2 py-0.5 text-[11px] border rounded transition-colors ${
             v === l.key
-              ? "text-accent border-accent bg-accent/15 font-semibold ring-1 ring-accent/30"
+              ? "text-accent border-accent bg-accent/20 font-semibold ring-1 ring-accent/30"
               : "text-fg-dim border-border-soft bg-transparent hover:text-fg hover:border-fg-faint"
           }`}
           disabled={busy}

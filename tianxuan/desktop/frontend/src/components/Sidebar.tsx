@@ -174,7 +174,7 @@ onOpenSettings,
                   <div
                     className={`flex items-start gap-2 py-1 pl-2.5 pr-1 mb-0.5 rounded-md hover:bg-sidebar-hover group ${
                       session.current
-                        ? "bg-sidebar-active border-l-[3px] border-accent pl-2"
+                        ? "bg-sidebar-active border-l-[3px] border-accent pl-2 ring-1 ring-accent/35"
                         : ""
                     }`}
                     key={session.path}

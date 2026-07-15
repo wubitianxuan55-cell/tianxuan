@@ -1,13 +1,14 @@
 ---
 name: version-history
 title: 版本历史
-description: 版本历史汇总 — V7.6 到 V10.51.1 全部主要版本摘要
+description: 版本历史汇总 — V7.6 到 V10.88.0 全部主要版本摘要
 metadata:
   type: reference
 ---
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.88.0 | 2026-07-15 | 双模型 Loop 工作流深度优化 — 三重门恢复+planFix反思+TurnResult去重+formatSummary改名，13 项改进 |
 | V10.87.0 | 2026-07-15 | 双模型验证闭环 — Plan→Execute→Verify→Fix→Complete，18 项改进 |
 | V10.86.0 | 2026-07-14 | 8 项代码审查修复 — Bug修复+内存泄漏+CSS变量+架构守卫 |
 | V10.85.0 | 2026-07-14 | 6 轮设置面板 UI 打磨详情 |

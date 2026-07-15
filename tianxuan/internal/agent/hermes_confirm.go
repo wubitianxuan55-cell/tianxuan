@@ -71,17 +71,12 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note strin
 // This reduces one round-trip for trivial changes (typo fixes, doc tweaks),
 // matching the UX of Aider's --auto-accept-architect for non-risky tasks.
 func shouldAutoConfirm(plan string) bool {
-	// Count steps by lines matching "步骤 N："
-	const stepPrefix = "步骤 "
+	// Count steps by lines matching "步骤 N：" or "Step N："
 	steps := 0
 	for _, line := range strings.Split(plan, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, stepPrefix) {
-			// Check the next characters look like a step number
-			rest := strings.TrimPrefix(trimmed, stepPrefix)
-			if len(rest) > 0 && rest[0] >= '0' && rest[0] <= '9' {
-				steps++
-			}
+		if isStepLine(trimmed) {
+			steps++
 		}
 	}
 	if steps > 3 {
@@ -93,6 +88,22 @@ func shouldAutoConfirm(plan string) bool {
 	}
 	return true
 }
+
+// isStepLine checks whether a trimmed line is a step header, supporting both
+// Chinese "步骤 N：" and English "Step N：" prefixes.
+func isStepLine(trimmed string) bool {
+	for _, prefix := range []string{"步骤 ", "Step "} {
+		if strings.HasPrefix(trimmed, prefix) {
+			rest := strings.TrimPrefix(trimmed, prefix)
+			if len(rest) > 0 && rest[0] >= '0' && rest[0] <= '9' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+
 
 // displayPlan extracts the structured plan portion (<!--plan--> onward) from the
 // full planner output for display in the confirmation dialog. The preamble

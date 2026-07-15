@@ -213,9 +213,13 @@ type AgentRunner struct {
 	// V6.0: 回忆提醒开关（recall_reminder.go）
 	recallReminderFired bool
 
-	// Stop gates (stop_gate.go) — only verifyGate remains after V10.XX
+	// Stop gates (stop_gate.go) — triple gate for solo mode, skipped in plannerMode.
+	// taskGate checks incomplete canonical todos, goalGate verifies session goal,
+	// verifyGate nudges the model to run tests. All three re-enter at most 3 times.
 	verifyGateFired  bool // Gate: orchestrate verify fired
 	disableVerify    bool // suppress verify nudge (for sub-agents)
+	taskGateReentry  int  // V10.87: reentry counter for taskGate (cap 3)
+	goalGateReentry  int  // V10.87: reentry counter for goalGate (cap 3)
 
 	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string

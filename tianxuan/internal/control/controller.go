@@ -670,7 +670,7 @@ func (c *Controller) NewSession() error {
 		c.mu.Unlock()
 	}
 	c.executor.SetSession(agent.NewSession(c.systemPrompt))
-	// V10.XX: also reset the planner session when using dual-model architecture,
+	// V10.87: also reset the planner session when using dual-model architecture,
 	// or the new session inherits stale project maps and execution feedback.
 	if h, ok := c.runner.(*agent.Hermes); ok {
 		h.ResetSession()

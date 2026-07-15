@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -71,6 +70,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	var turnFilesCreated []string
 	var turnFilesModified []string
 	var turnToolErrors []string
+	var turnToolErrorsTruncated int // V10.87: count of errors beyond the 5 we keep
 	var turnLastSummary string
 	var turnStepResults []StepResult
 	if a.paramStorm != nil {
@@ -227,16 +227,21 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				continue
 			}
 
-			// Gate 1: task gate — check against task completion state
-			// V10.85: plannerMode skips task/goal/readiness gates — the planner
-			// uses todo_write to maintain plan structure (per planmode.Marker),
-			// not execution todos; gating on incomplete todos would cause a loop.
-			// Gates: taskGate and goalGate were removed (V10.XX) — Hephaestus
-			// is a pure executor; Hermes handles verification. verifyGate fires
-			// a nudge to run tests before declaring completion.
-			if !a.plannerMode && a.verifyGate() {
-				continue
-			}
+		// ── Stop gates (solo mode) ───────────────────────────────────
+		// Triple gate: taskGate → goalGate → verifyGate.
+		// All three fire only in solo mode (!plannerMode); plannerMode
+		// (Hermes planner) skips them because Hermes handles task tracking
+		// and verification via its own plan/confirm/verify loop.
+		// V10.87: taskGate and goalGate restored for solo (single-model) runs.
+		if !a.plannerMode && a.taskGate() {
+			continue
+		}
+		if !a.plannerMode && a.goalGate() {
+			continue
+		}
+		if !a.plannerMode && a.verifyGate() {
+			continue
+		}
 
 			// final-answer readiness gate — verify evidence before accepting completion
 			if !a.plannerMode {
@@ -287,13 +292,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if p := extractFilePath(call.Name, call.Arguments); p != "" {
 					turnFilesModified = append(turnFilesModified, p)
 				}
-			}
-			// collect tool errors for TurnResult (max 5)
-			if isErrorResult(results[i]) && len(turnToolErrors) < 5 {
+		// collect tool errors for TurnResult (max 5, with truncation notice)
+		if isErrorResult(results[i]) {
+			turnToolErrorsTruncated++
+			if len(turnToolErrors) < 5 {
 				turnToolErrors = append(turnToolErrors, results[i])
 			}
-			if isErrorResult(results[i]) && len(turnToolErrors) == 5 {
-				slog.Warn("agent_run: too many tool errors, truncating to 5")
+		}
 			}
 			// Skip suppressed calls (already have placeholder result).
 			if strings.HasPrefix(results[i], "suppressed:") {
@@ -328,7 +333,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				Name:       call.Name,
 			})
 		}
+	// surface truncation notice when more than 5 tool errors occurred
+	if turnToolErrorsTruncated > 5 && len(turnToolErrors) == 5 {
+		turnToolErrors[4] = fmt.Sprintf("%s（还有 %d 个额外错误被截断）", turnToolErrors[4], turnToolErrorsTruncated-5)
+	}
 
+	// advance canonical todo state for successful complete_step calls
 		// advance canonical todo state for successful complete_step calls
 		// Also sync todo state from successful todo_write calls that ran
 		// in the current batch — rebuildTodoState at turn start can't see them.
@@ -346,7 +356,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if step != "" {
 					a.advanceCanonicalTodo(step)
 				}
-				// V10.XX: collect step results for TurnResult
+				// V10.87: collect step results for TurnResult
 				status := "success"
 				if strings.HasPrefix(results[i], "error:") {
 					status = "error"

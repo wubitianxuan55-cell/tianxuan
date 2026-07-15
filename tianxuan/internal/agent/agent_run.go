@@ -50,19 +50,17 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.activeSchemas = nil
 	a.activeSchemasMu.Unlock()
 
-
-
 	// reset pre-execution cache and tool result cache for new turn
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
-		a.dedupHashes = nil // P0-2: reset dedup hashes each turn
-		a.steerCount = 0 // P0-3: reset steer counter each turn
-		a.bgJobStartedThisTurn = false // 每轮重置启停标志
-		a.bgOutputReadThisTurn = false
-		a.bgJobKilledThisTurn = false
-		a.bgStartKillStreak = 0  // 新用户轮次重置循环计数
-		a.staleWrittenFiles = nil   // 每轮重置 stale anchor 追踪
-		a.staleReadFiles = nil
+	a.dedupHashes = nil            // P0-2: reset dedup hashes each turn
+	a.steerCount = 0               // P0-3: reset steer counter each turn
+	a.bgJobStartedThisTurn = false // 每轮重置启停标志
+	a.bgOutputReadThisTurn = false
+	a.bgJobKilledThisTurn = false
+	a.bgStartKillStreak = 0   // 新用户轮次重置循环计数
+	a.staleWrittenFiles = nil // 每轮重置 stale anchor 追踪
+	a.staleReadFiles = nil
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
@@ -84,15 +82,15 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		a.maybeRecallReminder()
 	}
 
-			graceRound := false
-		// stream recovery + empty final detection counters
-		streamRecoveries := 0
-		const maxStreamRecoveries = 3
-		emptyFinalBlocks := 0
-		const maxEmptyFinalBlocks = 3
-		finalReadinessBlocks := 0
-		const maxFinalReadinessBlocks = 3
-		for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
+	graceRound := false
+	// stream recovery + empty final detection counters
+	streamRecoveries := 0
+	const maxStreamRecoveries = 3
+	emptyFinalBlocks := 0
+	const maxEmptyFinalBlocks = 3
+	finalReadinessBlocks := 0
+	const maxFinalReadinessBlocks = 3
+	for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
 		// consume a queued mid-turn steer as session guidance
 		// (Design adopted from DeepSeek-Reasonix-V1.12)
 		// V10.46: planner doesn't accept mid-turn steers.
@@ -166,7 +164,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: msg})
 		}
 
-
 		// automatic compaction — truncates history when prompt
 		// exceeds the high-water mark. legacyTruncate preserves
 		// L1+L2+prefix+summary+tail for maximum cache continuity.
@@ -227,21 +224,21 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				continue
 			}
 
-		// ── Stop gates (solo mode) ───────────────────────────────────
-		// Triple gate: taskGate → goalGate → verifyGate.
-		// All three fire only in solo mode (!plannerMode); plannerMode
-		// (Hermes planner) skips them because Hermes handles task tracking
-		// and verification via its own plan/confirm/verify loop.
-		// V10.87: taskGate and goalGate restored for solo (single-model) runs.
-		if !a.plannerMode && a.taskGate() {
-			continue
-		}
-		if !a.plannerMode && a.goalGate() {
-			continue
-		}
-		if !a.plannerMode && a.verifyGate() {
-			continue
-		}
+			// ── Stop gates (solo mode) ───────────────────────────────────
+			// Triple gate: taskGate → goalGate → verifyGate.
+			// All three fire only in solo mode (!plannerMode); plannerMode
+			// (Hermes planner) skips them because Hermes handles task tracking
+			// and verification via its own plan/confirm/verify loop.
+			// V10.87: taskGate and goalGate restored for solo (single-model) runs.
+			if !a.plannerMode && a.taskGate() {
+				continue
+			}
+			if !a.plannerMode && a.goalGate() {
+				continue
+			}
+			if !a.plannerMode && a.verifyGate() {
+				continue
+			}
 
 			// final-answer readiness gate — verify evidence before accepting completion
 			if !a.plannerMode {
@@ -292,13 +289,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if p := extractFilePath(call.Name, call.Arguments); p != "" {
 					turnFilesModified = append(turnFilesModified, p)
 				}
-		// collect tool errors for TurnResult (max 5, with truncation notice)
-		if isErrorResult(results[i]) {
-			turnToolErrorsTruncated++
-			if len(turnToolErrors) < 5 {
-				turnToolErrors = append(turnToolErrors, results[i])
 			}
-		}
+			// collect tool errors for TurnResult (max 5, with truncation notice)
+			if isErrorResult(results[i]) {
+				turnToolErrorsTruncated++
+				if len(turnToolErrors) < 5 {
+					turnToolErrors = append(turnToolErrors, results[i])
+				}
 			}
 			// Skip suppressed calls (already have placeholder result).
 			if strings.HasPrefix(results[i], "suppressed:") {
@@ -333,12 +330,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				Name:       call.Name,
 			})
 		}
-	// surface truncation notice when more than 5 tool errors occurred
-	if turnToolErrorsTruncated > 5 && len(turnToolErrors) == 5 {
-		turnToolErrors[4] = fmt.Sprintf("%s（还有 %d 个额外错误被截断）", turnToolErrors[4], turnToolErrorsTruncated-5)
-	}
+		// surface truncation notice when more than 5 tool errors occurred
+		if turnToolErrorsTruncated > 5 && len(turnToolErrors) == 5 {
+			turnToolErrors[4] = fmt.Sprintf("%s（还有 %d 个额外错误被截断）", turnToolErrors[4], turnToolErrorsTruncated-5)
+		}
 
-	// advance canonical todo state for successful complete_step calls
 		// advance canonical todo state for successful complete_step calls
 		// Also sync todo state from successful todo_write calls that ran
 		// in the current batch — rebuildTodoState at turn start can't see them.
@@ -390,7 +386,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			continue // nudge injected, skip compaction and continue loop
 		}
 
-
 		// Grace Round — when maxSteps is reached, give one extra final turn.
 		// V10.46: planner uses its own maxSteps; no grace round needed.
 		if !a.plannerMode && a.maxSteps > 0 && step+1 >= a.maxSteps && !graceRound {
@@ -403,7 +398,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			continue
 		}
 
-			// no mid-turn compaction — cache grows monotonically within each turn
+		// no mid-turn compaction — cache grows monotonically within each turn
 	}
 	// Only reached when a positive maxSteps guard is configured. The work so far
 	// is already in the session, so the user can just send another message to pick

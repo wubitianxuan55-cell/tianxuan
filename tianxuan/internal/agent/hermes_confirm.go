@@ -66,6 +66,34 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note strin
 	}
 }
 
+// shouldAutoConfirm returns true when the plan is simple enough to skip the
+// interactive confirmation dialog. Heuristic: ≤3 steps AND no new files ([NEW]).
+// This reduces one round-trip for trivial changes (typo fixes, doc tweaks),
+// matching the UX of Aider's --auto-accept-architect for non-risky tasks.
+func shouldAutoConfirm(plan string) bool {
+	// Count steps by lines matching "步骤 N："
+	const stepPrefix = "步骤 "
+	steps := 0
+	for _, line := range strings.Split(plan, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, stepPrefix) {
+			// Check the next characters look like a step number
+			rest := strings.TrimPrefix(trimmed, stepPrefix)
+			if len(rest) > 0 && rest[0] >= '0' && rest[0] <= '9' {
+				steps++
+			}
+		}
+	}
+	if steps > 3 {
+		return false
+	}
+	// Reject plans that create new files
+	if strings.Contains(plan, "[NEW]") {
+		return false
+	}
+	return true
+}
+
 // displayPlan extracts the structured plan portion (<!--plan--> onward) from the
 // full planner output for display in the confirmation dialog. The preamble
 // (analysis/reasoning) often references project memory entries that should not

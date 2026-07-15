@@ -20,7 +20,7 @@ import (
 	"tianxuan/internal/tool"
 )
 
-const bashTimeout = 300 * time.Second
+const bashTimeout = 120 * time.Second
 
 func init() { tool.RegisterBuiltin(bash{}) }
 
@@ -43,9 +43,14 @@ func (b bash) Description() string {
 		return "Execute a command in the shell and return combined stdout/stderr. " +
 			"NOTE: bash is not available on this host — commands run under Windows PowerShell, " +
 			"so write PowerShell syntax (e.g. $null not /dev/null; ';' or separate calls, not '&&'; " +
-			"Get-ChildItem/Select-String, not ls/grep). Use for builds, tests, git, etc."
+			"Get-ChildItem/Select-String, not ls/grep). " +
+			"Commands time out after 2 minutes. For long-running servers/tunnels/watchers, " +
+			"you MUST use run_in_background=true — otherwise the process will be killed."
 	}
-	return "Execute a shell command. 5-minute timeout. For long-running commands, use run_in_background=true. Set output_format=json to get structured result with separated stdout/stderr fields."
+	return "Execute a shell command with a 2-minute timeout. " +
+		"For long-running servers, tunnels, watchers, or daemons, you MUST use run_in_background=true " +
+		"to avoid blocking. If you forget, the command will be killed after 2 minutes. " +
+		"Set output_format=json for structured {ok, exit_code, duration_ms, stdout, stderr}."
 }
 
 // resolved returns the bound shell, resolving lazily for the zero-value instance
@@ -87,15 +92,6 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		return "", fmt.Errorf("this shell is Windows PowerShell, which does not parse '&&' or '||'. " +
 			"Sequence with ';' (both run regardless of the first's result), use 'if ($?) { ... }' for " +
 			"conditional chaining, or issue the commands as separate calls")
-	}
-
-// Detect launcher commands (dev servers, tunnels, watchers, etc.) and
-	// background them using the shell's native mechanism so the bash tool does
-	// not block on cmd.Wait(). Applies to any shell on any platform.
-	if !p.RunInBackground {
-		if wrapped, ok := wrapLauncherCommand(p.Command, sh); ok {
-			p.Command = wrapped
-		}
 	}
 
 	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
@@ -168,20 +164,26 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 
 	err := cmd.Start()
 	if err == nil {
-		// V7.5: 监听 ctx 取消——不等 cmd.Wait()，卡死时立即强杀进程树。
-		// cmd.Wait() 可能永久阻塞（进程卡死不响应信号），此时 killProcessTree 永远执行不到。
+		// V10.x: ctx 超时/取消时，先关闭 Job Object handle 触发内核 KILL_ON_CLOSE
+		// 强制递归杀整个进程树，再 fallback taskkill。Job Object 关闭后 cmd.Wait()
+		// 瞬间返回，不会像之前那样永久阻塞。
+		var jobHandle syscall.Handle
 		go func() {
 			defer crash.Recover("bash-fg-kill")
 			<-ctx.Done()
+			if jobHandle != 0 {
+				syscall.CloseHandle(jobHandle)
+			}
 			killProcessTree(cmd)
 		}()
 
 		// Try Windows Job Object for reliable process-tree cleanup.
-		// When the job handle closes (defer), Windows kills all child/grandchild
-		// processes recursively — even on timeout or abrupt cancel.
-		job, jobErr := assignToJobObject(cmd)
+		// When the job handle closes (defer or goroutine above), Windows kills all
+		// child/grandchild processes recursively.
+		var jobErr error
+		jobHandle, jobErr = assignToJobObject(cmd)
 		if jobErr == nil {
-			defer syscall.CloseHandle(job)
+			defer syscall.CloseHandle(jobHandle)
 		}
 		err = cmd.Wait()
 		if jobErr != nil {
@@ -332,195 +334,4 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 		return s, false
 	}
 	return result, true
-}
-
-// ── launcher command detection (Windows, any shell) ──
-
-// launcherPrefixes are command prefixes that typically start long-running
-// server, tunnel, watcher, or GUI processes. On Windows, these are wrapped via
-// cmd /c start to open a new visible window and return immediately,
-// preventing the bash tool from blocking on cmd.Wait().
-var launcherPrefixes = []string{
-	// Node.js / Bun
-	"npm start", "npm run dev", "npm run serve", "npm run watch", "npm run ",
-	"npx ",
-	"yarn dev", "yarn start", "yarn serve", "yarn watch", "yarn ",
-	"pnpm dev", "pnpm start", "pnpm serve", "pnpm watch", "pnpm ",
-	"bun dev", "bun start", "bun run ",
-	// Go
-	"go run ",
-	"air", // Go live-reload
-	// Rust
-	"cargo run", "cargo watch",
-	// Python
-	"python -m http.server", "python3 -m http.server",
-	"python -m uvicorn", "python3 -m uvicorn",
-	"python -m flask run", "python3 -m flask run",
-	"uvicorn ", "gunicorn ", "flask run",
-	// Wails / Tauri / Electron
-	"wails dev", "wails serve",
-	// Docker
-	"docker compose up", "docker-compose up", "docker run ",
-	// Tunnels / proxies
-	"ngrok ", "cloudflared tunnel", "localtunnel ",
-	// Java / JVM
-	"java -jar ", "mvn spring-boot:run", "mvnw spring-boot:run",
-	"gradle bootrun", "gradlew bootrun",
-	// Elixir / Phoenix
-	"iex -S mix", "mix phx.server",
-	// Watchers / live-reload
-	"nodemon ", "ts-node-dev ", "tsx watch",
-	// .NET
-	"dotnet watch", "dotnet run",
-	// Make / Task runners
-	"make dev", "make serve", "make watch",
-	// Misc
-	"vite", "webpack-dev-server", "next dev", "nuxt dev",
-	"hugo server", "jekyll serve", "mkdocs serve",
-	// Python env managers running servers
-	"pipenv run ", "poetry run ",
-}
-
-// wrapLauncherCommand detects whether cmd starts a long-running process and
-// wraps it for non-blocking execution. The strategy depends on the shell:
-//   - bash: appends " &" so the shell backgrounds the command and returns.
-//   - PowerShell: wraps via cmd /c start (PowerShell has no native background
-//     operator; run_in_background is the preferred way for headless bg).
-// Returns the (possibly wrapped) command and true if wrapping was applied.
-func wrapLauncherCommand(cmd string, sh sandbox.Shell) (string, bool) {
-	trimmed := strings.TrimSpace(cmd)
-	lower := strings.ToLower(trimmed)
-
-	if !isLauncher(trimmed, lower) {
-		return cmd, false
-	}
-
-	// PowerShell: wrap launcher commands via cmd /c start so the process
-	// launches independently and exits immediately, never blocking bash.
-	// Shell will briefly flash a cmd window; start /b was tried but
-	// triggers "Windows cannot find file" ShellExecute popups on commands
-	// containing quoted arguments (V10.71→V10.75 regression).
-	if sh.Kind == sandbox.ShellPowerShell {
-		if isStartCmd(trimmed) {
-			return cmd, false // already non-blocking
-		}
-		return fmt.Sprintf(`cmd /c start "" %s`, escapeCmdArg(cmd)), true
-	}
-
-	// Bash / POSIX shell: append " &" to background the command.
-	return trimmed + " &", true
-}
-
-// isLauncher reports whether cmd looks like a long-running server/tunnel/watcher.
-func isLauncher(trimmed, lower string) bool {
-	// start /b is already backgrounded by the user; no wrapping needed.
-	if strings.HasPrefix(lower, "start /b") || strings.HasPrefix(lower, "start /B") {
-		return false
-	}
-	if isStartCmd(trimmed) {
-		return true
-	}
-	for _, prefix := range launcherPrefixes {
-		if strings.HasPrefix(lower, prefix) {
-			return true
-		}
-	}
-	return isLauncherByKeywords(lower)
-}
-
-// isLauncherByKeywords detects commands that contain keywords strongly
-// associated with long-running servers, watchers, or tunnels even when
-// they don't match a known prefix. Catches ad-hoc commands like
-// "node server.js", "python app.py --serve", etc.
-func isLauncherByKeywords(lower string) bool {
-	// Normalise common word separators so "server.py" / "bin/server" / "my-app"
-	// all expose the keyword boundaries for " server " etc.
-	normalised := strings.NewReplacer(".", " ", "/", " ", "\\", " ", "-", " ").Replace(lower)
-	// Pad so we can match keywords at the end of the string.
-	padded := normalised + " "
-	for _, kw := range launcherKeywords {
-		if strings.Contains(padded, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-// launcherKeywords are substrings that strongly indicate a long-running process.
-// Each keyword is padded with spaces so it only matches as a whole word — e.g.
-// " server " matches "python server.py" (after normalising separators) but not
-// "echo observer".
-var launcherKeywords = []string{
-	" serve ", " dev ", " watch ", " start ", " runserver ",
-	" server ", " daemon ", " listen ",
-	" ngrok ", " tunnel ", " proxy ",
-	" start-server ", " run-server ", " serve-app ",
-}
-
-// isStartCmd reports whether cmd starts with "start " (PowerShell alias for
-// Start-Process) or "Start-Process ", excluding "start /b" (background).
-func isStartCmd(cmd string) bool {
-	lower := strings.ToLower(cmd)
-	if strings.HasPrefix(lower, "start /b") || strings.HasPrefix(lower, "start /B") {
-		return false // /b = same window, no wrapping needed
-	}
-	return strings.HasPrefix(lower, "start ") || strings.HasPrefix(lower, "start-process ")
-}
-
-// restAfterStart returns the command part after "start " or "Start-Process ",
-// stripping the optional quoted window title and Start-Process flags.
-func restAfterStart(cmd string) string {
-	lower := strings.ToLower(strings.TrimSpace(cmd))
-	var rest string
-	if strings.HasPrefix(lower, "start-process ") {
-		rest = strings.TrimSpace(cmd[len("start-process "):])
-	} else {
-		rest = strings.TrimSpace(cmd[len("start "):])
-	}
-	// Skip optional quoted window title (cmd.exe start convention)
-	if strings.HasPrefix(rest, `"`) {
-		if end := strings.Index(rest[1:], `"`); end >= 0 {
-			rest = strings.TrimSpace(rest[end+2:])
-		}
-	}
-	// Strip Start-Process flags that conflict with new-window wrapping
-	if strings.HasPrefix(lower, "start-process ") {
-		rest = stripStartProcessFlags(rest)
-	}
-	return rest
-}
-
-// stripStartProcessFlags removes -NoNewWindow, -WindowStyle, and -Wait flags
-// from a Start-Process argument list.
-func stripStartProcessFlags(cmd string) string {
-	for _, flag := range []string{"-NoNewWindow", "-WindowStyle", "-Wait"} {
-		for {
-			idx := findFlag(cmd, flag)
-			if idx < 0 {
-				break
-			}
-			end := idx + len(flag)
-			rest := strings.TrimSpace(cmd[end:])
-			// If next token is a value (e.g. -WindowStyle Hidden), skip it too
-			if len(rest) > 0 && rest[0] != '-' {
-				if spaceIdx := strings.IndexByte(rest, ' '); spaceIdx > 0 {
-					rest = rest[spaceIdx:]
-				} else {
-					rest = ""
-				}
-			}
-			cmd = strings.TrimSpace(cmd[:idx] + rest)
-		}
-	}
-	return cmd
-}
-
-func findFlag(s, flag string) int {
-	return strings.Index(strings.ToLower(s), strings.ToLower(flag))
-}
-
-// escapeCmdArg wraps a command for use as a single argument to cmd /c start.
-func escapeCmdArg(cmd string) string {
-	escaped := strings.ReplaceAll(cmd, `"`, `""`)
-	return `"` + escaped + `"`
 }

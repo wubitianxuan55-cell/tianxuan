@@ -62,16 +62,24 @@ func CallContext(ctx context.Context) (parentID string, sink event.Sink, asker A
 	return cc.parentID, cc.sink, cc.asker, true
 }
 
+// StepResult records the outcome of a single complete_step call during a turn.
+type StepResult struct {
+	Step   string // step name from complete_step args
+	Status string // "success", "error", "blocked"
+	Result string // result field from complete_step args (truncated)
+}
+
 // TurnResult is a structured result produced by an AgentRunner after one turn.
 // It lets upstream callers (e.g. Hermes) consume execution outcomes without
 // having to extract them post-hoc from the agent's session.
 type TurnResult struct {
-	Plan          string   // the plan that was executed (empty for non-Hermes turns)
-	FilesCreated  []string // paths of files newly created this turn (vs. modified)
-	FilesModified []string // paths of files written/edited/moved/deleted this turn
-	Summary       string   // agent's final conclusion (last assistant message)
-	Success       bool     // true = no tool errors encountered this turn
-	Errors        []string // tool error messages collected during execution (max 5)
+	Plan          string        // the plan that was executed (empty for non-Hermes turns)
+	FilesCreated  []string      // paths of files newly created this turn (vs. modified)
+	FilesModified []string      // paths of files written/edited/moved/deleted this turn
+	Summary       string        // agent's final conclusion (last assistant message)
+	Success       bool          // true = no tool errors encountered this turn
+	Errors        []string      // tool error messages collected during execution (max 5)
+	StepResults   []StepResult  // per-step outcomes from complete_step calls
 }
 
 // Runner carries out one task turn. AgentRunner satisfies it.
@@ -205,11 +213,9 @@ type AgentRunner struct {
 	// V6.0: 回忆提醒开关（recall_reminder.go）
 	recallReminderFired bool
 
-	// V7.0: ��բ�Ŷ�����������stop_gate.go��
-	taskGateReentry  int  // Gate 1: unfinished task reentries
-	goalGateReentry  int  // Gate 2: goal-judge reentries
-	verifyGateFired  bool // Gate 3: orchestrate verify fired
-		disableVerify    bool // V10.22: suppress verify nudge (for sub-agents)
+	// Stop gates (stop_gate.go) — only verifyGate remains after V10.XX
+	verifyGateFired  bool // Gate: orchestrate verify fired
+	disableVerify    bool // suppress verify nudge (for sub-agents)
 
 	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string

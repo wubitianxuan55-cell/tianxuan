@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -116,11 +117,13 @@ func TestFormatHandoff_Normal(t *testing.T) {
 	if !strings.Contains(out, hephaestusHandoffMarker) {
 		t.Fatal("handoff missing marker")
 	}
-	if !strings.Contains(out, "Original task:\nbuild") {
+	if !strings.Contains(out, "任务:\nbuild") {
 		t.Fatal("handoff missing original task")
 	}
-	if !strings.Contains(out, "Hermes output:\nrun wails build") {
+	if !strings.Contains(out, "计划:\nrun wails build") {
 		t.Fatal("handoff missing Hermes output")
+	}
+	if strings.Contains(out, "📌 用户备注") {
 	}
 	if strings.Contains(out, "📌 User note (written during plan confirmation)") {
 		t.Fatal("should not contain user note section when empty")
@@ -129,14 +132,14 @@ func TestFormatHandoff_Normal(t *testing.T) {
 
 func TestFormatHandoff_WithUserNote(t *testing.T) {
 	out := formatHandoff("build", "run wails build", "also run tests first")
-	if !strings.Contains(out, "📌 User note (written during plan confirmation):\nalso run tests first") {
+	if !strings.Contains(out, "📌 用户备注:\nalso run tests first") {
 		t.Fatal("handoff missing user note")
 	}
 }
 
 func TestFormatHandoff_EmptyPlan(t *testing.T) {
 	out := formatHandoff("build", "", "")
-	if !strings.Contains(out, "Hermes output:\n") {
+	if !strings.Contains(out, "计划:\n") {
 		t.Fatal("handoff should still have Hermes output section")
 	}
 }
@@ -357,5 +360,125 @@ func TestHasStructuralChange_NoChange(t *testing.T) {
 func TestHasStructuralChange_Empty(t *testing.T) {
 	if hasStructuralChange(nil, nil) {
 		t.Fatal("empty should not trigger structural change")
+	}
+}
+
+// ── shouldAutoConfirm ────────────────────────────────────
+
+func TestShouldAutoConfirm_SimplePlan(t *testing.T) {
+	plan := `<!--plan-->
+
+步骤 1：Update greeting
+- **File(s)**：internal/foo.go
+- **Change**：fix greeting text
+- **Depends on**：无
+- **Verify**：go test
+
+步骤 2：Update tests
+- **File(s)**：internal/foo_test.go
+- **Change**：update expected value
+- **Depends on**：1
+- **Verify**：go test`
+	if !shouldAutoConfirm(plan) {
+		t.Fatal("simple plan with 2 steps, no new files should auto-confirm")
+	}
+}
+
+func TestShouldAutoConfirm_TooManySteps(t *testing.T) {
+	var plan string
+	for i := 1; i <= 5; i++ {
+		plan += fmt.Sprintf("步骤 %d：Step %d\n- **File(s)**：a.go\n- **Change**：do thing\n- **Depends on**：无\n- **Verify**：test\n", i, i)
+	}
+	if shouldAutoConfirm(plan) {
+		t.Fatal("plan with 5 steps should NOT auto-confirm")
+	}
+}
+
+func TestShouldAutoConfirm_NewFile(t *testing.T) {
+	plan := `<!--plan-->
+
+步骤 1：Create new file
+- **File(s)**：internal/new.go [NEW]
+- **Change**：add helper
+- **Depends on**：无
+- **Verify**：go build`
+	if shouldAutoConfirm(plan) {
+		t.Fatal("plan with [NEW] file should NOT auto-confirm")
+	}
+}
+
+func TestShouldAutoConfirm_Empty(t *testing.T) {
+	if !shouldAutoConfirm("") {
+		t.Fatal("empty plan should auto-confirm (no steps = trivial)")
+	}
+}
+
+func TestShouldAutoConfirm_ThreeSteps(t *testing.T) {
+	plan := `<!--plan-->
+
+步骤 1：Fix typo
+- **File(s)**：a.go
+- **Change**：fix typo
+- **Depends on**：无
+- **Verify**：test
+
+步骤 2：Update docs
+- **File(s)**：README.md
+- **Change**：update
+- **Depends on**：无
+- **Verify**：test
+
+步骤 3：Run tests
+- **File(s)**：a_test.go
+- **Change**：update
+- **Depends on**：1
+- **Verify**：test`
+	if !shouldAutoConfirm(plan) {
+		t.Fatal("plan with exactly 3 steps and no new files should auto-confirm")
+	}
+}
+
+// ── HermesPrompt tool alignment ──────────────────────────
+
+// TestHermesPromptToolsExist checks that every tool name mentioned in
+// HermesPrompt matches a known tool. When a tool is renamed in the registry,
+// this test catches the stale prompt entry by checking substring presence.
+func TestHermesPromptToolsExist(t *testing.T) {
+	tools := []struct {
+		name string
+		frag string // substring to search in HermesPrompt
+	}{
+		{"read_file", "read_file"},
+		{"grep", "grep"},
+		{"glob", "glob"},
+		{"ls", "ls"},
+		{"code_index", "code_index"},
+		{"lsp_definition", "lsp_definition"},
+		{"lsp_hover", "lsp_hover"},
+		{"lsp_references", "lsp_references"},
+		{"lsp_diagnostics", "lsp_diagnostics"},
+		{"mcp__codegraph__*", "mcp__codegraph__*"}, // wildcard in prompt
+		{"git_status", "git_status"},
+		{"git_diff", "git_diff"},
+		{"git_log", "git_log"},
+		{"web_search", "web_search"},
+		{"web_fetch", "web_fetch"},
+		{"memory_search", "memory_search"},
+		{"read_skill", "read_skill"},
+		{"explore", "explore"},
+		{"research", "research"},
+		{"review", "review"},
+		{"security_review", "security_review"},
+	}
+	prompt := HermesPrompt
+	var missing []string
+	for _, tt := range tools {
+		if !strings.Contains(prompt, tt.frag) {
+			missing = append(missing, tt.name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("HermesPrompt missing references to these tools (may have been renamed): %v\n"+
+			"Update HermesPrompt or the tools list in TestHermesPromptToolsExist.", missing)
 	}
 }

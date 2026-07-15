@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"tianxuan/internal/codegraph"
@@ -212,37 +213,135 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		return &TurnResult{Plan: input, Success: true}, nil
 	}
 
-	return h.executePlan(ctx, input, *plan)
+	// Execute plan with verification loop (up to 3 rounds).
+	// V10.XX: after each execution, check StepResults; if any step failed,
+	// generate a fix plan and re-execute automatically (no confirmation dialog).
+	firstRound := h.executePlanWithRetry(ctx, input, *plan)
+	return firstRound.result, firstRound.err
+}
+
+// executePlanWithRetry wraps executePlan in a verification loop.
+// The first round executes the original plan; subsequent rounds create
+// fix plans for failed steps and re-execute automatically.
+type execRound struct {
+	result *TurnResult
+	err    error
+}
+
+func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial planWithNote) execRound {
+	// Round 1: execute the original plan
+	result, err := h.executePlan(ctx, input, initial)
+
+	for round := 2; round <= 3; round++ {
+		if err != nil || result == nil {
+			break
+		}
+		if h.allStepsPassed(result) {
+			break
+		}
+
+		h.sink.Emit(event.Event{Kind: event.Phase, Text: "修正执行 (轮 " + strconv.Itoa(round) + "/3)"})
+
+		// Generate a fix plan targeting only the failed steps
+		fixPlan, fixErr := h.planFix(ctx, input, initial.text, result)
+		if fixErr != nil {
+			slog.Warn("hermes: fix plan generation failed", "error", fixErr)
+			break
+		}
+
+		// Execute the fix plan — always fast-path (no confirmation dialog)
+		result, err = h.executePlan(ctx, input, *fixPlan)
+	}
+
+	return execRound{result: result, err: err}
+}
+
+// allStepsPassed checks whether every step in the execution result succeeded.
+func (h *Hermes) allStepsPassed(r *TurnResult) bool {
+	if r == nil {
+		return false
+	}
+	if !r.Success {
+		return false
+	}
+	for _, sr := range r.StepResults {
+		if sr.Status != "success" {
+			return false
+		}
+	}
+	return true
+}
+
+// planFix asks the planner to produce a targeted fix for failed steps.
+// The fix plan is generated from the original context plus the execution
+// errors, and is auto-confirmed (no asker interaction).
+func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan string, failed *TurnResult) (*planWithNote, error) {
+	// Build a prompt describing what failed
+	var failedSteps []string
+	for _, sr := range failed.StepResults {
+		if sr.Status != "success" {
+			failedSteps = append(failedSteps, fmt.Sprintf("- ❌ %s: %s", sr.Step, sr.Result))
+		}
+	}
+
+	errSummary := strings.Join(failed.Errors, "; ")
+	fixInput := fmt.Sprintf(`以下步骤执行失败，请创建最小修正计划，仅修正失败的步骤：
+
+原计划:
+%q
+
+失败步骤:
+%s
+
+执行错误: %s
+
+修正计划要求:
+- 仅修复标记 ❌ 的步骤，不重做 ✅ 步骤
+- 使用 <!--plan--> 标记
+- 修正计划自动执行，不需要用户确认
+`, originalPlan, strings.Join(failedSteps, "\n"), errSummary)
+
+	// Use planWithTools (read-only investigation) for the fix plan
+	planText, err := h.planWithTools(ctx, fixInput)
+	if err != nil {
+		return nil, fmt.Errorf("hermes: fix plan failed: %w", err)
+	}
+
+	return &planWithNote{text: planText}, nil
 }
 
 // ── Run sub-steps ───────────────────────────────────────────────────────
 
+// wrapExecutorSink suppresses the executor's TurnStarted event and returns
+// a restore function. Both runFastPath and executePlan use it — Hermes
+// already emits TurnStarted at the top of Run(), and a duplicate from the
+// executor would reset per-turn cost stats in the frontend.
+func (h *Hermes) wrapExecutorSink() func() {
+	origSink := h.hephaestus.Sink()
+	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
+		if e.Kind == event.TurnStarted {
+			return
+		}
+		origSink.Emit(e)
+	}))
+	return func() { h.hephaestus.SetSink(origSink) }
+}
+
 // runFastPath handles the "!" prefix fast path that skips the planner entirely.
-// Returns (nil, nil) when input is not a fast-path candidate.
 func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, error) {
 	task, ok := shouldSkipPlanner(input)
 	if !ok {
 		return nil, nil
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · 快速执行"})
-	// Suppress the executor's TurnStarted — Hermes already started the turn.
-	execSink := h.hephaestus.Sink()
-	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
-		if e.Kind == event.TurnStarted {
-			return
-		}
-		execSink.Emit(e)
-	}))
-	defer h.hephaestus.SetSink(execSink)
+	defer h.wrapExecutorSink()()
+	// V10.XX: pre-inject original input before handoff, matching executePlan's
+	// injection order so the executor session's prefix is consistent across paths.
+	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: task})
 	return h.hephaestus.Run(ctx, formatHandoff(task, task, ""))
 }
 
-// injectProjectMap adds a structural overview to the planner session when the
-// workspace has changed since the last injection.
 func (h *Hermes) injectProjectMap() {
-	if h.wsRoot == "" {
-		return
-	}
 	pm := codegraph.Analyze(h.wsRoot)
 	pmHash := pm.Hash()
 	if pmHash != h.lastProjectHash {
@@ -277,6 +376,12 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlan
 		// Keep the full planner output — preamble (analysis/reasoning) is valuable
 		// context for the executor. Previously only the <!--plan--> portion was kept.
 
+		// V10.XX: auto-confirm simple plans (≤3 steps, no new files) to save one
+		// round-trip. The asker check ensures headless mode still skips confirm.
+		if h.asker != nil && shouldAutoConfirm(plan) {
+			return &planWithNote{text: plan}, nil
+		}
+
 		userNote, chatOnly, revise, err := h.confirmPlan(ctx, input, plan)
 		if err != nil {
 			h.hermesSess.Truncate(prePlanLen)
@@ -308,15 +413,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 	userNote := p.userNote
 
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
-	// Suppress the executor's TurnStarted — Hermes already started the turn.
-	execSink := h.hephaestus.Sink()
-	h.hephaestus.SetSink(event.FuncSink(func(e event.Event) {
-		if e.Kind == event.TurnStarted {
-			return
-		}
-		execSink.Emit(e)
-	}))
-	defer h.hephaestus.SetSink(execSink)
+	defer h.wrapExecutorSink()()
 
 	// V10.49: pre-inject the original Chinese input before the handoff prompt.
 	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: origInput})
@@ -325,6 +422,12 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 	// Attach plan to TurnResult so the returned value is self-contained.
 	if execResult != nil {
 		execResult.Plan = plan
+	}
+
+	// V10.XX: Hermes synthesizes final output — concise, no Hephaestus verbosity.
+	hermesSummary := h.synthesizeFinalOutput(execResult, execErr)
+	if hermesSummary != "" {
+		h.sink.Emit(event.Event{Kind: event.Text, Text: hermesSummary})
 	}
 
 	// Feed results back to the planner and emit TurnResultEvent.
@@ -338,7 +441,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 				FilesModified: execResult.FilesModified,
 				Success:       execResult.Success,
 				Errors:        execResult.Errors,
-				Summary:       execResult.Summary,
+				Summary:       hermesSummary, // Hermes version, not Hephaestus's verbose summary
 			},
 		})
 	} else if execErr != nil {
@@ -346,7 +449,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 			Plan:    plan,
 			Success: false,
 			Errors:  []string{execErr.Error()},
-			Summary: "execution terminated before producing output",
+			Summary: hermesSummary,
 		}
 		h.hermesSess.Add(provider.Message{
 			Role:    provider.RoleUser,
@@ -358,7 +461,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 				Plan:    synth.Plan,
 				Success: false,
 				Errors:  synth.Errors,
-				Summary: synth.Summary,
+				Summary: hermesSummary,
 			},
 		})
 	}
@@ -431,6 +534,55 @@ func hasStructuralChange(created, modified []string) bool {
 	return check(created) || check(modified)
 }
 
+// synthesizeFinalOutput produces a concise completion message from Hermes,
+// replacing Hephaestus's verbose end-of-turn summary. The output includes
+// what was accomplished and any errors, without repeating the plan.
+func (h *Hermes) synthesizeFinalOutput(r *TurnResult, execErr error) string {
+	if r == nil {
+		if execErr != nil {
+			return "❌ 执行失败: " + execErr.Error()
+		}
+		return ""
+	}
+
+	// Build concise summary: what files changed, what errors occurred
+	var parts []string
+	if len(r.FilesCreated) > 0 {
+		parts = append(parts, fmt.Sprintf("新建 %d 个文件", len(r.FilesCreated)))
+	}
+	if len(r.FilesModified) > 0 {
+		parts = append(parts, fmt.Sprintf("修改 %d 个文件", len(r.FilesModified)))
+	}
+	if len(r.Errors) > 0 {
+		parts = append(parts, fmt.Sprintf("%d 个错误", len(r.Errors)))
+	}
+
+	prefix := "✅ 任务完成"
+	if !r.Success || len(r.Errors) > 0 {
+		prefix = "⚠️ 任务部分完成"
+	}
+
+	msg := prefix
+	if len(parts) > 0 {
+		msg += " · " + strings.Join(parts, "，")
+	}
+
+	// Include step-level results when available
+	if len(r.StepResults) > 0 {
+		steps := make([]string, 0, len(r.StepResults))
+		for _, sr := range r.StepResults {
+			if sr.Status == "success" {
+				steps = append(steps, "✅ "+sr.Step)
+			} else {
+				steps = append(steps, "❌ "+sr.Step)
+			}
+		}
+		msg += "\n" + strings.Join(steps, "\n")
+	}
+
+	return msg
+}
+
 // ── Plan implementation ──────────────────────────────────────────────────
 
 // plan runs Hermes as an AgentRunner with read-only tools so it can investigate
@@ -478,6 +630,12 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 	// across turns, matching the planWithTools path.
 	h.hermesSess.Add(provider.Message{Role: provider.RoleUser, Content: input})
 	h.hermesSess.Add(provider.Message{Role: provider.RoleAssistant, Content: plan})
+	// Trigger compaction on the planner agent — planStream writes directly to
+	// h.hermesSess without going through plannerAgent.Run(), so auto-compaction
+	// never fires on this path. Without this, planStream sessions grow unbounded.
+	if h.plannerAgent != nil {
+		_ = h.plannerAgent.CompactNow(ctx, "planStream turn boundary")
+	}
 	return plan, nil
 }
 
@@ -499,23 +657,11 @@ func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}
-	if turnResult != nil && turnResult.Summary != "" {
-		slog.Info("hermes: planner run summary", "summary", turnResult.Summary)
-	}
-
-	// Extract the plan from the planner's persistent session (last assistant message).
-	var plan string
-	msgs := h.hermesSess.Messages
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i].Role == provider.RoleAssistant {
-			plan = msgs[i].Content
-			break
-		}
-	}
-	if plan == "" {
+	if turnResult == nil || turnResult.Summary == "" {
 		return "", fmt.Errorf("hermes: planner produced no output")
 	}
-	return plan, nil
+	slog.Info("hermes: planner run summary", "summary", turnResult.Summary)
+	return turnResult.Summary, nil
 }
 
 // autoGate approves every tool call — safe for read-only planners.
@@ -553,14 +699,14 @@ func isAnswerNotAction(plan string) bool {
 func formatHandoff(task, plan, userNote string) string {
 	note := ""
 	if userNote != "" {
-		note = fmt.Sprintf("\n\n📌 User note (written during plan confirmation):\n%s\n", userNote)
+		note = fmt.Sprintf("\n\n📌 用户备注:\n%s\n", userNote)
 	}
 	return fmt.Sprintf(`# %s
 
-Original task:
+任务:
 %s
 
-Hermes output:
+计划:
 %s%s`, hephaestusHandoffMarker, task, plan, note)
 }
 
@@ -573,13 +719,13 @@ func HandoffTask(s string) string {
 	if !strings.HasPrefix(trimmed, "# "+hephaestusHandoffMarker) {
 		return s
 	}
-	const header = "Original task:\n"
+	const header = "任务:\n"
 	i := strings.Index(trimmed, header)
 	if i < 0 {
 		return s
 	}
 	rest := trimmed[i+len(header):]
-	if j := strings.Index(rest, "\n\nHermes output:"); j >= 0 {
+	if j := strings.Index(rest, "\n\n计划:"); j >= 0 {
 		rest = rest[:j]
 	}
 	if task := strings.TrimSpace(rest); task != "" {

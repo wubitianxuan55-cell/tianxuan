@@ -191,3 +191,13 @@ func extractStepFromArgs(args string) string {
 	return v.Step
 }
 
+// extractStepResult parses the result field from complete_step JSON arguments.
+func extractStepResult(args string) string {
+	var v struct {
+		Result string `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(args), &v); err != nil {
+		return ""
+	}
+	return truncateStr(v.Result, 200)
+}

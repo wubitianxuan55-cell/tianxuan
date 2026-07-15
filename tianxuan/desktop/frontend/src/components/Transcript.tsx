@@ -359,7 +359,11 @@ export function Transcript({
     const el = scrollRef.current; if (!el) return;
     const savedTop = el.scrollTop;
     clearTimeout(measureTimer.current);
-    measureTimer.current = setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = savedTop; }, 250);
+    measureTimer.current = setTimeout(() => {
+      const el = scrollRef.current; if (!el) return;
+      const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (savedTop >= 0 && savedTop <= maxTop) el.scrollTop = savedTop;
+    }, 250);
   }, []);
   const entranceRef = useEntranceAnimation<HTMLDivElement>(
     items.length > 0 ? `${items[0].id}|${items[items.length - 1].id}` : undefined, items.length,

@@ -2624,8 +2624,6 @@ body::after {
 .tool {
   margin: 6px auto;
   overflow: hidden;
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 36px;
 }
 .tool__head {
   display: flex;
@@ -2835,8 +2833,6 @@ body::after {
 /* ── TurnCollapse: fold line for completed steps ─────────────────── */
 .turn-collapse {
   margin: 6px auto;
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 36px;
 }
 .turn-collapse__head {
   display: inline-flex;

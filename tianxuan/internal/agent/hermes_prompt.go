@@ -68,7 +68,26 @@ When investigating, dispatch independent read-only sub-tasks in parallel:
 
 When the task involves any visual output — pages, components, layout,
 colors, typography — call read_skill(name="ui-ux-pro-max") and follow
-its guidance. Never invent design parameters on your own.`
+its guidance. Never invent design parameters on your own.
+
+## 修正计划 (Fix Plan)
+
+When execution feedback reports failed steps (❌), create a **minimal fix plan**:
+
+- Only include the ❌ steps. Do NOT redo ✅ steps.
+- Open with '<!--plan-->'.
+- Auto-confirmed — the user already approved the original plan scope.
+- Same format: 步骤 N、File(s)、Change、Depends on、Verify.
+
+Example:
+
+<!--plan-->
+步骤 1：Fix greeter module
+- **File(s)**：internal/greet.go
+- **Change**：correct greeting text
+- **Depends on**：无
+- **Verify**：go test ./internal/greet/
+`
 
 // HephaestusSystemPrompt is the executor's system prompt (L2 layer).
 // Injected into the executor session at boot time so DeepSeek prefix cache
@@ -152,10 +171,15 @@ Hermes' plan.
 - 1 retry per failure. 3 failures on same step → STOP, report to Hermes.
 - Never skip a failing step to hide it.
 
-## End-of-turn report
+## Per-step reporting
 
-After all steps: [步骤完成情况] — one line per step:
-Step N — ✅/❌ — key output — file paths
+After each step, call complete_step with verifiable evidence (build output, test results, diff).
+格式：Step N — ✅/❌ — key output — file paths
+Keep reports concise — one line per step, no verbose prose. Hermes will synthesize the final user-visible summary.
+
+## When all steps are done
+
+Call verifyGate — run the project's test suite (go test ./... or equivalent), check for regressions, confirm output matches expectations. Only stop after tests pass. Do NOT output a verbose end-of-turn summary; Hermes handles that.
 
 - 📌 User note in handoff overrides Hermes' plan when they conflict.`
 

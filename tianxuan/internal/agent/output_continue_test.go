@@ -50,7 +50,7 @@ func TestOutputLengthContinueSafetyValve(t *testing.T) {
 	a := &AgentRunner{session: NewSession("")}
 	u := &provider.Usage{FinishReason: "length"}
 
-	for i := 0; i < outputLenNudgeCap; i++ {
+	for i := 0; i < OutputLenNudgeCap; i++ {
 		if !a.maybeContinueOutputLength(u, nil) {
 			t.Fatalf("retry %d: expected true", i+1)
 		}
@@ -107,7 +107,7 @@ func TestInvalidOutputRetrySkipsEmptyReasoning(t *testing.T) {
 func TestInvalidOutputRetrySafetyValve(t *testing.T) {
 	a := &AgentRunner{session: NewSession("")}
 
-	for i := 0; i < invalidOutputCap; i++ {
+	for i := 0; i < InvalidOutputCap; i++ {
 		if !a.maybeRetryInvalidOutput("", "thinking...", nil) {
 			t.Fatalf("retry %d: expected true", i+1)
 		}

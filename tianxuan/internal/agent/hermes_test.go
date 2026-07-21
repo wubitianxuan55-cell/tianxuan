@@ -482,3 +482,351 @@ func TestHermesPromptToolsExist(t *testing.T) {
 			"Update HermesPrompt or the tools list in TestHermesPromptToolsExist.", missing)
 	}
 }
+
+// ── formatSummary ──────────────────────────────────────────
+
+func TestFormatSummary_NilResultWithError(t *testing.T) {
+	out := (&Hermes{}).formatSummary(nil, fmt.Errorf("timeout"), false)
+	if !strings.Contains(out, "❌ 执行失败") {
+		t.Fatalf("expected failure prefix, got: %s", out)
+	}
+	if !strings.Contains(out, "timeout") {
+		t.Fatalf("expected error text, got: %s", out)
+	}
+}
+
+func TestFormatSummary_NilResultNoError(t *testing.T) {
+	out := (&Hermes{}).formatSummary(nil, nil, false)
+	if out != "" {
+		t.Fatalf("expected empty string for nil result + nil error, got: %s", out)
+	}
+}
+
+func TestFormatSummary_SuccessNoDetails(t *testing.T) {
+	r := &TurnResult{Success: true}
+	out := (&Hermes{}).formatSummary(r, nil, false)
+	if !strings.Contains(out, "✅ 任务完成") {
+		t.Fatalf("expected success prefix, got: %s", out)
+	}
+	if !strings.Contains(out, "未记录步骤详情") {
+		t.Fatalf("expected no-details note, got: %s", out)
+	}
+}
+
+func TestFormatSummary_SuccessWithFiles(t *testing.T) {
+	r := &TurnResult{
+		Success:       true,
+		FilesCreated:  []string{"a.go", "b.go"},
+		FilesModified: []string{"c.go"},
+	}
+	out := (&Hermes{}).formatSummary(r, nil, false)
+	if !strings.Contains(out, "新建 2 个文件") {
+		t.Fatalf("expected file creation count, got: %s", out)
+	}
+	if !strings.Contains(out, "修改 1 个文件") {
+		t.Fatalf("expected file modification count, got: %s", out)
+	}
+}
+
+func TestFormatSummary_PartialSuccess(t *testing.T) {
+	r := &TurnResult{
+		Success: false,
+		Errors:  []string{"e1", "e2", "e3"},
+	}
+	out := (&Hermes{}).formatSummary(r, nil, false)
+	if !strings.Contains(out, "⚠️ 任务部分完成") {
+		t.Fatalf("expected partial prefix, got: %s", out)
+	}
+	if !strings.Contains(out, "3 个错误") {
+		t.Fatalf("expected error count, got: %s", out)
+	}
+}
+
+func TestFormatSummary_WithStepResults(t *testing.T) {
+	r := &TurnResult{
+		Success: true,
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "success"},
+			{Step: "步骤2", Status: "error"},
+			{Step: "步骤3", Status: "success"},
+		},
+	}
+	out := (&Hermes{}).formatSummary(r, nil, false)
+	if !strings.Contains(out, "✅ 步骤1") {
+		t.Fatalf("expected step1 success, got: %s", out)
+	}
+	if !strings.Contains(out, "❌ 步骤2") {
+		t.Fatalf("expected step2 failure, got: %s", out)
+	}
+}
+
+func TestFormatSummary_RetriesExhausted(t *testing.T) {
+	r := &TurnResult{Success: false, Errors: []string{"e1"}}
+	out := (&Hermes{}).formatSummary(r, nil, true)
+	if !strings.Contains(out, "已尝试多轮自动修正") {
+		t.Fatalf("expected retries-exhausted note, got: %s", out)
+	}
+}
+
+// ── allStepsPassed ─────────────────────────────────────────
+
+func TestAllStepsPassed_Nil(t *testing.T) {
+	if (&Hermes{}).allStepsPassed(nil) {
+		t.Fatal("nil TurnResult should not pass")
+	}
+}
+
+func TestAllStepsPassed_NotSuccess(t *testing.T) {
+	r := &TurnResult{Success: false}
+	if (&Hermes{}).allStepsPassed(r) {
+		t.Fatal("!Success should not pass")
+	}
+}
+
+func TestAllStepsPassed_FailedStep(t *testing.T) {
+	r := &TurnResult{
+		Success: true,
+		StepResults: []StepResult{
+			{Step: "step1", Status: "success"},
+			{Step: "step2", Status: "error"},
+		},
+	}
+	if (&Hermes{}).allStepsPassed(r) {
+		t.Fatal("result with failed step should not pass")
+	}
+}
+
+func TestAllStepsPassed_BlockedStep(t *testing.T) {
+	r := &TurnResult{
+		Success: true,
+		StepResults: []StepResult{
+			{Step: "step1", Status: "blocked"},
+		},
+	}
+	if (&Hermes{}).allStepsPassed(r) {
+		t.Fatal("result with blocked step should not pass")
+	}
+}
+
+func TestAllStepsPassed_AllSuccess(t *testing.T) {
+	r := &TurnResult{
+		Success: true,
+		StepResults: []StepResult{
+			{Step: "step1", Status: "success"},
+			{Step: "step2", Status: "success"},
+		},
+	}
+	if !(&Hermes{}).allStepsPassed(r) {
+		t.Fatal("result with all-success steps should pass")
+	}
+}
+
+func TestAllStepsPassed_NoStepResults(t *testing.T) {
+	r := &TurnResult{Success: true}
+	// Success=true but no step results — model declared done without complete_step.
+	// allStepsPassed treats this as passing (no contradiction to Success).
+	if !(&Hermes{}).allStepsPassed(r) {
+		t.Fatal("Success=true with no step results should pass")
+	}
+}
+
+// ── planFix prompt construction ────────────────────────────
+
+func TestPlanFixPrompt_Round2(t *testing.T) {
+	failed := &TurnResult{
+		Success: false,
+		Errors:  []string{"build error: undefined: Foo"},
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "success"},
+			{Step: "步骤2", Status: "error", Result: "go build 失败"},
+		},
+	}
+	prompt := buildFixPrompt("修复所有bug", "步骤1: fix\n步骤2: test", failed, 2, nil)
+
+	// Round 2: targeted fix — should reference original task and plan.
+	if !strings.Contains(prompt, "修复所有bug") {
+		t.Fatal("round 2 prompt should include original task")
+	}
+	if !strings.Contains(prompt, "步骤1: fix") {
+		t.Fatal("round 2 prompt should include original plan")
+	}
+	if !strings.Contains(prompt, "步骤2") {
+		t.Fatal("round 2 prompt should mention failed step")
+	}
+	if !strings.Contains(prompt, "<!--plan-->") {
+		t.Fatal("round 2 prompt should request <!--plan--> marker")
+	}
+	if !strings.Contains(prompt, "仅修复标记") {
+		t.Fatal("round 2 prompt should say 仅修复")
+	}
+	if strings.Contains(prompt, "反思") {
+		t.Fatal("round 2 prompt should NOT request reflection")
+	}
+}
+
+func TestPlanFixPrompt_Round3(t *testing.T) {
+	failed := &TurnResult{
+		Success: false,
+		Errors:  []string{"still broken"},
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "error", Result: "test still fails"},
+		},
+	}
+	fixHistory := []fixAttempt{
+		{round: 2, fixPlan: "fix plan v2", feedback: "still failed"},
+	}
+	prompt := buildFixPrompt("原始任务", "原始计划", failed, 3, fixHistory)
+
+	// Round 3: reflection mode — should request rethinking.
+	if !strings.Contains(prompt, "反思") {
+		t.Fatal("round 3 prompt should request reflection")
+	}
+	if !strings.Contains(prompt, "根本方向") {
+		t.Fatal("round 3 prompt should ask about fundamental approach")
+	}
+	if !strings.Contains(prompt, "fix plan v2") {
+		t.Fatal("round 3 prompt should include fix history")
+	}
+	if !strings.Contains(prompt, "<!--plan-->") {
+		t.Fatal("round 3 prompt should request <!--plan--> marker")
+	}
+}
+
+func TestPlanFixPrompt_NoStepResults(t *testing.T) {
+	// Defensive: TurnResult.Errors is non-empty but StepResults is empty.
+	failed := &TurnResult{Success: false, Errors: []string{"unknown error"}}
+	prompt := buildFixPrompt("task", "plan", failed, 2, nil)
+
+	if !strings.Contains(prompt, "unknown error") {
+		t.Fatal("prompt should include error text even without step results")
+	}
+}
+
+// ── displayPlan ────────────────────────────────────────────
+
+func TestDisplayPlan_WithMarker(t *testing.T) {
+	full := `这是分析前言，包含了一些内部记忆和推理过程。
+用户提到……
+<!--plan-->
+步骤 1：修复 bug
+- **File(s)**：foo.go
+- **Change**：修正逻辑`
+
+	displayed := displayPlan(full)
+	if strings.Contains(displayed, "分析前言") {
+		t.Fatal("displayPlan should strip preamble analysis")
+	}
+	if strings.Contains(displayed, "内部记忆") {
+		t.Fatal("displayPlan should strip memory references in preamble")
+	}
+	if !strings.Contains(displayed, "<!--plan-->") {
+		t.Fatal("displayPlan should keep the <!--plan--> marker")
+	}
+	if !strings.Contains(displayed, "步骤 1") {
+		t.Fatal("displayPlan should keep plan content after marker")
+	}
+}
+
+func TestDisplayPlan_NoMarker(t *testing.T) {
+	text := "这是纯文本回复，没有计划标记。"
+	displayed := displayPlan(text)
+	if displayed != text {
+		t.Fatalf("displayPlan without marker should return full text unchanged, got: %s", displayed)
+	}
+}
+
+func TestDisplayPlan_MarkerAtStart(t *testing.T) {
+	text := "<!--plan-->\n步骤 1：do thing"
+	displayed := displayPlan(text)
+	if !strings.HasPrefix(displayed, "<!--plan-->") {
+		t.Fatal("displayPlan with marker at start should keep it")
+	}
+}
+
+func TestDisplayPlan_BlankPreamble(t *testing.T) {
+	text := "\n\n  <!--plan-->\n步骤 1：do thing"
+	displayed := displayPlan(text)
+	if !strings.HasPrefix(displayed, "<!--plan-->") {
+		t.Fatalf("displayPlan should trim whitespace and start at marker, got: %s", displayed)
+	}
+}
+
+func TestDisplayPlan_Empty(t *testing.T) {
+	if displayPlan("") != "" {
+		t.Fatal("displayPlan of empty string should return empty")
+	}
+}
+
+// ── resolveConfirmChoice ───────────────────────────────────
+
+func TestResolveConfirmChoice_Submit(t *testing.T) {
+	note, chatOnly, revise, err := resolveConfirmChoice("提交执行", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if chatOnly || revise || note != "" {
+		t.Fatal("提交执行 should return zero values")
+	}
+}
+
+func TestResolveConfirmChoice_ChatOnly(t *testing.T) {
+	_, chatOnly, revise, err := resolveConfirmChoice("仅聊天", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !chatOnly || revise {
+		t.Fatal("仅聊天 should set chatOnly=true, revise=false")
+	}
+}
+
+func TestResolveConfirmChoice_Revise(t *testing.T) {
+	note, chatOnly, revise, err := resolveConfirmChoice("按用户意见修改计划", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !revise || chatOnly {
+		t.Fatal("按用户意见修改计划 should set revise=true")
+	}
+	if note != "" {
+		t.Fatalf("revise without feedback should return empty note, got %q", note)
+	}
+}
+
+func TestResolveConfirmChoice_ReviseWithFeedback(t *testing.T) {
+	note, chatOnly, revise, err := resolveConfirmChoice("按用户意见修改计划", []string{"请改用 Go 1.21 语法"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !revise {
+		t.Fatal("should set revise=true")
+	}
+	if note != "请改用 Go 1.21 语法" {
+		t.Fatalf("should extract feedback from extra[0], got %q", note)
+	}
+	if chatOnly {
+		t.Fatal("should not set chatOnly")
+	}
+}
+
+func TestResolveConfirmChoice_Cancel(t *testing.T) {
+	_, _, _, err := resolveConfirmChoice("取消", nil)
+	if err == nil {
+		t.Fatal("取消 should return an error")
+	}
+	if !strings.Contains(err.Error(), "取消") {
+		t.Fatalf("expected cancel error, got: %v", err)
+	}
+}
+
+func TestResolveConfirmChoice_FreeText(t *testing.T) {
+	note, chatOnly, revise, err := resolveConfirmChoice("请添加更多测试", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if chatOnly || revise {
+		t.Fatal("free text should not set chatOnly or revise")
+	}
+	if note != "请添加更多测试" {
+		t.Fatalf("free text should become note, got %q", note)
+	}
+}

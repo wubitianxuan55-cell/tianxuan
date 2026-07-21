@@ -234,7 +234,7 @@ func runParallel(start, end int, run func(int)) {
 // third identical failure is a death-spiral �� the dominant case being a tool call
 // whose arguments are truncated at the output-token ceiling, which the model then
 // re-emits (re-worded but still over-long), truncating the same way again.
-const stormBreakThreshold = 3
+// stormBreakThreshold 原定义已迁至 loop_limits.go → StormBreakThreshold。
 
 // applyStormBreaker detects a run of identically-failing turns and, past the
 // threshold, rewrites the model-facing result (results[0]) into a directive to
@@ -258,7 +258,7 @@ func (a *AgentRunner) applyStormBreaker(calls []provider.ToolCall, outcomes []to
 		return
 	}
 	a.storm.Count++
-	if a.storm.Count < stormBreakThreshold {
+	if a.storm.Count < StormBreakThreshold {
 		return
 	}
 
@@ -317,12 +317,12 @@ func batchStormSignature(calls []provider.ToolCall, outcomes []toolOutcome) (str
 // blocked narrows that to a refusal (plan mode / permission). truncMsg is set
 // (without the "�� " prefix) when the output was head+tailed.
 type toolOutcome struct {
-	output    string
-	blocked   bool
-	errMsg    string
+	output      string
+	blocked     bool
+	errMsg      string
 	recoverable bool // agent can fix this on next turn (bad args, wrong file, etc.)
-	truncated bool
-	truncMsg  string
+	truncated   bool
+	truncMsg    string
 }
 
 // executeOne runs a single tool call. It is pure with respect to the event sink

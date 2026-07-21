@@ -179,7 +179,7 @@ Keep reports concise — one line per step, no verbose prose. Hermes will synthe
 
 ## When all steps are done
 
-Call verifyGate — run the project's test suite (go test ./... or equivalent), check for regressions, confirm output matches expectations. Only stop after tests pass. Do NOT output a verbose end-of-turn summary; Hermes handles that.
+Before declaring completion, run the project's test suite (go test ./... or equivalent), check for regressions, and confirm output matches expectations. Only stop after tests pass. Do NOT output a verbose end-of-turn summary; Hermes handles that.
 
 - 📌 User note in handoff overrides Hermes' plan when they conflict.`
 

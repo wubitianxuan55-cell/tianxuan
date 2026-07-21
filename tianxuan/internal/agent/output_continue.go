@@ -8,7 +8,6 @@ import (
 
 // outputLenNudgeCap prevents infinite continuation when the model keeps
 // hitting the output length limit without producing tool calls.
-const outputLenNudgeCap = 5
 
 // outputLengthNudge is injected when finish_reason="length" and there are
 // no tool calls — the model hit the output token limit mid-response.
@@ -24,9 +23,6 @@ const invalidOutputNudge = "[system] " +
 	"or had only thinking with no tool calls and no final text. " +
 	"Provide a final answer or call a tool to make progress on the task."
 
-// invalidOutputCap prevents infinite retry on invalid output.
-const invalidOutputCap = 3
-
 // maybeContinueOutputLength checks whether the model's output was truncated
 // and injects a continuation nudge. Returns true when it did (caller should
 // continue the loop).
@@ -41,7 +37,7 @@ func (a *AgentRunner) maybeContinueOutputLength(u *provider.Usage, calls []provi
 		return false
 	}
 	a.lenContCount++
-	if a.lenContCount > outputLenNudgeCap {
+	if a.lenContCount > OutputLenNudgeCap {
 		return false // safety valve
 	}
 	a.session.Add(provider.Message{
@@ -64,7 +60,7 @@ func (a *AgentRunner) maybeRetryInvalidOutput(text, reasoning string, calls []pr
 		return false
 	}
 	a.invalidOutCount++
-	if a.invalidOutCount > invalidOutputCap {
+	if a.invalidOutCount > InvalidOutputCap {
 		return false
 	}
 	a.session.Add(provider.Message{

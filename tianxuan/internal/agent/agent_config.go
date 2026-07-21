@@ -80,6 +80,14 @@ type Options struct {
 	// PlanModeReadOnlyCommands names concrete shell command prefixes that plan mode
 	// treats as read-only (e.g. "gh issue view", "git log").
 	PlanModeReadOnlyCommands []string
+
+	// OffloadDir is the directory where large tool outputs are offloaded.
+	// Empty disables context offloading. Each session gets a subdirectory
+	// named by its session ID.
+	OffloadDir string
+	// OffloadThresholdChars is the output character count above which results
+	// are offloaded to disk. Zero means use the default (offload.DefaultThresholdChars).
+	OffloadThresholdChars int
 }
 
 // StormBreaker tracks repeated failures to detect death spirals (V3.0 Phase 4).

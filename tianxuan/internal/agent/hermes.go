@@ -343,7 +343,21 @@ func (h *Hermes) allStepsPassed(r *TurnResult) bool {
 // Round 2 does a minimal fix; round 3 switches to reflection mode with full
 // fix history, asking the planner to reconsider the overall approach.
 func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan string, failed *TurnResult, round int, fixHistory []fixAttempt) (*planWithNote, error) {
-	// Build a prompt describing what failed
+	fixInput := buildFixPrompt(origInput, originalPlan, failed, round, fixHistory)
+
+	// Use planWithTools (read-only investigation) for the fix plan
+	planText, err := h.planWithTools(ctx, fixInput)
+	if err != nil {
+		return nil, fmt.Errorf("hermes: fix plan failed: %w", err)
+	}
+
+	return &planWithNote{text: planText}, nil
+}
+
+// buildFixPrompt constructs the prompt for a fix/replan round.
+// Round 2 (or when there's no history) is a targeted fix for failed steps.
+// Round 3+ is a reflection round asking the planner to reconsider the approach.
+func buildFixPrompt(origInput, originalPlan string, failed *TurnResult, round int, fixHistory []fixAttempt) string {
 	var failedSteps []string
 	for _, sr := range failed.StepResults {
 		if sr.Status != "success" {
@@ -354,10 +368,9 @@ func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan str
 	errSummary := strings.Join(failed.Errors, "; ")
 	execFeedback := formatExecutionFeedback(failed)
 
-	var fixInput string
 	if round == 2 || len(fixHistory) == 0 {
 		// Round 2: targeted fix — only patch the broken steps
-		fixInput = fmt.Sprintf(`以下步骤执行失败，请创建最小修正计划，仅修正失败的步骤：
+		return fmt.Sprintf(`以下步骤执行失败，请创建最小修正计划，仅修正失败的步骤：
 
 原始任务:
 %s
@@ -378,15 +391,16 @@ func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan str
 - 使用 <!--plan--> 标记
 - 修正计划自动执行，不需要用户确认
 `, origInput, originalPlan, execFeedback, strings.Join(failedSteps, "\n"), errSummary)
-	} else {
-		// Round 3: reflection mode — prior rounds failed, reconsider the approach
-		var historyLines []string
-		for _, a := range fixHistory {
-			historyLines = append(historyLines, fmt.Sprintf(
-				"--- 第 %d 轮修正 ---\n修正计划:\n%s\n\n执行反馈:\n%s",
-				a.round, a.fixPlan, a.feedback))
-		}
-		fixInput = fmt.Sprintf(`前两轮针对性修补均未完全解决，请重新审视整体方案：
+	}
+
+	// Round 3+: reflection mode — prior rounds failed, reconsider the approach
+	var historyLines []string
+	for _, a := range fixHistory {
+		historyLines = append(historyLines, fmt.Sprintf(
+			"--- 第 %d 轮修正 ---\n修正计划:\n%s\n\n执行反馈:\n%s",
+			a.round, a.fixPlan, a.feedback))
+	}
+	return fmt.Sprintf(`前两轮针对性修补均未完全解决，请重新审视整体方案：
 
 原始任务:
 %s
@@ -409,15 +423,6 @@ func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan str
 - 使用 <!--plan--> 标记
 - 修正计划自动执行，不需要用户确认
 `, origInput, originalPlan, strings.Join(historyLines, "\n\n"), strings.Join(failedSteps, "\n"), errSummary)
-	}
-
-	// Use planWithTools (read-only investigation) for the fix plan
-	planText, err := h.planWithTools(ctx, fixInput)
-	if err != nil {
-		return nil, fmt.Errorf("hermes: fix plan failed: %w", err)
-	}
-
-	return &planWithNote{text: planText}, nil
 }
 
 // ── Run sub-steps ───────────────────────────────────────────────────────
@@ -806,7 +811,7 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 			return "", chunk.Err
 		}
 	}
-		h.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: h.hermesPricing, UsageSource: event.UsageSourcePlanner})
+	h.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: h.hermesPricing, UsageSource: event.UsageSourcePlanner})
 
 	plan := text.String()
 	// Persist this turn into the session so the planner accumulates history

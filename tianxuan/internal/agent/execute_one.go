@@ -197,6 +197,12 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	result = secrets.RedactToolOutput(result)
 	duration := time.Since(start).Milliseconds()
 
+	// Context offloading: if enabled and output exceeds threshold, save full
+	// output to disk and replace with compact reference (path + preview).
+	if err == nil && a.offloadStore != nil {
+		result = a.offloadStore.MaybeOffload(call.Name, result, a.offloadThresholdChars)
+	}
+
 	// V4.2: cache successful file reads; invalidate writes
 	if a.tc != nil {
 		switch call.Name {
@@ -211,7 +217,9 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 				}
 			}
 		case "edit_file", "write_file", "multi_edit", "delete_range", "delete_symbol":
-			var wa struct{ Path string `json:"path"` }
+			var wa struct {
+				Path string `json:"path"`
+			}
 			if json.Unmarshal(json.RawMessage(call.Arguments), &wa) == nil && wa.Path != "" {
 				a.tc.InvalidatePath(wa.Path)
 			}
@@ -331,7 +339,7 @@ func (a *AgentRunner) toolReadOnly(name string) bool {
 
 // repeatSuccessAllowed 是同一写工具签名允许成功的最大次数。
 // 2 次给模型自我修正的空间；第 3 次通常是空转/写循环，应阻止。
-const repeatSuccessAllowed = 2
+// 值已迁至 loop_limits.go → RepeatSuccessAllowed。
 
 // repeatedSuccessBlock 检测写工具是否在同轮中重复成功过多次。
 // 命中时返回阻止消息，防止模型无意义循环消耗 token。
@@ -341,7 +349,7 @@ func (a *AgentRunner) repeatedSuccessBlock(call provider.ToolCall, t tool.Tool) 
 		return "", false
 	}
 	count := a.repeatSuccessCounts[sig]
-	if count < repeatSuccessAllowed {
+	if count < RepeatSuccessAllowed {
 		return "", false
 	}
 	return fmt.Sprintf(

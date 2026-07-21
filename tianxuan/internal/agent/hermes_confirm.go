@@ -45,25 +45,7 @@ func (h *Hermes) confirmPlan(ctx context.Context, task, plan string) (note strin
 	if len(answers) == 0 || len(answers[0].Selected) == 0 {
 		return "", false, false, fmt.Errorf("计划被取消（无回复）")
 	}
-	selected := answers[0].Selected[0]
-	switch selected {
-	case "提交执行":
-		return "", false, false, nil // agree without notes
-	case "仅聊天":
-		return "", true, false, nil // chat-only: don't dispatch to executor
-	case "按用户意见修改计划":
-		feedback := ""
-		if len(answers[0].Selected) > 1 {
-			feedback = answers[0].Selected[1]
-		}
-		return feedback, false, true, nil // revise: re-plan with feedback
-	case "取消":
-		return "", false, false, fmt.Errorf("计划被用户取消")
-	default:
-		// User typed free-text in the input box without selecting a preset option.
-		// Treat as "提交执行" with the typed text as execution notes.
-		return selected, false, false, nil
-	}
+	return resolveConfirmChoice(answers[0].Selected[0], answers[0].Selected[1:])
 }
 
 // shouldAutoConfirm returns true when the plan is simple enough to skip the
@@ -103,7 +85,27 @@ func isStepLine(trimmed string) bool {
 	return false
 }
 
-
+// resolveConfirmChoice maps the user's confirmation dialog choice to
+// (note, chatOnly, revise, err). Extracted from confirmPlan so the
+// decision logic can be unit-tested without an interactive Asker.
+func resolveConfirmChoice(selected string, extra []string) (note string, chatOnly bool, revise bool, err error) {
+	switch selected {
+	case "提交执行":
+		return "", false, false, nil
+	case "仅聊天":
+		return "", true, false, nil
+	case "按用户意见修改计划":
+		feedback := ""
+		if len(extra) > 0 {
+			feedback = extra[0]
+		}
+		return feedback, false, true, nil
+	case "取消":
+		return "", false, false, fmt.Errorf("计划被用户取消")
+	default:
+		return selected, false, false, nil
+	}
+}
 
 // displayPlan extracts the structured plan portion (<!--plan--> onward) from the
 // full planner output for display in the confirmation dialog. The preamble

@@ -1,13 +1,15 @@
-﻿package agent
+package agent
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 
+	"tianxuan/internal/agent/cache"
+	"tianxuan/internal/agent/offload"
 	"tianxuan/internal/archive"
 	tiancontext "tianxuan/internal/context"
 	"tianxuan/internal/diff"
@@ -19,7 +21,6 @@ import (
 	"tianxuan/internal/nilutil"
 	"tianxuan/internal/planmode"
 	"tianxuan/internal/provider"
-	"tianxuan/internal/agent/cache"
 	"tianxuan/internal/tool"
 )
 
@@ -73,13 +74,13 @@ type StepResult struct {
 // It lets upstream callers (e.g. Hermes) consume execution outcomes without
 // having to extract them post-hoc from the agent's session.
 type TurnResult struct {
-	Plan          string        // the plan that was executed (empty for non-Hermes turns)
-	FilesCreated  []string      // paths of files newly created this turn (vs. modified)
-	FilesModified []string      // paths of files written/edited/moved/deleted this turn
-	Summary       string        // agent's final conclusion (last assistant message)
-	Success       bool          // true = no tool errors encountered this turn
-	Errors        []string      // tool error messages collected during execution (max 5)
-	StepResults   []StepResult  // per-step outcomes from complete_step calls
+	Plan          string       // the plan that was executed (empty for non-Hermes turns)
+	FilesCreated  []string     // paths of files newly created this turn (vs. modified)
+	FilesModified []string     // paths of files written/edited/moved/deleted this turn
+	Summary       string       // agent's final conclusion (last assistant message)
+	Success       bool         // true = no tool errors encountered this turn
+	Errors        []string     // tool error messages collected during execution (max 5)
+	StepResults   []StepResult // per-step outcomes from complete_step calls
 }
 
 // Runner carries out one task turn. AgentRunner satisfies it.
@@ -147,14 +148,14 @@ const (
 )
 
 type AgentRunner struct {
-	prov        provider.Provider
-	tools       *tool.Registry
-	session     *Session
-	sessMu      sync.Mutex // guards the session pointer for external Session()/SetSession
+	prov    provider.Provider
+	tools   *tool.Registry
+	session *Session
+	sessMu  sync.Mutex // guards the session pointer for external Session()/SetSession
 
 	// === dispatcher ===
-	dispatcher *ToolDispatcher              // centralized pre-execution checks
-	ctxMgr     *tiancontext.ContextManager   // V3.0: TCCA kernel (nil = legacy mode)
+	dispatcher  *ToolDispatcher             // centralized pre-execution checks
+	ctxMgr      *tiancontext.ContextManager // V3.0: TCCA kernel (nil = legacy mode)
 	maxSteps    int
 	temperature float64
 	pricing     *provider.Pricing
@@ -180,19 +181,22 @@ type AgentRunner struct {
 	sessCacheMiss atomic.Int64
 	// lastPrefixShape records the previous request's cacheable prefix
 	// so usage events can explain prefix churn on the next request.
-	lastPrefixShape     PrefixShape
+	lastPrefixShape      PrefixShape
 	prefixFingerprintSet bool
 
-
-	// V5.31: ����������Ƚضϼ�����output_continue.go��
+	// V5.31: output_continue.go
 	lenContCount    int
 	invalidOutCount int
+
+	// V10.89: 工具失败的结构化反馈 — 防止模型在工具连续失败后
+	// 低效循环。跨轮次累计，成功率高的轮次自动重置。
+	toolFeedbackCount int
 
 	// V5.31: 重复检测（repeat_detect.go）
 	repeatSig   string
 	repeatCount int
-	steerCount   int    // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
-	dedupHashes  map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
+	steerCount  int             // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
+	dedupHashes map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
 
 	// V10.27: 后台任务启停循环检测 — 防止模型反复 start-bash → kill_shell
 	// 而不读取输出。跨轮次累计，仅 bash_output/wait/前台 bash 重置计数。
@@ -216,10 +220,10 @@ type AgentRunner struct {
 	// Stop gates (stop_gate.go) — triple gate for solo mode, skipped in plannerMode.
 	// taskGate checks incomplete canonical todos, goalGate verifies session goal,
 	// verifyGate nudges the model to run tests. All three re-enter at most 3 times.
-	verifyGateFired  bool // Gate: orchestrate verify fired
-	disableVerify    bool // suppress verify nudge (for sub-agents)
-	taskGateReentry  int  // V10.87: reentry counter for taskGate (cap 3)
-	goalGateReentry  int  // V10.87: reentry counter for goalGate (cap 3)
+	verifyGateFired bool // Gate: orchestrate verify fired
+	disableVerify   bool // suppress verify nudge (for sub-agents)
+	taskGateReentry int  // V10.87: reentry counter for taskGate (cap 3)
+	goalGateReentry int  // V10.87: reentry counter for goalGate (cap 3)
 
 	// V6.0 P7: session goal (set via /goal), enforced by stop gate
 	goal string
@@ -311,7 +315,6 @@ type AgentRunner struct {
 	// V5.13: �������籩��·���������ͬ turn ���ظ����ã���ǰԤ����
 	paramStorm *ParamStormBreaker
 
-
 	// V5.15: Ԥ���ſء���׷�ٻỰ�ۼƷ��ã�80%����/100%��ϡ�
 	budgetGate *BudgetGate
 	// lspManager runs LSP diagnostics on files modified by writer tools
@@ -331,11 +334,9 @@ type AgentRunner struct {
 	preMu       sync.Mutex
 	preWG       sync.WaitGroup
 
-
 	// tc caches read-only tool results (file reads) to avoid redundant disk IO
 	// within a turn. Write operations auto-invalidate. Thread-safe.
 	tc *cache.Cache
-
 
 	// steerQueue holds mid-turn user messages queued while the agent is
 	// running. Each is consumed once per loop iteration, persisted to the
@@ -358,12 +359,10 @@ type AgentRunner struct {
 	// dispatch.
 	hostAdvanceSeq atomic.Int64
 
-
 	// responseLanguage is the runtime final-answer language preference
 	// ("auto"|"zh"|"en"), stored as an atomic.Value for lock-free reads
 	// from the hot stream path. Set via SetResponseLanguage.
 	// (Design adopted from DeepSeek-Reasonix-V1.12)
-
 
 	responseLanguage atomic.Value // string
 
@@ -384,6 +383,14 @@ type AgentRunner struct {
 
 	// planModePolicy carries the policy parameters for plan-mode tool gating.
 	planModePolicy planmode.Policy
+
+	// offloadStore manages context offloading: large tool outputs are saved to
+	// disk and replaced with compact references to keep the context window lean.
+	// nil when offloading is disabled (OffloadDir empty).
+	offloadStore *offload.Store
+	// offloadThresholdChars is the character threshold above which results are
+	// offloaded. Zero means use the default.
+	offloadThresholdChars int
 }
 
 // SetActiveSchemas installs a tool subset for this session. Pass nil to revert
@@ -422,8 +429,6 @@ func (a *AgentRunner) planModeBlocked(name string, readOnly, untrusted bool, saf
 	return true, decision.Message
 }
 
-
-
 // SetGate installs the per-call permission gate. MUST be called before the
 // run loop starts — executeOne reads gate from concurrent goroutines and
 // SetGate does not lock. The happens-before guarantee is provided by the
@@ -452,7 +457,6 @@ func (a *AgentRunner) MergeRuntimePrompt(content string) {
 }
 func (a *AgentRunner) SetGoal(g string) { a.goal = g }
 
-
 // SetMemoryQueue installs the sink the remember/forget tools use to apply a
 // memory change in the current session. The controller wires itself in.
 func (a *AgentRunner) SetMemoryQueue(q memory.Queue) { a.memQueue = q }
@@ -462,6 +466,7 @@ func (a *AgentRunner) SetSessionSaver(s memory.SessionSaver) { a.sessionSaver = 
 
 // SetPromoter installs the sink the promote_session_facts tool uses.
 func (a *AgentRunner) SetPromoter(p memory.SessionFactPromoter) { a.promoter = p }
+
 // SetArchive installs the session archive store for cross-session Dream/Distill.
 // nil disables archiving. V7.0.
 func (a *AgentRunner) SetLSPManager(m interface {
@@ -488,6 +493,33 @@ func (a *AgentRunner) SetArchive(ar *archive.Store, sessionID string) {
 	a.sessionID = sessionID
 }
 
+// SetOffload enables context offloading for this session. dir is the parent
+// directory for offloaded files; a session-specific subdirectory is created
+// automatically. Pass an empty dir to disable. thresholdChars is the output
+// size above which results are offloaded (0 = default).
+func (a *AgentRunner) SetOffload(dir string, thresholdChars int) {
+	if dir == "" {
+		a.offloadStore = nil
+		return
+	}
+	s, err := offload.NewStore(dir, a.sessionID)
+	if err != nil {
+		a.offloadStore = nil
+		return
+	}
+	a.offloadStore = s
+	a.offloadThresholdChars = thresholdChars
+}
+
+// CloseOffload cleans up the offload store, deleting all offloaded files.
+// Safe to call when offloading is disabled (no-op).
+func (a *AgentRunner) CloseOffload() {
+	if a.offloadStore != nil {
+		_ = a.offloadStore.RemoveAll()
+		a.offloadStore = nil
+	}
+}
+
 // SetPreEditHook installs the pre-edit snapshot hook (see onPreEdit). The
 // controller wires it to its per-session checkpoint store; nil disables capture.
 func (a *AgentRunner) SetPreEditHook(fn func(diff.Change)) { a.onPreEdit = fn }
@@ -512,7 +544,6 @@ func (a *AgentRunner) Session() *Session {
 	defer a.sessMu.Unlock()
 	return a.session
 }
-
 
 // SetSession replaces the agent's conversation wholesale. Used by
 // `tianxuan chat --resume` to load a saved JSONL transcript before the first turn,
@@ -568,8 +599,6 @@ func (a *AgentRunner) systemPrompt() string {
 	return b.String()
 }
 
-
-
 func (a *AgentRunner) ContextWindow() int { return a.compaction.Window }
 
 // CompactRatio returns the fraction of the window at which auto-compaction
@@ -624,17 +653,17 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		sink:          sink,
 		gate:          gate,
 		hooks:         hooks,
-		jobs:       opts.Jobs,
-		evidence:   evidence.NewLedger(),
-		compaction: comp,
-		keepPolicy: comp.KeepPolicy,
-		dispatcher: opts.Dispatcher,
-		ctxMgr:     opts.CtxMgr,
-		auditFunc:  opts.AuditFunc,
-		tc:         cache.New(-1), // V5.8: session �����棬mtime У�������
-		goal:       opts.Goal,        // V6.0 P7: �ỰĿ��
+		jobs:          opts.Jobs,
+		evidence:      evidence.NewLedger(),
+		compaction:    comp,
+		keepPolicy:    comp.KeepPolicy,
+		dispatcher:    opts.Dispatcher,
+		ctxMgr:        opts.CtxMgr,
+		auditFunc:     opts.AuditFunc,
+		tc:            cache.New(-1), // V5.8: session �����棬mtime У�������
+		goal:          opts.Goal,     // V6.0 P7: �ỰĿ��
 		disableVerify: opts.DisableVerify,
-		plannerMode:  opts.PlannerMode,
+		plannerMode:   opts.PlannerMode,
 		planModePolicy: planmode.Policy{
 			AllowedTools:     opts.PlanModeAllowedTools,
 			ReadOnlyCommands: opts.PlanModeReadOnlyCommands,
@@ -675,7 +704,6 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 
 // Run executes one turn with the single-model path (V5.0: Planner removed).
 // plan-mode gating is consistent. Call after construction.
-
 
 // filteredSchemas returns a reduced tool schema list for analysis-only
 // inputs. IMPORTANT: intentionally NOT called in runDirect() — DeepSeek prefix
@@ -805,7 +833,7 @@ func (a *AgentRunner) checkBgStartKillCycle() bool {
 	// Same-turn start→kill without reading output.
 	a.bgStartKillStreak++
 
-	const threshold = 3
+	const threshold = BgStartKillStreakThreshold
 	if a.bgStartKillStreak < threshold {
 		return false
 	}

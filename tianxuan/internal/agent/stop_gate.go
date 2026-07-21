@@ -27,7 +27,7 @@ func (a *AgentRunner) taskGate() bool {
 	if a.plannerMode || a.disableVerify {
 		return false
 	}
-	if a.taskGateReentry >= 3 {
+	if a.taskGateReentry >= TaskGateReentryLimit {
 		return false
 	}
 	incomplete, ok := a.incompleteCanonicalTodos()
@@ -65,7 +65,7 @@ func (a *AgentRunner) goalGate() bool {
 	if a.goal == "" {
 		return false
 	}
-	if a.goalGateReentry >= 3 {
+	if a.goalGateReentry >= GoalGateReentryLimit {
 		return false
 	}
 	a.goalGateReentry++

@@ -8,6 +8,7 @@ metadata:
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| V10.88.1 | 2026-07-15 | isErrorResult 死代码热修复 — isErrorResult 移出 switch case 覆盖全部工具调用 + gofmt 格式化 |
 | V10.88.0 | 2026-07-15 | 双模型 Loop 工作流深度优化 — 三重门恢复+planFix反思+TurnResult去重+formatSummary改名，13 项改进 |
 | V10.87.0 | 2026-07-15 | 双模型验证闭环 — Plan→Execute→Verify→Fix→Complete，18 项改进 |
 | V10.86.0 | 2026-07-14 | 8 项代码审查修复 — Bug修复+内存泄漏+CSS变量+架构守卫 |

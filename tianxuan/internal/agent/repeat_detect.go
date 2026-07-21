@@ -7,9 +7,7 @@ import (
 	"tianxuan/internal/provider"
 )
 
-// repeatedStepThreshold is how many consecutive identical assistant steps
-// trigger the nudge. Mirrors MiMo-Code's REPEATED_STEP_THRESHOLD.
-const repeatedStepThreshold = 3
+// RepeatedStepThreshold 原定义已迁至 loop_limits.go。
 
 // repeatedStepNudge is the turn-tail synthetic user message injected when the
 // model has taken the same action 3 times in a row. Compile-time constant
@@ -54,7 +52,7 @@ func stepSignature(calls []provider.ToolCall) string {
 }
 
 // detectRepeatedSteps checks whether the model has taken the same action
-// repeatedStepThreshold times in a row. Returns true when it injected a nudge
+// RepeatedStepThreshold times in a row. Returns true when it injected a nudge
 // (caller should continue the loop).
 func (a *AgentRunner) detectRepeatedSteps(calls []provider.ToolCall) bool {
 	sig := stepSignature(calls)
@@ -69,7 +67,7 @@ func (a *AgentRunner) detectRepeatedSteps(calls []provider.ToolCall) bool {
 	}
 
 	a.repeatCount++
-	if a.repeatCount < repeatedStepThreshold {
+	if a.repeatCount < RepeatedStepThreshold {
 		return false
 	}
 

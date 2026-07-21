@@ -34,7 +34,8 @@ var compactDesc = map[string]string{
 	"memory_search":  "搜索记忆(关键词+kind过滤,BM25排序)",
 	"read_skill":     "读取指定技能(skill)的完整内容",
 	"move_file":      "移动/重命名文件(自动建目录,工作区限制)",
-	"code_index":     "轻量符号索引(outline/search,Go AST+多语言regex)",
+	"code_index":            "轻量符号索引(outline/search,Go AST+多语言regex)",
+	"search_large_output":    "查询被卸载的大型工具输出(list/read/search)",
 }
 
 // compactSchema maps tool names to stripped JSON Schema (properties without
@@ -96,4 +97,6 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
 	"code_index": json.RawMessage(
 		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer"}},"required":["action"]}`),
+	"search_large_output": json.RawMessage(
+		`{"type":"object","properties":{"operation":{"type":"string","enum":["list","read","search"]},"name":{"type":"string"},"query":{"type":"string"}},"required":["operation"]}`),
 }

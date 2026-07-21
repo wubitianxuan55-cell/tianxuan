@@ -46,7 +46,7 @@ func warnNoticeRecorder() (event.Sink, *[]string) {
 }
 
 // TestStormBreakerEscalatesRepeatedFailure: once the same tool has failed the
-// same way stormBreakThreshold times in a row, the model-facing result must carry
+// same way StormBreakThreshold times in a row, the model-facing result must carry
 // the loop-guard directive (not just the raw error again), and the user must get
 // a warn notice. The arguments DIFFER on every call — mirroring the live failure
 // mode where a stuck model re-words the payload — to prove detection keys on the
@@ -59,13 +59,13 @@ func TestStormBreakerEscalatesRepeatedFailure(t *testing.T) {
 
 	args := []string{`{"content":"Mountains are`, `{"path":"n.txt","content":"Peaks rise`, `{}`}
 	var last string
-	for i := 0; i < stormBreakThreshold; i++ {
+	for i := 0; i < StormBreakThreshold; i++ {
 		call := provider.ToolCall{Name: "write_file", Arguments: args[i]}
 		last = a.executeBatch(context.Background(), []provider.ToolCall{call})[0]
 	}
 
 	if !strings.Contains(last, "[loop guard]") {
-		t.Fatalf("after %d same-error failures the result should carry the loop guard, got: %q", stormBreakThreshold, last)
+		t.Fatalf("after %d same-error failures the result should carry the loop guard, got: %q", StormBreakThreshold, last)
 	}
 	if !strings.Contains(last, "write_file") {
 		t.Errorf("loop-guard text should name the offending tool, got: %q", last)
@@ -80,7 +80,7 @@ func TestStormBreakerEscalatesRepeatedFailure(t *testing.T) {
 
 // TestStormBreakerEscalatesRepeatedBatch: a multi-call batch that fails the same
 // way every round is just as much a death-spiral as a single call — once the whole
-// batch repeats stormBreakThreshold times, the guard must fire and name the batch.
+// batch repeats StormBreakThreshold times, the guard must fire and name the batch.
 func TestStormBreakerEscalatesRepeatedBatch(t *testing.T) {
 	reg := tool.NewRegistry()
 	reg.Add(failTool{name: "write_a"})
@@ -93,7 +93,7 @@ func TestStormBreakerEscalatesRepeatedBatch(t *testing.T) {
 		{Name: "write_b", Arguments: `{"content":"y`},
 	}
 	var first string
-	for i := 0; i < stormBreakThreshold; i++ {
+	for i := 0; i < StormBreakThreshold; i++ {
 		first = a.executeBatch(context.Background(), batch)[0]
 	}
 
@@ -123,7 +123,7 @@ func TestStormBreakerBatchResetsOnPartialSuccess(t *testing.T) {
 		{Name: "read_file", Arguments: `{"path":"x"}`},
 	}
 	var first string
-	for i := 0; i < stormBreakThreshold+2; i++ {
+	for i := 0; i < StormBreakThreshold+2; i++ {
 		first = a.executeBatch(context.Background(), batch)[0]
 	}
 
@@ -145,12 +145,12 @@ func TestStormBreakerSilentBelowThreshold(t *testing.T) {
 
 	call := provider.ToolCall{Name: "write_file", Arguments: `{"content":"x`}
 	var last string
-	for i := 0; i < stormBreakThreshold-1; i++ {
+	for i := 0; i < StormBreakThreshold-1; i++ {
 		last = a.executeBatch(context.Background(), []provider.ToolCall{call})[0]
 	}
 
 	if strings.Contains(last, "[loop guard]") {
-		t.Fatalf("guard fired after only %d repeats (threshold %d)", stormBreakThreshold-1, stormBreakThreshold)
+		t.Fatalf("guard fired after only %d repeats (threshold %d)", StormBreakThreshold-1, StormBreakThreshold)
 	}
 	if len(*notices) != 0 {
 		t.Errorf("no warn notice expected below threshold, got %v", *notices)

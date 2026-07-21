@@ -64,6 +64,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
+	a.toolFeedbackCount = 0     // V10.89: 每轮重置工具反馈计数
 	// per-turn TurnResult tracking — accumulated here and returned by Run().
 	var turnFilesCreated []string
 	var turnFilesModified []string
@@ -85,11 +86,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	graceRound := false
 	// stream recovery + empty final detection counters
 	streamRecoveries := 0
-	const maxStreamRecoveries = 3
 	emptyFinalBlocks := 0
-	const maxEmptyFinalBlocks = 3
 	finalReadinessBlocks := 0
-	const maxFinalReadinessBlocks = 3
 	for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
 		// consume a queued mid-turn steer as session guidance
 		// (Design adopted from DeepSeek-Reasonix-V1.12)
@@ -103,7 +101,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		text, reasoning, signature, calls, usage, interrupted, err := a.stream(ctx, step+1)
 		if err != nil {
 			// stream recovery — save partial output and inject recovery prompt
-			if interrupted && streamRecoveries < maxStreamRecoveries {
+			if interrupted && streamRecoveries < MaxStreamRecoveries {
 				streamRecoveries++
 				if strings.TrimSpace(text) != "" {
 					a.session.Add(provider.Message{
@@ -117,7 +115,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 					Role:    provider.RoleUser,
 					Content: streamRecoveryMessage(strings.TrimSpace(text) != ""),
 				})
-				a.sink.Emit(event.Event{Kind: event.Retrying, RetryAttempt: streamRecoveries, RetryMax: maxStreamRecoveries})
+				a.sink.Emit(event.Event{Kind: event.Retrying, RetryAttempt: streamRecoveries, RetryMax: MaxStreamRecoveries})
 				step-- // recovery retries do not consume the tool-round budget
 				continue
 			}
@@ -214,11 +212,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			// and no visible text. Inject retry prompt; fail after 3 blocks.
 			if strings.TrimSpace(text) == "" {
 				emptyFinalBlocks++
-				if emptyFinalBlocks >= maxEmptyFinalBlocks {
+				if emptyFinalBlocks >= MaxEmptyFinalBlocks {
 					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("model finished without a visible final answer %d times", emptyFinalBlocks)
 				}
 				a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-					Text: fmt.Sprintf("empty final answer blocked: retrying (%d/%d)", emptyFinalBlocks, maxEmptyFinalBlocks)})
+					Text: fmt.Sprintf("empty final answer blocked: retrying (%d/%d)", emptyFinalBlocks, MaxEmptyFinalBlocks)})
 				a.session.Add(provider.Message{Role: provider.RoleUser, Content: emptyFinalRetryMessage()})
 				a.maybeCompact(ctx, usage)
 				continue
@@ -230,10 +228,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			// (Hermes planner) skips them because Hermes handles task tracking
 			// and verification via its own plan/confirm/verify loop.
 			// V10.87: taskGate and goalGate restored for solo (single-model) runs.
-			if !a.plannerMode && a.taskGate() {
+			// Both check plannerMode internally, so no external guard needed.
+			if a.taskGate() {
 				continue
 			}
-			if !a.plannerMode && a.goalGate() {
+			if a.goalGate() {
 				continue
 			}
 			if !a.plannerMode && a.verifyGate() {
@@ -244,7 +243,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			if !a.plannerMode {
 				if blocked, reason := a.finalReadinessCheck(); blocked {
 					finalReadinessBlocks++
-					if finalReadinessBlocks >= maxFinalReadinessBlocks {
+					if finalReadinessBlocks >= MaxFinalReadinessBlocks {
 						return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
 					}
 					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
@@ -365,6 +364,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 					Result: extractStepResult(call.Arguments),
 				})
 			}
+		}
+
+		// V10.89: 工具失败的结构化反馈 — 2+ errors 时注入归纳性消息，
+		// 帮助 LLM 理解失败模式（参考 Aider reflected_message）。
+		if a.maybeInjectToolFeedback(calls, results) {
+			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+				Text: "部分工具执行失败，已注入错误分析反馈"})
 		}
 
 		// P0-3: mid-turn steer — detect error patterns and inject corrective hints.

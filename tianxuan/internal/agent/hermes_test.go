@@ -198,6 +198,13 @@ func TestSoloSystemPrompt_ContainsEssentials(t *testing.T) {
 		"Surgical",
 		"Defensive",
 		"No placeholders",
+		// V10.89: SDD distillation
+		"Specs First",
+		"ADDED",
+		"MODIFIED",
+		"REMOVED",
+		"completeness",
+		"coherence",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -236,7 +243,7 @@ func TestHermesPrompt_ContainsEssentials(t *testing.T) {
 		"<!--plan-->",
 		"read-only",
 		"3–8 steps",
-		"will NOT re-explore",
+		"no re-exploration",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {

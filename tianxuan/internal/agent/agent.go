@@ -195,7 +195,6 @@ type AgentRunner struct {
 	// V5.31: 重复检测（repeat_detect.go）
 	repeatSig   string
 	repeatCount int
-	steerCount  int             // V8.0 P0-3: consecutive all-fail batches for mid-turn steer
 	dedupHashes map[string]bool // V8.0 P0-2: deterministic pruning (tool+args+result → seen)
 
 	// V10.27: 后台任务启停循环检测 — 防止模型反复 start-bash → kill_shell
@@ -759,59 +758,6 @@ func (a *AgentRunner) filteredSchemas(input string) []provider.ToolSchema {
 		"todo_write", "complete_step",
 		"task", "ask",
 	})
-}
-
-// shouldMidTurnSteer detects error spirals during tool execution and injects
-// a corrective hint. Returns true if a steer was injected (caller should
-// continue the loop to let the model respond to the hint).
-func (a *AgentRunner) shouldMidTurnSteer(calls []provider.ToolCall, results []string) bool {
-	if len(calls) == 0 {
-		return false
-	}
-
-	failed := 0
-	blockedCount := 0
-	for _, r := range results {
-		if strings.HasPrefix(r, "blocked:") {
-			blockedCount++ // V8.0.5: plan-mode blocks are normal, not failures
-		} else if strings.HasPrefix(r, "error:") || strings.HasPrefix(r, "tool panic:") ||
-			strings.HasPrefix(r, "suppressed:") {
-			failed++
-		}
-	}
-	// If all calls were blocked by plan mode, that is normal.
-	if blockedCount == len(results) {
-		a.steerCount = 0
-		return false
-	}
-	// All non-blocked calls failed → likely wrong approach.
-	if failed == len(results)-blockedCount && failed >= 2 {
-		a.steerCount++
-	} else {
-		a.steerCount = 0
-		return false
-	}
-
-	// Inject steer after 1st all-fail batch (gentle) or 3rd (firm).
-	if a.steerCount == 1 {
-		a.session.Add(provider.Message{Role: provider.RoleUser,
-			Content: "[System note: all tool calls in the last batch failed. " +
-				"Try a different approach — use read-only tools first to understand " +
-				"the situation, break the task into smaller steps, or ask the user " +
-				"for clarification if you are unsure. Do NOT retry the same calls.]"})
-		return true
-	}
-	if a.steerCount >= 3 {
-		a.session.Add(provider.Message{Role: provider.RoleUser,
-			Content: "[System note: you have been stuck for several rounds. " +
-				"STOP and re-assess. Read relevant files with read_file first. " +
-				"Ask the user a clarifying question with the ask tool. " +
-				"Do NOT continue the current approach.]"})
-		a.steerCount = 0 // reset after firm steer
-		return true
-	}
-
-	return false
 }
 
 // checkBgStartKillCycle detects repeated start→kill patterns on background bash

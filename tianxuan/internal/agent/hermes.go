@@ -650,13 +650,14 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 
 // feedResultToPlanner injects execution feedback into the planner's session
 // and invalidates the project map cache on structural changes.
+// V10.89: uses enhanced SDD feedback with Delta + Verify triad.
 func (h *Hermes) feedResultToPlanner(r *TurnResult) {
 	hasContent := r.Summary != "" || len(r.Errors) > 0 ||
 		len(r.FilesCreated) > 0 || len(r.FilesModified) > 0
 	if hasContent {
 		h.hermesSess.Add(provider.Message{
 			Role:    provider.RoleUser,
-			Content: formatExecutionFeedback(r),
+			Content: formatExecutionFeedbackEnhanced(r, r.Plan),
 		})
 	}
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {

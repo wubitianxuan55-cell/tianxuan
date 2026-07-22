@@ -24,15 +24,75 @@ const toolFeedbackThreshold = 2
 
 // maybeInjectToolFeedback 检查工具执行结果并在连续失败时注入结构化反馈。
 // 返回 true 表示注入了消息（调用方应发出 notice 事件）。
+//
+// 两层机制：
+//   - 温和模式（2+ 错误）: 注入分类错误分析 + 修正建议（参考 Aider reflected_message）
+//   - 强硬模式（全批次非 blocked 调用都失败 + 已连续 >=3 轮）: STOP and re-assess
 func (a *AgentRunner) maybeInjectToolFeedback(calls []provider.ToolCall, results []string) bool {
 	if a.plannerMode {
 		return false
 	}
-	errCount := 0
-	var details []string
+
+	errCount, blockedCount, details := analyzeResults(calls, results)
+
+	// All blocked → normal with permission gating, ignore.
+	if blockedCount == len(results) {
+		a.toolFeedbackCount = 0
+		return false
+	}
+
+	// Not enough failures → reset counter.
+	if errCount < toolFeedbackThreshold {
+		a.toolFeedbackCount = 0
+		return false
+	}
+
+	a.toolFeedbackCount++
+	if a.toolFeedbackCount > ToolFeedbackCap {
+		return false
+	}
+
+	// All non-blocked calls failed → stuck, use firm steer at count 1 and 3.
+	allFailed := errCount == len(results) && blockedCount < len(results)
+
+	var msg string
+	if allFailed && a.toolFeedbackCount >= 3 {
+		msg = "[system] 你已连续多轮全部操作失败。停下来重新评估方案。\n" +
+			"先用 read_file/ls/glob 了解现状，或用 ask 工具向用户确认方向。\n" +
+			"不要继续当前做法。\n\n" + buildToolFeedbackMessage(errCount, len(results), details)
+	} else if allFailed && a.toolFeedbackCount == 1 {
+		msg = "[system] 本轮全部操作都失败了。尝试不同方法——先读取相关代码再动手，" +
+			"把任务拆成更小的步骤，或在不确定时用 ask 工具询问。\n\n" +
+			buildToolFeedbackMessage(errCount, len(results), details)
+	} else {
+		msg = buildToolFeedbackMessage(errCount, len(results), details)
+	}
+
+	a.session.Add(provider.Message{
+		Role:    provider.RoleUser,
+		Content: msg,
+	})
+	return true
+}
+
+// analyzeResults counts errors and blocked calls in a batch of tool results.
+// blocked is tracked separately for the "all-blocked is normal" heuristic,
+// but counted together with errors for the feedback trigger threshold (matching
+// isErrorResult's broad definition that includes blocked/error/Error/[error).
+func analyzeResults(calls []provider.ToolCall, results []string) (errors, blocked int, details []string) {
 	for i, r := range results {
-		if isErrorResult(r) {
-			errCount++
+		if strings.HasPrefix(r, "blocked:") {
+			blocked++
+			errors++ // treat as error for trigger threshold (matching isErrorResult)
+			if len(details) < 5 {
+				name := ""
+				if i < len(calls) {
+					name = calls[i].Name
+				}
+				details = append(details, fmt.Sprintf("  %s → %s", name, truncateStr(r, 100)))
+			}
+		} else if isErrorResult(r) {
+			errors++
 			if len(details) < 5 {
 				name := ""
 				if i < len(calls) {
@@ -42,23 +102,7 @@ func (a *AgentRunner) maybeInjectToolFeedback(calls []provider.ToolCall, results
 			}
 		}
 	}
-
-	if errCount < toolFeedbackThreshold {
-		a.toolFeedbackCount = 0 // 低错误轮次重置
-		return false
-	}
-
-	a.toolFeedbackCount++
-	if a.toolFeedbackCount > ToolFeedbackCap {
-		return false
-	}
-
-	msg := buildToolFeedbackMessage(errCount, len(calls), details)
-	a.session.Add(provider.Message{
-		Role:    provider.RoleUser,
-		Content: msg,
-	})
-	return true
+	return
 }
 
 // buildToolFeedbackMessage 根据错误信息构建结构化反馈消息。

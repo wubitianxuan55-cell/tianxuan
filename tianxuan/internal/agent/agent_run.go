@@ -54,7 +54,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.preMu.Lock()
 	a.preOutcomes = make(map[string]toolOutcome)
 	a.dedupHashes = nil            // P0-2: reset dedup hashes each turn
-	a.steerCount = 0               // P0-3: reset steer counter each turn
 	a.bgJobStartedThisTurn = false // 每轮重置启停标志
 	a.bgOutputReadThisTurn = false
 	a.bgJobKilledThisTurn = false
@@ -371,12 +370,6 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		if a.maybeInjectToolFeedback(calls, results) {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 				Text: "部分工具执行失败，已注入错误分析反馈"})
-		}
-
-		// P0-3: mid-turn steer — detect error patterns and inject corrective hints.
-		// V10.46: planner uses read-only tools — no error spirals to correct.
-		if !a.plannerMode && a.shouldMidTurnSteer(calls, results) {
-			continue // steer injected, skip compaction and continue loop
 		}
 
 		// bg start-kill cycle — detect repeated background job start→kill

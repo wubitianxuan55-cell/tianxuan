@@ -268,7 +268,142 @@ func TestCategorizeErrors_Dedup(t *testing.T) {
 	}
 }
 
-// ── 回归：跨 turn 重置 ──────────────────────────────────────────────
+// ── 合并自 steer_test.go：全失败批次的两级机制 ─────────────────────
+
+// TestToolFeedback_AllBlockedIsNotFailure 移植自 steer_test.go。
+// 全部 blocked → 不是失败，不触发反馈。
+func TestToolFeedback_AllBlockedIsNotFailure(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "write_file"}, {Name: "edit_file"},
+	}
+	results := []string{
+		"blocked: write_file denied",
+		"blocked: edit_file denied",
+	}
+	if a.maybeInjectToolFeedback(calls, results) {
+		t.Error("all-blocked should NOT trigger feedback")
+	}
+}
+
+// TestToolFeedback_RealFailuresTrigger 移植自 steer_test.go。
+func TestToolFeedback_RealFailuresTrigger(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "read_file"}, {Name: "read_file"},
+	}
+	results := []string{
+		"error: no such file",
+		"error: permission denied",
+	}
+	if !a.maybeInjectToolFeedback(calls, results) {
+		t.Error("real failures should trigger feedback")
+	}
+}
+
+// TestToolFeedback_MixedBlockedAndFailed 移植自 steer_test.go。
+func TestToolFeedback_MixedBlockedAndFailed(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "write_file"}, {Name: "read_file"}, {Name: "read_file"},
+	}
+	results := []string{
+		"blocked: writer denied",
+		"error: no such file",
+		"error: permission denied",
+	}
+	if !a.maybeInjectToolFeedback(calls, results) {
+		t.Error("mixed blocked+real failures (2 real) should trigger")
+	}
+}
+
+// TestToolFeedback_SingleFailureNotTriggered 移植自 steer_test.go。
+func TestToolFeedback_SingleFailureNotTriggered(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "read_file"}, {Name: "read_file"},
+	}
+	results := []string{
+		"error: no such file",
+		"file content here",
+	}
+	if a.maybeInjectToolFeedback(calls, results) {
+		t.Error("single failure should NOT trigger feedback")
+	}
+}
+
+// TestToolFeedback_FirmSteerAfterThreeAllFail 验证合并后的强硬模式：
+// 全部非 blocked 调用失败 + 连续 >=3 轮 → "停下来重新评估方案"
+func TestToolFeedback_FirmSteerAfterThreeAllFail(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "read_file"}, {Name: "read_file"},
+	}
+	results := []string{
+		"error: fail1",
+		"error: fail2",
+	}
+
+	// Round 1 — gentle: "尝试不同方法"
+	a.maybeInjectToolFeedback(calls, results)
+	msg1 := s.Messages[len(s.Messages)-1]
+	if !strings.Contains(msg1.Content, "尝试不同方法") {
+		t.Errorf("round 1 (all-fail, count=1) should say 尝试不同方法, got: %s", msg1.Content)
+	}
+
+	// Round 2 — standard (non-all-fail condition not met? No — it IS all-fail but count=2, not 1 or >=3)
+	a.maybeInjectToolFeedback(calls, results)
+	msg2 := s.Messages[len(s.Messages)-1]
+	// count=2 falls through to standard feedback (not all-fail gentle, not firm)
+	if strings.Contains(msg2.Content, "停下来重新评估") {
+		t.Error("round 2 (count=2) should NOT trigger firm steer")
+	}
+
+	// Round 3 — firm: "停下来重新评估方案"
+	a.maybeInjectToolFeedback(calls, results)
+	msg3 := s.Messages[len(s.Messages)-1]
+	if !strings.Contains(msg3.Content, "停下来重新评估") {
+		t.Errorf("round 3 (count=3) should trigger firm steer, got: %s", msg3.Content)
+	}
+}
+
+// TestToolFeedback_NonAllFailUsesStandard 验证非全失败时用标准消息（不触发强硬/温和模式）。
+func TestToolFeedback_NonAllFailUsesStandard(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+
+	calls := []provider.ToolCall{
+		{Name: "bash"}, {Name: "read_file"}, {Name: "write_file"},
+	}
+	results := []string{
+		"error: fail1",
+		"error: fail2",
+		"success output",
+	}
+
+	// 2 errors out of 3 — ≥2 but not all-fail.
+	if !a.maybeInjectToolFeedback(calls, results) {
+		t.Fatal("should trigger for 2 errors")
+	}
+	msg := s.Messages[len(s.Messages)-1]
+	// Should use standard message — no all-fail prefix.
+	if strings.Contains(msg.Content, "全部操作都失败") || strings.Contains(msg.Content, "停下来重新评估") {
+		t.Errorf("mixed success+fail should use standard message, got: %s", msg.Content)
+	}
+	if !strings.Contains(msg.Content, "2 个失败") {
+		t.Error("standard message should mention error count")
+	}
+}
 
 // TestToolFeedbackResetsPerTurn 验证新 turn 开始时 toolFeedbackCount 重置为 0。
 // 防止 turn 1 耗尽 cap 后 turn 2 被错误抑制。

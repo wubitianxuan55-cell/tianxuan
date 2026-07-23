@@ -355,3 +355,58 @@ func TestCreateRefusesOverwrite(t *testing.T) {
 		t.Error("second create should refuse to overwrite")
 	}
 }
+
+func TestBundledSkillsEmbedded(t *testing.T) {
+	entries, err := BundledSkills.ReadDir("bundled")
+	if err != nil {
+		t.Fatalf("BundledSkills.ReadDir: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("bundled directory is empty — skills not embedded")
+	}
+	found := false
+	for _, e := range entries {
+		if e.Name() == "ui-ux-pro-max" && e.IsDir() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("ui-ux-pro-max not found in bundled skills")
+	}
+}
+
+func TestEnsureBundledExtracts(t *testing.T) {
+	home := t.TempDir()
+
+	if err := EnsureBundled(home); err != nil {
+		t.Fatalf("EnsureBundled: %v", err)
+	}
+
+	skillPath := filepath.Join(home, ".tianxuan", SkillsDirname, "ui-ux-pro-max", "SKILL.md")
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("extracted SKILL.md not found at %s: %v", skillPath, err)
+	}
+
+	searchPath := filepath.Join(home, ".tianxuan", SkillsDirname, "ui-ux-pro-max", "scripts", "search.py")
+	if _, err := os.Stat(searchPath); err != nil {
+		t.Fatalf("search.py not found at %s: %v", searchPath, err)
+	}
+
+	// Idempotent: second call should not fail.
+	if err := EnsureBundled(home); err != nil {
+		t.Fatalf("second EnsureBundled: %v", err)
+	}
+
+	// User modification should survive re-extraction.
+	if err := os.WriteFile(skillPath, []byte("modified"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBundled(home); err != nil {
+		t.Fatalf("third EnsureBundled: %v", err)
+	}
+	after, _ := os.ReadFile(skillPath)
+	if string(after) != "modified" {
+		t.Error("EnsureBundled overwrote a user-modified file")
+	}
+}

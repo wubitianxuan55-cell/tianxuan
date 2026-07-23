@@ -46,6 +46,12 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 	}
 
 	cwd, _ := os.Getwd()
+
+	// Ensure bundled skills are extracted to the global skills directory.
+	// No-op after first run; a user's existing customisations are never
+	// overwritten (EnsureBundled skips files that already exist).
+	skill.EnsureBundled("")
+
 	skillStore := skill.New(skill.Options{ProjectRoot: cwd, CustomPaths: cfg.SkillCustomPaths(), Stderr: stderrPath})
 	skills := skillStore.List()
 	sysPrompt = skill.ApplyIndex(sysPrompt, skills)

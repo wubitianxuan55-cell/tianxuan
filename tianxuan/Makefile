@@ -8,6 +8,7 @@ CODEGRAPH_VERSION := v0.9.7
 .PHONY: build vet fmt test hooks cross clean e2e-codegraph webui clean-webui lint-cache
 
 build:
+	go generate ./internal/skill/
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan ./cmd/tianxuan
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/tianxuan-plugin-example ./cmd/tianxuan-plugin-example
 

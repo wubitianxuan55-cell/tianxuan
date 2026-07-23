@@ -1,3 +1,20 @@
+## [10.91.0] — 2026-07-23
+
+### 🧬 ui-ux-pro-max 技能完整内置 + go:embed 嵌入编译
+
+> 从官方 nextlevelbuilder/ui-ux-pro-max-skill v2.11.0 完整下载 7 个设计技能，
+> 通过 go:embed 嵌入二进制，首次运行自动解压到 `~/.tianxuan/skills/`。
+
+- **技能内置**：ui-ux-pro-max 从扁平 `.md` 转为子目录格式（45 文件），含 search.py / design_system.py / 14 CSV 数据 / 22 技术栈 CSV / 2 references
+- **6 个子技能同步**：banner-design / brand / design / design-system / slides / ui-styling SKILL.md 全部更新为官方 v2.11.0
+- **go:embed 嵌入编译**：`internal/skill/embed.go` 嵌入全部 151 技能文件，`EnsureBundled()` 解压到全局目录
+- **初始化集成**：`sysprompt.go` 在 Store 创建前调用 `skill.EnsureBundled("")`，幂等安全
+- **构建脚本**：build-desktop.bat / build-wails.bat / Makefile 添加编译前 robocopy 同步步骤
+- **测试**：+2 新测试（TestBundledSkillsEmbedded + TestEnsureBundledExtracts），70 测试全部通过
+
+### 📁 文件变更
+- 159 files: bundled/ (151) + embed.go + sysprompt.go + skill_test.go + 2 build scripts + Makefile + CHANGELOG
+
 ## [10.85.0] — 2026-07-15
 
 ### 🎨 设置面板六轮深度 UI 打磨（ui-ux-pro-max 驱动）

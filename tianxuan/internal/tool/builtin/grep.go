@@ -41,6 +41,7 @@ func (grepTool) Schema() json.RawMessage {
 }
 
 func (grepTool) ReadOnly() bool { return true }
+func (grepTool) Kind() tool.ToolKind { return tool.KindSearch }
 
 func (grepTool) CompactDescription() string { return compactDesc["grep"] }
 func (grepTool) CompactSchema() json.RawMessage   { return compactSchema["grep"] }

@@ -56,6 +56,7 @@ type gitStatus struct{}
 
 func (gitStatus) Name() string        { return "git_status" }
 func (gitStatus) ReadOnly() bool      { return true }
+func (gitStatus) Kind() tool.ToolKind  { return tool.KindRead }
 func (gitStatus) Description() string {
 	return "Show working tree status: current branch, staged/unstaged/untracked files, merge conflicts. 🔴 Check this before committing: ensure only intended files are staged. Returns structured output with file paths and status codes (M=modified, A=added, D=deleted, ??=untracked)."
 }
@@ -181,6 +182,7 @@ type gitDiff struct{}
 
 func (gitDiff) Name() string        { return "git_diff" }
 func (gitDiff) ReadOnly() bool      { return true }
+func (gitDiff) Kind() tool.ToolKind  { return tool.KindRead }
 func (gitDiff) Description() string {
 	return "Show line-level diff for working tree changes. --staged shows staged (index) diff; path limits to one file."
 }
@@ -224,6 +226,7 @@ type gitCommit struct{}
 
 func (gitCommit) Name() string        { return "git_commit" }
 func (gitCommit) ReadOnly() bool      { return false }
+func (gitCommit) Kind() tool.ToolKind  { return tool.KindExecute }
 func (gitCommit) Description() string {
 	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 V10.6: warns when committing directly to main/master — use a feature branch instead. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted."
 }
@@ -445,6 +448,7 @@ type gitLog struct{}
 
 func (gitLog) Name() string        { return "git_log" }
 func (gitLog) ReadOnly() bool      { return true }
+func (gitLog) Kind() tool.ToolKind  { return tool.KindRead }
 func (gitLog) Description() string {
 	return "Show commit history (default: last 10 commits). Supports count, file filter, and author filter."
 }

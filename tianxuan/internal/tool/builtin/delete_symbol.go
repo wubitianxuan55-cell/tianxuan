@@ -53,6 +53,7 @@ func (deleteSymbol) Schema() json.RawMessage {
 }
 
 func (deleteSymbol) ReadOnly() bool { return false }
+func (deleteSymbol) Kind() tool.ToolKind { return tool.KindDelete }
 
 func (deleteSymbol) CompactDescription() string { return compactDesc["delete_symbol"] }
 func (deleteSymbol) CompactSchema() json.RawMessage   { return compactSchema["delete_symbol"] }

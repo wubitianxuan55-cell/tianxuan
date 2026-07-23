@@ -31,6 +31,7 @@ type notebookEdit struct {
 func (notebookEdit) Name() string { return "notebook_edit" }
 
 func (notebookEdit) ReadOnly() bool { return false }
+func (notebookEdit) Kind() tool.ToolKind { return tool.KindEdit }
 
 func (notebookEdit) CompactDescription() string { return compactDesc["notebook_edit"] }
 func (notebookEdit) CompactSchema() json.RawMessage   { return compactSchema["notebook_edit"] }

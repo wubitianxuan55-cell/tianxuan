@@ -29,6 +29,7 @@ func (globTool) Schema() json.RawMessage {
 }
 
 func (globTool) ReadOnly() bool { return true }
+func (globTool) Kind() tool.ToolKind { return tool.KindSearch }
 
 func (globTool) CompactDescription() string { return compactDesc["glob"] }
 func (globTool) CompactSchema() json.RawMessage   { return compactSchema["glob"] }

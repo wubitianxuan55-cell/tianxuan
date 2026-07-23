@@ -20,6 +20,7 @@ type readSkill struct {
 func (readSkill) Name() string        { return "read_skill" }
 func (readSkill) Description() string { return "读取指定技能(skill)的完整内容(前置元数据+正文)" }
 func (readSkill) ReadOnly() bool      { return true }
+func (readSkill) Kind() tool.ToolKind  { return tool.KindRead }
 
 func (readSkill) Schema() json.RawMessage {
 	return json.RawMessage(`{

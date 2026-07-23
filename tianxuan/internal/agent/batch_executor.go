@@ -80,6 +80,18 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 		outcomes[i] = a.executeOne(ctx, calls[i])
 		results[i] = outcomes[i].output
 
+		// tailCall chaining: tool delegates to another tool.
+		// Pattern distilled from Gemini CLI scheduler._execute() tailToolCallRequest.
+		for outcomes[i].tailCall != nil {
+			prevName := calls[i].Name
+			tc := outcomes[i].tailCall
+			tc.ID = calls[i].ID // reuse original call ID for session history continuity
+			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+				Text: prevName + " → " + tc.Name + " (tail call)"})
+			outcomes[i] = a.executeOne(ctx, *tc)
+			results[i] = outcomes[i].output
+		}
+
 		// V7.4: learn from tool errors across sessions
 		if a.patternExtractor != nil {
 			if p := a.patternExtractor.Extract(calls[i].Name, results[i]); p != nil {
@@ -316,6 +328,10 @@ func batchStormSignature(calls []provider.ToolCall, outcomes []toolOutcome) (str
 // renders the result as failed ("? name <errMsg>" / a red card) instead of OK;
 // blocked narrows that to a refusal (plan mode / permission). truncMsg is set
 // (without the "�� " prefix) when the output was head+tailed.
+// tailCall, when non-nil, chains execution to another tool — the executing tool
+// discovered it should delegate (e.g. write_file → edit_file when target exists).
+// executeBatch replaces the original result with the tail call's result.
+// Pattern distilled from Gemini CLI's tailToolCallRequest.
 type toolOutcome struct {
 	output      string
 	blocked     bool
@@ -323,6 +339,7 @@ type toolOutcome struct {
 	recoverable bool // agent can fix this on next turn (bad args, wrong file, etc.)
 	truncated   bool
 	truncMsg    string
+	tailCall    *provider.ToolCall // delegate to another tool; nil = no delegation
 }
 
 // executeOne runs a single tool call. It is pure with respect to the event sink

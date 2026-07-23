@@ -27,6 +27,7 @@ func (listDir) Schema() json.RawMessage {
 }
 
 func (listDir) ReadOnly() bool { return true }
+func (listDir) Kind() tool.ToolKind { return tool.KindRead }
 
 func (listDir) CompactDescription() string { return compactDesc["ls"] }
 func (listDir) CompactSchema() json.RawMessage   { return compactSchema["ls"] }

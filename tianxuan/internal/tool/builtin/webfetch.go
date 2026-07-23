@@ -54,6 +54,7 @@ func (webFetch) Schema() json.RawMessage {
 }
 
 func (webFetch) ReadOnly() bool { return true }
+func (webFetch) Kind() tool.ToolKind { return tool.KindFetch }
 
 func (webFetch) CompactDescription() string { return compactDesc["web_fetch"] }
 func (webFetch) CompactSchema() json.RawMessage   { return compactSchema["web_fetch"] }

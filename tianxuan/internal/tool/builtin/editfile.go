@@ -31,6 +31,7 @@ func (editFile) Schema() json.RawMessage {
 }
 
 func (editFile) ReadOnly() bool { return false }
+func (editFile) Kind() tool.ToolKind { return tool.KindEdit }
 
 func (editFile) CompactDescription() string { return compactDesc["edit_file"] }
 func (editFile) CompactSchema() json.RawMessage   { return compactSchema["edit_file"] }

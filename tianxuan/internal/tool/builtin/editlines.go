@@ -31,6 +31,7 @@ func (editLines) Schema() json.RawMessage {
 }
 
 func (editLines) ReadOnly() bool { return false }
+func (editLines) Kind() tool.ToolKind { return tool.KindEdit }
 
 func (editLines) CompactDescription() string { return compactDesc["edit_lines"] }
 func (editLines) CompactSchema() json.RawMessage   { return compactSchema["edit_lines"] }

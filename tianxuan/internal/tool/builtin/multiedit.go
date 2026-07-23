@@ -60,6 +60,7 @@ func (multiEdit) Schema() json.RawMessage {
 }
 
 func (multiEdit) ReadOnly() bool { return false }
+func (multiEdit) Kind() tool.ToolKind { return tool.KindEdit }
 
 func (multiEdit) CompactDescription() string { return compactDesc["multi_edit"] }
 func (multiEdit) CompactSchema() json.RawMessage   { return compactSchema["multi_edit"] }

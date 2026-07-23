@@ -38,6 +38,7 @@ func (deleteRange) Schema() json.RawMessage {
 }
 
 func (deleteRange) ReadOnly() bool { return false }
+func (deleteRange) Kind() tool.ToolKind { return tool.KindDelete }
 
 func (deleteRange) CompactDescription() string { return compactDesc["delete_range"] }
 func (deleteRange) CompactSchema() json.RawMessage   { return compactSchema["delete_range"] }

@@ -25,6 +25,7 @@ type searchLargeOutput struct {
 func (t *searchLargeOutput) Name() string        { return "search_large_output" }
 func (t *searchLargeOutput) Description() string { return "查询被卸载到磁盘的大型工具输出。支持 list(列出所有)/read(读取指定文件)/search(跨文件搜索)" }
 func (t *searchLargeOutput) ReadOnly() bool       { return true }
+func (t *searchLargeOutput) Kind() tool.ToolKind   { return tool.KindSearch }
 
 func (t *searchLargeOutput) Schema() json.RawMessage {
 	return json.RawMessage(`{

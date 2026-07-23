@@ -62,6 +62,7 @@ func (todoWrite) Schema() json.RawMessage {
 // effect), so it never needs approval and stays available in plan mode — where
 // laying out a plan as todos is exactly the point.
 func (todoWrite) ReadOnly() bool { return true }
+func (todoWrite) Kind() tool.ToolKind { return tool.KindOther }
 
 func (todoWrite) CompactDescription() string { return compactDesc["todo_write"] }
 func (todoWrite) CompactSchema() json.RawMessage   { return compactSchema["todo_write"] }

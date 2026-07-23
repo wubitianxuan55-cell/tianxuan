@@ -37,6 +37,7 @@ func (moveFile) Schema() json.RawMessage {
 }
 
 func (moveFile) ReadOnly() bool { return false }
+func (moveFile) Kind() tool.ToolKind { return tool.KindMove }
 
 func (m moveFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {

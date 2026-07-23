@@ -75,6 +75,7 @@ func (completeStep) Schema() json.RawMessage {
 // ReadOnly is true: complete_step only records a claim (no filesystem or process
 // effect), so it never needs approval and stays available alongside todo_write.
 func (completeStep) ReadOnly() bool { return true }
+func (completeStep) Kind() tool.ToolKind { return tool.KindOther }
 
 func (completeStep) CompactDescription() string { return compactDesc["complete_step"] }
 func (completeStep) CompactSchema() json.RawMessage   { return compactSchema["complete_step"] }

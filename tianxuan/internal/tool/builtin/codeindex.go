@@ -42,6 +42,7 @@ func (codeIndex) Schema() json.RawMessage {
 }
 
 func (codeIndex) ReadOnly() bool { return true }
+func (codeIndex) Kind() tool.ToolKind { return tool.KindSearch }
 
 const (
 	codeIdxDefaultLimit = 100

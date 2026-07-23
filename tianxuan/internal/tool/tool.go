@@ -14,6 +14,73 @@ import (
 	"tianxuan/internal/provider"
 )
 
+// ToolKind classifies a tool by the nature of its operation, enabling
+// fine-grained policy decisions beyond the boolean ReadOnly flag. Inspired by
+// Gemini CLI's Kind enum (Read/Edit/Delete/Move/Search/Execute/Think/Agent/
+// Fetch/Communicate/Plan/SwitchMode/Other) — distilled for tianxuan.
+type ToolKind int
+
+const (
+	KindRead    ToolKind = iota // no side effects, only reads data (read_file, ls, grep, lsp_*)
+	KindEdit                    // modifies existing file content in-place (edit_file)
+	KindWrite                   // creates or overwrites a file (write_file)
+	KindDelete                  // removes files or symbols (delete_range, delete_symbol)
+	KindMove                    // renames or relocates files (move_file)
+	KindSearch                  // searches across files; read-only but may be heavy (grep, glob)
+	KindExecute                 // runs a user-supplied command or script (bash)
+	KindFetch                   // fetches external resources over network (web_fetch, web_search)
+	KindAgent                   // spawns a sub-agent (task, fleet)
+	KindOther                   // uncategorized — treated as a mutator for safety
+)
+
+// IsMutator reports whether the kind is a write/delete/move/execute operation.
+// Used for policy gating: any mutator kind requires permission checks beyond
+// a simple ReadOnly flag. KindOther is conservatively treated as a mutator.
+func (k ToolKind) IsMutator() bool {
+	switch k {
+	case KindEdit, KindWrite, KindDelete, KindMove, KindExecute, KindAgent, KindOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns a human-readable name for the kind.
+func (k ToolKind) String() string {
+	switch k {
+	case KindRead:
+		return "read"
+	case KindEdit:
+		return "edit"
+	case KindWrite:
+		return "write"
+	case KindDelete:
+		return "delete"
+	case KindMove:
+		return "move"
+	case KindSearch:
+		return "search"
+	case KindExecute:
+		return "execute"
+	case KindFetch:
+		return "fetch"
+	case KindAgent:
+		return "agent"
+	default:
+		return "other"
+	}
+}
+
+// KindedTool is an optional interface a Tool may implement to declare its
+// operation kind. Tools that don't implement it are treated as KindOther
+// (conservatively a mutator). This allows the permission policy engine to
+// make finer-grained decisions — e.g. "allow all reads, ask for edits,
+// deny executes without confirmation".
+type KindedTool interface {
+	Tool
+	Kind() ToolKind
+}
+
 // Tool is a capability the model can invoke.
 type Tool interface {
 	Name() string
@@ -29,6 +96,19 @@ type Tool interface {
 	// ordering is preserved. bash and plugin tools must return false because
 	// their effects can't be inferred statically from args.
 	ReadOnly() bool
+}
+
+// ToolKindOf returns the kind of a tool. If the tool implements KindedTool,
+// its declared kind is returned; otherwise KindOther is the safe default.
+func ToolKindOf(t Tool) ToolKind {
+	if kt, ok := t.(KindedTool); ok {
+		return kt.Kind()
+	}
+	// Fallback: derive from ReadOnly flag — not perfect but better than KindOther.
+	if t.ReadOnly() {
+		return KindRead
+	}
+	return KindOther
 }
 
 // ToolContext carries session-scoped information that a tool may need beyond

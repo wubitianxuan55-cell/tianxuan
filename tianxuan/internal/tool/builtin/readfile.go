@@ -54,6 +54,7 @@ func (readFile) Schema() json.RawMessage {
 }
 
 func (readFile) ReadOnly() bool { return true }
+func (readFile) Kind() tool.ToolKind { return tool.KindRead }
 
 func (readFile) CompactDescription() string { return compactDesc["read_file"] }
 func (readFile) CompactSchema() json.RawMessage   { return compactSchema["read_file"] }

@@ -57,6 +57,7 @@ func (webSearch) Schema() json.RawMessage {
 }
 
 func (webSearch) ReadOnly() bool { return true }
+func (webSearch) Kind() tool.ToolKind { return tool.KindFetch }
 
 func (webSearch) CompactDescription() string { return compactDesc["web_search"] }
 func (webSearch) CompactSchema() json.RawMessage   { return compactSchema["web_search"] }

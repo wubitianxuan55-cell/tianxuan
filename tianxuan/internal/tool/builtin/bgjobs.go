@@ -44,6 +44,7 @@ func (bashOutput) Schema() json.RawMessage {
 }
 
 func (bashOutput) ReadOnly() bool { return true }
+func (bashOutput) Kind() tool.ToolKind { return tool.KindRead }
 
 func (bashOutput) CompactDescription() string { return compactDesc["bash_output"] }
 func (bashOutput) CompactSchema() json.RawMessage   { return compactSchema["bash_output"] }
@@ -124,6 +125,7 @@ func (killShell) Schema() json.RawMessage {
 }
 
 func (killShell) ReadOnly() bool { return false }
+func (killShell) Kind() tool.ToolKind { return tool.KindExecute }
 
 func (killShell) CompactDescription() string { return compactDesc["kill_shell"] }
 func (killShell) CompactSchema() json.RawMessage   { return compactSchema["kill_shell"] }
@@ -177,6 +179,7 @@ func (waitJob) Schema() json.RawMessage {
 }
 
 func (waitJob) ReadOnly() bool { return true }
+func (waitJob) Kind() tool.ToolKind { return tool.KindRead }
 
 func (waitJob) CompactDescription() string { return compactDesc["wait"] }
 func (waitJob) CompactSchema() json.RawMessage   { return compactSchema["wait"] }

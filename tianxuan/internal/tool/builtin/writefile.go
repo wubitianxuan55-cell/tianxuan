@@ -34,6 +34,7 @@ func (writeFile) Schema() json.RawMessage {
 }
 
 func (writeFile) ReadOnly() bool { return false }
+func (writeFile) Kind() tool.ToolKind { return tool.KindWrite }
 
 func (writeFile) CompactDescription() string { return compactDesc["write_file"] }
 func (writeFile) CompactSchema() json.RawMessage   { return compactSchema["write_file"] }

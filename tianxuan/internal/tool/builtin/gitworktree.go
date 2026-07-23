@@ -38,6 +38,7 @@ func (gitWorktree) Schema() json.RawMessage {
 }
 
 func (gitWorktree) ReadOnly() bool { return false }
+func (gitWorktree) Kind() tool.ToolKind { return tool.KindExecute }
 
 func (gitWorktree) CompactDescription() string { return compactDesc["git_worktree"] }
 func (gitWorktree) CompactSchema() json.RawMessage   { return compactSchema["git_worktree"] }

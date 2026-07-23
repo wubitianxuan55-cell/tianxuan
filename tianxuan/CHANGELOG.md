@@ -1,3 +1,22 @@
+## [10.93.0] — 2026-07-24
+
+### 🔬 Gemini CLI 接口设计蒸馏：Kind 分类 + tailToolCall + SubagentDefinition
+
+> 从 google-gemini/gemini-cli 蒸馏三项接口设计精华到 tianxuan 内核。
+> 全部遵循 Go 可选接口模式，零破坏性、纯增量。
+
+- **ToolKind 分类系统**：`tool.ToolKind` 枚举 10 种分类 (Read/Edit/Write/Delete/Move/Search/Execute/Fetch/Agent/Other)，`KindedTool` 可选接口 + `ToolKindOf()`/`IsMutator()`/`String()` 辅助函数
+- **27 内置工具 Kind() 实现**：全部 builtin 工具声明精确分类，read_file→KindRead, bash→KindExecute, edit_file→KindEdit 等
+- **tailToolCallRequest 链式调用**：`toolOutcome.tailCall` + `executeBatch` for 循环，工具可链式调用另一个工具替换自身结果
+- **SubagentDefinition**：新文件 `agent/subagent_def.go`，7 字段类型安全定义 + `SubagentBuilder` + `BuildTaskArgs()`
+- **清理 release 目录**：移除 11 个历史 release 文件
+
+### 📁 文件变更
+- `internal/tool/tool.go` (+77): ToolKind 枚举 + KindedTool 接口
+- `internal/tool/builtin/*.go` (27 files): 全部添加 Kind() 方法
+- `internal/agent/batch_executor.go` (+12): tailCall 链式处理
+- `internal/agent/subagent_def.go` (新文件): SubagentDefinition + Builder
+
 ## [10.92.0] — 2026-07-23
 
 ### ⚡ 单模型编程能力深度优化

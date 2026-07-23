@@ -1,3 +1,22 @@
+## [10.92.0] — 2026-07-23
+
+### ⚡ 单模型编程能力深度优化
+
+> SoloSystemPrompt 结构化重写，全面对齐双模型 Hephaestus 的编程纪律。
+> 新增 Think Before Coding 阶段、TDD 5 步显式循环、Pre-completion 回归测试清单。
+
+- **Think Before Coding**：新增预编码阶段——先读相关代码→了解模式/签名/错误风格→检查规范→用读验证
+- **TDD 5 步循环**：从隐式 `TDD per step` 展开为显式 a)写失败测试→b)确认失败→c)最小代码→d)确认通过→e)complete_step
+- **Pre-completion 清单**：新增 5 项交付前检查（测试套件、go vet、文件一致性、最终 verify）
+- **Per-step 报告格式**：明确 `complete_step` result 格式 + 具体示例
+- **ask 工具强化**：对齐 Hephaestus 强度——"text question = 轮次终止，zero excuse"
+- **Go 错误处理指引**：Defensive 规则新增 `fmt.Errorf("...: %w", err)` 包装 + 禁止 `_` 丢弃
+- **Simplicity First 去重**：合并到 Core Principles 的 Minimal 规则
+- **并行指引精简**：合并 parallel_tasks/parallel_skills/bash background 为一行
+
+### 📁 文件变更
+- 1 file: hermes_prompt.go (+72/-46)
+
 ## [10.91.0] — 2026-07-23
 
 ### 🧬 ui-ux-pro-max 技能完整内置 + go:embed 嵌入编译

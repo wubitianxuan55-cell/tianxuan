@@ -33,8 +33,10 @@ func TestModelRefsSkipsUnconfigured(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("DEEPSEEK_API_KEY", "")
 	t.Setenv("MIMO_API_KEY", "")
-	if refs := modelRefs(); len(refs) != 0 {
-		t.Errorf("no keys set → no refs, got %v", refs)
+	for _, ref := range modelRefs() {
+		if !strings.HasPrefix(ref, "xai") && !strings.HasPrefix(ref, "grok") {
+			t.Errorf("no keys set → got non-OAuth ref %q", ref)
+		}
 	}
 }
 

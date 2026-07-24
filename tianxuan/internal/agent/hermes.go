@@ -137,11 +137,17 @@ func (h *Hermes) ResetSession() {
 	// leaking stale history into future plans across session switches.
 	if h.plannerAgent != nil {
 		h.plannerAgent.SetSession(h.hermesSess)
+		// V10.88: reset compaction sticky-state so a fresh session
+		// does not inherit stuck status from the previous one.
+		h.plannerAgent.ResetCompactState()
 	}
 	// V10.87: reset project map hash so the new session gets a fresh injection.
 	// Without this, injectProjectMap sees the stale hash and skips re-injection,
 	// leaving the planner without a project map for the first turn.
 	h.lastProjectHash = ""
+	// V10.89: reset executor sink wrapper flag so wrapExecutorSink works in
+	// the new session. Without this, the first turn silently skips wrapping.
+	h.executorSinkWrapped = false
 }
 
 // PlannerContext returns the planner agent's last usage and context window,
@@ -267,7 +273,7 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 		h.sink.Emit(event.Event{Kind: event.Phase, Text: "修正执行 (轮 " + strconv.Itoa(round) + "/3)"})
 
 		// Generate a fix plan — round 2 is targeted, round 3 includes reflection
-		fixPlan, fixErr := h.planFix(ctx, input, initial.text, result, round, fixHistory)
+		fixPlan, fixErr := h.planFix(ctx, input, initial.text, initial.userNote, result, round, fixHistory)
 		if fixErr != nil {
 			slog.Warn("hermes: fix plan generation failed", "error", fixErr)
 			h.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
@@ -279,10 +285,17 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 		result, err = h.executePlan(ctx, input, *fixPlan, true)
 
 		// Record this fix attempt so round 3 can reflect on prior failures
+		feedback := ""
+		if result != nil {
+			feedback = formatExecutionFeedbackEnhanced(result, result.Plan)
+			if len(feedback) > 4096 {
+				feedback = feedback[:4096] + "\n...(truncated)"
+			}
+		}
 		fixHistory = append(fixHistory, fixAttempt{
 			round:    round,
 			fixPlan:  fixPlan.text,
-			feedback: formatExecutionFeedback(result),
+			feedback: feedback,
 		})
 	}
 
@@ -324,11 +337,15 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 }
 
 // allStepsPassed checks whether every step in the execution result succeeded.
+// Returns false when StepResults is empty — no steps executed means nothing passed.
 func (h *Hermes) allStepsPassed(r *TurnResult) bool {
 	if r == nil {
 		return false
 	}
 	if !r.Success {
+		return false
+	}
+	if len(r.StepResults) == 0 {
 		return false
 	}
 	for _, sr := range r.StepResults {
@@ -342,7 +359,8 @@ func (h *Hermes) allStepsPassed(r *TurnResult) bool {
 // planFix asks the planner to produce a targeted fix for failed steps.
 // Round 2 does a minimal fix; round 3 switches to reflection mode with full
 // fix history, asking the planner to reconsider the overall approach.
-func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan string, failed *TurnResult, round int, fixHistory []fixAttempt) (*planWithNote, error) {
+func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan string, userNote string, failed *TurnResult, round int, fixHistory []fixAttempt) (*planWithNote, error) {
+	h.injectProjectMap()
 	fixInput := buildFixPrompt(origInput, originalPlan, failed, round, fixHistory)
 
 	// Use planWithTools (read-only investigation) for the fix plan
@@ -351,7 +369,7 @@ func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan str
 		return nil, fmt.Errorf("hermes: fix plan failed: %w", err)
 	}
 
-	return &planWithNote{text: planText}, nil
+	return &planWithNote{text: planText, userNote: userNote}, nil
 }
 
 // buildFixPrompt constructs the prompt for a fix/replan round.
@@ -366,7 +384,10 @@ func buildFixPrompt(origInput, originalPlan string, failed *TurnResult, round in
 	}
 
 	errSummary := strings.Join(failed.Errors, "; ")
-	execFeedback := formatExecutionFeedback(failed)
+	execFeedback := formatExecutionFeedbackEnhanced(failed, originalPlan)
+	if len(execFeedback) > 4096 {
+		execFeedback = execFeedback[:4096] + "\n...(truncated)"
+	}
 
 	if round == 2 || len(fixHistory) == 0 {
 		// Round 2: targeted fix — only patch the broken steps
@@ -462,10 +483,9 @@ func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, er
 	}
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · 快速执行"})
 	defer h.wrapExecutorSink()()
-	// V10.87: pre-inject original input before handoff, matching executePlan's
-	// injection order so the executor session's prefix is consistent across paths.
-	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: task})
-	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(task, task, ""))
+
+	// V10.88: removed redundant pre-injection — formatHandoff already contains the task.
+	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(task, task, "", h.wsRoot))
 
 	// V10.87: emit TurnResultEvent so the frontend gets a structured result card,
 	// matching executePlan's behaviour. Pre-injection stays as `task` — the "!"
@@ -532,6 +552,7 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlan
 			return nil, fmt.Errorf("hermes: %w", err)
 		}
 		if isAnswerNotAction(plan) {
+			h.hermesSess.Truncate(prePlanLen)
 			return nil, nil // Hermes answered directly
 		}
 
@@ -551,6 +572,7 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlan
 			return nil, err
 		}
 		if chatOnly {
+			h.hermesSess.Truncate(prePlanLen)
 			return nil, nil
 		}
 		if revise {
@@ -571,6 +593,8 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string, prePlan
 		if revisedNote != "" {
 			note = revisedNote
 		}
+		// V10.89: truncate intermediate plans from revise loop, keep only final.
+		h.hermesSess.Truncate(prePlanLen)
 		return &planWithNote{text: plan, userNote: note}, nil
 	}
 }
@@ -586,9 +610,9 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 	h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · Hephaestus"})
 	defer h.wrapExecutorSink()()
 
-	// V10.49: pre-inject the original Chinese input before the handoff prompt.
-	h.hephaestus.Session().Add(provider.Message{Role: provider.RoleUser, Content: origInput})
-	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(origInput, plan, userNote))
+	// V10.88: removed redundant pre-injection — formatHandoff already contains
+	// the task in its structured handoff block, so the executor sees it once.
+	execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(origInput, plan, userNote, h.wsRoot))
 
 	// Attach plan to TurnResult so the returned value is self-contained.
 	if execResult != nil {
@@ -629,10 +653,8 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 			Errors:  []string{execErr.Error()},
 			Summary: hermesSummary,
 		}
-		h.hermesSess.Add(provider.Message{
-			Role:    provider.RoleUser,
-			Content: formatExecutionFeedback(synth),
-		})
+		// V10.89: use feedResultToPlanner for consistent SDD Enhanced format.
+		h.feedResultToPlanner(synth)
 		if !suppressResultEvent {
 			h.sink.Emit(event.Event{
 				Kind: event.TurnResultEvent,
@@ -910,18 +932,22 @@ func isAnswerNotAction(plan string) bool {
 	return !strings.Contains(trimmed, "<!--plan-->")
 }
 
-func formatHandoff(task, plan, userNote string) string {
+func formatHandoff(task, plan, userNote, projectRoot string) string {
+	rootLine := ""
+	if projectRoot != "" {
+		rootLine = fmt.Sprintf("项目根目录: %s\n\n", projectRoot)
+	}
 	note := ""
 	if userNote != "" {
 		note = fmt.Sprintf("\n\n📌 用户备注:\n%s\n", userNote)
 	}
 	return fmt.Sprintf(`# %s
 
-任务:
+%s任务:
 %s
 
 计划:
-%s%s`, hephaestusHandoffMarker, task, plan, note)
+%s%s`, hephaestusHandoffMarker, rootLine, task, plan, note)
 }
 
 // HandoffTask returns the original user task embedded in an executor handoff

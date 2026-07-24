@@ -201,7 +201,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 
 	// parallel_tasks: dispatches multiple independent sub-agent tasks concurrently.
 	parallelTasksTool := agent.NewParallelTasksTool(execProv, entry.Price, reg, maxSteps,
-		entry.ContextWindow, cfg.Agent.Temperature, config.ArchiveDir(), "", headlessGate)
+		entry.ContextWindow, cfg.Agent.SubagentTemp(), config.ArchiveDir(), "", headlessGate)
 	reg.Add(parallelTasksTool)
 
 	// The `remember` tool lets the model persist durable facts to the project's
@@ -394,14 +394,9 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
 			readOnlyReg := newReadOnlyRegistry(reg)
 
-			// V10.32: 子代理注册表 = 只读工具 + bash。规划者本身不拿
-			// bash（保持只读），但 task 子代理需要 bash 执行构建/测试等
-			// 操作类命令。设计类技能（ui-ux-pro-max 等）已改为规划者
-			// 直接 read_skill 加载规则，不再需要子代理跑 Python 脚本。
+			// V10.89: subagent registry is read-only — bash is too dangerous
+			// for subagents. They use task tool for code execution.
 			subagentReg := newReadOnlyRegistry(reg)
-			if bashTool, ok := reg.Get("bash"); ok {
-				subagentReg.Add(bashTool)
-			}
 
 			// 显式添加 ask 工具到规划者只读工具集中。
 			// ask 工具 ReadOnly=true 理论上会被 newReadOnlyRegistry 自动包含，
@@ -448,7 +443,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 				sysPrompt := childCompiler.SystemPrompt()
 				return agent.RunSubAgent(sctx, prov, subReg, sysPrompt, sk.Body+"\n\n"+task, agent.Options{
 					MaxSteps:       steps,
-					Temperature:    cfg.Agent.Temperature,
+					Temperature:    cfg.Agent.PlannerTemp(),
 					Pricing:        price,
 					Gate:           headlessGate,
 					ContextWindow:  ctxWin,
@@ -465,6 +460,11 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			}
 
 			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxSteps, pe.ContextWindow, config.ArchiveDir(), cwd)
+		// V10.89: emit warning if planner context window differs from provider default.
+		if pe.ContextWindow < entry.ContextWindow {
+			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+				Text: fmt.Sprintf("规划者上下文窗口 (%d) < 模型默认 (%d)；超限计划可能被截断", pe.ContextWindow, entry.ContextWindow)})
+		}
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)

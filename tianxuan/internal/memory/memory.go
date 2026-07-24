@@ -127,7 +127,9 @@ func (s *Set) WriteDoc(path, body string) (string, error) {
 }
 
 // compactMemoryThreshold caps how much full memory fits in the cache-stable prefix.
-const compactMemoryThreshold = 4096
+// 16 KB ensures AGENTS.md (~6 KB) + memory index fit without triggering
+// compact mode that strips coding disciplines to a single-line summary.
+const compactMemoryThreshold = 16384
 
 // Block renders memory for the cache-stable prefix. Returns a compact block when
 // the full memory would exceed a reasonable size, keeping the prefix lean.
@@ -157,7 +159,7 @@ func (s *Set) PlannerBlock() string {
 		return ""
 	}
 	full := s.buildPlannerFullBlock()
-	if len(full) <= 4096 {
+	if len(full) <= compactMemoryThreshold {
 		return full
 	}
 	return s.buildPlannerCompactBlock()

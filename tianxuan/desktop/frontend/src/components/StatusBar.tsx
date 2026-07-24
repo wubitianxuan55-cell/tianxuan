@@ -107,7 +107,7 @@ export const StatusBar = memo(function StatusBar({
   const connTextColor = !bridgeAlive ? "text-err" : running ? "text-warning" : "text-ok";
 
   return (
-    <div className={`flex items-center gap-2 ${barH} ${barPx} ${fontSize} bg-bg-soft border-t border-border-soft select-none shrink-0`} data-wails-no-drag>
+    <div className={`flex items-center gap-2 ${barH} ${barPx} ${fontSize} bg-bg-soft border-t border-border-soft select-none shrink-0 max-w-[--maxw] mx-auto`} data-wails-no-drag>
       {/* ── 左: 连接灯 + 状态文字 ── */}
       <div className="flex items-center gap-1.5 shrink-0">
         <Tooltip label={connLabel}>

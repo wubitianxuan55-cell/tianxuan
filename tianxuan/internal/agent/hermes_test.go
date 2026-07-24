@@ -113,7 +113,7 @@ func TestIsAnswerNotAction_LongWithoutPlan(t *testing.T) {
 // ── formatHandoff ─────────────────────────────────────────
 
 func TestFormatHandoff_Normal(t *testing.T) {
-	out := formatHandoff("build", "run wails build", "")
+	out := formatHandoff("build", "run wails build", "", "")
 	if !strings.Contains(out, hephaestusHandoffMarker) {
 		t.Fatal("handoff missing marker")
 	}
@@ -131,21 +131,21 @@ func TestFormatHandoff_Normal(t *testing.T) {
 }
 
 func TestFormatHandoff_WithUserNote(t *testing.T) {
-	out := formatHandoff("build", "run wails build", "also run tests first")
+	out := formatHandoff("build", "run wails build", "also run tests first", "")
 	if !strings.Contains(out, "📌 用户备注:\nalso run tests first") {
 		t.Fatal("handoff missing user note")
 	}
 }
 
 func TestFormatHandoff_EmptyPlan(t *testing.T) {
-	out := formatHandoff("build", "", "")
+	out := formatHandoff("build", "", "", "")
 	if !strings.Contains(out, "计划:\n") {
 		t.Fatal("handoff should still have Hermes output section")
 	}
 }
 
 func TestFormatHandoff_SpecialChars(t *testing.T) {
-	out := formatHandoff(`test "quotes"`, `plan with <angle>`, "")
+	out := formatHandoff(`test "quotes"`, `plan with <angle>`, "", "")
 	if !strings.Contains(out, `test "quotes"`) {
 		t.Fatal("handoff should preserve special chars in task")
 	}
@@ -157,7 +157,7 @@ func TestFormatHandoff_SpecialChars(t *testing.T) {
 // ── HandoffTask ───────────────────────────────────────────
 
 func TestHandoffTask_ExtractsTask(t *testing.T) {
-	handoff := formatHandoff("build the app", "run wails build", "")
+	handoff := formatHandoff("build the app", "run wails build", "", "")
 	extracted := HandoffTask(handoff)
 	if extracted != "build the app" {
 		t.Fatalf("got %q, want %q", extracted, "build the app")
@@ -221,11 +221,10 @@ func TestHephaestusSystemPrompt_ContainsEssentials(t *testing.T) {
 		"complete_step",
 		"todo_write",
 		"parallel_tasks",
-		"Surgical Changes",
-		"Goal-Driven Execution",
-		"NEVER re-explore",
-		"not plans, not confirmations, not investigations",
-		"Hermes handles replanning",
+		"GOAL",
+		"constraints",
+		"report ❌",
+		"Failure handling",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -242,8 +241,8 @@ func TestHermesPrompt_ContainsEssentials(t *testing.T) {
 		"Hephaestus",
 		"<!--plan-->",
 		"read-only",
-		"3–8 steps",
-		"no re-exploration",
+		"1–8 steps",
+		"analysis",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -415,8 +414,8 @@ func TestShouldAutoConfirm_NewFile(t *testing.T) {
 }
 
 func TestShouldAutoConfirm_Empty(t *testing.T) {
-	if !shouldAutoConfirm("") {
-		t.Fatal("empty plan should auto-confirm (no steps = trivial)")
+	if shouldAutoConfirm("") {
+		t.Fatal("empty plan should NOT auto-confirm (0 steps is a no-op)")
 	}
 }
 

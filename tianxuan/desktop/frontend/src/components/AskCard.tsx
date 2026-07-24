@@ -148,7 +148,7 @@ export function AskCard({
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none">
       <div
         ref={cardRef}
-        className="relative flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl p-5 pt-8 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
+        className="relative flex flex-col gap-4 w-full max-w-[--maxw] max-h-[85vh] overflow-y-auto bg-bg-elev border border-border rounded-xl p-5 pt-8 animate-[scaleIn_.2s_ease-out] pointer-events-auto"
         style={{
           boxShadow: "var(--ds-shadow-panel)",
           ...(pos

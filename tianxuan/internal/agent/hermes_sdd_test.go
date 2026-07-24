@@ -325,11 +325,11 @@ func TestHermesPrompt_SDDKeywords(t *testing.T) {
 		// Proposal layer
 		"Proposal",
 		"why",
-		// Delta marking
-		"Delta",
-		"ADDED",
-		"MODIFIED",
-		"REMOVED",
+		// Goal + constraint (replaces Delta marking)
+		"GOAL",
+		"Constraint",
+		"WHAT",
+		"HOW",
 		// Specs first
 		"openspec/specs",
 		"现有规范",
@@ -353,13 +353,13 @@ func TestHermesPrompt_SDDKeywords(t *testing.T) {
 	}
 }
 
-func TestHermesPrompt_ContainsDeltaFormat(t *testing.T) {
-	// 验证步骤格式中包含 Delta 字段说明
-	if !strings.Contains(HermesPrompt, "**Delta**") {
-		t.Error("HermesPrompt missing Delta field in step format")
+func TestHermesPrompt_ContainsGoalFormat(t *testing.T) {
+	// 验证步骤格式中包含 Goal + Constraint 字段说明
+	if !strings.Contains(HermesPrompt, "**Constraint**") {
+		t.Error("HermesPrompt missing Constraint field in step format")
 	}
-	if !strings.Contains(HermesPrompt, "ADDED | MODIFIED | REMOVED") {
-		t.Error("HermesPrompt missing ADDED/MODIFIED/REMOVED explanation")
+	if !strings.Contains(HermesPrompt, "GOAL") {
+		t.Error("HermesPrompt missing GOAL explanation")
 	}
 }
 

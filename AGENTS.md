@@ -131,6 +131,8 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.95.0** (2026-07-24): 双模型架构 15 项逻辑修复 + 契约简化 + Hephaestus 上下文补齐
+- **V10.94.0** (2026-07-24): XAI 规划者独立架构 + 轻量子代理路径（已回退）
 - **V10.93.0** (2026-07-24): Gemini CLI 接口设计蒸馏 — Kind 分类系统 + tailToolCall + SubagentDefinition
 - **V10.92.0** (2026-07-23): 单模型编程能力深度优化
 - 详见 [CHANGELOG.md](tianxuan/CHANGELOG.md) + [[v10-93-release]]

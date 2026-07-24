@@ -61,6 +61,9 @@ func shouldAutoConfirm(plan string) bool {
 			steps++
 		}
 	}
+	if steps == 0 {
+		return false
+	}
 	if steps > 3 {
 		return false
 	}
@@ -68,8 +71,47 @@ func shouldAutoConfirm(plan string) bool {
 	if strings.Contains(plan, "[NEW]") {
 		return false
 	}
+	// V10.89: reject plans whose Verify fields lack executable commands.
+	// "手动测试"/"manual"/"目测" etc. are not verifiable by Hephaestus.
+	if hasUnverifiableSteps(plan) {
+		return false
+	}
 	return true
 }
+
+// hasUnverifiableSteps checks whether any step's Verify field lacks an
+// executable command. Matches patterns like "手动测试", "manual check",
+// "目测", or empty Verify fields.
+func hasUnverifiableSteps(plan string) bool {
+	soft := []string{"手动测试", "手动验证", "目测", "manual test", "manual check", "manually"}
+	stepCount := 0
+	hasVerify := false
+	for _, line := range strings.Split(plan, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if isStepLine(trimmed) {
+			stepCount++
+		}
+		if strings.HasPrefix(trimmed, "- **Verify**") {
+			hasVerify = true
+			content := strings.TrimPrefix(trimmed, "- **Verify**")
+			content = strings.TrimPrefix(content, "：")
+			content = strings.TrimPrefix(content, ":")
+			content = strings.TrimSpace(content)
+			if content == "" {
+				return true
+			}
+			for _, s := range soft {
+				if strings.Contains(strings.ToLower(content), strings.ToLower(s)) {
+					return true
+				}
+			}
+		}
+	}
+	// If steps exist but no Verify field at all, that's also unverifiable
+	return stepCount > 0 && !hasVerify
+}
+
+// isStepLine checks whether a trimmed line is a step header, supporting both
 
 // isStepLine checks whether a trimmed line is a step header, supporting both
 // Chinese "步骤 N：" and English "Step N：" prefixes.

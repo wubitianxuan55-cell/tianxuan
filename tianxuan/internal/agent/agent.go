@@ -566,6 +566,13 @@ func (a *AgentRunner) SetSession(s *Session) {
 	// cacheBreakCount removed (Phase 3)
 }
 
+// ResetCompactState resets the compaction sticky-state counters so a fresh
+// planner session does not inherit stuck status from a previous session.
+func (a *AgentRunner) ResetCompactState() {
+	a.consecutiveCompacts = 0
+	a.compactStuck = false
+}
+
 // LastUsage returns the most recent per-turn token telemetry the provider
 // reported (nil if no turn has run yet). The TUI uses it to show a context
 // gauge alongside the prompt; the actual cache decisions still live inside

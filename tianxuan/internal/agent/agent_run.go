@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"tianxuan/internal/event"
@@ -32,10 +33,9 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	if !a.plannerMode {
 		input = a.withTurnPreferences(input)
 	}
-	// V10.49: Hermes pre-injects the original user input (origInput) before
-	// the formatHandoff call, so the handoff never enters the session as a
-	// user-visible message. Both messages reach the model; History() skips
-	// the handoff text by prefix. See app_session.go History().
+	// V10.88: executor receives the handoff message as input. The handoff
+	// has a structured marker prefix; App.History() in the UI layer filters
+	// it for display, extracting only the user task. See app_session.go:213.
 	a.session.Add(provider.Message{Role: provider.RoleUser, Content: input})
 
 	// rebuild canonical todo state from session history
@@ -350,18 +350,24 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if step != "" {
 					a.advanceCanonicalTodo(step)
 				}
-				// V10.87: collect step results for TurnResult
+				// V10.89: collect step results, dedup by step name — Hephaestus may
+				// call complete_step multiple times for the same step; keep only last.
 				status := "success"
 				if strings.HasPrefix(results[i], "error:") {
 					status = "error"
 				} else if strings.HasPrefix(results[i], "blocked:") {
 					status = "blocked"
 				}
-				turnStepResults = append(turnStepResults, StepResult{
+				sr := StepResult{
 					Step:   step,
 					Status: status,
 					Result: extractStepResult(call.Arguments),
-				})
+				}
+				if idx := slices.IndexFunc(turnStepResults, func(s StepResult) bool { return s.Step == step }); idx >= 0 {
+					turnStepResults[idx] = sr
+				} else {
+					turnStepResults = append(turnStepResults, sr)
+				}
 			}
 		}
 

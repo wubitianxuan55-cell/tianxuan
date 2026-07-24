@@ -1,3 +1,41 @@
+## [10.95.0] — 2026-07-24
+
+### 🔧 双模型架构 15 项逻辑修复 + 契约简化
+
+> Hermes/Hephaestus 协作质量提升：会话膨胀修复、反馈格式统一、计划粒度简化、子代理安全加固。
+
+#### 逻辑修复
+- **会话膨胀**：`planWithConfirmation` 退出/ask残留路径增加 `Truncate` 清理中间计划；`executePlan` 删除冗余预注入
+- **修正图谱过期**：`planFix` 调用 `injectProjectMap()` 刷新项目结构
+- **反馈降级**：`formatExecutionFeedback` → `formatExecutionFeedbackEnhanced`，统一 SDD 格式；超大反馈截断（>4KB）
+- **userNote 丢失**：修正计划路径保留原始 `userNote`
+- **子代理逃逸**：`subagentReg` 移除 bash，子代理只读
+- **temperature 独立**：规划者用 `PlannerTemp()`，子代理用 `SubagentTemp()`
+- **allStepsPassed**：空 `StepResults` 返回 false
+- **wrapExecutorSink 泄漏**：`ResetSession` 重置 `executorSinkWrapped`
+- **上下文窗口**：规划者窗口小于模型默认时 emit Warning
+- **complete_step 去重**：同名步骤保留最后一次
+
+#### Hephaestus 上下文补齐
+- **handoff 注入项目根目录**：`formatHandoff` 新增 `项目根目录` 行
+- **AGENTS.md 阈值上调**：`compactMemoryThreshold` 4096→16384，编码铁律完整进入 L1
+
+#### 契约简化
+- **计划格式**：Delta/File(s)/Change/Depends on → Goal + Constraint + Verify
+- **Hephaestus 自主权**：从 "NEVER re-explore" 放宽为 "信任目标，自己找实现路径"
+- **Hermes 计划前自检**：缓存前缀不变性 + 根因溯源 + 兄弟组件扫描
+- **Proposal 强制**：每次 `<!--plan-->` 前必须写分析段
+- **HephaestusSystemPrompt 去重**：删除与 L1 重复的编码铁律（TDD/Surgical/Simplicity）
+- **设计技能表**：7 个设计技能完整注入 HermesPrompt
+
+#### 前端对齐
+- **StatusBar/AskCard** 宽度约束 `max-w-[--maxw]` 与 Composer 对齐
+
+#### 桌面端
+- `tianxuan-desktop.exe`：Wails build 固定位置
+
+---
+
 ## [10.94.0] — 2026-07-24
 
 ### 🧠 XAI 规划者独立架构 + 轻量子代理路径
@@ -749,4 +787,3 @@
 - release/v10.11.0/tianxuan-desktop.exe (16MB Wails)
 
 ---
-

@@ -37,11 +37,10 @@ type Hermes struct {
 	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
 	asker         Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
 
-	// V10.36: persistent planner Agent with compaction — replaces per-turn temp AgentRunner.
-	// The planner accumulates planning history + execution results across turns, with
-	// compaction keeping the context bounded. This gives the planner a proper TCCA-like
-	// architecture (L1 stable prefix + L4 growing flow + compaction).
-	plannerAgent *AgentRunner
+	// planner 是规划者的抽象。DeepSeek 使用 AgentRunner（TCCA 四域缓存），
+	// XAI/Grok 等非 DeepSeek provider 使用 XAIPlanner（独立上下文管理）。
+	// 根据 hermesProvider 的名称自动选择实现。
+	planner Planner
 
 	// V10.54: workspace root for project map injection.
 	wsRoot          string
@@ -93,17 +92,9 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 			}
 			sink.Emit(e)
 		})
-		h.plannerAgent = New(hermesProvider, readonlyTools, hermesSession, Options{
-			MaxSteps:       planMaxSteps,
-			Temperature:    temperature,
-			Pricing:        hermesPricing,
-			Gate:           &autoGate{},
-			DisableVerify:  true,
-			PlannerMode:    true,
-			StrictEvidence: false,
-			ContextWindow:  contextWindow,
-			Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: contextWindow},
-		}, plannerSink)
+		h.planner = newPlanner(hermesProvider, readonlyTools, hermesSession,
+			planMaxSteps, temperature, hermesPricing,
+			contextWindow, archiveDir, plannerSink)
 	}
 	return h
 }
@@ -135,8 +126,8 @@ func (h *Hermes) ResetSession() {
 	// Also update the plannerAgent's session pointer so it uses the fresh
 	// session. Without this, plannerAgent still writes to the old session,
 	// leaking stale history into future plans across session switches.
-	if h.plannerAgent != nil {
-		h.plannerAgent.SetSession(h.hermesSess)
+	if h.planner != nil {
+		h.planner.SetSession(h.hermesSess)
 	}
 	// V10.87: reset project map hash so the new session gets a fresh injection.
 	// Without this, injectProjectMap sees the stale hash and skips re-injection,
@@ -147,14 +138,14 @@ func (h *Hermes) ResetSession() {
 // PlannerContext returns the planner agent's last usage and context window,
 // for the status bar's per-model context gauge.
 func (h *Hermes) PlannerContext() (used int, window int) {
-	if h == nil || h.plannerAgent == nil {
+	if h == nil || h.planner == nil {
 		return 0, 0
 	}
-	u := h.plannerAgent.LastUsage()
+	u := h.planner.LastUsage()
 	if u == nil {
-		return 0, h.plannerAgent.ContextWindow()
+		return 0, h.planner.ContextWindow()
 	}
-	return u.PromptTokens, h.plannerAgent.ContextWindow()
+	return u.PromptTokens, h.planner.ContextWindow()
 }
 
 // SetAsker installs the interactive asker for plan confirmation (V10.34).
@@ -163,8 +154,8 @@ func (h *Hermes) PlannerContext() (used int, window int) {
 // during planning (scope negotiation, detail gathering).
 func (h *Hermes) SetAsker(a Asker) {
 	h.asker = a
-	if h.plannerAgent != nil {
-		h.plannerAgent.SetAsker(a)
+	if h.planner != nil {
+		h.planner.SetAsker(a)
 	}
 }
 
@@ -174,8 +165,8 @@ func (h *Hermes) SetPlanMode(v bool) {
 	if h == nil {
 		return
 	}
-	if h.plannerAgent != nil {
-		h.plannerAgent.SetPlanMode(v)
+	if h.planner != nil {
+		h.planner.SetPlanMode(v)
 	}
 	h.hephaestus.SetPlanMode(v)
 }
@@ -185,8 +176,8 @@ func (h *Hermes) SetPlanModePolicy(p planmode.Policy) {
 	if h == nil {
 		return
 	}
-	if h.plannerAgent != nil {
-		h.plannerAgent.SetPlanModePolicy(p)
+	if h.planner != nil {
+		h.planner.SetPlanModePolicy(p)
 	}
 	h.hephaestus.SetPlanModePolicy(p)
 }
@@ -654,12 +645,21 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 func (h *Hermes) feedResultToPlanner(r *TurnResult) {
 	hasContent := r.Summary != "" || len(r.Errors) > 0 ||
 		len(r.FilesCreated) > 0 || len(r.FilesModified) > 0
-	if hasContent {
-		h.hermesSess.Add(provider.Message{
-			Role:    provider.RoleUser,
-			Content: formatExecutionFeedbackEnhanced(r, r.Plan),
-		})
+	if !hasContent {
+		return
 	}
+
+	// XAI planner 用精简反馈（省 token），DeepSeek 用完整格式
+	feedback := formatExecutionFeedbackEnhanced(r, r.Plan)
+	if ff, ok := h.planner.(interface{ FormatFeedback(*TurnResult) string }); ok {
+		feedback = ff.FormatFeedback(r)
+	}
+
+	h.hermesSess.Add(provider.Message{
+		Role:    provider.RoleUser,
+		Content: feedback,
+	})
+
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {
 		h.lastProjectHash = ""
 	}
@@ -822,8 +822,8 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 	// Trigger compaction on the planner agent — planStream writes directly to
 	// h.hermesSess without going through plannerAgent.Run(), so auto-compaction
 	// never fires on this path. Without this, planStream sessions grow unbounded.
-	if h.plannerAgent != nil {
-		if err := h.plannerAgent.CompactNow(ctx, "planStream turn boundary"); err != nil {
+	if h.planner != nil {
+		if err := h.planner.CompactNow(ctx, "planStream turn boundary"); err != nil {
 			slog.Warn("hermes: planStream compaction failed", "error", err)
 		}
 	} else {
@@ -858,16 +858,16 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 // building a temporary AgentRunner each turn. The planner's session accumulates
 // planning history + execution results across turns; compaction keeps it bounded.
 func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error) {
-	if h.plannerAgent == nil {
+	if h.planner == nil {
 		return "", fmt.Errorf("hermes: planner agent not initialized (no read-only tools)")
 	}
 	// Re-propagate asker to plannerAgent before each planning run,
 	// ensuring the ask tool can interact with the user even if
 	// SetAsker was called before plannerAgent was created.
 	if h.asker != nil {
-		h.plannerAgent.SetAsker(h.asker)
+		h.planner.SetAsker(h.asker)
 	}
-	turnResult, err := h.plannerAgent.Run(ctx, input)
+	turnResult, err := h.planner.Run(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}
@@ -946,4 +946,28 @@ func HandoffTask(s string) string {
 		return task
 	}
 	return s
+}
+
+// newPlanner 根据 provider 类型创建对应的规划者。
+// DeepSeek → AgentRunner（TCCA 四域缓存 + 前缀守卫）
+// 其他 → XAIPlanner（独立上下文管理）
+func newPlanner(prov provider.Provider, tools *tool.Registry, session *Session,
+	maxSteps int, temperature float64, pricing *provider.Pricing,
+	ctxWindow int, archiveDir string, sink event.Sink) Planner {
+
+	if !strings.Contains(strings.ToLower(prov.Name()), "deepseek") {
+		return NewXAIPlanner(prov, tools, session, maxSteps, temperature,
+			pricing, ctxWindow, archiveDir, sink)
+	}
+	return New(prov, tools, session, Options{
+		MaxSteps:       maxSteps,
+		Temperature:    temperature,
+		Pricing:        pricing,
+		Gate:           &autoGate{},
+		DisableVerify:  true,
+		PlannerMode:    true,
+		StrictEvidence: false,
+		ContextWindow:  ctxWindow,
+		Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: ctxWindow},
+	}, sink)
 }

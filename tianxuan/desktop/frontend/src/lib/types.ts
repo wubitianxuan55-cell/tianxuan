@@ -297,6 +297,8 @@ export interface ProviderView {
   reasoningProtocol: string;
   supportedEfforts: string[];
   defaultEffort: string;
+  oauthKind: string; // non-empty when OAuth login is available (e.g. "xai")
+  oauthReady: boolean; // whether OAuth token is currently valid
 }
 
 // BalanceInfo is the wallet-balance readout (desktop/app.go Balance). available

@@ -137,6 +137,9 @@ export interface AppBindings {
   SaveProvider(p: ProviderView): Promise<void>;
   DeleteProvider(name: string): Promise<void>;
   SetProviderKey(apiKeyEnv: string, value: string): Promise<void>;
+  StartOAuth(provider: string): Promise<string>;
+  LoginProvider(kind: string): Promise<void>;
+  LogoutProvider(kind: string): Promise<void>;
   SetPermissionMode(mode: string): Promise<void>;
   AddPermissionRule(list: string, rule: string): Promise<void>;
   RemovePermissionRule(list: string, rule: string): Promise<void>;

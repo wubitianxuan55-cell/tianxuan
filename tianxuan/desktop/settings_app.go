@@ -13,6 +13,7 @@ import (
 	"tianxuan/internal/config"
 	"tianxuan/internal/hook"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/provider/xai"
 )
 
 // settings_app.go is the desktop Settings panel's command surface: it reads the
@@ -45,6 +46,9 @@ type ProviderView struct {
 	ReasoningProtocol string `json:"reasoningProtocol"`
 	SupportedEfforts  []string `json:"supportedEfforts"`
 	DefaultEffort string   `json:"defaultEffort"`
+	// OAuth support: non-empty when OAuth login is available (e.g. "xai").
+	OAuthKind  string `json:"oauthKind"`
+	OAuthReady bool   `json:"oauthReady"`
 }
 
 type DesktopView struct {
@@ -237,6 +241,8 @@ func (a *App) Settings() SettingsView {
 			ReasoningProtocol: p.ReasoningProtocol,
 			SupportedEfforts:  p.SupportedEfforts,
 			DefaultEffort: p.DefaultEffort,
+			OAuthKind:  func() string { if p.Kind == "xai" { return "xai" }; return "" }(),
+			OAuthReady: func() bool { if p.Kind == "xai" { return xai.IsLoggedIn() }; return false }(),
 		})
 	}
 	return v
@@ -419,6 +425,40 @@ func (a *App) SaveProvider(p ProviderView) error {
 // DeleteProvider removes a provider (refused for the current default_model).
 func (a *App) DeleteProvider(name string) error {
 	return a.applyConfigChange(func(c *config.Config) error { return c.RemoveProvider(name) })
+}
+
+// LoginProvider triggers OAuth login for a provider (currently only "xai").
+func (a *App) LoginProvider(kind string) error {
+	switch kind {
+	case "xai":
+		if err := xai.Login(); err != nil {
+			return fmt.Errorf("XAI login failed: %w", err)
+		}
+		return a.rebuild()
+	default:
+		return fmt.Errorf("unsupported OAuth provider: %s", kind)
+	}
+}
+
+// LogoutProvider signs out of an OAuth provider.
+func (a *App) LogoutProvider(kind string) error {
+	switch kind {
+	case "xai":
+		if err := xai.Logout(); err != nil {
+			return fmt.Errorf("XAI logout failed: %w", err)
+		}
+		return a.rebuild()
+	default:
+		return fmt.Errorf("unsupported OAuth provider: %s", kind)
+	}
+}
+
+// StartOAuth is the generic OAuth login entry point called from frontend.
+func (a *App) StartOAuth(provider string) (string, error) {
+	if err := a.LoginProvider(provider); err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 // SetProviderKey writes a secret to ./.env under the given env-var name (the one a

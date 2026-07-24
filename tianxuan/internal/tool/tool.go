@@ -1,7 +1,8 @@
-// Package tool defines the Tool abstraction and a Registry. Built-in tools live
-// in tool/builtin and self-register via init(); plugin-provided tools are added
-// to a runtime Registry alongside the enabled built-ins. The agent sees only a
-// *Registry, never the global built-in set directly.
+// Package tool — V10.94: Toolset 分组系统，蒸馏自 NousResearch/hermes-agent 的 toolsets.py。
+//
+// Toolset 将工具按场景预定义分组（coding/readonly/research/safe），支持组合（includes）
+// 和递归解析（resolveToolset）。用户配置 "toolsets: [coding]" 而非逐个列出工具名。
+// 设计原则：Hermes Agent 的 Footprint Ladder — 核心保持窄，能力放在边缘。
 package tool
 
 import (
@@ -14,6 +15,123 @@ import (
 	"tianxuan/internal/provider"
 )
 
+// Toolset 通过名称引用一组工具和子工具集。
+// 预定义的 DefaultToolsets 覆盖常用场景；用户可在 TOML 配置中自定义。
+type Toolset struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Tools       []string `json:"tools"`    // 直接包含的工具名；支持 "lsp_*" 通配前缀
+	Includes    []string `json:"includes"` // 引用的子工具集名称
+}
+
+// DefaultToolsets 预定义工具集，蒸馏自 Hermes Agent 的 TOOLSETS dict。
+// 用户可通过 TOML 配置覆盖或扩展。
+var DefaultToolsets = map[string]Toolset{
+	"coding": {
+		Name:        "coding",
+		Description: "核心编码工具：文件读写编辑、搜索、bash、git、子代理",
+		Tools: []string{
+			"read_file", "write_file", "edit_file", "multi_edit",
+			"delete_range", "delete_symbol", "move_file",
+			"grep", "glob", "ls", "code_index",
+			"bash", "bash_output", "kill_shell", "wait",
+			"git_status", "git_diff", "git_commit", "git_log",
+			"task", "todo_write", "complete_step", "ask",
+			"web_fetch", "web_search",
+		},
+		Includes: []string{"readonly"},
+	},
+	"readonly": {
+		Name:        "readonly",
+		Description: "只读工具：安全，适合探索阶段和 plan mode",
+		Tools: []string{
+			"read_file", "ls", "glob", "grep", "code_index",
+			"memory_search", "read_skill",
+			"git_status", "git_diff", "git_log",
+			"web_fetch", "web_search",
+		},
+	},
+	"research": {
+		Name:        "research",
+		Description: "研究分析工具：无需写文件即可调查代码库和外部资源",
+		Tools: []string{
+			"read_file", "ls", "glob", "grep", "code_index",
+			"web_fetch", "web_search",
+			"task", "ask",
+		},
+		Includes: []string{"readonly"},
+	},
+	"safe": {
+		Name:        "safe",
+		Description: "安全模式：无可执行命令，无写文件，仅读写搜索",
+		Tools:       []string{},
+		Includes:    []string{"readonly"},
+	},
+	"full": {
+		Name:        "full",
+		Description: "全部内置工具（默认）",
+		Tools:       []string{},
+		// 空 tools + 空 includes = 全部工具
+	},
+}
+
+// ResolveToolset 递归解析工具集，返回去重排序的工具名列表。循环检测：已访问的工具集安全跳过。
+func ResolveToolset(name string, visited map[string]bool, custom map[string]Toolset) []string {
+	if visited == nil {
+		visited = map[string]bool{}
+	}
+	if visited[name] {
+		return nil // 循环或菱形依赖
+	}
+	visited[name] = true
+
+	// 先查自定义，再查预定义
+	ts, ok := custom[name]
+	if !ok {
+		ts, ok = DefaultToolsets[name]
+	}
+	if !ok {
+		return nil
+	}
+
+	set := map[string]bool{}
+	for _, t := range ts.Tools {
+		set[t] = true
+	}
+	for _, inc := range ts.Includes {
+		for _, t := range ResolveToolset(inc, visited, custom) {
+			set[t] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for t := range set {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// ResolveToolsets 解析多个工具集，合并去重。
+func ResolveToolsets(names []string, custom map[string]Toolset) []string {
+	if len(names) == 0 {
+		return nil // 空 = 全部工具
+	}
+	set := map[string]bool{}
+	for _, name := range names {
+		if name == "full" {
+			return nil // full = 全部工具
+		}
+		for _, t := range ResolveToolset(name, nil, custom) {
+			set[t] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for t := range set {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
+}
 // ToolKind classifies a tool by the nature of its operation, enabling
 // fine-grained policy decisions beyond the boolean ReadOnly flag. Inspired by
 // Gemini CLI's Kind enum (Read/Edit/Delete/Move/Search/Execute/Think/Agent/

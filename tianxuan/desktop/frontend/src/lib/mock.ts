@@ -121,8 +121,9 @@ export function makeMockApp(): AppBindings {
   const settings: SettingsView = {
     defaultModel: "deepseek-flash",
     providers: [
-      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "" },
-      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "" },
+      { name: "deepseek-flash", kind: "openai", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-flash"], default: "deepseek-v4-flash", apiKeyEnv: "DEEPSEEK_API_KEY", keySet: !freshMock, balanceUrl: "https://api.deepseek.com/user/balance", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "", oauthKind: "", oauthReady: false },
+      { name: "mimo-pro", kind: "openai", baseUrl: "https://api.xiaomimimo.com/v1", models: ["mimo-v2.5-pro"], default: "mimo-v2.5-pro", apiKeyEnv: "MIMO_API_KEY", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "", oauthKind: "", oauthReady: false },
+      { name: "xai-oauth", kind: "xai", baseUrl: "https://api.x.ai/v1", models: ["grok-4.5"], default: "grok-4.5", apiKeyEnv: "", keySet: false, balanceUrl: "", contextWindow: 1_000_000, thinking: "", effort: "", chatUrl: "", modelsUrl: "", headers: {}, extraBody: "", authHeader: false, visionModels: [], reasoningProtocol: "", supportedEfforts: [], defaultEffort: "", oauthKind: "xai", oauthReady: false },
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
@@ -132,7 +133,7 @@ export function makeMockApp(): AppBindings {
     subagentModels: {},
     subagentSkills: ["explore", "research", "review", "security-review"],
     configPath: freshMock ? "~/.tianxuan/config.toml" : "~/projects/tianxuan/tianxuan.toml",
-    providerKinds: ["openai"],
+    providerKinds: ["openai", "xai"],
     bypass: false,
     language: "",
     network: { proxyMode: "off", proxyUrl: "", noProxy: "" },
@@ -503,6 +504,11 @@ export function makeMockApp(): AppBindings {
         if (p.apiKeyEnv === apiKeyEnv) p.keySet = true;
       });
     },
+    async StartOAuth(_provider: string): Promise<string> {
+      return "xai-mock-api-key";
+    },
+    async LoginProvider(_kind: string) { settings.providers.find(p=>p.oauthKind===_kind)!.oauthReady = true; },
+    async LogoutProvider(_kind: string) { settings.providers.find(p=>p.oauthKind===_kind)!.oauthReady = false; },
     async SetPermissionMode(mode: string) {
       settings.permissions.mode = mode;
     },

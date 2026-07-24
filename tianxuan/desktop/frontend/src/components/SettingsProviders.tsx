@@ -9,6 +9,7 @@ const PROVIDER_PRESETS = [
   { name: "deepseek", kind: "openai", baseUrl: "https://api.deepseek.com", models: "deepseek-chat", apiEnv: "DEEPSEEK_API_KEY", ctx: 1000000 },
   { name: "openai", kind: "openai", baseUrl: "https://api.openai.com/v1", models: "gpt-4o", apiEnv: "OPENAI_API_KEY", ctx: 128000 },
   { name: "anthropic", kind: "openai", baseUrl: "https://api.anthropic.com/v1", models: "claude-sonnet-4-20250514", apiEnv: "ANTHROPIC_API_KEY", ctx: 200000 },
+  { name: "xai", kind: "xai", baseUrl: "https://api.x.ai/v1", models: "grok-4.5", apiEnv: "", ctx: 1000000 },
   { name: "kimi", kind: "openai", baseUrl: "https://api.moonshot.cn/v1", models: "moonshot-v1-8k", apiEnv: "MOONSHOT_API_KEY", ctx: 8000 },
   { name: "qwen", kind: "openai", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", models: "qwen-plus", apiEnv: "DASHSCOPE_API_KEY", ctx: 131072 },
   { name: "glm", kind: "openai", baseUrl: "https://open.bigmodel.cn/api/paas/v4", models: "glm-4-plus", apiEnv: "ZHIPUAI_API_KEY", ctx: 128000 },
@@ -50,9 +51,16 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
             <div className="bg-bg border border-border-soft rounded-lg p-3 mb-2" key={p.name}>
               <div className="flex items-center gap-2">
                 <span className="text-fg text-[13px] font-semibold">{p.name}</span>
-                <span className={`badge ${p.keySet ? "badge--success" : "badge--warning"}`}>
-                  {p.keySet ? t("settings.keySet") : t("settings.noKey")}
-                </span>
+                {p.oauthKind && (
+                  <span className={`badge ${p.oauthReady ? "badge--success" : "badge--warning"}`}>
+                    {p.oauthReady ? "OAuth 已登录" : "OAuth 未登录"}
+                  </span>
+                )}
+                {!p.oauthKind && (
+                  <span className={`badge ${p.keySet ? "badge--success" : "badge--warning"}`}>
+                    {p.keySet ? t("settings.keySet") : t("settings.noKey")}
+                  </span>
+                )}
                 <span className="flex-1" />
                 <button className="px-2.5 py-1 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg hover:bg-bg-soft transition-colors" onClick={() => setEditing(p.name)}>
                   {t("common.edit")}
@@ -72,6 +80,22 @@ export function ProvidersSection({ s, busy, apply }: SectionProps) {
                 <span className="truncate max-w-[260px]" title={p.models.join(", ")}>{p.models.join(", ")}</span>
               </div>
               <KeyField apiKeyEnv={p.apiKeyEnv} busy={busy} onSet={(v) => apply(() => app.SetProviderKey(p.apiKeyEnv, v))} />
+              {p.oauthKind && !p.oauthReady && (
+                <div className="mt-2">
+                  <button className="px-3 py-1.5 text-xs border border-accent/40 rounded bg-accent/10 text-accent cursor-pointer hover:bg-accent/20 transition-colors"
+                    disabled={busy} onClick={() => apply(() => app.LoginProvider(p.oauthKind))}>
+                    🔑 登录 XAI
+                  </button>
+                </div>
+              )}
+              {p.oauthKind && p.oauthReady && (
+                <div className="mt-2">
+                  <button className="px-3 py-1.5 text-xs border border-border-soft rounded bg-transparent text-fg-dim cursor-pointer hover:text-fg"
+                    disabled={busy} onClick={() => apply(() => app.LogoutProvider(p.oauthKind))}>
+                    登出
+                  </button>
+                </div>
+              )}
             </div>
           ),
         )}
@@ -170,6 +194,8 @@ function ProviderEditor({
       reasoningProtocol: reasoningProtocol.trim(),
       supportedEfforts: [],
       defaultEffort: defaultEffort.trim(),
+      oauthKind: initial?.oauthKind ?? "",
+      oauthReady: initial?.oauthReady ?? false,
     });
   };
 

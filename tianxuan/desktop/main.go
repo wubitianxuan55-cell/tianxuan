@@ -28,6 +28,7 @@ import (
 	// cmd/tianxuan does — boot.Build resolves providers/tools from these registries.
 	_ "tianxuan/internal/provider/anthropic"
 	_ "tianxuan/internal/provider/openai"
+	_ "tianxuan/internal/provider/xai"
 	_ "tianxuan/internal/tool/builtin"
 )
 

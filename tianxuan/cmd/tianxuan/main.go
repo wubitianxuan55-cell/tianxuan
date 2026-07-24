@@ -10,6 +10,7 @@ import (
 	// Blank imports wire compile-time built-ins into their registries.
 	_ "tianxuan/internal/provider/anthropic"
 	_ "tianxuan/internal/provider/openai"
+	_ "tianxuan/internal/provider/xai"
 	_ "tianxuan/internal/tool/builtin"
 )
 

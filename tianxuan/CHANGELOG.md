@@ -1,3 +1,31 @@
+## [10.94.0] — 2026-07-24
+
+### 🧠 XAI 规划者独立架构 + 轻量子代理路径
+
+> XAI(Grok) 规划者完全独立于 DeepSeek AgentRunner，不沾 TCCA 四域缓存。
+> 借鉴 Headroom 内容感知压缩策略。子代理对 XAI 走轻量路径跳过 TCCA 全套。
+
+#### 新增
+- **Planner 接口** (`planner.go`)：统一 DeepSeek AgentRunner 和 XAIPlanner 的契约
+- **XAIPlanner** (`xai_planner.go`)：独立规划者，自然对话循环（模型自主探索→规划）
+- **分层上下文** (`xai_context.go`)：L0-L4 五层管理 + Live-zone 压缩（grep/代码/日志 各有专用压缩器）
+- **XAI Provider** (`internal/provider/xai/`)：OAuth 集成
+- **轻量子代理** (`task.go`)：XAI 子代理走 runLightSubAgent，跳过 AgentRunner/TCCA
+
+#### 改动
+- `hermes.go`：plannerAgent → planner(Planner 接口)，newPlanner 工厂自动分发；XAI 用精简反馈
+- `config.go`：planner_model 支持 XAI provider
+- DeepSeek 代码（agent.go / cache_guard.go / compact.go）零改动
+
+#### 设计借鉴
+- Headroom live-zone 压缩 + 内容感知路由（compressGrepOutput/compressFileContent 等）
+- Claude Code Plan Mode（工具始终可用 + prompt 引导替代阶段状态机）
+
+#### 桌面端
+- `tianxuan-desktop.exe`：20.1 MB（+0.8 MB，XAI provider + planner 代码）
+
+---
+
 ## [10.93.0] — 2026-07-24
 
 ### 🔬 Gemini CLI 接口设计蒸馏：Kind 分类 + tailToolCall + SubagentDefinition

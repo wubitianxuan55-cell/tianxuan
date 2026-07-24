@@ -80,7 +80,12 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 	var toolErrors []string
 
 	for step := 0; step < maxSteps; step++ {
-		msgs := xctx.BuildMessages(input)
+		// 首轮传完整任务，后续不追加 user 消息（模型从工具结果自然继续）
+		taskPrompt := input
+		if step > 0 {
+			taskPrompt = ""
+		}
+		msgs := xctx.BuildMessages(taskPrompt)
 
 		text, calls, usage, err := p.streamOnce(ctx, msgs)
 		if err != nil {
@@ -92,9 +97,12 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 
 		summary.WriteString(text)
 
-		// 保存本轮对话
-		xctx.AddHistory(provider.Message{Role: provider.RoleUser, Content: input})
-		xctx.AddHistory(provider.Message{Role: provider.RoleAssistant, Content: text})
+		// 保存 assistant 回复（含 tool_calls 保持 API 规范）
+		xctx.AddHistory(provider.Message{
+			Role:      provider.RoleAssistant,
+			Content:   text,
+			ToolCalls: calls,
+		})
 
 		// 无工具调用 → 模型已给出最终计划
 		if len(calls) == 0 {
@@ -202,14 +210,16 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 	}
 
 	var textBuf strings.Builder
+	batcher := newStreamBatcher(p.sink)
 	for chunk := range ch {
 		switch chunk.Type {
 		case provider.ChunkText:
 			textBuf.WriteString(chunk.Text)
-			p.sink.Emit(event.Event{Kind: event.Text, Text: chunk.Text})
+			batcher.AddText(chunk.Text)
 		case provider.ChunkReasoning:
-			p.sink.Emit(event.Event{Kind: event.Reasoning, Text: chunk.Text})
+			batcher.AddReasoning(chunk.Text)
 		case provider.ChunkToolCallStart:
+			batcher.FlushNow()
 			if tc := chunk.ToolCall; tc != nil {
 				p.sink.Emit(event.Event{Kind: event.ToolDispatch, Tool: event.Tool{
 					ID: tc.ID, Name: tc.Name, ReadOnly: true, Partial: true,
@@ -219,13 +229,16 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 			calls = append(calls, *chunk.ToolCall)
 		case provider.ChunkUsage:
 			usage = chunk.Usage
+			batcher.FlushNow()
 			if usage != nil {
 				p.sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: p.pricing})
 			}
 		case provider.ChunkError:
+			batcher.FlushAll()
 			return "", nil, nil, chunk.Err
 		}
 	}
+	batcher.FlushAll()
 	return textBuf.String(), calls, usage, nil
 }
 

@@ -167,11 +167,13 @@ func (c *xaiContext) BuildMessages(taskPrompt string) []provider.Message {
 		}
 	}
 
-	// 当前任务
-	msgs = append(msgs, provider.Message{
-		Role:    provider.RoleUser,
-		Content: taskPrompt,
-	})
+	// 当前任务（首轮传完整任务，后续可以为空让模型从工具结果自然继续）
+	if taskPrompt != "" {
+		msgs = append(msgs, provider.Message{
+			Role:    provider.RoleUser,
+			Content: taskPrompt,
+		})
+	}
 
 	return msgs
 }

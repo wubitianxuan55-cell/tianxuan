@@ -76,8 +76,8 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 		maxSteps = 12
 	}
 
-	var summary strings.Builder
 	var toolErrors []string
+	var lastText string
 
 	for step := 0; step < maxSteps; step++ {
 		// 首轮传完整任务，后续不追加 user 消息（模型从工具结果自然继续）
@@ -95,7 +95,7 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 			p.lastUsage = *usage
 		}
 
-		summary.WriteString(text)
+		lastText = text
 
 		// 保存 assistant 回复（含 tool_calls 保持 API 规范）
 		xctx.AddHistory(provider.Message{
@@ -131,10 +131,10 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 		}
 	}
 
-	p.persistToSession(input, summary.String())
+	p.persistToSession(input, lastText)
 
 	return &TurnResult{
-		Summary: strings.TrimSpace(summary.String()),
+		Summary: strings.TrimSpace(lastText),
 		Success: len(toolErrors) == 0,
 		Errors:  toolErrors,
 	}, nil
@@ -256,6 +256,9 @@ func (p *XAIPlanner) executeTool(ctx context.Context, tc provider.ToolCall) (res
 		}
 	}
 	outcome, err := t.Execute(ctx, json.RawMessage(tc.Arguments))
+	p.sink.Emit(event.Event{Kind: event.ToolResult, Tool: event.Tool{
+		ID: tc.ID, Name: tc.Name, ReadOnly: t.ReadOnly(), Output: outcome,
+	}})
 	if err != nil {
 		return outcome, err.Error()
 	}

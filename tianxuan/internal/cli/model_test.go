@@ -34,7 +34,6 @@ func TestModelRefsSkipsUnconfigured(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "")
 	t.Setenv("MIMO_API_KEY", "")
 	for _, ref := range modelRefs() {
-		// XAI uses OAuth — may be auto-configured without env vars
 		if !strings.HasPrefix(ref, "xai") && !strings.HasPrefix(ref, "grok") {
 			t.Errorf("no keys set → got non-OAuth ref %q", ref)
 		}

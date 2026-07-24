@@ -38,8 +38,8 @@ type Hermes struct {
 	asker         Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
 
 	// planner 是规划者的抽象。DeepSeek 使用 AgentRunner（TCCA 四域缓存），
-	// XAI/Grok 等非 DeepSeek provider 使用 XAIPlanner（独立上下文管理）。
-	// 根据 hermesProvider 的名称自动选择实现。
+	// planner 是规划者，当前 DeepSeek 和 XAI 都使用 AgentRunner。
+	// 后续 XAI 将替换为独立的上下文管理。
 	planner Planner
 
 	// V10.54: workspace root for project map injection.
@@ -645,20 +645,12 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 func (h *Hermes) feedResultToPlanner(r *TurnResult) {
 	hasContent := r.Summary != "" || len(r.Errors) > 0 ||
 		len(r.FilesCreated) > 0 || len(r.FilesModified) > 0
-	if !hasContent {
-		return
+	if hasContent {
+		h.hermesSess.Add(provider.Message{
+			Role:    provider.RoleUser,
+			Content: formatExecutionFeedbackEnhanced(r, r.Plan),
+		})
 	}
-
-	// XAI planner 用精简反馈（省 token），DeepSeek 用完整格式
-	feedback := formatExecutionFeedbackEnhanced(r, r.Plan)
-	if ff, ok := h.planner.(interface{ FormatFeedback(*TurnResult) string }); ok {
-		feedback = ff.FormatFeedback(r)
-	}
-
-	h.hermesSess.Add(provider.Message{
-		Role:    provider.RoleUser,
-		Content: feedback,
-	})
 
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {
 		h.lastProjectHash = ""
@@ -948,17 +940,13 @@ func HandoffTask(s string) string {
 	return s
 }
 
-// newPlanner 根据 provider 类型创建对应的规划者。
-// DeepSeek → AgentRunner（TCCA 四域缓存 + 前缀守卫）
-// 其他 → XAIPlanner（独立上下文管理）
+// newPlanner 根据 provider 创建规划者。
+// 当前两者都使用 AgentRunner——XAI 先完整复制 DeepSeek 工作流，
+// 后续再替换 XAI 的上下文管理（TCCA 部分）。
 func newPlanner(prov provider.Provider, tools *tool.Registry, session *Session,
 	maxSteps int, temperature float64, pricing *provider.Pricing,
 	ctxWindow int, archiveDir string, sink event.Sink) Planner {
 
-	if !strings.Contains(strings.ToLower(prov.Name()), "deepseek") {
-		return NewXAIPlanner(prov, tools, session, maxSteps, temperature,
-			pricing, ctxWindow, archiveDir, sink)
-	}
 	return New(prov, tools, session, Options{
 		MaxSteps:       maxSteps,
 		Temperature:    temperature,

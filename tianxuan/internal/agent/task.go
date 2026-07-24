@@ -331,16 +331,7 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 	var subUsage provider.Usage
 	var result string
 	var err error
-
-	// XAI 等非 DeepSeek provider → 轻量子代理（跳过 TCCA）
-	if isLightSubAgentProvider(subProv.Name()) {
-		if run != nil && run.Session != nil {
-			// continue_from 的 session 已经包含历史，直接用 runLightSubAgent 不支持 session 复用
-			result, err = runLightSubAgent(ctx, subProv, subReg, sysPrompt, prompt, opts, sink, &subUsage)
-		} else {
-			result, err = runLightSubAgent(ctx, subProv, subReg, sysPrompt, prompt, opts, sink, &subUsage)
-		}
-	} else if run != nil && run.Session != nil {
+	if run != nil && run.Session != nil {
 		result, err = RunSubAgentWithSession(ctx, subProv, subReg, run.Session, prompt, opts, sink, &subUsage)
 	} else {
 		result, err = RunSubAgent(ctx, subProv, subReg, sysPrompt, prompt, opts, sink, &subUsage)
@@ -478,114 +469,6 @@ func RunSubAgentWithSession(ctx context.Context, prov provider.Provider, reg *to
 	return runSubAgentInternal(ctx, prov, reg, sess, prompt, opts, sink, subUsage)
 }
 
-// runLightSubAgent 是 XAI 等非 DeepSeek provider 的轻量子代理路径。
-// 不经过 AgentRunner 和 TCCA 四域缓存——子代理是一次性的，前缀缓存无意义。
-// 自己管理 session → stream → 工具执行循环，只返回最后一条 assistant 消息。
-func runLightSubAgent(ctx context.Context, prov provider.Provider, reg *tool.Registry, sysPrompt, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
-	sess := NewSession(sysPrompt)
-	if opts.RuntimePrompt != "" {
-		sess.Messages[0].Content += "\n\n" + opts.RuntimePrompt
-	}
-	sess.Add(provider.Message{Role: provider.RoleUser, Content: prompt})
-
-	maxSteps := opts.MaxSteps
-	if maxSteps <= 0 {
-		maxSteps = 8
-	}
-
-	var lastText string
-	schemas := reg.Schemas()
-
-	for step := 0; step < maxSteps; step++ {
-		msgs := sess.Snapshot()
-
-		ch, err := prov.Stream(ctx, provider.Request{
-			Messages:    msgs,
-			Tools:       schemas,
-			Temperature: opts.Temperature,
-		})
-		if err != nil {
-			return "", fmt.Errorf("light sub-agent stream: %w", err)
-		}
-
-		var textBuf strings.Builder
-		var calls []provider.ToolCall
-		var usage *provider.Usage
-
-		for chunk := range ch {
-			switch chunk.Type {
-			case provider.ChunkText:
-				textBuf.WriteString(chunk.Text)
-			case provider.ChunkToolCallStart:
-				if tc := chunk.ToolCall; tc != nil && sink != nil {
-					sink.Emit(event.Event{Kind: event.ToolDispatch, Tool: event.Tool{
-						ID: tc.ID, Name: tc.Name, ReadOnly: toolIsReadOnly(reg, tc.Name), Partial: true,
-					}})
-				}
-			case provider.ChunkToolCall:
-				calls = append(calls, *chunk.ToolCall)
-			case provider.ChunkUsage:
-				usage = chunk.Usage
-				if usage != nil && sink != nil {
-					sink.Emit(event.Event{Kind: event.Usage, Usage: usage, Pricing: opts.Pricing})
-				}
-			case provider.ChunkError:
-				return "", chunk.Err
-			}
-		}
-
-		text := textBuf.String()
-		lastText = text
-		if usage != nil && subUsage != nil {
-			*subUsage = *usage
-		}
-
-		// 无工具调用 → 模型给出最终答案
-		if len(calls) == 0 {
-			break
-		}
-
-		// 保存 assistant 消息和执行工具
-		sess.Add(provider.Message{Role: provider.RoleAssistant, Content: text, ToolCalls: calls})
-		for _, tc := range calls {
-			result := executeLightTool(ctx, reg, tc, sink)
-			sess.Add(provider.Message{
-				Role: provider.RoleTool, Content: result,
-				ToolCallID: tc.ID, Name: tc.Name,
-			})
-		}
-	}
-
-	if lastText == "" {
-		return "", fmt.Errorf("light sub-agent finished without producing a final answer")
-	}
-	return lastText, nil
-}
-
-// executeLightTool 执行单个工具调用（轻量版，无 gate）。
-func executeLightTool(ctx context.Context, reg *tool.Registry, tc provider.ToolCall, sink event.Sink) string {
-	t, ok := reg.Get(tc.Name)
-	if !ok {
-		return fmt.Sprintf("unknown tool: %s", tc.Name)
-	}
-	result, err := t.Execute(ctx, json.RawMessage(tc.Arguments))
-	if sink != nil {
-		sink.Emit(event.Event{Kind: event.ToolResult, Tool: event.Tool{
-			ID: tc.ID, Name: tc.Name, ReadOnly: t.ReadOnly(), Output: result,
-		}})
-	}
-	if err != nil {
-		return fmt.Sprintf("tool error: %s\n%s", err.Error(), result)
-	}
-	return result
-}
-
-// toolIsReadOnly 检查工具是否为只读。
-func toolIsReadOnly(reg *tool.Registry, name string) bool {
-	t, ok := reg.Get(name)
-	return ok && t.ReadOnly()
-}
-
 // runSubAgentInternal is the shared sub-agent execution path: wire up an
 // AgentRunner, run the prompt, and extract the final assistant message.
 func runSubAgentInternal(ctx context.Context, prov provider.Provider, reg *tool.Registry, sess *Session, prompt string, opts Options, sink event.Sink, subUsage *provider.Usage) (string, error) {
@@ -663,10 +546,4 @@ func subSinkFor(parentID string, parent event.Sink) event.Sink {
 			parent.Emit(e)
 		}
 	})
-}
-
-// isLightSubAgentProvider 判断是否应使用轻量子代理路径。
-// 非 DeepSeek provider（XAI 等）的子代理是一次性的，TCCA 四域缓存无意义。
-func isLightSubAgentProvider(name string) bool {
-	return !strings.Contains(strings.ToLower(name), "deepseek")
 }

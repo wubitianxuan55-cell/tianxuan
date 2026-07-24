@@ -87,7 +87,7 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 		}
 		msgs := xctx.BuildMessages(taskPrompt)
 
-		text, calls, usage, err := p.streamOnce(ctx, msgs)
+		text, calls, toolResults, toolErrMsgs, usage, err := p.streamOnce(ctx, msgs)
 		if err != nil {
 			return nil, fmt.Errorf("xai planner: %w", err)
 		}
@@ -109,9 +109,12 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 			break
 		}
 
-		// 执行工具调用，结果注入上下文
-		for _, tc := range calls {
-			result, errMsg := p.executeTool(ctx, tc)
+		// 工具已在 streamOnce 中即时执行，这里只需注入结果到上下文
+		for i, tc := range calls {
+			result := ""
+			if i < len(toolResults) {
+				result = toolResults[i]
+			}
 			xctx.AddHistory(provider.Message{
 				Role:       provider.RoleTool,
 				Content:    result,
@@ -120,8 +123,8 @@ func (p *XAIPlanner) Run(ctx context.Context, input string) (*TurnResult, error)
 			})
 			xctx.AddDiscovery(tc.Name, result)
 
-			if errMsg != "" {
-				toolErrors = append(toolErrors, fmt.Sprintf("%s: %s", tc.Name, errMsg))
+			if i < len(toolErrMsgs) && toolErrMsgs[i] != "" {
+				toolErrors = append(toolErrors, fmt.Sprintf("%s: %s", tc.Name, toolErrMsgs[i]))
 			}
 		}
 
@@ -197,7 +200,7 @@ func (p *XAIPlanner) maybeCompact(xctx *xaiContext, promptTokens int) {
 // ── stream / tool ──
 
 func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
-	text string, calls []provider.ToolCall, usage *provider.Usage, err error) {
+	text string, calls []provider.ToolCall, toolResults []string, toolErrMsgs []string, usage *provider.Usage, err error) {
 
 	schemas := p.tools.Schemas()
 	ch, err := p.prov.Stream(ctx, provider.Request{
@@ -206,7 +209,7 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 		Temperature: p.temperature,
 	})
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, nil, err
 	}
 
 	var textBuf strings.Builder
@@ -227,6 +230,14 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 			}
 		case provider.ChunkToolCall:
 			calls = append(calls, *chunk.ToolCall)
+			// 即时执行工具，让 ToolResult 穿插在 Text 流中
+			if tc := chunk.ToolCall; tc != nil && tc.ID != "" {
+				result, errMsg := p.executeTool(ctx, *tc)
+				toolResults = append(toolResults, result)
+				if errMsg != "" {
+					toolErrMsgs = append(toolErrMsgs, errMsg)
+				}
+			}
 		case provider.ChunkUsage:
 			usage = chunk.Usage
 			batcher.FlushNow()
@@ -235,11 +246,11 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 			}
 		case provider.ChunkError:
 			batcher.FlushAll()
-			return "", nil, nil, chunk.Err
+			return "", nil, nil, nil, nil, chunk.Err
 		}
 	}
 	batcher.FlushAll()
-	return textBuf.String(), calls, usage, nil
+	return textBuf.String(), calls, toolResults, toolErrMsgs, usage, nil
 }
 
 func (p *XAIPlanner) executeTool(ctx context.Context, tc provider.ToolCall) (result, errMsg string) {

@@ -214,6 +214,17 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 
 	var textBuf strings.Builder
 	batcher := newStreamBatcher(p.sink)
+
+	// 异步工具执行（对齐 AgentRunner pre-execute goroutine 模式）
+	type toolOutcome struct {
+		index  int
+		result string
+		errMsg string
+	}
+	var wg sync.WaitGroup
+	outcomes := make(chan toolOutcome, 8)
+	toolIndex := 0
+
 	for chunk := range ch {
 		switch chunk.Type {
 		case provider.ChunkText:
@@ -230,13 +241,15 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 			}
 		case provider.ChunkToolCall:
 			calls = append(calls, *chunk.ToolCall)
-			// 即时执行工具，让 ToolResult 穿插在 Text 流中
 			if tc := chunk.ToolCall; tc != nil && tc.ID != "" {
-				result, errMsg := p.executeTool(ctx, *tc)
-				toolResults = append(toolResults, result)
-				if errMsg != "" {
-					toolErrMsgs = append(toolErrMsgs, errMsg)
-				}
+				idx := toolIndex
+				toolIndex++
+				wg.Add(1)
+				go func(call provider.ToolCall, i int) {
+					defer wg.Done()
+					r, em := p.executeTool(ctx, call)
+					outcomes <- toolOutcome{index: i, result: r, errMsg: em}
+				}(*tc, idx)
 			}
 		case provider.ChunkUsage:
 			usage = chunk.Usage
@@ -250,6 +263,18 @@ func (p *XAIPlanner) streamOnce(ctx context.Context, msgs []provider.Message) (
 		}
 	}
 	batcher.FlushAll()
+
+	// 等待所有异步工具执行完成，收集结果
+	wg.Wait()
+	close(outcomes)
+	toolResults = make([]string, toolIndex)
+	toolErrMsgs = make([]string, toolIndex)
+	for o := range outcomes {
+		toolResults[o.index] = o.result
+		if o.errMsg != "" {
+			toolErrMsgs[o.index] = o.errMsg
+		}
+	}
 	return textBuf.String(), calls, toolResults, toolErrMsgs, usage, nil
 }
 

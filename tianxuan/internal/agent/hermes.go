@@ -37,10 +37,11 @@ type Hermes struct {
 	planMaxSteps  int            // max planner tool-call turns (<=0 = unlimited)
 	asker         Asker          // V10.34: interactive plan confirmation (nil = auto-confirm)
 
-	// planner 是规划者的抽象。DeepSeek 使用 AgentRunner（TCCA 四域缓存），
-	// planner 是规划者，当前 DeepSeek 和 XAI 都使用 AgentRunner。
-	// 后续 XAI 将替换为独立的上下文管理。
-	planner Planner
+	// V10.36: persistent planner Agent with compaction — replaces per-turn temp AgentRunner.
+	// The planner accumulates planning history + execution results across turns, with
+	// compaction keeping the context bounded. This gives the planner a proper TCCA-like
+	// architecture (L1 stable prefix + L4 growing flow + compaction).
+	plannerAgent *AgentRunner
 
 	// V10.54: workspace root for project map injection.
 	wsRoot          string
@@ -92,9 +93,17 @@ func NewHermes(hermesProvider provider.Provider, hermesSession *Session, hermesP
 			}
 			sink.Emit(e)
 		})
-		h.planner = newPlanner(hermesProvider, readonlyTools, hermesSession,
-			planMaxSteps, temperature, hermesPricing,
-			contextWindow, archiveDir, plannerSink)
+		h.plannerAgent = New(hermesProvider, readonlyTools, hermesSession, Options{
+			MaxSteps:       planMaxSteps,
+			Temperature:    temperature,
+			Pricing:        hermesPricing,
+			Gate:           &autoGate{},
+			DisableVerify:  true,
+			PlannerMode:    true,
+			StrictEvidence: false,
+			ContextWindow:  contextWindow,
+			Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: contextWindow},
+		}, plannerSink)
 	}
 	return h
 }
@@ -126,8 +135,8 @@ func (h *Hermes) ResetSession() {
 	// Also update the plannerAgent's session pointer so it uses the fresh
 	// session. Without this, plannerAgent still writes to the old session,
 	// leaking stale history into future plans across session switches.
-	if h.planner != nil {
-		h.planner.SetSession(h.hermesSess)
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetSession(h.hermesSess)
 	}
 	// V10.87: reset project map hash so the new session gets a fresh injection.
 	// Without this, injectProjectMap sees the stale hash and skips re-injection,
@@ -138,14 +147,14 @@ func (h *Hermes) ResetSession() {
 // PlannerContext returns the planner agent's last usage and context window,
 // for the status bar's per-model context gauge.
 func (h *Hermes) PlannerContext() (used int, window int) {
-	if h == nil || h.planner == nil {
+	if h == nil || h.plannerAgent == nil {
 		return 0, 0
 	}
-	u := h.planner.LastUsage()
+	u := h.plannerAgent.LastUsage()
 	if u == nil {
-		return 0, h.planner.ContextWindow()
+		return 0, h.plannerAgent.ContextWindow()
 	}
-	return u.PromptTokens, h.planner.ContextWindow()
+	return u.PromptTokens, h.plannerAgent.ContextWindow()
 }
 
 // SetAsker installs the interactive asker for plan confirmation (V10.34).
@@ -154,8 +163,8 @@ func (h *Hermes) PlannerContext() (used int, window int) {
 // during planning (scope negotiation, detail gathering).
 func (h *Hermes) SetAsker(a Asker) {
 	h.asker = a
-	if h.planner != nil {
-		h.planner.SetAsker(a)
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetAsker(a)
 	}
 }
 
@@ -165,8 +174,8 @@ func (h *Hermes) SetPlanMode(v bool) {
 	if h == nil {
 		return
 	}
-	if h.planner != nil {
-		h.planner.SetPlanMode(v)
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetPlanMode(v)
 	}
 	h.hephaestus.SetPlanMode(v)
 }
@@ -176,8 +185,8 @@ func (h *Hermes) SetPlanModePolicy(p planmode.Policy) {
 	if h == nil {
 		return
 	}
-	if h.planner != nil {
-		h.planner.SetPlanModePolicy(p)
+	if h.plannerAgent != nil {
+		h.plannerAgent.SetPlanModePolicy(p)
 	}
 	h.hephaestus.SetPlanModePolicy(p)
 }
@@ -651,7 +660,6 @@ func (h *Hermes) feedResultToPlanner(r *TurnResult) {
 			Content: formatExecutionFeedbackEnhanced(r, r.Plan),
 		})
 	}
-
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {
 		h.lastProjectHash = ""
 	}
@@ -814,8 +822,8 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 	// Trigger compaction on the planner agent — planStream writes directly to
 	// h.hermesSess without going through plannerAgent.Run(), so auto-compaction
 	// never fires on this path. Without this, planStream sessions grow unbounded.
-	if h.planner != nil {
-		if err := h.planner.CompactNow(ctx, "planStream turn boundary"); err != nil {
+	if h.plannerAgent != nil {
+		if err := h.plannerAgent.CompactNow(ctx, "planStream turn boundary"); err != nil {
 			slog.Warn("hermes: planStream compaction failed", "error", err)
 		}
 	} else {
@@ -850,16 +858,16 @@ func (h *Hermes) planStream(ctx context.Context, input string) (string, error) {
 // building a temporary AgentRunner each turn. The planner's session accumulates
 // planning history + execution results across turns; compaction keeps it bounded.
 func (h *Hermes) planWithTools(ctx context.Context, input string) (string, error) {
-	if h.planner == nil {
+	if h.plannerAgent == nil {
 		return "", fmt.Errorf("hermes: planner agent not initialized (no read-only tools)")
 	}
 	// Re-propagate asker to plannerAgent before each planning run,
 	// ensuring the ask tool can interact with the user even if
 	// SetAsker was called before plannerAgent was created.
 	if h.asker != nil {
-		h.planner.SetAsker(h.asker)
+		h.plannerAgent.SetAsker(h.asker)
 	}
-	turnResult, err := h.planner.Run(ctx, input)
+	turnResult, err := h.plannerAgent.Run(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("hermes: %w", err)
 	}
@@ -938,24 +946,4 @@ func HandoffTask(s string) string {
 		return task
 	}
 	return s
-}
-
-// newPlanner 根据 provider 创建规划者。
-// 当前两者都使用 AgentRunner——XAI 先完整复制 DeepSeek 工作流，
-// 后续再替换 XAI 的上下文管理（TCCA 部分）。
-func newPlanner(prov provider.Provider, tools *tool.Registry, session *Session,
-	maxSteps int, temperature float64, pricing *provider.Pricing,
-	ctxWindow int, archiveDir string, sink event.Sink) Planner {
-
-	return New(prov, tools, session, Options{
-		MaxSteps:       maxSteps,
-		Temperature:    temperature,
-		Pricing:        pricing,
-		Gate:           &autoGate{},
-		DisableVerify:  true,
-		PlannerMode:    true,
-		StrictEvidence: false,
-		ContextWindow:  ctxWindow,
-		Compaction:     CompactionConfig{ArchiveDir: archiveDir, Window: ctxWindow},
-	}, sink)
 }

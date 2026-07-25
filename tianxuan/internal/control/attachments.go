@@ -24,11 +24,11 @@ func SaveImageDataURL(dataURL string) (string, error) {
 	const prefix = "data:"
 	const marker = ";base64,"
 	if !strings.HasPrefix(dataURL, prefix) {
-		return "", fmt.Errorf("unsupported pasted image")
+		return "", fmt.Errorf("unsupported pasted image: not a data URL")
 	}
 	i := strings.Index(dataURL, marker)
 	if i <= len(prefix) {
-		return "", fmt.Errorf("unsupported pasted image")
+		return "", fmt.Errorf("unsupported pasted image: missing base64 marker")
 	}
 	mime := strings.ToLower(dataURL[len(prefix):i])
 	raw, err := base64.StdEncoding.DecodeString(dataURL[i+len(marker):])

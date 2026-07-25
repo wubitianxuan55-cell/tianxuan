@@ -125,6 +125,24 @@ func (l *Ledger) HasSuccessfulCommand(command string) bool {
 	return false
 }
 
+// HasFailedCommand reports whether the cited command ran this turn but exited
+// non-zero — so callers can distinguish "ran and failed" from "never ran".
+// Design adopted from DeepSeek-Reasonix v1.17.21.
+func (l *Ledger) HasFailedCommand(command string) bool {
+	command = strings.TrimSpace(command)
+	if l == nil || command == "" {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, r := range l.receipts {
+		if !r.Success && r.ToolName == "bash" && r.Command == command {
+			return true
+		}
+	}
+	return false
+}
+
 // SuccessfulCommands returns up to limit distinct successful bash commands
 // recorded this turn, for use in diagnostic hints.
 func (l *Ledger) SuccessfulCommands(limit int) []string {
@@ -137,6 +155,29 @@ func (l *Ledger) SuccessfulCommands(limit int) []string {
 	var cmds []string
 	for _, r := range l.receipts {
 		if !r.Success || r.Command == "" || r.ToolName != "bash" || seen[r.Command] {
+			continue
+		}
+		seen[r.Command] = true
+		cmds = append(cmds, r.Command)
+		if len(cmds) >= limit {
+			break
+		}
+	}
+	return cmds
+}
+
+// FailedCommands returns up to limit distinct failed bash commands recorded
+// this turn, for use in diagnostic hints.
+func (l *Ledger) FailedCommands(limit int) []string {
+	if l == nil {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	seen := map[string]bool{}
+	var cmds []string
+	for _, r := range l.receipts {
+		if r.Success || r.Command == "" || r.ToolName != "bash" || seen[r.Command] {
 			continue
 		}
 		seen[r.Command] = true
@@ -171,6 +212,23 @@ func (l *Ledger) MatchLatestTodoStep(step string) (TodoStepMatch, bool) {
 		return matchTodoStep(step, r.Todos), true
 	}
 	return TodoStepMatch{}, false
+}
+
+// LatestTodos returns the todo list from the most recent successful todo_write
+// receipt. Used by VerifySerialTodos to compare against the previous state.
+func (l *Ledger) LatestTodos() ([]TodoItem, bool) {
+	if l == nil {
+		return nil, false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i := len(l.receipts) - 1; i >= 0; i-- {
+		r := l.receipts[i]
+		if r.Success && r.ToolName == "todo_write" {
+			return r.Todos, true
+		}
+	}
+	return nil, false
 }
 
 // UnverifiedCompletedTodos reports current completed todos that transitioned

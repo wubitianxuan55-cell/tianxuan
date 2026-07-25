@@ -1,5 +1,7 @@
 package evidence
 
+import "fmt"
+
 // IncompleteTodos returns the items of a todo list that are not completed.
 // (Design adopted from DeepSeek-Reasonix-V1.12)
 func IncompleteTodos(todos []TodoItem) []TodoStepMatch {
@@ -26,4 +28,33 @@ func IncompleteTodos(todos []TodoItem) []TodoStepMatch {
 func MatchStep(step string, todos []TodoItem) (TodoStepMatch, bool) {
 	m := matchTodoStep(step, todos)
 	return m, m.Found
+}
+
+// ── V10.99 蒸馏自 Reasonix v1.17.21 — todo 状态机守卫 ──
+
+// ValidateSerialTodos enforces the task-list state machine:
+//   - At most one in_progress item at a time
+//   - All status values must be valid (pending|in_progress|completed)
+//   - A level-1 sub-step must have a level-0 phase header above it
+//
+// Design adopted from DeepSeek-Reasonix v1.17.21, relaxed for tianxuan's
+// gate-at-final-answer design (ordering enforced by finalReadinessCheck).
+func ValidateSerialTodos(todos []TodoItem) error {
+	ipSeen := false
+	for i, todo := range todos {
+		switch todoStatus(todo.Status) {
+		case "completed", "pending":
+		case "in_progress":
+			if ipSeen {
+				return fmt.Errorf("todo %d %q is a second in_progress item; serial task lists allow exactly one current item", i+1, todo.Content)
+			}
+			ipSeen = true
+		default:
+			return fmt.Errorf("todo %d %q has invalid status %q", i+1, todo.Content, todo.Status)
+		}
+	}
+	if len(todos) > 0 && todos[0].Level == 1 {
+		return fmt.Errorf("todo 1 %q is a level-1 sub-step with no phase above it; add a level-0 phase header or use level 0", todos[0].Content)
+	}
+	return nil
 }

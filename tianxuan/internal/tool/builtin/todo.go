@@ -93,7 +93,14 @@ func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, err
 			return "", fmt.Errorf("todo %d: invalid status %q (want pending|in_progress|completed)", i+1, t.Status)
 		}
 	}
-	if err := verifyTodoCompletionTransitions(ctx, p.Todos); err != nil {
+	// V10.99: 蒸馏自 Reasonix v1.17.21 — todo 状态机校验
+	// 仅校验基础状态机（最多一个 in_progress、有效状态值、level-1 必须有 phase 头）
+	// 更严格的排序和连续性由 final-answer 门控阶段处理
+	evTodos := toEvidenceTodos(p.Todos)
+	if err := evidence.ValidateSerialTodos(evTodos); err != nil {
+		return "", err
+	}
+	if err := verifyTodoCompletionTransitionsFrom(ctx, evTodos); err != nil {
 		return "", err
 	}
 
@@ -160,21 +167,17 @@ func findTianxuanDir(dir string) string {
 	}
 }
 
-func verifyTodoCompletionTransitions(ctx context.Context, todos []todoItem) error {
+func verifyTodoCompletionTransitionsFrom(ctx context.Context, evTodos []evidence.TodoItem) error {
 	ledger, ok := evidence.FromContext(ctx)
 	if !ok {
 		return nil
 	}
 	// V10.8: 只在严格验证模式（Plan Mode）下强制 complete_step 验证
 	// 普通模式下允许自由标记 todo 状态，由 complete_step 自行验证
-	strictMode := false
-	if ledger, ok := evidence.FromContext(ctx); ok {
-		strictMode = ledger.StrictVerification()
-	}
-	if !strictMode {
+	if !ledger.StrictVerification() {
 		return nil
 	}
-	missing, hasBaseline := ledger.UnverifiedCompletedTodos(toEvidenceTodos(todos))
+	missing, hasBaseline := ledger.UnverifiedCompletedTodos(evTodos)
 	if !hasBaseline || len(missing) == 0 {
 		return nil
 	}

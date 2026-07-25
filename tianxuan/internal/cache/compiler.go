@@ -10,7 +10,6 @@ import (
 
 // Compiler assembles the L1 cache domain into the byte-stable prefix.
 // V3.0: Compiler delegates identity operations to IdentityLayer.
-// Deprecated: use context.ContextManager.Identity() instead.
 type Compiler struct {
 	l1 *IdentityLayer
 }

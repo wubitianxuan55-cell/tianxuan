@@ -176,6 +176,9 @@ func verifyStepEvidence(ctx context.Context, items []stepEvidence) (hostVerified
 				return 0, 0, fmt.Errorf("evidence %d: verification command is required for host verification", i+1)
 			}
 			if !ledger.HasSuccessfulCommand(command) {
+				if ledger.HasFailedCommand(command) {
+					return 0, 0, fmt.Errorf("evidence %d: verification command %q ran but exited non-zero — it can't prove the step; fix the command so it succeeds, then re-run and sign off again", i+1, command)
+				}
 				hint := commandHints(ledger)
 				return 0, 0, fmt.Errorf("evidence %d: verification command %q has no matching successful bash receipt in this turn%s", i+1, command, hint)
 			}
@@ -229,13 +232,32 @@ func verifyTodoStep(ctx context.Context, step string) (evidence.TodoStepMatch, b
 
 func commandHints(ledger *evidence.Ledger) string {
 	cmds := ledger.SuccessfulCommands(5)
-	if len(cmds) == 0 {
+	failed := ledger.FailedCommands(3)
+	if len(cmds) == 0 && len(failed) == 0 {
 		return ""
 	}
-	for i, c := range cmds {
-		if len(c) > 80 {
-			cmds[i] = c[:80] + "…"
+	var parts []string
+	if len(cmds) > 0 {
+		truncated := make([]string, len(cmds))
+		for i, c := range cmds {
+			if len(c) > 80 {
+				truncated[i] = c[:80] + "…"
+			} else {
+				truncated[i] = c
+			}
 		}
+		parts = append(parts, fmt.Sprintf("successful commands this turn: %s — cite one exactly as it ran", strings.Join(truncated, ", ")))
 	}
-	return fmt.Sprintf("; successful commands this turn: %s — cite one exactly as it ran", strings.Join(cmds, ", "))
+	if len(failed) > 0 {
+		truncated := make([]string, len(failed))
+		for i, c := range failed {
+			if len(c) > 80 {
+				truncated[i] = c[:80] + "…"
+			} else {
+				truncated[i] = c
+			}
+		}
+		parts = append(parts, fmt.Sprintf("commands that ran but failed: %s — fix and re-run before citing", strings.Join(truncated, ", ")))
+	}
+	return "; " + strings.Join(parts, "; ")
 }

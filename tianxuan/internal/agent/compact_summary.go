@@ -1,12 +1,19 @@
 package agent
 
 import (
-"sort"
-"strings"
+	"path/filepath"
+	"sort"
+	"strings"
 
-"tianxuan/internal/provider"
+	"tianxuan/internal/provider"
 	"tianxuan/internal/strutil"
 )
+
+var codeExts = map[string]bool{
+	".go": true, ".ts": true, ".tsx": true, ".js": true, ".py": true,
+	".rs": true, ".java": true, ".md": true, ".json": true, ".yaml": true,
+	".yml": true, ".toml": true,
+}
 
 // 提取：用户请求、工具统计、编辑文件、待办项、关键文件、最近工作。
 // 完全确定性：相同输入 → 相同输出，不影响缓存稳定性。
@@ -212,15 +219,8 @@ func extractKeyFiles(msg provider.Message) []string {
 			if !strings.Contains(token, "/") {
 				continue
 			}
-			// 检查是否有已知代码文件扩展名
-			hasExt := false
-			for _, ext := range []string{".go", ".ts", ".tsx", ".js", ".py", ".rs", ".java", ".md", ".json", ".yaml", ".yml", ".toml"} {
-				if strings.HasSuffix(token, ext) {
-					hasExt = true
-					break
-				}
-			}
-			if hasExt && !seen[token] {
+			// 		// 检查是否有已知代码文件扩展名
+		if codeExts[filepath.Ext(token)] && !seen[token] {
 				files = append(files, token)
 				seen[token] = true
 			}

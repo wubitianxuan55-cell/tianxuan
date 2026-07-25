@@ -120,7 +120,7 @@ func TestCompleteStepRejectsUnverifiedHostEvidence(t *testing.T) {
 		{
 			name: "failed verification command",
 			body: `{"step":"x","result":"y","evidence":[{"kind":"verification","summary":"claimed tests","command":"go test ./..."}]}`,
-			want: "successful bash receipt",
+			want: "exited non-zero",
 		},
 		{
 			name: "missing diff writer",

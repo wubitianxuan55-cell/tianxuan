@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,6 +230,17 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 			fmt.Fprintf(&b, "\n[more lines available; pass offset=%d to continue]\n",
 				p.Offset+len(collected))
 		}
+	}
+
+	// V10.96: 阶梯式阅读门控 — 大文件盲读时提示降级路径。
+	// 当 Agent 未指定 offset/limit 且文件超过 200 行时，注入阶梯式建议，
+	// 引导 Agent 优先使用 lsp_definition / grep 等精确工具定位后再读取片段。
+	// 蒸馏自 SDL-MCP Iris Gate Ladder：Rung1(符号卡片)→Rung2(grep)→Rung3(offset读取)→Rung4(全文件)。
+	const rungThreshold = 200
+	if p.Offset == 0 && p.Limit == readFileDefaultLimit && lineNo > rungThreshold {
+		b.WriteString("\n[阶梯式阅读提示: 文件较大(")
+		b.WriteString(strconv.Itoa(lineNo))
+		b.WriteString("+行)。下次优先: (1) lsp_definition/grep 定位目标 → (2) read_file(offset,limit) 精确片段读取。避免盲目全文件读取消耗 token。]\n")
 	}
 	return b.String(), nil
 }

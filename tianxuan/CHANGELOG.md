@@ -1,3 +1,98 @@
+## [10.99.0] — 2026-07-25
+
+### 🪜 Ponytail 7 级梯子 + 🛡️ guard-skills AI 失败模式：双重编码质量提升
+
+> 从 ponytail (89k⭐) 蒸馏 7 级决策梯子（benchmark: −54% LOC），从 guard-skills 蒸馏 15 种 AI 生成代码失败模式。
+
+#### ponytail 蒸馏
+- **7 级实现梯子注入 L2 hint**：在写代码前从第 1 级爬梯——(1)需要存在？→(2)已有？→(3)标准库？→(4)原生API？→(5)已装依赖？→(6)一行搞定？→(7)最少代码。`原生优于依赖,删除优于添加,无聊优于聪明`
+- 梯子在理解问题后运行，不是替代理解
+
+#### guard-skills 蒸馏
+- **code-review-guard skill**：内置 bundle skill，三种模式：
+  - `guard-pass`：交付前 diff 自检 → 修复 → 输出 `N fixed, M flagged`
+  - `review`：结构化 PR 审查报告
+  - `live`：边写边遵循规则
+- **15 种 AI 失败模式**：catch-all 异常吞咽、幻觉API、过早抽象、硬编码成功返回、死代码、为琐事加依赖等
+- **11 项自检清单**：交付前逐项走查 diff
+- **安全护栏**：永不简化的底线（输入验证、错误处理、安全、无障碍）
+
+#### 文件变更
+- `internal/boot/sysprompt.go` — L2 hint 升级（代码阶梯+实现梯子）
+- `internal/skill/bundled/code-review-guard/SKILL.md` — 新 skill (+105行)
+
+---
+
+## [10.98.0] — 2026-07-25
+
+### 🔗 Closure Evidence：AI-Atomic-Framework 蒸馏
+
+> 从 ATM 确定性治理框架蒸馏闭包证据机制 — complete_step 自动 Git 锚定形成不可抵赖的证据链。
+
+#### Closure Evidence 蒸馏
+- **complete_step Git 锚定**：每个步骤完成时自动 `git rev-parse --short HEAD`，输出中附带 `Git anchor: <sha>`，形成不可抵赖的证据链
+- **evidence-freshness**：已由 `Ledger.Reset()` 天然保证（每轮清空收据），无需额外代码
+- 蒸馏原理：参考 ATM 的 `closure-packet.v1`（`commandRuns SHA256 + targetCommit + governedTreeSha`），简化版只取 `git HEAD` 锚定
+
+#### 文件变更
+- `internal/tool/builtin/completestep.go` — Git 锚定注入 (+11行)
+
+---
+
+## [10.97.0] — 2026-07-25
+
+### 🚦 Phase Gate + 🧠 Auto-Dream：headsign + Bamboo 联合蒸馏
+
+> 两个互补改进：确定性 shell 验证门控 替代 LLM 判断，被动记忆提取 减少 Agent 认知负担。
+
+#### headsign Phase Gate 蒸馏
+- **`verify_gate` 工具**：shell 命令验证门控。退出码裁决 pass/fail，第一个失败即停。比 complete_step 的 LLM 判断更确定性。支持超时（默认 120s，最大 600s）
+- **`compact` 注册**：紧凑描述 + Schema 已注册到工具集
+
+#### Bamboo Auto-Dream 蒸馏
+- **`archive.Dream` — 规则驱动的被动记忆提取**：从会话归档 JSONL 中自动提取用户偏好（"I prefer"/"我喜欢"）和项目约定（"we use"/"我们采用"）
+- **`archive.DreamBatch` — 批量梦境运行**：遍历所有归档会话，带冷却期控制，避免重复提取
+- **零额外 LLM 调用**：纯正则规则匹配，不增加 API 成本
+- 输出格式：frontmatter（type/source/date）+ Markdown body，写入 `.tianxuan/memory/auto-dream/`
+
+#### 文件变更
+- `internal/tool/builtin/verify_gate.go` — 新工具
+- `internal/tool/builtin/compact.go` — verify_gate 紧凑描述 + Schema
+- `internal/tool/builtin/tool_extra_test.go` — 4 个 verify_gate 测试
+- `internal/archive/dream.go` — Auto-Dream 提取引擎
+- `internal/archive/archive_test.go` — 4 个 dream 测试
+
+---
+
+## [10.96.0] — 2026-07-25
+
+### 🧠 四项目联合蒸馏：SDL-MCP + jcode + Bernstein
+
+> 从四个新兴开源 agent 项目蒸馏关键设计精华到 tianxuan 内核。
+> 聚焦编程工作流与编程能力，不动 L1 前缀缓存。
+
+#### SDL-MCP 蒸馏
+- **渐进式上下文阶梯**：L2 Runtime 注入四层代码阅读模型（lsp_definition → grep → read_file(offset) → 全文件），引导 Agent 从最便宜的方式开始探索代码
+- **策略门控大文件保护**：read_file 超 200 行且无 offset/limit 时在返回结果中注入阶梯式降级建议，减少盲目全文件读取
+
+#### jcode 蒸馏
+- **语义记忆自动回想**：Agent 每轮启动时自动用 FTS5 BM25 搜索记忆，无需显式调用 `memory_search`。零外部依赖，沿用现有 BM25 索引
+- **Split Prompt 优化**：确认 tianxuan TCCA L1/L2 分离 + cache_guard 已覆盖 jcode 设计，无需额外改动
+
+#### Bernstein 蒸馏
+- **Checkpoint 完整性校验**：FileSnap 新增 SHA-256 ContentHash 字段，`/undo` 恢复后验证字节级一致性，确保可重现性
+
+#### 文件变更
+- `internal/tool/builtin/readfile.go` — 阶梯式阅读门控提示
+- `internal/tool/builtin/tool_extra_test.go` — TestReadFileRungLadderHint
+- `internal/boot/sysprompt.go` — L2 渐进式上下文阶梯注入
+- `internal/boot/boot.go` — MemorySearchFunc 注入
+- `internal/agent/recall_reminder.go` — maybeAutoRecall + MemorySearchFunc
+- `internal/agent/agent_run.go` — 调用 maybeAutoRecall
+- `internal/checkpoint/checkpoint.go` — SHA-256 完整性校验
+
+---
+
 ## [10.95.0] — 2026-07-24
 
 ### 🔧 双模型架构 15 项逻辑修复 + 契约简化

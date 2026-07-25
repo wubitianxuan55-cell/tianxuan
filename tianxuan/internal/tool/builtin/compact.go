@@ -36,6 +36,7 @@ var compactDesc = map[string]string{
 	"move_file":      "移动/重命名文件(自动建目录,工作区限制)",
 	"code_index":            "轻量符号索引(outline/search,Go AST+多语言regex)",
 	"search_large_output":    "查询被卸载的大型工具输出(list/read/search)",
+	"verify_gate":            "shell 验证门控(退出码裁决 pass/fail,确定性检查)",
 }
 
 // compactSchema maps tool names to stripped JSON Schema (properties without
@@ -99,4 +100,6 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer"}},"required":["action"]}`),
 	"search_large_output": json.RawMessage(
 		`{"type":"object","properties":{"operation":{"type":"string","enum":["list","read","search"]},"name":{"type":"string"},"query":{"type":"string"}},"required":["operation"]}`),
+	"verify_gate": json.RawMessage(
+		`{"type":"object","properties":{"checks":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"command":{"type":"string"},"timeout":{"type":"integer"}},"required":["name","command"]}}},"required":["checks"]}`),
 }

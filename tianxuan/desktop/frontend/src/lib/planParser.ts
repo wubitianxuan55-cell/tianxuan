@@ -16,6 +16,8 @@ export interface ParsedStep {
 }
 
 export interface ParsedPlan {
+  /** 步骤之前的分析/前置文本（需求分析、方案评估、架构决策等） */
+  preamble: string;
   steps: ParsedStep[];
   allFiles: string[];
 }
@@ -75,6 +77,14 @@ export function parsePlan(plan: string): ParsedPlan | null {
 
   for (let i = 0; i < headers.length - 1; i++) { headers[i].end = headers[i + 1].start; }
 
+  // Extract preamble: text before first step header.
+  // Strips <!--plan--> sentinel if present, then trims.
+  let preamble = trimmed.slice(0, headers[0].start);
+  if (preamble.startsWith("<!--plan-->")) {
+    preamble = preamble.slice("<!--plan-->".length);
+  }
+  preamble = preamble.trim();
+
   // Pass 2: parse fields
   for (const h of headers) {
     const block = trimmed.slice(h.start, h.end).trim();
@@ -120,5 +130,5 @@ export function parsePlan(plan: string): ParsedPlan | null {
     steps.push({ number: h.number, title: h.title, files: stepFiles, change, dependsOn, success, riskRecovery });
   }
 
-  return { steps, allFiles: [...allFilesSet] };
+  return { preamble, steps, allFiles: [...allFilesSet] };
 }

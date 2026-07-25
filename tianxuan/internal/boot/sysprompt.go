@@ -80,6 +80,11 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 	})
 	runtimeCtx.SetCompactL2(true)
 
+	// V10.96: 渐进式上下文阶梯 — 蒸馏自 SDL-MCP Iris Gate Ladder。
+	// V10.99: 7 级实现梯子 — 蒸馏自 ponytail (89k⭐)。ponytail benchmark: −54% LOC −22% tokens。
+	// 梯子在理解问题后爬，不是替代理解。原生优先于依赖，删除优于添加，无聊优于聪明。
+	runtimeCtx.SetPromptHint("代码阶梯: lsp→grep→read_file(offset)→全文件。实现梯子(爬梯): (1)需要存在?→(2)已有?→(3)标准库?→(4)原生API?→(5)已装依赖?→(6)一行搞定?→(7)最少代码。原生优于依赖,删除优于添加,无聊优于聪明。")
+
 	return &syspromptOut{
 		prompt:     sysPrompt,
 		mem:        mem,

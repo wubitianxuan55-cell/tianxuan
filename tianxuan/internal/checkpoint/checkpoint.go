@@ -11,6 +11,7 @@
 package checkpoint
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -26,9 +27,12 @@ import (
 
 // FileSnap is one file's state at the moment it was first touched in a turn.
 // Content == nil means the file did not exist then, so a restore deletes it.
+// ContentHash is SHA-256 of Content (for integrity verification post-restore).
+// V10.96: 蒸馏自 Bernstein 确定性重现 — 哈希校验确保 /undo 恢复的字节级完整性。
 type FileSnap struct {
-	Path    string  `json:"path"`
-	Content *string `json:"content"`
+	Path        string  `json:"path"`
+	Content     *string `json:"content,omitempty"`
+	ContentHash string  `json:"contentHash,omitempty"`
 }
 
 // Checkpoint anchors the pre-edit state of every distinct file touched during one
@@ -143,7 +147,13 @@ func (s *Store) Snapshot(ch diff.Change) {
 		old := ch.OldText
 		content = &old
 	}
-	s.cur.Files = append(s.cur.Files, FileSnap{Path: ch.Path, Content: content})
+	// V10.96: SHA-256 完整性校验 — 蒸馏自 Bernstein
+	hash := ""
+	if content != nil {
+		h := sha256.Sum256([]byte(*content))
+		hash = fmt.Sprintf("%x", h)
+	}
+	s.cur.Files = append(s.cur.Files, FileSnap{Path: ch.Path, Content: content, ContentHash: hash})
 	s.persist(s.cur)
 }
 
@@ -211,6 +221,7 @@ func (s *Store) RestoreCode(fromTurn int) (written, deleted []string, err error)
 	s.mu.Lock()
 	// earliest snapshot per path across checkpoints >= fromTurn (turn order → first wins).
 	earliest := map[string]*string{}
+	hashes := map[string]string{}
 	order := []string{}
 	for _, c := range s.all() {
 		if c.Turn < fromTurn {
@@ -221,6 +232,7 @@ func (s *Store) RestoreCode(fromTurn int) (written, deleted []string, err error)
 				continue
 			}
 			earliest[f.Path] = f.Content
+			hashes[f.Path] = f.ContentHash
 			order = append(order, f.Path)
 		}
 	}
@@ -249,6 +261,15 @@ func (s *Store) RestoreCode(fromTurn int) (written, deleted []string, err error)
 		if wErr := os.WriteFile(abs, []byte(*content), 0o644); wErr != nil {
 			err = wErr
 			continue
+		}
+		// V10.96: 恢复后完整性验证 — 蒸馏自 Bernstein
+		if expectedHash := hashes[p]; expectedHash != "" {
+			actual := sha256.Sum256([]byte(*content))
+			actualHash := fmt.Sprintf("%x", actual)
+			if actualHash != expectedHash {
+				slog.Warn("checkpoint restore integrity mismatch",
+					"path", p, "expected", expectedHash, "actual", actualHash)
+			}
 		}
 		written = append(written, p)
 	}

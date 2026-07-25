@@ -82,6 +82,11 @@ function PlanCard({
           {/* 步骤列表 */}
           {hasPlan ? (
             <div className="space-y-2">
+              {parsed.preamble && (
+                <div className="text-fg-dim text-[12px] leading-relaxed whitespace-pre-wrap bg-bg-soft rounded p-2 border border-border-soft max-h-[180px] overflow-y-auto">
+                  {parsed.preamble}
+                </div>
+              )}
               {parsed.steps.map((step) => (
                 <div key={step.number} className="flex gap-2">
                   <StepBadge n={step.number} done={record.success} />

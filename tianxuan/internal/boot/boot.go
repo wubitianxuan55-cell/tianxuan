@@ -124,6 +124,22 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	runtimeCtx := sp.runtimeCtx
 	skillStore := sp.store
 
+	// V10.96: 语义记忆自动回想 — 蒸馏自 jcode 语义记忆系统。
+	// 注入 FTS5 BM25 搜索函数，Agent 在每轮开始时自动检索相关记忆。
+	if mem.Search != nil {
+		agent.MemorySearchFunc = func(query string, limit int) []agent.MemoryResult {
+			matches := mem.Search.Search(query)
+			if len(matches) > limit {
+				matches = matches[:limit]
+			}
+			results := make([]agent.MemoryResult, len(matches))
+			for i, m := range matches {
+				results[i] = agent.MemoryResult{Name: m.Name, Preview: m.Preview}
+			}
+			return results
+		}
+	}
+
 	cwd, _ := os.Getwd()
 	reg := tool.NewRegistry()
 	bashSpec := sandbox.Spec{Mode: cfg.BashMode(), WriteRoots: cfg.WriteRoots(), Network: cfg.Sandbox.Network}

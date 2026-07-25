@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import { parsePlan } from "./planParser";
 
 const samplePlan = `
+前置分析：当前计划展示卡片只显示步骤列表，
+丢失了步骤之前的分析文本（需求分析、方案对比、架构决策等），
+这些前置信息对用户理解计划的「为什么」至关重要。
+
 步骤 1：新增计划内容解析工具函数 \`parsePlan\`
 - **File(s)**：[NEW] \`tianxuan/desktop/frontend/src/lib/planParser.ts\`
 - **Change**：实现 \`parsePlan(plan: string)\` 函数，从 Markdown 计划文本中提取结构化数据
@@ -239,5 +243,60 @@ describe("parsePlan", () => {
     const result = parsePlan(text)!;
     expect(result.steps.length).toBe(1);
     expect(result.steps[0].title).toBe("带 plan 标记的步骤");
+  });
+
+  it("提取步骤前的分析文本 (preamble)", () => {
+    const text = `
+需求分析：用户反馈计划卡片缺少上下文，
+需要展示步骤前的分析文本。
+
+方案评估：方案 A 直接展示原始文本（简单），方案 B 做结构化渲染（复杂）。
+推荐方案 A（极简实现）。
+
+步骤 1：修改解析器
+- **File(s)**：\`src/parser.ts\`
+- **Change**：提取 preamble
+- **Depends on**：无
+- **Success**：测试通过
+- **Risk recovery**：回退
+`;
+    const result = parsePlan(text)!;
+    expect(result.preamble).toContain("需求分析");
+    expect(result.preamble).toContain("方案评估");
+    expect(result.preamble).toContain("推荐方案 A");
+    expect(result.steps.length).toBe(1);
+  });
+
+  it("preamble 与 <!--plan--> 共存时正确清理", () => {
+    const text = `<!--plan-->
+架构决策：采用解析器模式而非正则替换，
+因为后续需要支持更多结构化字段。
+
+步骤 1：实现解析器
+- **File(s)**：\`src/parser.ts\`
+- **Change**：新增类
+- **Depends on**：无
+- **Success**：go test
+- **Risk recovery**：git checkout
+`;
+    const result = parsePlan(text)!;
+    expect(result.preamble).toContain("架构决策");
+    expect(result.preamble).not.toContain("<!--plan-->");
+    expect(result.preamble).not.toContain("步骤 1");
+    expect(result.steps.length).toBe(1);
+  });
+
+  it("无 preamble 时为返回空字符串", () => {
+    const text = `
+步骤 1：直接写步骤，无前置文本
+- **File(s)**：\`src/main.go\`
+- **Change**：修改逻辑
+- **Depends on**：无
+- **Success**：go test 通过
+- **Risk recovery**：回退
+`;
+    const result = parsePlan(text)!;
+    expect(result.preamble).toBe("");
+    expect(result.steps.length).toBe(1);
   });
 });

@@ -170,3 +170,59 @@ func TestArchiveFileCreated(t *testing.T) {
 		t.Error("expected .jsonl file in archive dir")
 	}
 }
+
+// --- dream tests --- V10.97: Bamboo Auto-Dream
+
+func TestDreamExtractPreferences(t *testing.T) {
+	records := []Record{
+		{Role: "user", Content: "I prefer using tabs over spaces for indentation. It just looks cleaner."},
+		{Role: "assistant", Content: "Got it, I'll use tabs."},
+		{Role: "user", Content: "Also, I usually write tests first before implementation."},
+	}
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, "memory")
+	cfg := DreamConfig{MemoryDir: memDir, MinMessages: 2}
+	n := Dream(records, cfg)
+	if n < 1 {
+		t.Errorf("should extract at least 1 preference, got %d", n)
+	}
+}
+
+func TestDreamExtractConventions(t *testing.T) {
+	records := []Record{
+		{Role: "assistant", Content: "In this project we use the repository pattern for data access. All database calls go through repositories."},
+		{Role: "user", Content: "Correct, that's our convention."},
+	}
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, "memory")
+	cfg := DreamConfig{MemoryDir: memDir, MinMessages: 2}
+	n := Dream(records, cfg)
+	if n < 1 {
+		t.Errorf("should extract at least 1 convention, got %d", n)
+	}
+}
+
+func TestDreamTooFewMessages(t *testing.T) {
+	records := []Record{
+		{Role: "user", Content: "I prefer dark mode."},
+	}
+	dir := t.TempDir()
+	memDir := filepath.Join(dir, "memory")
+	cfg := DreamConfig{MemoryDir: memDir, MinMessages: 5}
+	n := Dream(records, cfg)
+	if n != 0 {
+		t.Errorf("should not dream with too few messages, got %d", n)
+	}
+}
+
+func TestDreamEmptyMemoryDir(t *testing.T) {
+	records := []Record{
+		{Role: "user", Content: "I prefer tabs"},
+		{Role: "assistant", Content: "ok"},
+	}
+	cfg := DreamConfig{MemoryDir: "", MinMessages: 1}
+	n := Dream(records, cfg)
+	if n != 0 {
+		t.Errorf("should return 0 when MemoryDir is empty, got %d", n)
+	}
+}

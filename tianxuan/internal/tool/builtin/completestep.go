@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"tianxuan/internal/evidence"
@@ -134,8 +135,20 @@ func (completeStep) Execute(ctx context.Context, args json.RawMessage) (string, 
 	if hasTodo {
 		todoStatus = fmt.Sprintf(" Todo step: todo-matched %d.", todoMatch.Index)
 	}
-	return fmt.Sprintf("Step %q signed off with %d evidence item(s) [%s].%s The host advances the task list for you — it marks this step completed and moves the next to in_progress, so you don't need another todo_write to mark completions.",
-		p.Step, len(p.Evidence), strings.Join(kinds, ", "), hostStatus+todoStatus), nil
+
+	// V10.98: Git 锚定闭包证据 — 蒸馏自 AI-Atomic-Framework Closure Evidence。
+	// 自动获取当前 HEAD SHA，形成不可抵赖的证据链。每个 complete_step
+	// 输出都锚定到具体 git commit，支持事后验证（"这个步骤完成时的代码状态是什么"）。
+	gitAnchor := ""
+	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		sha := strings.TrimSpace(string(out))
+		if sha != "" {
+			gitAnchor = fmt.Sprintf(" Git anchor: %s.", sha)
+		}
+	}
+
+	return fmt.Sprintf("Step %q signed off with %d evidence item(s) [%s].%s%s The host advances the task list for you — it marks this step completed and moves the next to in_progress, so you don't need another todo_write to mark completions.",
+		p.Step, len(p.Evidence), strings.Join(kinds, ", "), hostStatus+todoStatus, gitAnchor), nil
 }
 
 func verifyStepEvidence(ctx context.Context, items []stepEvidence) (hostVerified int, manualUnverified int, err error) {

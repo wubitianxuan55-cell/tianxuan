@@ -55,6 +55,29 @@ func TestReadFileLargeFile(t *testing.T) {
 	}
 }
 
+// V10.96: 阶梯式阅读门控 — 大文件盲读时注入降级建议。
+func TestReadFileRungLadderHint(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "large.txt")
+	var b strings.Builder
+	for i := 1; i <= 250; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	os.WriteFile(f, []byte(b.String()), 0o644)
+
+	// 默认 limit=2000, offset=0, 文件>200行 → 应触发阶梯式提示
+	out := runTool(t, readFile{}, map[string]any{"path": f})
+	if !strings.Contains(out, "阶梯式阅读提示") {
+		t.Errorf("rung ladder hint missing for large file blind read: %s", out)
+	}
+
+	// 指定了 offset → 不触发阶梯式提示
+	out2 := runTool(t, readFile{}, map[string]any{"path": f, "offset": 100, "limit": 10})
+	if strings.Contains(out2, "阶梯式阅读提示") {
+		t.Errorf("rung ladder hint should not trigger with explicit offset/limit: %s", out2)
+	}
+}
+
 func TestReadFileOffsetPastEOF(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "short.txt")
@@ -224,5 +247,48 @@ func TestGlobQuestionMark(t *testing.T) {
 	}
 	if strings.Contains(out, "ab.txt") {
 		t.Errorf("?.txt should not match ab.txt: %s", out)
+	}
+}
+
+// --- verify_gate tests --- V10.97: headsign phase gate
+
+func TestVerifyGateAllPass(t *testing.T) {
+	out := runTool(t, verifyGate{}, map[string]any{
+		"checks": []map[string]any{
+			{"name": "truth", "command": "exit 0"},
+			{"name": "echo test", "command": "echo ok"},
+		},
+	})
+	if !strings.Contains(out, "GATE PASSED") {
+		t.Errorf("all-pass gate should report PASSED: %s", out)
+	}
+}
+
+func TestVerifyGateFirstFail(t *testing.T) {
+	out := runTool(t, verifyGate{}, map[string]any{
+		"checks": []map[string]any{
+			{"name": "fail check", "command": "exit 1"},
+			{"name": "never runs", "command": "echo should not run"},
+		},
+	})
+	if !strings.Contains(out, "GATE FAILED") {
+		t.Errorf("should report FAILED: %s", out)
+	}
+	if strings.Contains(out, "never runs") || strings.Contains(out, "should not run") {
+		t.Errorf("second check should not run after first failure: %s", out)
+	}
+}
+
+func TestVerifyGateEmptyChecks(t *testing.T) {
+	_, err := verifyGate{}.Execute(context.Background(), argsJSON(t, map[string]any{"checks": []any{}}))
+	if err == nil {
+		t.Fatal("expected error for empty checks")
+	}
+}
+
+func TestVerifyGateInvalidArgs(t *testing.T) {
+	_, err := verifyGate{}.Execute(context.Background(), json.RawMessage(`{invalid`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
 	}
 }

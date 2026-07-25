@@ -80,6 +80,8 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	// V10.46: planner doesn't need recall reminders.
 	if !a.plannerMode {
 		a.maybeRecallReminder()
+		// V10.96: 自动记忆检索 — 蒸馏自 jcode 语义记忆系统
+		a.maybeAutoRecall()
 	}
 
 	graceRound := false

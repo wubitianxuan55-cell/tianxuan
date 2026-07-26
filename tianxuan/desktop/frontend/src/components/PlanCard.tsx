@@ -166,7 +166,7 @@ export function PlanCard({ ask, onAnswer }: { ask: WireAsk; onAnswer: (id: strin
 
   return (
     <div className="fixed inset-0 bg-bg/60 z-50 p-6 animate-[fadeIn_.15s_ease-out] pointer-events-none flex items-start justify-center">
-      <div ref={cardRef} className="relative flex flex-col w-full max-w-2xl max-h-[88vh] bg-bg-elev border border-border rounded-xl animate-[scaleIn_.2s_ease-out] pointer-events-auto" style={{ boxShadow: "var(--ds-shadow-panel)", ...style }}>
+      <div ref={cardRef} className="relative flex flex-col w-full max-w-[--maxw] max-h-[88vh] bg-bg-elev border border-border rounded-xl animate-[scaleIn_.2s_ease-out] pointer-events-auto" style={{ boxShadow: "var(--ds-shadow-panel)", ...style }}>
         <div className="absolute top-0 left-0 right-0 h-7 cursor-grab flex items-start justify-center pt-2.5 select-none group z-10" onPointerDown={onPointerDown} title={t("ask.dragHint")}>
           <GripVertical size={12} className="text-fg-faint/20 group-hover:text-fg-faint/40 transition-colors" />
         </div>

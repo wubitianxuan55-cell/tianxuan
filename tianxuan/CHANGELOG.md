@@ -1,4 +1,33 @@
-## [10.99.0] — 2026-07-25
+## [10.101.0] — 2026-07-26
+
+### 🔧 修正循环根因修复 + 停止门全面加固 + 移动端移除
+
+> 三管齐下消除无意义修正循环：核心判断逻辑修正 + 停止门计数器跨 turn 重置 + 证据检查真正的拦截。
+
+#### 修正循环修复（3 项）
+- **`allStepsPassed` 重写决策顺序**：`StepResults` 全成功时忽略 `Success`/`Errors` 字段——非致命错误（loop guard 阻止、maxSteps 耗尽）不再触发不必要的修正循环
+- **`complete_step` 失败也记录进 `StepResults`**：移除 `!isErrorResult` 守卫，失败步骤记录 `Status:"error"`，`allStepsPassed` 能正确检测失败步骤
+- **`executePlan` 不再强制 `Success=false`**：非致命 execErr（如 maxSteps 耗尽）仅追加到 Errors，不覆盖正确的 Success 状态
+
+#### 停止门加固（4 项）
+- **gate 计数器每 turn 重置**：`taskGateReentry`/`goalGateReentry`/`verifyGateFired` 不再跨 turn 累加——之前第二个用户 turn 后停止门永久失效
+- **`finalReadinessCheck` 传入当前 todo 列表**：旧代码传 `nil` 导致 `UnverifiedCompletedTodos` 永不拦截——修复后真正检查 `complete_step` 缺失
+- **`finalReadinessBlocks` 对齐重置**：随工具调用重置（与 `emptyFinalBlocks` 对称）
+- **`goalGate` 添加 `disableVerify` 检查**：与 `taskGate`/`verifyGate` 保持一致
+
+#### 其他修复（4 项）
+- **`formatExecutionFeedback` 三分支结论**：`Success + Errors` 非空时不矛盾输出
+- **grace round nudge 泄漏修复**：3 个 ctx 取消路径添加 `RemoveLast()`
+- **ASK 卡宽度对齐**：`max-w-2xl`(672px) → `max-w-[--maxw]`(1100px)
+- **移动端代码完全移除**：删 62 文件，清理 7 处引用（−6233 行）
+
+#### 测试
+- `hermes_test.go` +3 测试：`StepSuccessOverridesNonFatalErrors`、`StepSuccessButMixedWithMaxSteps`、`PartialSuccessStillFails`
+- `stop_gate_test.go` +1 测试：`UnverifiedTodosBlocks`，适配新签名
+- 全量 50 包 Go 测试通过，TS 编译通过
+
+---
+
 
 ### 🪜 Ponytail 7 级梯子 + 🛡️ guard-skills AI 失败模式：双重编码质量提升
 

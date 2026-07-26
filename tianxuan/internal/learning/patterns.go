@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"tianxuan/internal/tool"
 )
 
 // Pattern is one recurring failure mode the system has observed across sessions.
@@ -155,7 +157,12 @@ func (e *PatternExtractor) Extract(toolName, result string) *Pattern {
 }
 
 // isErrorResult checks whether a tool result string indicates failure.
+// V10.88: parse JSON-envelope first (ToolEnvelope from V8.9+), then fall back
+// to keyword-based detection for legacy plain-text tool results.
 func isErrorResult(r string) bool {
+	if env, ok := tool.ParseEnvelope(r); ok {
+		return !env.OK
+	}
 	lower := strings.ToLower(r)
 	// A tool returns error messages as plain text; successful results rarely
 	// contain these keywords.

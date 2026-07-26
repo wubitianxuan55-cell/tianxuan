@@ -7,9 +7,11 @@ import (
 	"slices"
 	"strings"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/event"
 	"tianxuan/internal/evidence"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/tool"
 )
 
 func (a *AgentRunner) Run(ctx context.Context, input string) (*TurnResult, error) {
@@ -64,6 +66,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.preMu.Unlock()
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
 	a.toolFeedbackCount = 0     // V10.89: 每轮重置工具反馈计数
+	// V10.101: 每轮重置 stop gate 计数器——这些门的「最多 3 次」是 per-turn
+	// 上限，不是整个会话累计（否则第二个用户 turn 后就全部永久失效）。
+	a.taskGateReentry = 0
+	a.goalGateReentry = 0
+	a.verifyGateFired = false
 	// per-turn TurnResult tracking — accumulated here and returned by Run().
 	var turnFilesCreated []string
 	var turnFilesModified []string
@@ -90,6 +97,16 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	emptyFinalBlocks := 0
 	finalReadinessBlocks := 0
 	for step := 0; a.maxSteps <= 0 || step < a.maxSteps || graceRound; step++ {
+		// honour cancellation promptly — every loop iteration checks ctx.
+		select {
+		case <-ctx.Done():
+			if graceRound {
+				a.session.RemoveLast() // V10.101: clean up leaked grace-round nudge
+			}
+			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), ctx.Err()
+		default:
+		}
+
 		// consume a queued mid-turn steer as session guidance
 		// (Design adopted from DeepSeek-Reasonix-V1.12)
 		// V10.46: planner doesn't accept mid-turn steers.
@@ -101,26 +118,36 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 		text, reasoning, signature, calls, usage, interrupted, err := a.stream(ctx, step+1)
 		if err != nil {
-			// stream recovery — save partial output and inject recovery prompt
-			if interrupted && streamRecoveries < MaxStreamRecoveries {
-				streamRecoveries++
-				if strings.TrimSpace(text) != "" {
+			// ctx cancelled? Skip stream recovery — retrying with a cancelled
+			// context is futile (every stream() call would fail immediately).
+			if ctx.Err() == nil {
+				// stream recovery — save partial output and inject recovery prompt
+				if interrupted && streamRecoveries < MaxStreamRecoveries {
+					streamRecoveries++
+					if strings.TrimSpace(text) != "" {
+						a.session.Add(provider.Message{
+							Role:               provider.RoleAssistant,
+							Content:            text,
+							ReasoningContent:   reasoning,
+							ReasoningSignature: signature,
+						})
+					}
 					a.session.Add(provider.Message{
-						Role:               provider.RoleAssistant,
-						Content:            text,
-						ReasoningContent:   reasoning,
-						ReasoningSignature: signature,
+						Role:    provider.RoleUser,
+						Content: streamRecoveryMessage(strings.TrimSpace(text) != ""),
 					})
+					a.sink.Emit(event.Event{Kind: event.Retrying, RetryAttempt: streamRecoveries, RetryMax: MaxStreamRecoveries})
+					step-- // recovery retries do not consume the tool-round budget
+					continue
 				}
-				a.session.Add(provider.Message{
-					Role:    provider.RoleUser,
-					Content: streamRecoveryMessage(strings.TrimSpace(text) != ""),
-				})
-				a.sink.Emit(event.Event{Kind: event.Retrying, RetryAttempt: streamRecoveries, RetryMax: MaxStreamRecoveries})
-				step-- // recovery retries do not consume the tool-round budget
-				continue
 			}
-			a.preWG.Wait() // drain any in-flight pre-execution goroutines before returning
+			// cancellable wait — don't block on preWG if ctx is cancelled.
+			done := make(chan struct{})
+			go func() { defer crash.Recover("prewg-waiter"); a.preWG.Wait(); close(done) }()
+			select {
+			case <-done:
+			case <-ctx.Done():
+			}
 			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), err
 		}
 		streamRecoveries = 0
@@ -148,7 +175,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if status == BudgetBlock {
 					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 						Text: a.budgetGate.StatusMessage()})
-					a.preWG.Wait()
+					// cancellable wait — don't block on preWG if ctx is cancelled.
+					done := make(chan struct{})
+					go func() { defer crash.Recover("prewg-waiter"); a.preWG.Wait(); close(done) }()
+					select {
+					case <-done:
+					case <-ctx.Done():
+					}
 					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
 				}
 			}
@@ -199,13 +232,21 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		}
 
 		if len(calls) == 0 {
+			// honour cancellation before any gate logic.
+			select {
+			case <-ctx.Done():
+				if graceRound {
+					a.session.RemoveLast() // V10.101: clean up leaked grace-round nudge
+				}
+				return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), ctx.Err()
+			default:
+			}
+
 			// finish-gate — prevent premature model stop
 			// Grace Round — model produced summary, done.
 			if graceRound {
 				// clean up grace-round nudge from session before exit
-				if len(a.session.Messages) > 0 {
-					a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
-				}
+				a.session.RemoveLast()
 				return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), nil
 			}
 
@@ -242,7 +283,10 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 
 			// final-answer readiness gate — verify evidence before accepting completion
 			if !a.plannerMode {
-				if blocked, reason := a.finalReadinessCheck(); blocked {
+				a.todoMu.Lock()
+				todos := append([]evidence.TodoItem(nil), a.todoState...)
+				a.todoMu.Unlock()
+				if blocked, reason := a.finalReadinessCheck(todos); blocked {
 					finalReadinessBlocks++
 					if finalReadinessBlocks >= MaxFinalReadinessBlocks {
 						return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("final-answer readiness failed %d times: %s", finalReadinessBlocks, reason)
@@ -262,18 +306,32 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 
 		// wait for stream() pre-execution goroutines to finish before
 		// dispatching the full batch — avoids races and double-execution.
-		emptyFinalBlocks = 0 // reset empty-final counter when model calls tools successfully
+		emptyFinalBlocks = 0     // reset empty-final counter when model calls tools successfully
+		finalReadinessBlocks = 0 // V10.101: reset per-turn, same as emptyFinalBlocks
 		// Grace Round guard — if model still calls tools during grace round, exit.
 		// Ported from Reasonix to prevent infinite loops under MaxSteps limit.
 		if graceRound {
-			a.preWG.Wait() // drain pre-exec goroutines started during grace streaming
-			// clean up grace-round nudge to prevent leaking to next user turn
-			if len(a.session.Messages) > 0 {
-				a.session.Messages = a.session.Messages[:len(a.session.Messages)-1]
+			// cancellable wait: honour ctx cancellation instead of blocking.
+			done := make(chan struct{})
+			go func() { defer crash.Recover("prewg-waiter"); a.preWG.Wait(); close(done) }()
+			select {
+			case <-done:
+			case <-ctx.Done():
+				a.session.RemoveLast() // V10.101: clean up leaked grace-round nudge
+				return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), ctx.Err()
 			}
+			// clean up grace-round nudge to prevent leaking to next user turn
+			a.session.RemoveLast()
 			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("paused after %d tool-call rounds (agent.max_steps) — the model continued calling tools during the grace round; the work so far is saved. Send another message to continue, or increase max_steps", a.maxSteps)
 		}
-		a.preWG.Wait()
+		// cancellable wait: honour ctx cancellation instead of blocking.
+		done := make(chan struct{})
+		go func() { defer crash.Recover("prewg-waiter"); a.preWG.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), ctx.Err()
+		}
 		results := a.executeBatch(ctx, calls)
 		// P0-2: deterministic pruning — skip duplicate tool results.
 		// only dedup ReadOnly tools — bash/git_commit etc. may produce
@@ -339,7 +397,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		// Also sync todo state from successful todo_write calls that ran
 		// in the current batch — rebuildTodoState at turn start can't see them.
 		for i, call := range calls {
-			if call.Name == "todo_write" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
+			if call.Name == "todo_write" && !isErrorResult(results[i]) {
 				rec := evidence.ReceiptFromToolCall(call.Name, json.RawMessage(call.Arguments), true, false)
 				if len(rec.Todos) > 0 {
 					a.setTodoState(rec.Todos)
@@ -347,18 +405,19 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			}
 		}
 		for i, call := range calls {
-			if call.Name == "complete_step" && !strings.HasPrefix(results[i], "error:") && !strings.HasPrefix(results[i], "blocked:") {
+			if call.Name == "complete_step" {
 				step := extractStepFromArgs(call.Arguments)
-				if step != "" {
+				isErr := isErrorResult(results[i])
+				if !isErr && step != "" {
 					a.advanceCanonicalTodo(step)
 				}
 				// V10.89: collect step results, dedup by step name — Hephaestus may
 				// call complete_step multiple times for the same step; keep only last.
+				// V10.101: record failed complete_step calls too (status="error"),
+				// so allStepsPassed can detect them and trigger correction loops.
 				status := "success"
-				if strings.HasPrefix(results[i], "error:") {
+				if isErr {
 					status = "error"
-				} else if strings.HasPrefix(results[i], "blocked:") {
-					status = "blocked"
 				}
 				sr := StepResult{
 					Step:   step,
@@ -440,8 +499,14 @@ func uniqFiles(files []string) []string {
 }
 
 // isErrorResult checks if a tool result indicates an error or blocked condition.
-// Detects multiple error prefix formats.
+// V10.88: parse JSON-envelope first (ToolEnvelope introduced in V8.9), then fall
+// back to legacy string prefix matching. The JSON path is checked first because
+// WrapError/WrapResult always produce valid JSON; older tools may still emit
+// plain-text error strings.
 func isErrorResult(result string) bool {
+	if env, ok := tool.ParseEnvelope(result); ok {
+		return !env.OK || env.Code == tool.CodeBlocked
+	}
 	return strings.HasPrefix(result, "error:") ||
 		strings.HasPrefix(result, "Error:") ||
 		strings.HasPrefix(result, "blocked:") ||

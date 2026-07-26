@@ -151,12 +151,6 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /mcp/enabled", s.setMCPServerEnabled)
 	mux.Handle("GET /assets/", http.FileServer(http.FS(webDist)))
 
-	// Mobile SPA routes — embedded at build time via go:embed mobileui
-	if mobileDist, ok := tryMobileDist(); ok {
-		mux.HandleFunc("GET /mobile", s.indexMobile)
-		mux.Handle("GET /mobile/", http.StripPrefix("/mobile", http.FileServer(http.FS(mobileDist))))
-	}
-
 	h := http.Handler(mux)
 	// Middleware stack (innermost → outermost):
 	//   1. csrfGuard — require application/json on POST
@@ -231,17 +225,6 @@ func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(indexHTML)
-}
-
-// indexMobile serves the mobile SPA entrypoint at /mobile. Falls back to
-// 404 when the mobile frontend has not been built (z_embed_mobile.go absent).
-func (s *Server) indexMobile(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if mobileHTML, ok := getMobileIndex(); ok {
-		_, _ = w.Write(mobileHTML)
-		return
-	}
-	http.NotFound(w, nil)
 }
 
 // staticCSS serves the client stylesheet.
@@ -333,7 +316,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 // submit runs raw user input as a turn (slash commands and @-references
 // resolved by the controller). Returns 202 — output arrives on the event stream.
 // Also broadcasts the user message to all SSE clients so every connected
-// viewer (desktop web, mobile) sees the input immediately.
+// viewer (desktop web) sees the input immediately.
 func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Input string `json:"input"`

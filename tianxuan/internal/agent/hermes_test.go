@@ -629,10 +629,78 @@ func TestAllStepsPassed_AllSuccess(t *testing.T) {
 
 func TestAllStepsPassed_NoStepResults(t *testing.T) {
 	r := &TurnResult{Success: true}
-	// Success=true but no step results — model declared done without complete_step.
-	// allStepsPassed treats this as passing (no contradiction to Success).
+	// Success=true but no step results AND no file changes — model declared
+	// done without doing anything visible. allStepsPassed returns false
+	// because no concrete work was accomplished.
+	if (&Hermes{}).allStepsPassed(r) {
+		t.Fatal("Success=true with no step results and no file changes should NOT pass")
+	}
+	// With file changes present, it should pass (work was done even if
+	// complete_step evidence collection failed).
+	r2 := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
+	if !(&Hermes{}).allStepsPassed(r2) {
+		t.Fatal("Success=true with no step results but file changes should pass")
+	}
+	// File changes + system errors (e.g. "paused after maxSteps") should
+	// still pass — system errors don't negate the visible work done.
+	r3 := &TurnResult{Success: true, FilesModified: []string{"b.go"},
+		Errors: []string{"paused after 5 tool-call rounds (agent.max_steps)"}}
+	if !(&Hermes{}).allStepsPassed(r3) {
+		t.Fatal("file changes should pass even with system-level errors present")
+	}
+}
+
+// TestAllStepsPassed_StepSuccessOverridesNonFatalErrors verifies
+// that allStepsPassed returns true when every step is "success"
+// even if TurnResult.Success is false due to non-fatal errors
+// (e.g. a tool blocked by loop guard, or maxSteps exhaustion).
+// Without this guard, the Hermes fix loop re-executes a plan whose
+// steps already all passed — the "perpetual correction loop" bug.
+func TestAllStepsPassed_StepSuccessOverridesNonFatalErrors(t *testing.T) {
+	r := &TurnResult{
+		Success: false,
+		Errors:  []string{"blocked: [loop guard] \"write_file\" has already succeeded 2 times"},
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "success", Result: "完成"},
+			{Step: "步骤2", Status: "success", Result: "完成"},
+			{Step: "步骤3", Status: "success", Result: "完成"},
+		},
+	}
 	if !(&Hermes{}).allStepsPassed(r) {
-		t.Fatal("Success=true with no step results should pass")
+		t.Fatal("all-success StepResults should pass even when Success=false due to non-fatal errors")
+	}
+}
+
+// TestAllStepsPassed_StepSuccessButMixedWithMaxSteps checks the
+// common case: executor exhausted maxSteps but all tracked steps
+// passed. This should not trigger a correction loop.
+func TestAllStepsPassed_StepSuccessButMixedWithMaxSteps(t *testing.T) {
+	r := &TurnResult{
+		Success: false,
+		Errors:  []string{"paused after 5 tool-call rounds (agent.max_steps)"},
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "success"},
+		},
+		FilesModified: []string{"a.go"},
+	}
+	if !(&Hermes{}).allStepsPassed(r) {
+		t.Fatal("all-success steps with file changes should pass even with maxSteps exhaustion")
+	}
+}
+
+// TestAllStepsPassed_PartialSuccessStillFails confirms that when
+// some steps failed, allStepsPassed still returns false regardless
+// of the Success field value.
+func TestAllStepsPassed_PartialSuccessStillFails(t *testing.T) {
+	r := &TurnResult{
+		Success: true,
+		StepResults: []StepResult{
+			{Step: "步骤1", Status: "success"},
+			{Step: "步骤2", Status: "error", Result: "build failed"},
+		},
+	}
+	if (&Hermes{}).allStepsPassed(r) {
+		t.Fatal("mixed success/error StepResults should not pass")
 	}
 }
 
@@ -662,7 +730,7 @@ func TestPlanFixPrompt_Round2(t *testing.T) {
 	if !strings.Contains(prompt, "<!--plan-->") {
 		t.Fatal("round 2 prompt should request <!--plan--> marker")
 	}
-	if !strings.Contains(prompt, "仅修复标记") {
+	if !strings.Contains(prompt, "仅修复失败") {
 		t.Fatal("round 2 prompt should say 仅修复")
 	}
 	if strings.Contains(prompt, "反思") {

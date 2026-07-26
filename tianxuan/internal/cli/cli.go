@@ -231,7 +231,6 @@ func runServe(args []string) int {
 		fmt.Printf("  🔓 Public mode — anyone with the token can control tianxuan\n")
 		fmt.Printf("  🔑 Token: %s\n", token)
 		fmt.Printf("  💻 Web UI:  http://%s/?token=%s\n", bindAddr, token)
-		fmt.Printf("  📱 Mobile:  http://%s/mobile?token=%s\n", bindAddr, token)
 	} else {
 		fmt.Printf("  💻 Web UI:  http://%s\n", bindAddr)
 	}

@@ -47,7 +47,7 @@ func TestTokenAuthMiddleware_ExemptPaths(t *testing.T) {
 	})
 	h := tokenAuthMiddleware("secret", okHandler)
 
-	exempt := []string{"/", "/health", "/assets/main.js", "/assets/css/app.css", "/mobile", "/mobile/index.html"}
+	exempt := []string{"/", "/health", "/assets/main.js", "/assets/css/app.css"}
 	for _, path := range exempt {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
@@ -170,8 +170,8 @@ func TestAuthExempt(t *testing.T) {
 		{"/health", true},
 		{"/assets/main.js", true},
 		{"/assets/sub/dir/file.css", true},
-		{"/mobile", true},
-		{"/mobile/index.html", true},
+		{"/mobile", false},
+		{"/mobile/index.html", false},
 		{"/history", false},
 		{"/submit", false},
 		{"/events", false},

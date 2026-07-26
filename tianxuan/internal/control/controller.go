@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"tianxuan/internal/agent"
 	"tianxuan/internal/billing"
@@ -426,6 +427,25 @@ func (c *Controller) Cancel() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+// CancelAndSubmit cancels the in-flight turn and immediately submits a new one
+// — all within a single atomic operation. This avoids the race between frontend
+// Cancel → wait-for-running-false → Submit by spinning until the cancelled turn
+// finishes, then starting the new turn. Used by the correction feature (Shift+Enter
+// during a running turn).
+func (c *Controller) CancelAndSubmit(input string) {
+	c.Cancel()
+	// Wait for the cancelled turn to fully exit — the goroutine in runGuarded
+	// sets c.running = false in its defer.
+	for c.Running() {
+		// Brief sleep to avoid busy-wait. The cancelled goroutine exits within
+		// milliseconds once ctx.Done() propagates through the agent loop.
+		select {
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	c.Submit(input)
 }
 
 // Running reports whether a turn is currently in flight.

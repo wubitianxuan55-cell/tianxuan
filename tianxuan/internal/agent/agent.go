@@ -215,6 +215,8 @@ type AgentRunner struct {
 
 	// V6.0: 回忆提醒开关（recall_reminder.go）
 	recallReminderFired bool
+	// V10.100: maybeAutoRecall 去重缓存 — 相同查询跳过搜索
+	lastRecallQuery string
 
 	// Stop gates (stop_gate.go) — triple gate for solo mode, skipped in plannerMode.
 	// taskGate checks incomplete canonical todos, goalGate verifies session goal,
@@ -449,10 +451,10 @@ func (a *AgentRunner) SetAsker(as Asker) { a.asker = as }
 // 必须在首轮 stream() 调用前调用一次。
 func (a *AgentRunner) MergeRuntimePrompt(content string) {
 	content = strings.TrimSpace(content)
-	if content == "" || len(a.session.Messages) == 0 || a.session.Messages[0].Role != provider.RoleSystem {
+	if content == "" {
 		return
 	}
-	a.session.Messages[0].Content += "\n\n" + content
+	a.session.AppendSystemPrompt(content)
 }
 func (a *AgentRunner) SetGoal(g string) { a.goal = g }
 
@@ -869,13 +871,15 @@ func (a *AgentRunner) steerQueueLen() int {
 // finalReadinessCheck verifies that the model's claim of completion is backed
 // by host-observable evidence. Returns reason string if blocked, empty if ok.
 // (Design adopted from DeepSeek-Reasonix-V1.12, simplified for tianxuan)
-func (a *AgentRunner) finalReadinessCheck() (blocked bool, reason string) {
+// V10.101: now accepts the current canonical todo list so unverified completed
+// todos are actually detected — the old nil argument caused the check to be a no-op.
+func (a *AgentRunner) finalReadinessCheck(currentTodos []evidence.TodoItem) (blocked bool, reason string) {
 	if a.evidence == nil {
 		return false, ""
 	}
 	// Check for unverified completed todos: the model marked a todo as
-	// "completed" but never ran complete_step for it.
-	unverified, hasBaseline := a.evidence.UnverifiedCompletedTodos(nil)
+	// "completed" (via todo_write) but never ran complete_step for it.
+	unverified, hasBaseline := a.evidence.UnverifiedCompletedTodos(currentTodos)
 	if hasBaseline && len(unverified) > 0 {
 		names := make([]string, len(unverified))
 		for i, m := range unverified {

@@ -59,7 +59,7 @@ func (a *AgentRunner) taskGate() bool {
 // asking the model to verify the goal has been met before declaring
 // completion. Reentry cap = 3. Skips in plannerMode.
 func (a *AgentRunner) goalGate() bool {
-	if a.plannerMode {
+	if a.plannerMode || a.disableVerify {
 		return false
 	}
 	if a.goal == "" {

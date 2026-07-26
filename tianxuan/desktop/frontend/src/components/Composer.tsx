@@ -67,13 +67,31 @@ export function Composer({
   // 排队
   const queueRef = useRef<string[]>([]);
   const [queueLen, setQueueLen] = useState(0);
+  const [queueDisplay, setQueueDisplay] = useState<string[]>([]); // 可视化队列列表
+  const correctionRef = useRef<string | null>(null);               // 纠正模式待发送文本
   const onSendRef = useRef(onSend);
   onSendRef.current = onSend;
+  // Shift 键追踪（用于发送按钮提示）
+  const [shiftHeld, setShiftHeld] = useState(false);
   useEffect(() => {
+    const onDown = (e: globalThis.KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(true); };
+    const onUp = (e: globalThis.KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(false); };
+    window.addEventListener("keydown", onDown); window.addEventListener("keyup", onUp);
+    return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
+  }, []);
+  useEffect(() => {
+    // 纠正模式优先：cancel 后 running→false，立即发送纠正文本
+    if (!running && correctionRef.current) {
+      const correction = correctionRef.current;
+      correctionRef.current = null;
+      onSendRef.current(correction, correction);
+      return;
+    }
     if (!running && queueRef.current.length > 0) {
       const timer = setTimeout(() => {
         const next = queueRef.current.shift()!;
         setQueueLen(queueRef.current.length);
+        setQueueDisplay([...queueRef.current]);
         onSendRef.current(next, next);
       }, 50);
       return () => clearTimeout(timer);
@@ -151,7 +169,7 @@ export function Composer({
       } catch {}
     }
     setHistoryIndex(-1);
-    if (running) { queueRef.current.push(submitText); setQueueLen(queueRef.current.length); setText(""); setAttachments([]); return; }
+    if (running) { queueRef.current.push(submitText); setQueueLen(queueRef.current.length); setQueueDisplay([...queueRef.current]); setText(""); setAttachments([]); return; }
     onSend(displayText, submitText); setText(""); setAttachments([]);
   };
 
@@ -191,7 +209,14 @@ export function Composer({
   };
   const onDragLeave = () => setDragOver(false);
 
-  const handleCancel = () => { queueRef.current = []; setQueueLen(0); const restored = onCancel(); if (typeof restored === "string") setTextCaretEnd(restored); };
+  const handleCancel = () => { queueRef.current = []; setQueueLen(0); setQueueDisplay([]); const restored = onCancel(); if (typeof restored === "string") setTextCaretEnd(restored); };
+
+  // 逐条取消排队
+  const cancelQueueItem = (index: number) => {
+    queueRef.current.splice(index, 1);
+    setQueueLen(queueRef.current.length);
+    setQueueDisplay([...queueRef.current]);
+  };
 
   const pickCommand = (c: CommandInfo) => setTextCaretEnd("/" + c.name + " ");
   const pickEntry = (e: DirEntry) => {
@@ -251,6 +276,33 @@ export function Composer({
       if (e.key === "ArrowUp" && text === "") { e.preventDefault(); navigateHistory(1); return; }
       if (e.key === "ArrowDown" && historyIndex >= 0) { e.preventDefault(); navigateHistory(-1); return; }
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && historyIndex >= 0) setHistoryIndex(-1);
+    }
+    if (e.key === "Enter" && e.shiftKey && !composing) {
+      // 纠正模式：Shift+Enter → Cancel 当前轮次 + 立即发送新文本
+      // 使用前端 correctionRef 机制：cancel → 等待 running→false → 自动发送
+      e.preventDefault();
+      if (disabled) return;
+      const tTrim = text.trim();
+      if ((!tTrim && attachments.length === 0) || pendingPaste > 0) return;
+      const refs = attachments.map((a) => `@${a.path}`).join(" ");
+      const displayText = [tTrim, refs].filter(Boolean).join(tTrim && refs ? " " : "");
+      const submitText = [paste.expandBlocks(tTrim), refs].filter(Boolean).join(tTrim && refs ? " " : "");
+      if (displayText.trim()) {
+        try {
+          const history = JSON.parse(sessionStorage.getItem(INPUT_HISTORY_KEY) || "[]") as string[];
+          history.unshift(displayText); sessionStorage.setItem(INPUT_HISTORY_KEY, JSON.stringify(history.slice(0, MAX_INPUT_HISTORY)));
+        } catch {}
+      }
+      setHistoryIndex(-1);
+      // 清空队列，取消当前轮次，丢弃恢复的文本；running→false 时 correctionRef 自动发送
+      queueRef.current = [];
+      setQueueLen(0);
+      setQueueDisplay([]);
+      onCancel(); // 触发 unsend + app.Cancel()，丢弃返回值
+      correctionRef.current = submitText;
+      setText("");
+      setAttachments([]);
+      return;
     }
     if (e.key === "Enter" && !e.shiftKey && !composing) { e.preventDefault(); submit(); }
     if (e.key === "Escape" && running) { e.preventDefault(); handleCancel(); }
@@ -345,6 +397,25 @@ export function Composer({
         onRemove={paste.removeBlock}
       />
 
+      {/* ── 排队列表 ── */}
+      {running && queueDisplay.length > 0 && (
+        <div className="mb-2 max-h-[120px] overflow-y-auto rounded-xl border border-border-soft bg-bg-elev px-2 py-1.5">
+          <div className="text-fg-faint/50 text-[10px] font-medium px-2 pb-1 select-none">排队中 ({queueDisplay.length})</div>
+          {queueDisplay.map((item, i) => (
+            <div key={i} className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-bg-soft group transition-colors duration-100">
+              <span className="text-xs text-fg-dim flex-1 truncate">{item.slice(0, 80)}</span>
+              <button
+                className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-5 h-5 border-0 rounded bg-transparent text-fg-faint hover:text-err hover:bg-err/10 cursor-pointer transition-all duration-150"
+                onClick={() => cancelQueueItem(i)}
+                title="取消排队"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── 输入卡片 ── */}
       <div
         className={`relative border border-border-soft bg-bg-elev rounded-2xl overflow-hidden transition-[border-color,box-shadow] duration-150 focus-within:border-accent/30 focus-within:shadow-[0_0_0_1px_var(--accent-soft),var(--ds-shadow-composer)] ${composerHeight !== null ? "flex flex-col" : ""} ${composerResizing ? "cursor-ns-resize" : ""}`}
@@ -379,13 +450,15 @@ export function Composer({
             </button>
           )}
           <button
-            className={`inline-flex items-center justify-center w-[32px] h-[32px] border-0 rounded-full cursor-pointer shrink-0 transition-all duration-150 active:scale-95 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${running ? "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105" : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none`}
+            className={`inline-flex items-center justify-center w-[32px] h-[32px] border-0 rounded-full cursor-pointer shrink-0 transition-all duration-150 active:scale-95 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${running ? (shiftHeld ? "bg-warn/20 text-warn hover:bg-warn hover:text-white shadow-[0_0_8px_var(--warn)]" : "bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg hover:scale-105") : "bg-accent text-accent-fg hover:brightness-110"} disabled:bg-bg-elev-2 disabled:text-fg-faint disabled:cursor-default disabled:hover:scale-100 disabled:active:scale-100 disabled:shadow-none`}
             style={!running && !disabled ? {boxShadow: "var(--ds-shadow-accent-btn)"} : undefined}
             onClick={submit}
             disabled={disabled || pendingPaste > 0 || (!text.trim() && attachments.length === 0 && (!running || queueLen === 0))}
-            title={running ? (queueLen > 0 ? `排队发送 (${queueLen})` : t("composer.queue")) : t("composer.send")}
+            title={running ? (shiftHeld ? "纠正发送（Shift+Enter）" : queueLen > 0 ? `排队发送 (${queueLen})` : t("composer.queue")) : t("composer.send")}
           >
-            {running && queueLen > 0 ? (
+            {running && shiftHeld ? (
+              <Zap size={16} />
+            ) : running && queueLen > 0 ? (
               <span className="text-xs font-semibold leading-none">{queueLen}</span>
             ) : (
               <ArrowUp size={16} />
@@ -435,10 +508,10 @@ export function Composer({
           <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-2">
             <span>/ 命令</span>
             <span>@ 文件</span>
+            {running && <span className="text-warn/60">Shift+Enter 纠正</span>}
           </span>
         </div>
       </div>
     </div>
   );
 }
-

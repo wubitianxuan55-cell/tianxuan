@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"tianxuan/internal/provider"
+	"tianxuan/internal/tool"
 )
 
 // ToolFeedbackCap 连续工具反馈消息的最大注入轮数。
@@ -81,6 +82,30 @@ func (a *AgentRunner) maybeInjectToolFeedback(calls []provider.ToolCall, results
 // isErrorResult's broad definition that includes blocked/error/Error/[error).
 func analyzeResults(calls []provider.ToolCall, results []string) (errors, blocked int, details []string) {
 	for i, r := range results {
+		// V10.88: parse JSON-envelope first (V8.9+), then fall back to legacy prefixes.
+		if env, ok := tool.ParseEnvelope(r); ok {
+			if env.Code == tool.CodeBlocked {
+				blocked++
+				errors++ // treat as error for trigger threshold (matching isErrorResult)
+				if len(details) < 5 {
+					name := ""
+					if i < len(calls) {
+						name = calls[i].Name
+					}
+					details = append(details, fmt.Sprintf("  %s → %s", name, truncateStr(r, 100)))
+				}
+			} else if !env.OK {
+				errors++
+				if len(details) < 5 {
+					name := ""
+					if i < len(calls) {
+						name = calls[i].Name
+					}
+					details = append(details, fmt.Sprintf("  %s → %s", name, truncateStr(r, 100)))
+				}
+			}
+			continue
+		}
 		if strings.HasPrefix(r, "blocked:") {
 			blocked++
 			errors++ // treat as error for trigger threshold (matching isErrorResult)

@@ -55,6 +55,7 @@ export interface AppBindings {
   Submit(input: string): Promise<void>;
   SubmitDisplay(display: string, input: string): Promise<void>;
   Cancel(): Promise<void>;
+  CancelAndSubmit(input: string): Promise<void>; // atomically cancel + submit (correct mode)
   Approve(id: string, allow: boolean, session: boolean): Promise<void>;
   AnswerQuestion(id: string, answers: QuestionAnswer[]): Promise<void>;
   SetAgentMode(mode: string): Promise<void>;
@@ -338,4 +339,4 @@ import {
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 
 type AssertNever<T extends never> = T;
-export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel" | "StartMobileAccess" | "StopMobileAccess" | "MobileAccessStatus" | "CheckNgrok" | "AutoStartMobileAccess" | "GetPersistedMobileToken">>;
+export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel">>;

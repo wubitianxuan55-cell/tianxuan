@@ -51,6 +51,9 @@ func (a *AgentRunner) maybeRecallReminder() {
 // 消除 Agent 显式调用 memory_search 的需要 — Agent 无需主动搜索即可获得上下文。
 // 与 jcode 不同，tianxuan 用 FTS5 BM25 替代向量嵌入（零外部依赖）。
 // MemorySearchFunc 由 boot 在初始化时注入。
+//
+// V10.100: 添加去重缓存 — 相同查询不重复搜索，连续相同查询只注入一次。
+// 避免多轮对话中重复 BM25 搜索和 session 膨胀。
 
 // MemoryResult 是自动记忆检索的结果条目。
 type MemoryResult struct {
@@ -70,6 +73,13 @@ func (a *AgentRunner) maybeAutoRecall() {
 	if len(query) < 5 {
 		return
 	}
+	// V10.100: 去重 — 相同查询跳过，避免每轮重复搜索和注入。
+	// 仅在用户发送了与上一轮不同的新消息时才执行搜索。
+	if query == a.lastRecallQuery {
+		return
+	}
+	a.lastRecallQuery = query
+
 	// FTS5 BM25 搜索记忆
 	hits := MemorySearchFunc(query, 3) // 最多 3 条
 	if len(hits) == 0 {

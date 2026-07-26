@@ -8,11 +8,9 @@
 //   GET /            — landing page
 //   GET /health      — health check
 //   GET /assets/*    — static assets (CSS, JS, fonts)
-//   GET /mobile      — mobile SPA
-//   GET /mobile/*    — mobile SPA assets
 //
 // The query-parameter channel exists because EventSource (SSE) does not
-// support custom headers — mobile clients pass the token as ?token=... on
+// support custom headers — clients pass the token as ?token=... on
 // the /events endpoint.
 package serve
 
@@ -39,9 +37,6 @@ func authExempt(path string) bool {
 		return true
 	}
 	if strings.HasPrefix(path, "/assets/") {
-		return true
-	}
-	if path == "/mobile" || strings.HasPrefix(path, "/mobile/") {
 		return true
 	}
 	return false

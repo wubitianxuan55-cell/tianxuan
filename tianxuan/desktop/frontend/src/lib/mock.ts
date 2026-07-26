@@ -193,6 +193,10 @@ export function makeMockApp(): AppBindings {
       cancelled = true;
       emit({ kind: "turn_done" });
     },
+    async CancelAndSubmit(_input: string) {
+      cancelled = true;
+      emit({ kind: "turn_done" });
+    },
     async Approve() {},
     async AnswerQuestion() {},
     async SetAgentMode(_mode: string) {},

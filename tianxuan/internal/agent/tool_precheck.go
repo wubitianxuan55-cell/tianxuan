@@ -50,12 +50,12 @@ func (a *AgentRunner) precheckEditFile(raw json.RawMessage) string {
 
 	// old_string not found — give the model actionable diagnostics
 	preview := p.OldString
-	if len(preview) > 100 {
-		preview = preview[:100] + "..."
+	if len([]rune(preview)) > 100 {
+		preview = truncateString(preview, 100) + "..."
 	}
 	filePreview := content
-	if len(filePreview) > 200 {
-		filePreview = filePreview[:200] + "..."
+	if len([]rune(filePreview)) > 200 {
+		filePreview = truncateString(filePreview, 200) + "..."
 	}
 	return fmt.Sprintf(
 		"precheck blocked: old_string not found in %s.\n"+
@@ -88,8 +88,8 @@ func (a *AgentRunner) precheckMultiEdit(raw json.RawMessage) string {
 	for i, e := range p.Edits {
 		if e.OldString != "" && !strings.Contains(content, e.OldString) {
 			preview := e.OldString
-			if len(preview) > 80 {
-				preview = preview[:80] + "..."
+			if len([]rune(preview)) > 80 {
+				preview = truncateString(preview, 80) + "..."
 			}
 			return fmt.Sprintf(
 				"precheck blocked: multi_edit[%d] old_string not found in %s: %q. "+

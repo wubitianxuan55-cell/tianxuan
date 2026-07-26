@@ -199,7 +199,7 @@ func TestGoalGateFiresWithGoal(t *testing.T) {
 
 func TestFinalReadinessCheck_NilEvidence(t *testing.T) {
 	a := &AgentRunner{} // evidence is nil by default
-	blocked, _ := a.finalReadinessCheck()
+	blocked, _ := a.finalReadinessCheck(nil)
 	if blocked {
 		t.Fatal("nil evidence should not block")
 	}
@@ -208,7 +208,7 @@ func TestFinalReadinessCheck_NilEvidence(t *testing.T) {
 func TestFinalReadinessCheck_NoBaseline(t *testing.T) {
 	ledger := evidence.NewLedger()
 	a := &AgentRunner{evidence: ledger}
-	blocked, _ := a.finalReadinessCheck()
+	blocked, _ := a.finalReadinessCheck(nil)
 	if blocked {
 		t.Fatal("no baseline should not block")
 	}
@@ -220,24 +220,33 @@ func TestFinalReadinessCheck_NoBaseline(t *testing.T) {
 // See canonical_todo.go: recordTodoState updates the ledger with a synthetic
 // baseline when complete_step fires, so by the time finalReadinessCheck runs
 // the ledger's latest todo_write baseline has already been patched.
-func TestFinalReadinessCheck_UnverifiedTodosWithNilCurrent(t *testing.T) {
+// TestFinalReadinessCheck_UnverifiedTodosBlocks verifies that when the model
+// marks todos as completed via todo_write without complete_step, the readiness
+// gate now correctly blocks (V10.101: current todos are passed in, not nil).
+func TestFinalReadinessCheck_UnverifiedTodosBlocks(t *testing.T) {
 	ledger := evidence.NewLedger()
-	// A todo_write that marks steps as completed without complete_step.
-	// In production, recordTodoState would have already patched the ledger
-	// by the time finalReadinessCheck runs. Since we bypass that path,
-	// and finalReadinessCheck passes nil as current, this should not block.
+	// Baseline: todo_write creates tasks as pending
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
 		Success:  true,
 		Todos: []evidence.TodoItem{
-			{Content: "Step 1", Status: "completed", ActiveForm: "Step 1"},
-			{Content: "Step 2", Status: "completed", ActiveForm: "Step 2"},
+			{Content: "Step 1", Status: "pending", ActiveForm: "Step 1"},
+			{Content: "Step 2", Status: "pending", ActiveForm: "Step 2"},
 		},
 	})
 	a := &AgentRunner{evidence: ledger}
-	blocked, _ := a.finalReadinessCheck()
-	if blocked {
-		t.Fatal("nil current should not block even with unverified todos (recordTodoState patches baseline first)")
+	// Current: the host (advanceCanonicalTodo) has flipped them to completed,
+	// but the model never called complete_step for them.
+	currentTodos := []evidence.TodoItem{
+		{Content: "Step 1", Status: "completed", ActiveForm: "Step 1"},
+		{Content: "Step 2", Status: "completed", ActiveForm: "Step 2"},
+	}
+	blocked, reason := a.finalReadinessCheck(currentTodos)
+	if !blocked {
+		t.Fatal("unverified completed todos should block")
+	}
+	if reason == "" {
+		t.Fatal("blocked should include a reason")
 	}
 }
 
@@ -256,7 +265,10 @@ func TestFinalReadinessCheck_VerifiedTodos(t *testing.T) {
 		Step:     "1",
 	})
 	a := &AgentRunner{evidence: ledger}
-	blocked, _ := a.finalReadinessCheck()
+	currentTodos := []evidence.TodoItem{
+		{Content: "Step 1", Status: "completed", ActiveForm: "Step 1"},
+	}
+	blocked, _ := a.finalReadinessCheck(currentTodos)
 	if blocked {
 		t.Fatal("verified todos should not block")
 	}

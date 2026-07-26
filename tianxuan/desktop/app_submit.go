@@ -35,6 +35,14 @@ func (a *App) Cancel() {
 	}
 }
 
+// CancelAndSubmit cancels the current turn and immediately submits a new one,
+// used by the correction feature (Shift+Enter during a running turn).
+func (a *App) CancelAndSubmit(input string) {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
+		ctrl.CancelAndSubmit(input)
+	}
+}
+
 // Approve answers a pending approval_request by ID: allow runs the call, session
 // also remembers the grant for the rest of the session.
 func (a *App) Approve(id string, allow, session bool) {

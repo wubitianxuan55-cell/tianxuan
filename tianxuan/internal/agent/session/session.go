@@ -44,15 +44,6 @@ func (s *Session) PrependSystem(content string) {
 	s.Messages = append([]provider.Message{{Role: provider.RoleSystem, Content: content}}, s.Messages...)
 }
 
-// Truncate cuts the message log back to n messages. Used to roll back
-// unapproved plan output from the planner's session.
-func (s *Session) Truncate(n int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if n < len(s.Messages) {
-		s.Messages = s.Messages[:n]
-	}
-}
 
 // Replace swaps the whole message log — used by compaction, which rewrites the
 // middle of the history.
@@ -69,6 +60,28 @@ func (s *Session) Snapshot() []provider.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]provider.Message(nil), s.Messages...)
+}
+
+// RemoveLast drops the last message, holding the write lock. Used to clean up
+// transient steering/nudge messages before returning from a turn. No-op when
+// Messages is empty.
+func (s *Session) RemoveLast() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.Messages) > 0 {
+		s.Messages = s.Messages[:len(s.Messages)-1]
+	}
+}
+
+// AppendSystemPrompt appends content to the first system message, holding the
+// write lock. Used by MergeRuntimePrompt during turn setup. Safe to call
+// concurrently with Snapshot().
+func (s *Session) AppendSystemPrompt(content string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.Messages) > 0 && s.Messages[0].Role == provider.RoleSystem {
+		s.Messages[0].Content += "\n\n" + content
+	}
 }
 
 // HasContent returns true when the session carries at least one user,

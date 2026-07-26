@@ -893,8 +893,9 @@ func (h *Hermes) formatSummary(r *TurnResult, execErr error, retriesExhausted bo
 			}
 		}
 		msg += "\n" + strings.Join(steps, "\n")
-	} else if r.Success {
-		// V10.87: model declared success but didn't record step details.
+	} else if r.Success && (len(r.FilesCreated) > 0 || len(r.FilesModified) > 0) {
+		// V10.106: only show this when files changed but steps unrecorded.
+		// Read-only tasks (no files, no steps → auto-skip) should be clean.
 		msg += "\n（未记录步骤详情）"
 	}
 

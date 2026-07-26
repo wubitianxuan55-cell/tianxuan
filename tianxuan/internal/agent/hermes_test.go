@@ -602,13 +602,28 @@ func TestFormatSummary_NilResultNoError(t *testing.T) {
 }
 
 func TestFormatSummary_SuccessNoDetails(t *testing.T) {
+	// Pure success with no files and no steps → no spurious "未记录步骤详情".
+	// Read-only tasks (e.g. "运行测试") produce no file changes, so the
+	// "未记录步骤详情" note would be misleading.
 	r := &TurnResult{Success: true}
 	out := (&Hermes{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "✅ 任务完成") {
 		t.Fatalf("expected success prefix, got: %s", out)
 	}
+	if strings.Contains(out, "未记录步骤详情") {
+		t.Fatalf("should NOT show no-details note for file-less success, got: %s", out)
+	}
+}
+
+func TestFormatSummary_SuccessWithFilesNoDetails(t *testing.T) {
+	// Files changed but no step results → "未记录步骤详情" is correct.
+	r := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
+	out := (&Hermes{}).formatSummary(r, nil, false)
+	if !strings.Contains(out, "新建 1 个文件") {
+		t.Fatalf("expected file count, got: %s", out)
+	}
 	if !strings.Contains(out, "未记录步骤详情") {
-		t.Fatalf("expected no-details note, got: %s", out)
+		t.Fatalf("expected no-details note for file changes without steps, got: %s", out)
 	}
 }
 

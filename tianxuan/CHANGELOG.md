@@ -1,3 +1,20 @@
+## [10.106.0] — 2026-07-26
+
+### 🔧 formatSummary 优化 — 纯只读任务不再显示「未记录步骤详情」
+
+> auto-skip 只读任务（如 "运行测试"）成功时，summary 原先显示 "✅ 任务完成\n（未记录步骤详情）"，提示冗余且有误导性。修复后纯无文件变更的任务直接输出 "✅ 任务完成"。
+
+#### 修复
+- **`formatSummary`** 条件收紧：`r.Success && (len(FilesCreated)>0 || len(FilesModified)>0)` — 仅在有文件产出但未记录步骤时才提示
+- **新增 `TestFormatSummary_SuccessWithFilesNoDetails`**：验证有文件但未记录步骤时仍显示提示
+- **更新 `TestFormatSummary_SuccessNoDetails`**：验证纯只读任务不显示提示
+
+#### 文件变更
+- `internal/agent/hermes.go` — ±3 行
+- `internal/agent/hermes_test.go` — +22 行
+
+---
+
 ## [10.105.0] — 2026-07-26
 
 ### 🔧 消除 TurnResultEvent 重复代码 + directive 边界测试

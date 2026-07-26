@@ -81,8 +81,9 @@ func DecidePlannerRoute(input string) PlannerDecision {
 	}
 	// Pure directive: short, clear single-operation commands.
 	// "构建" / "更新文件" / "更新记忆" — no planning needed.
+	// Cap at 40 runes: longer inputs likely describe multi-step tasks.
 	if f.work && !f.ambiguous && !f.crossSurface && !f.structured &&
-		utf8.RuneCountInString(text) <= 100 {
+		utf8.RuneCountInString(text) <= 40 {
 		return execDecision("directive")
 	}
 	if f.ambiguous {

@@ -223,7 +223,38 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	if d := DecidePlannerRoute(input); d.Route == RouteExecOnly &&
 		(d.Reason == "atomic_edit" || d.Reason == "read_only" || d.Reason == "directive") {
 		h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing (auto-skip: " + d.Reason + ")"})
-		return h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
+		defer h.wrapExecutorSink()()
+		execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
+		if execResult != nil {
+			execResult.Plan = "" // auto-skip has no plan
+		}
+		hermesSummary := h.formatSummary(execResult, execErr, false)
+		if hermesSummary != "" {
+			h.sink.Emit(event.Event{Kind: event.Text, Text: hermesSummary})
+		}
+		if execResult != nil {
+			h.sink.Emit(event.Event{
+				Kind: event.TurnResultEvent,
+				PlanResult: &event.PlanResult{
+					Plan:          "",
+					FilesCreated:  execResult.FilesCreated,
+					FilesModified: execResult.FilesModified,
+					Success:       execResult.Success,
+					Errors:        execResult.Errors,
+					Summary:       hermesSummary,
+				},
+			})
+		} else if execErr != nil {
+			h.sink.Emit(event.Event{
+				Kind: event.TurnResultEvent,
+				PlanResult: &event.PlanResult{
+					Success: false,
+					Errors:  []string{execErr.Error()},
+					Summary: hermesSummary,
+				},
+			})
+		}
+		return execResult, execErr
 	}
 
 	// Normal path: plan → confirm → execute.
@@ -390,11 +421,14 @@ func (h *Hermes) allStepsPassed(r *TurnResult) bool {
 	if len(r.FilesCreated) > 0 || len(r.FilesModified) > 0 {
 		return true
 	}
-	// No visible work AND no step tracking: reject. This prevents a
-	// model that declared victory without doing anything from passing.
-	// (In Hermes mode the Hephaestus stop-gates catch this earlier;
-	// this is the last-resort guard inside the correction-loop logic.)
-	return false
+	// No visible work AND no step tracking: check for concrete failures.
+	// Read-only tasks (e.g. "运行测试", auto-skipped from planner) produce
+	// no file changes and typically no complete_step calls, but are valid
+	// successful runs when there are no errors and Success is true.
+	if len(r.Errors) > 0 || !r.Success {
+		return false
+	}
+	return true
 }
 
 // planFix asks the planner to produce a targeted fix for failed steps.

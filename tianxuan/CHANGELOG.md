@@ -1,3 +1,31 @@
+## [10.104.0] — 2026-07-26
+
+### 🎯 Auto-skip 路径完善 + 多项收紧优化
+
+> 双模型 auto-skip 路径现在有完整的结果处理（sink event / summary / TurnResultEvent），allStepsPassed 支持只读任务，directive 阈值收紧，UI 卡片宽度优化。
+
+#### Auto-skip 路径增强
+- **`hermes.go`**：auto-skip 分支（atomic_edit/read_only/directive）增加 `wrapExecutorSink()`、`formatSummary()`、`TurnResultEvent` emit，与正常路径保持一致的结果卡片输出
+- **`allStepsPassed`** 第 4 条规则放宽：Success=true + 无错误 → 通过，支持只读任务（无文件变更、无 complete_step）正常结束
+
+#### 阈值收紧
+- **`planner_route.go`**：directive 字符阈值从 100 runes 收紧到 40 runes，更长输入走完整规划流程
+
+#### UI 优化
+- **AskCard / PlanCard**：卡片最大宽度减半 `max-w-[calc(var(--maxw)/2)]`，避免过宽
+
+#### 清理
+- 移除 `code-review-guard/SKILL.md` — 不再需要内联捆绑技能
+
+#### 文件变更
+- `internal/agent/hermes.go` — +46/-2
+- `internal/agent/hermes_test.go` — +12/-12
+- `internal/agent/planner_route.go` — +3/-1
+- `desktop/frontend/src/components/AskCard.tsx` — +1/-1
+- `desktop/frontend/src/components/PlanCard.tsx` — +1/-1
+
+---
+
 ## [10.103.0] — 2026-07-26
 
 ### 🔧 Precheck 模糊匹配 — 修复 edit_file 误拦导致整文件重写

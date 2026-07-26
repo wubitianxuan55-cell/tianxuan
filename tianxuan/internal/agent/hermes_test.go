@@ -686,25 +686,27 @@ func TestAllStepsPassed_AllSuccess(t *testing.T) {
 }
 
 func TestAllStepsPassed_NoStepResults(t *testing.T) {
+	// Success=true, no step results, no files, no errors → pass.
+	// Read-only tasks (auto-skipped from planner) are valid successful runs.
 	r := &TurnResult{Success: true}
-	// Success=true but no step results AND no file changes — model declared
-	// done without doing anything visible. allStepsPassed returns false
-	// because no concrete work was accomplished.
-	if (&Hermes{}).allStepsPassed(r) {
-		t.Fatal("Success=true with no step results and no file changes should NOT pass")
+	if !(&Hermes{}).allStepsPassed(r) {
+		t.Fatal("Success=true with no errors should pass (read-only task)")
 	}
-	// With file changes present, it should pass (work was done even if
-	// complete_step evidence collection failed).
+	// Success=false, no step results, no files → fail (genuine failure).
+	rFail := &TurnResult{Success: false, Errors: []string{"build failed"}}
+	if (&Hermes{}).allStepsPassed(rFail) {
+		t.Fatal("Success=false with errors should NOT pass")
+	}
+	// With file changes present, it should pass (work was done).
 	r2 := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
 	if !(&Hermes{}).allStepsPassed(r2) {
-		t.Fatal("Success=true with no step results but file changes should pass")
+		t.Fatal("file changes should pass")
 	}
-	// File changes + system errors (e.g. "paused after maxSteps") should
-	// still pass — system errors don't negate the visible work done.
+	// File changes + errors should still pass.
 	r3 := &TurnResult{Success: true, FilesModified: []string{"b.go"},
 		Errors: []string{"paused after 5 tool-call rounds (agent.max_steps)"}}
 	if !(&Hermes{}).allStepsPassed(r3) {
-		t.Fatal("file changes should pass even with system-level errors present")
+		t.Fatal("file changes should pass even with system-level errors")
 	}
 }
 

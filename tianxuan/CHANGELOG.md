@@ -1,4 +1,47 @@
-## [10.101.0] — 2026-07-26
+## [10.103.0] — 2026-07-26
+
+### 🔧 Precheck 模糊匹配 — 修复 edit_file 误拦导致整文件重写
+
+> Precheck 的 `strings.Contains` 精确匹配与 Execute 的模糊匹配不一致，导致有尾部空白/Tab空格/行号前缀差异的 edit_file 被错误阻止，模型放弃 edit_file 改用 write_file 重写整个文件。
+
+#### 修复
+- **Precheck 新增 `fuzzyPrecheckMatch`**：和 Execute 使用相同的 4 种模糊模式（trimTrailing/expandTabs/stripOldReadPrefixes）
+- 编辑 `old_string` 有细微差异时不再被 Precheck 误拦，Execute 的模糊匹配可以正常处理
+- 适用 `edit_file`、`multi_edit`、`delete_range` 的预检查
+
+#### 文件变更
+- `internal/agent/tool_precheck.go` — +116 行：`fuzzyPrecheckMatch` + `normLine` + `stripReadPrefix` + `hasReadFileNumberPrefix`
+
+---
+
+
+### 🎯 双模型智能跳过规划者 — 特征分析引擎
+
+> 从 reasonix-src 蒸馏确定性特征分析引擎，双模型模式下自动跳过不必要的规划者调用。纯聊天/简单操作/复杂任务三路分发，system prompt 不变，缓存不裂。
+
+#### 特征分析引擎
+- **`DecidePlannerRoute`**：15 级优先级决策链，纯文本分析，无模型调用
+- **12 维特征提取**：work / highRisk / multiFile / crossSurface / structured / complex / atomic / readOnly / guidance / anchored / ambiguous / directive
+- **中英双语词表**：覆盖 10 类特征词（work/mutation/readOnly/highRisk/crossSurface/complex/atomic/namedTargets/ambiguous）
+- **`directive` 直行指令**：短操作（"构建""更新文件""add pagination"≤100字）跳过规划者
+
+#### 三路分发
+- **纯聊天**（hello/ok/谢谢）→ Hermes 规划者直接回答，不产生 plan，不过 executor
+- **简单工作**（typo 修正/运行测试/构建/更新文件）→ ⚡跳过规划者，Hephaestus 执行者直接用 HephaestusSystemPrompt
+- **复杂任务**（重构/前后端联调/高风险管理）→ 完整规划者→确认→执行流程
+
+#### 文件变更
+- `internal/agent/planner_route.go` — 新增：`PlannerDecision` + `DecidePlannerRoute` 决策链 (+105行)
+- `internal/agent/planner_gate.go` — 新增：12 维特征提取 + 中英词表 (+225行)
+- `internal/agent/hermes.go` — `Run` 中插入 6 行 auto-skip 判断
+- `internal/agent/hermes_test.go` — +6 个测试：AtomicEdit/HighRisk/ReadOnly/Directives/ShortComplex/Default
+
+#### 缓存安全
+- 执行者 system prompt 始终是 `HephaestusSystemPrompt`，一次编译，字节不变
+- 跳过规划者只减少 API 调用轮次，不影响 L1/L2 前缀缓存
+
+---
+
 
 ### 🔧 修正循环根因修复 + 停止门全面加固 + 移动端移除
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // precheckTool runs a fast deterministic check before a writer tool executes.
@@ -46,6 +47,13 @@ func (a *AgentRunner) precheckEditFile(raw json.RawMessage) string {
 
 	if strings.Contains(content, p.OldString) {
 		return "" // found — let it proceed
+	}
+	// V10.103: try the same fuzzy matching that Execute uses.
+	// Without this, precheck rejects edits that Execute could handle
+	// (trailing whitespace, tab/space differences, read_file line prefixes),
+	// causing the model to give up on edit_file and rewrite the whole file.
+	if fuzzyPrecheckMatch(content, p.OldString) {
+		return ""
 	}
 
 	// old_string not found — give the model actionable diagnostics
@@ -160,4 +168,112 @@ func (a *AgentRunner) readFileForPrecheck(path string) (string, bool) {
 		a.tc.Set(path, 0, content)
 	}
 	return content, true
+}
+
+// fuzzyPrecheckMatch mirrors the fuzzy matching that Execute uses in
+// encoding_helpers.go (trimTrailing, expandTabs, stripOldReadPrefixes).
+// Returns true if old can be matched in content under any fuzzy mode —
+// prevents precheck from falsely blocking edits that Execute would accept.
+func fuzzyPrecheckMatch(content, old string) bool {
+	if old == "" || content == "" {
+		return false
+	}
+	contentLines := strings.Split(content, "\n")
+	oldLines := strings.Split(old, "\n")
+	if len(oldLines) == 0 || len(oldLines) > len(contentLines) {
+		return false
+	}
+
+	oldHasReadPrefixes := true
+	for _, line := range oldLines {
+		if !strings.HasPrefix(strings.TrimLeft(line, " \t"), "→") &&
+			!hasReadFileNumberPrefix(line) {
+			oldHasReadPrefixes = false
+			break
+		}
+	}
+
+	// Mirror the fuzzy modes from encoding_helpers.go fuzzyEditRanges.
+	type mode struct {
+		trimTrailing, expandTabs, stripPrefixes bool
+	}
+	modes := []mode{
+		{trimTrailing: true},
+		{trimTrailing: true, expandTabs: true},
+	}
+	if oldHasReadPrefixes {
+		modes = append(modes,
+			mode{trimTrailing: true, stripPrefixes: true},
+			mode{trimTrailing: true, expandTabs: true, stripPrefixes: true},
+		)
+	}
+
+	for _, m := range modes {
+		normOld := make([]string, len(oldLines))
+		for i, line := range oldLines {
+			normOld[i] = normLine(line, m)
+		}
+		normContent := make([]string, len(contentLines))
+		for i, line := range contentLines {
+			normContent[i] = normLine(line, m)
+		}
+		// Sliding window match: find oldLines consecutively in contentLines.
+		for i := 0; i <= len(normContent)-len(normOld); i++ {
+			match := true
+			for j := 0; j < len(normOld); j++ {
+				if normContent[i+j] != normOld[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func normLine(line string, m struct{ trimTrailing, expandTabs, stripPrefixes bool }) string {
+	s := line
+	if m.stripPrefixes {
+		s = stripReadPrefix(s)
+	}
+	if m.expandTabs {
+		s = strings.ReplaceAll(s, "\t", "    ")
+	}
+	if m.trimTrailing {
+		s = strings.TrimRight(s, " \t")
+	}
+	return s
+}
+
+func stripReadPrefix(s string) string {
+	// Strip " 123→" read_file line number prefixes.
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 && s[0] >= '0' && s[0] <= '9' {
+		s = s[1:]
+	}
+	if len(s) > 0 {
+		// Check for "→" (Unicode arrow used by read_file output).
+		r, size := utf8.DecodeRuneInString(s)
+		if r == '→' || r == '>' {
+			s = s[size:]
+		}
+	}
+	return s
+}
+
+func hasReadFileNumberPrefix(line string) bool {
+	s := strings.TrimLeft(line, " \t")
+	for len(s) > 0 && s[0] >= '0' && s[0] <= '9' {
+		s = s[1:]
+	}
+	if len(s) > 0 {
+		r, _ := utf8.DecodeRuneInString(s)
+		return r == '→' || r == '>'
+	}
+	return false
 }

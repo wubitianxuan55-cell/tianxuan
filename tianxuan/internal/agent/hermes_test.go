@@ -73,6 +73,64 @@ func TestShouldSkipPlanner_NoBangWithBlocks(t *testing.T) {
 	}
 }
 
+// ── DecidePlannerRoute ─────────────────────────────────────
+
+func TestDecidePlannerRoute_AtomicEdit(t *testing.T) {
+	for _, q := range []string{"fix typo in readme", "rename getCwd in main.go"} {
+		d := DecidePlannerRoute(q)
+		if d.Route != RouteExecOnly {
+			t.Fatalf("%q should be exec_only (atomic, got %s)", q, d.Route)
+		}
+	}
+}
+
+func TestDecidePlannerRoute_HighRisk(t *testing.T) {
+	d := DecidePlannerRoute("修复并发竞态问题")
+	if d.Route != RoutePlanAndExec {
+		t.Fatalf("high risk should be plan_and_execute (got %s)", d.Route)
+	}
+}
+
+func TestDecidePlannerRoute_ReadOnlyWork(t *testing.T) {
+	d := DecidePlannerRoute("运行测试看看有没有问题")
+	if d.Route != RouteExecOnly {
+		t.Fatalf("read-only work should be exec_only (got %s)", d.Route)
+	}
+}
+
+func TestDecidePlannerRoute_ShortComplexSkipsPlanner(t *testing.T) {
+	// Short work-bearing tasks with cross-surface or ambiguous keywords → plan.
+	for _, q := range []string{"重构认证模块", "fix the cache bug in user.go and auth.go"} {
+		d := DecidePlannerRoute(q)
+		if d.Route != RoutePlanAndExec {
+			t.Fatalf("%q should be plan_and_execute (got %s)", q, d.Route)
+		}
+	}
+	// Simple directives → exec_only.
+	for _, q := range []string{"add pagination", "fix the build"} {
+		d := DecidePlannerRoute(q)
+		if d.Route != RouteExecOnly {
+			t.Fatalf("%q should be exec_only (simple directive, got %s)", q, d.Route)
+		}
+	}
+}
+
+func TestDecidePlannerRoute_DefaultIsExecutor(t *testing.T) {
+	d := DecidePlannerRoute("hello")
+	if d.Route != RouteExecOnly {
+		t.Fatalf("'hello' should default to exec_only (got %s)", d.Route)
+	}
+}
+
+func TestDecidePlannerRoute_Directives(t *testing.T) {
+	for _, q := range []string{"构建", "更新文件", "更新记忆", "保存会话", "提交代码"} {
+		d := DecidePlannerRoute(q)
+		if d.Route != RouteExecOnly {
+			t.Fatalf("%q should be exec_only (directive, got %s)", q, d.Route)
+		}
+	}
+}
+
 // ── isAnswerNotAction ──────────────────────────────────────
 
 func TestIsAnswerNotAction_Short(t *testing.T) {

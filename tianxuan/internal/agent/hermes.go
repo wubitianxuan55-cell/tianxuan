@@ -211,9 +211,19 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 
 	h.sink.Emit(event.Event{Kind: event.TurnStarted})
 
-	// V10.31: fast path — skip planner for simple/quick tasks ("!" prefix).
+	// V10.31: fast path — explicit "!" prefix skips planner.
 	if result, err := h.runFastPath(ctx, input); result != nil || err != nil {
 		return result, err
+	}
+
+	// V10.102: auto-skip planner only for work-bearing simple tasks
+	// (atomic edits, read-only work, short directives like "构建").
+	// Pure chat / questions / short replies still go through Hermes —
+	// the planner answers directly without producing a plan.
+	if d := DecidePlannerRoute(input); d.Route == RouteExecOnly &&
+		(d.Reason == "atomic_edit" || d.Reason == "read_only" || d.Reason == "directive") {
+		h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing (auto-skip: " + d.Reason + ")"})
+		return h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
 	}
 
 	// Normal path: plan → confirm → execute.

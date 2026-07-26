@@ -225,35 +225,7 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing (auto-skip: " + d.Reason + ")"})
 		defer h.wrapExecutorSink()()
 		execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
-		if execResult != nil {
-			execResult.Plan = "" // auto-skip has no plan
-		}
-		hermesSummary := h.formatSummary(execResult, execErr, false)
-		if hermesSummary != "" {
-			h.sink.Emit(event.Event{Kind: event.Text, Text: hermesSummary})
-		}
-		if execResult != nil {
-			h.sink.Emit(event.Event{
-				Kind: event.TurnResultEvent,
-				PlanResult: &event.PlanResult{
-					Plan:          "",
-					FilesCreated:  execResult.FilesCreated,
-					FilesModified: execResult.FilesModified,
-					Success:       execResult.Success,
-					Errors:        execResult.Errors,
-					Summary:       hermesSummary,
-				},
-			})
-		} else if execErr != nil {
-			h.sink.Emit(event.Event{
-				Kind: event.TurnResultEvent,
-				PlanResult: &event.PlanResult{
-					Success: false,
-					Errors:  []string{execErr.Error()},
-					Summary: hermesSummary,
-				},
-			})
-		}
+		h.emitExecutorResult(execResult, execErr, false, true)
 		return execResult, execErr
 	}
 
@@ -365,29 +337,7 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 	// V10.87: if retries happened, emit a single final TurnResultEvent.
 	// Rounds 2/3 suppressed theirs so the frontend sees exactly one result card.
 	if len(fixHistory) > 0 {
-		if result != nil {
-			summary := h.formatSummary(result, err, !h.allStepsPassed(result))
-			h.sink.Emit(event.Event{
-				Kind: event.TurnResultEvent,
-				PlanResult: &event.PlanResult{
-					Plan:          result.Plan,
-					FilesCreated:  result.FilesCreated,
-					FilesModified: result.FilesModified,
-					Success:       result.Success,
-					Errors:        result.Errors,
-					Summary:       summary,
-				},
-			})
-		} else if err != nil {
-			h.sink.Emit(event.Event{
-				Kind: event.TurnResultEvent,
-				PlanResult: &event.PlanResult{
-					Success: false,
-					Errors:  []string{err.Error()},
-					Summary: "❌ 执行失败: " + err.Error(),
-				},
-			})
-		}
+		h.emitExecutorResult(result, err, !h.allStepsPassed(result), false)
 	}
 
 	return execRound{result: result, err: err}
@@ -577,23 +527,30 @@ func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, er
 	// V10.87: emit TurnResultEvent so the frontend gets a structured result card,
 	// matching executePlan's behaviour. Pre-injection stays as `task` — the "!"
 	// marker is a Hermes-layer signal and must not leak to the executor.
-	if execResult != nil {
-		execResult.Plan = "" // fast path has no plan
+	h.emitExecutorResult(execResult, execErr, false, true)
+	return execResult, execErr
+}
+
+// emitExecutorResult formats and emits the summary text + TurnResultEvent for an
+// executor run. clearPlan clears the plan field (auto-skip/fast-path have no plan).
+func (h *Hermes) emitExecutorResult(r *TurnResult, execErr error, retriesExhausted, clearPlan bool) {
+	if r != nil && clearPlan {
+		r.Plan = ""
 	}
-	hermesSummary := h.formatSummary(execResult, execErr, false)
-	if hermesSummary != "" {
-		h.sink.Emit(event.Event{Kind: event.Text, Text: hermesSummary})
+	summary := h.formatSummary(r, execErr, retriesExhausted)
+	if summary != "" {
+		h.sink.Emit(event.Event{Kind: event.Text, Text: summary})
 	}
-	if execResult != nil {
+	if r != nil {
 		h.sink.Emit(event.Event{
 			Kind: event.TurnResultEvent,
 			PlanResult: &event.PlanResult{
-				Plan:          "",
-				FilesCreated:  execResult.FilesCreated,
-				FilesModified: execResult.FilesModified,
-				Success:       execResult.Success,
-				Errors:        execResult.Errors,
-				Summary:       hermesSummary,
+				Plan:          r.Plan,
+				FilesCreated:  r.FilesCreated,
+				FilesModified: r.FilesModified,
+				Success:       r.Success,
+				Errors:        r.Errors,
+				Summary:       summary,
 			},
 		})
 	} else if execErr != nil {
@@ -602,11 +559,10 @@ func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, er
 			PlanResult: &event.PlanResult{
 				Success: false,
 				Errors:  []string{execErr.Error()},
-				Summary: hermesSummary,
+				Summary:  summary,
 			},
 		})
 	}
-	return execResult, execErr
 }
 
 func (h *Hermes) injectProjectMap() {

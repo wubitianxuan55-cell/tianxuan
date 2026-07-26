@@ -131,6 +131,41 @@ func TestDecidePlannerRoute_Directives(t *testing.T) {
 	}
 }
 
+// TestDecidePlannerRoute_DirectiveBoundary verifies edge cases for the
+// ≤40-rune directive threshold: exactly-at-40 passes, 41 fails,
+// and short inputs with high-risk/complex terms still go to planner.
+func TestDecidePlannerRoute_DirectiveBoundary(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		want   PlannerRoute
+	}{
+		// ≤40 runes, work=true, no prior-match → directive
+		{"short mutation", "修改配置", RouteExecOnly},
+		{"short delete", "删除旧文件", RouteExecOnly},
+		{"short update", "更新依赖", RouteExecOnly},
+
+		// ≤40 runes but caught by higher-priority rules
+		{"high-risk short", "修复并发问题", RoutePlanAndExec},
+		{"complex short", "重构认证系统", RoutePlanAndExec},
+		{"cross-surface short", "前后端联调", RoutePlanAndExec},
+
+		// Exact 40-rune boundary: "修复" × 20 = 40 runes → directive
+		{"boundary 40 runes", strings.Repeat("修复", 20), RouteExecOnly},
+
+		// 41 runes ("a" + 40 "修复"): exceeds threshold → planner
+		{"boundary 41 runes", "a" + strings.Repeat("修复", 20), RoutePlanAndExec},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := DecidePlannerRoute(tt.input)
+			if d.Route != tt.want {
+				t.Errorf("route = %s (reason=%s), want %s", d.Route, d.Reason, tt.want)
+			}
+		})
+	}
+}
+
 // ── isAnswerNotAction ──────────────────────────────────────
 
 func TestIsAnswerNotAction_Short(t *testing.T) {

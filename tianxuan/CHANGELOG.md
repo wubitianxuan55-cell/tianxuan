@@ -1,3 +1,28 @@
+## [10.105.0] — 2026-07-26
+
+### 🔧 消除 TurnResultEvent 重复代码 + directive 边界测试
+
+> 提取 `emitExecutorResult` 消除 auto-skip/fast-path/retry 三条路径的 75 行重复代码；新增 directive 边界测试覆盖 40/41 runes 阈值。
+
+#### 重构
+- **`hermes.go`**：新增 `emitExecutorResult(r, execErr, retriesExhausted, clearPlan)` 方法，统一 summary + Text + TurnResultEvent emit
+- auto-skip 路径：25 行 → 1 行 `h.emitExecutorResult(execResult, execErr, false, true)`
+- fast-path 路径：25 行 → 1 行同上
+- retry 路径：24 行 → 1 行 `h.emitExecutorResult(result, err, !h.allStepsPassed(result), false)`
+- 净减少 ~50 行
+
+#### 测试
+- **`hermes_test.go`**：新增 `TestDecidePlannerRoute_DirectiveBoundary` — 8 个子测试覆盖：
+  - ≤40 runes 短命令 → directive
+  - 41 runes 边界 → planner
+  - 高危/复杂/跨面短命令 → planner（验证优先级不被 directive 劫持）
+
+#### 文件变更
+- `internal/agent/hermes.go` — -48/+37（净 -11）
+- `internal/agent/hermes_test.go` — +38 行（新增测试）
+
+---
+
 ## [10.104.0] — 2026-07-26
 
 ### 🎯 Auto-skip 路径完善 + 多项收紧优化

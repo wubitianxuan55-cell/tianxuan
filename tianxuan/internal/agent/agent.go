@@ -206,11 +206,13 @@ type AgentRunner struct {
 
 	// V10.28: stale anchor 编辑守卫 — 同一轮内编辑文件后必须重新 read_file，
 	// 防止 old_string 锚点过时。追踪每轮写入和读取的文件路径。
+	staleMu           sync.Mutex   // 保护 staleWrittenFiles / staleReadFiles 的并发访问
 	staleWrittenFiles map[string]bool // 本轮已写入的文件路径
 	staleReadFiles    map[string]bool // 本轮已读取的文件路径
 
 	// V10.13: 成功循环检测 — 移植自 Reasonix repeatedSuccessBlock。
 	// 检测写工具在同一用户轮次中重复成功调用，阈值 2 次后阻止。
+	repeatMu           sync.Mutex
 	repeatSuccessCounts map[string]int
 
 	// V6.0: 回忆提醒开关（recall_reminder.go）

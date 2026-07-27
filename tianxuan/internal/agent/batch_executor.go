@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
@@ -234,6 +235,7 @@ func runParallel(start, end int, run func(int)) {
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
+			defer crash.Recover("batch-parallel")
 			run(i)
 		}()
 	}

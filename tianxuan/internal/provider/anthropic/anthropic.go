@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/provider"
 )
 
@@ -302,6 +303,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	idleDone := make(chan struct{})
 	defer close(idleDone)
 	go func() {
+		defer crash.Recover("anthropic-body-close")
 		select {
 		case <-ctx.Done():
 			resp.Body.Close()

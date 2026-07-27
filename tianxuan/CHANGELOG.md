@@ -1,3 +1,28 @@
+## [10.107.0] — 2026-07-27
+
+### 🔧 修复"无故崩溃"：并发 map 写入 fatal error + goroutine recover 补全
+
+> 定位到两条独立的 `fatal error: concurrent map writes` 路径，均通过 `runParallel` 8 并发执行 `executeOne` 时触发——Go runtime 级致命错误不可被 recover 捕获，直接杀进程且不留 crash 日志，完美解释了"无故崩溃"现象。同时补全 3 个遗漏 recover 的 goroutine。
+
+#### 根因修复
+- **`staleWrittenFiles`/`staleReadFiles` 并发写入**：`executeOne` 在 `runParallel` 中并行执行时，对这两个 map 的并发读写未受保护 → 新增 `staleMu sync.Mutex`
+- **`repeatSuccessCounts` 并发写入**：`repeatedSuccessBlock`/`recordRepeatSuccess` 中 map 的 nil-reset + 读写未受保护 → 新增 `repeatMu sync.Mutex`
+
+#### 防御性修复
+- **`anthropic.go`**：body-close goroutine 缺少 recover，`resp.Body.Close()` panic 可直接杀进程 → 添加 `crash.Recover("anthropic-body-close")`
+- **`probe.go`**：`runProbesUncached` 的并行 probe goroutine 缺少 recover → 添加 `crash.Recover("env-probe")`
+- **`batch_executor.go`**：`runParallel` 内部 goroutine 缺少 recover → 添加 `crash.Recover("batch-parallel")`
+
+#### 文件变更
+- `internal/agent/agent.go` — +2 行（staleMu + repeatMu）
+- `internal/agent/execute_one.go` — +17/-6 行（两处 map 访问加锁 + repeatedSuccessBlock/recordRepeatSuccess 加锁）
+- `internal/agent/agent_run.go` — +6/-2 行（重置改用对应 mutex）
+- `internal/agent/batch_executor.go` — +2 行（crash.Recover + import）
+- `internal/environment/probe.go` — +2 行（crash.Recover + import）
+- `internal/provider/anthropic/anthropic.go` — +2 行（crash.Recover + import）
+
+---
+
 ## [10.106.0] — 2026-07-26
 
 ### 🔧 formatSummary 优化 — 纯只读任务不再显示「未记录步骤详情」

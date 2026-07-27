@@ -129,11 +129,12 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	// V10.28: stale anchor 守卫 — 同一轮内已编辑的文件必须先 read_file 才能再编辑
 	if !t.ReadOnly() && isFileWriter(call.Name) {
 		if path := extractFilePath(call.Name, call.Arguments); path != "" {
-			if a.staleWrittenFiles != nil && a.staleWrittenFiles[path] {
-				if a.staleReadFiles == nil || !a.staleReadFiles[path] {
-					msg := fmt.Sprintf("blocked: [stale content] %q was already modified this turn. Re-read it with read_file first so your edit anchors (old_string/anchors) match the current file content.", path)
-					return toolOutcome{output: msg, blocked: true, errMsg: msg}
-				}
+			a.staleMu.Lock()
+			block := a.staleWrittenFiles != nil && a.staleWrittenFiles[path] && (a.staleReadFiles == nil || !a.staleReadFiles[path])
+			a.staleMu.Unlock()
+			if block {
+				msg := fmt.Sprintf("blocked: [stale content] %q was already modified this turn. Re-read it with read_file first so your edit anchors (old_string/anchors) match the current file content.", path)
+				return toolOutcome{output: msg, blocked: true, errMsg: msg}
 			}
 		}
 	}
@@ -295,6 +296,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	}
 	// V10.28: 追踪 stale anchor — 记录本轮成功的读写操作
 	if path := extractFilePath(call.Name, call.Arguments); path != "" {
+		a.staleMu.Lock()
 		if t.ReadOnly() && call.Name == "read_file" {
 			if a.staleReadFiles == nil {
 				a.staleReadFiles = make(map[string]bool)
@@ -309,6 +311,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			}
 			a.staleWrittenFiles[path] = true
 		}
+		a.staleMu.Unlock()
 	}
 	// A foreground `task` sub-agent just finished — its result is the final answer.
 	if a.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
@@ -345,10 +348,16 @@ func (a *AgentRunner) toolReadOnly(name string) bool {
 // 命中时返回阻止消息，防止模型无意义循环消耗 token。
 func (a *AgentRunner) repeatedSuccessBlock(call provider.ToolCall, t tool.Tool) (string, bool) {
 	sig, ok := repeatSuccessSignature(call, t)
-	if !ok || a.repeatSuccessCounts == nil {
+	if !ok {
+		return "", false
+	}
+	a.repeatMu.Lock()
+	if a.repeatSuccessCounts == nil {
+		a.repeatMu.Unlock()
 		return "", false
 	}
 	count := a.repeatSuccessCounts[sig]
+	a.repeatMu.Unlock()
 	if count < RepeatSuccessAllowed {
 		return "", false
 	}
@@ -363,10 +372,12 @@ func (a *AgentRunner) recordRepeatSuccess(call provider.ToolCall, t tool.Tool) {
 	if !ok {
 		return
 	}
+	a.repeatMu.Lock()
 	if a.repeatSuccessCounts == nil {
 		a.repeatSuccessCounts = make(map[string]int)
 	}
 	a.repeatSuccessCounts[sig]++
+	a.repeatMu.Unlock()
 }
 
 // repeatSuccessSignature 为写工具调用计算可比较的签名。

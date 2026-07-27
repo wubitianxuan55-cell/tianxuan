@@ -60,11 +60,15 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.bgOutputReadThisTurn = false
 	a.bgJobKilledThisTurn = false
 	a.bgStartKillStreak = 0   // 新用户轮次重置循环计数
-	a.staleWrittenFiles = nil // 每轮重置 stale anchor 追踪
-	a.staleReadFiles = nil
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
+	a.staleMu.Lock()
+	a.staleWrittenFiles = nil // 每轮重置 stale anchor 追踪
+	a.staleReadFiles = nil
+	a.staleMu.Unlock()
+	a.repeatMu.Lock()
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
+	a.repeatMu.Unlock()
 	a.toolFeedbackCount = 0     // V10.89: 每轮重置工具反馈计数
 	// V10.101: 每轮重置 stop gate 计数器——这些门的「最多 3 次」是 per-turn
 	// 上限，不是整个会话累计（否则第二个用户 turn 后就全部永久失效）。

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"tianxuan/internal/crash"
 	"tianxuan/internal/proc"
 	"tianxuan/internal/secrets"
 	"tianxuan/internal/shellparse"
@@ -117,6 +118,7 @@ func runProbesUncached(ctx context.Context, commands []string, opts ProbeOptions
 		wg.Add(1)
 		go func(i int, command string) {
 			defer wg.Done()
+			defer crash.Recover("env-probe")
 			results[i] = runOne(ctx, command, opts)
 		}(i, command)
 	}

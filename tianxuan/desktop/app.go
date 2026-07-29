@@ -216,20 +216,13 @@ func (a *App) buildController() {
 	// resume it so the user picks up where they left off. Corrupt files
 	// and empty sessions are skipped silently — the fresh session created
 	// above is the safe fallback.
+	// V10.108: system prompt preservation is handled internally by
+	// ctrl.Resume — it replaces the loaded session's system prompt with
+	// the current executor's full L1+Instructions prompt automatically.
 	if dir := ctrl.SessionDir(); dir != "" {
 		sessions, _ := agent.ListSessions(dir)
 		if len(sessions) > 0 && sessions[0].Turns > 0 {
 			if loaded, err := agent.LoadSession(sessions[0].Path); err == nil {
-				// Replace the loaded session's system prompt with the fresh L1.
-				// Old sessions may have a different system prompt format (e.g.
-				// V1.4 included Profile in L1; V1.5 keeps it in turn-tail). Using
-				// the fresh L1 ensures the prefix matches across sessions for
-				// DeepSeek's global cache.
-				if msgs := loaded.Messages; len(msgs) > 0 && msgs[0].Role == provider.RoleSystem {
-					if sys := ctrl.SystemPrompt(); sys != "" {
-						msgs[0] = provider.Message{Role: provider.RoleSystem, Content: sys}
-					}
-				}
 				ctrl.Resume(loaded, sessions[0].Path)
 				slog.Info("auto-resumed session", "path", sessions[0].Path, "turns", sessions[0].Turns)
 			}

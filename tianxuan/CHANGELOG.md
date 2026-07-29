@@ -1,3 +1,31 @@
+## [10.108.0] — 2026-07-29
+
+### 🔧 修复重启后旧会话上下文被清空
+
+> 定位到三个根因导致重启后自动恢复的会话丢失关键上下文：(1) 系统提示词被 `app.go` 手动替换为不完整的 L1 Identity，导致 executor 丢失全部行为指令；(2) 双模型架构中 Hermes 规划器会话未恢复，重启后规划历史归零；(3) TCCA FlowLayer 未同步恢复后的会话历史。
+
+#### 根因 1（致命）：系统提示词被截断为 L1 Identity
+- **`desktop/app.go:228-231`**：自动恢复时用 `ctrl.SystemPrompt()`（仅 L1）替换了 executor 会话中完整的 `L1+Instructions` 提示词，导致 Hephaestus/Solo 丢失所有编码铁律和行为规则
+
+#### 根因 2（严重）：Hermes 规划器上下文泄漏
+- **`internal/control/controller.go:Resume()`**：只恢复了 executor 会话，未处理 Hermes 的 `hermesSess`，重启后规划器携带陈旧或不完整的上下文
+
+#### 根因 3（相关）：TCCA FlowLayer 未同步
+- `ctrl.Resume()` 没有像 `NewSession()` 那样更新 FlowLayer，影响 compaction 状态和缓存指标
+
+#### 修复
+- **`Resume()` 重写**：内部自动从当前 executor session 提取完整 L1+Instructions 系统提示词替换加载会话中的旧版本；检测 `*agent.Hermes` runner 时调用 `ResetSession()` 清空规划器旧上下文；同步 `ctxMgr.Flow().ReplaceMessages()` 更新 TCCA 状态
+- **`app.go` 简化**：移除自动恢复路径中错误的系统提示词手动替换逻辑（−12 行），改为直接调用 `ctrl.Resume()`（现已内聚处理）
+
+#### 影响范围
+- 覆盖全部 11 处 `ctrl.Resume()` 调用点：桌面端自动/手动恢复、CLI `--resume`/`/resume`、模型切换重建、HTTP API、ACP 协议 — 所有路径统一受益，无回归
+
+#### 文件变更
+- `internal/control/controller.go` — `Resume()` +30/−4 行
+- `desktop/app.go` — 恢复逻辑 −12 行（移除错误的手动替换）
+
+---
+
 ## [10.107.0] — 2026-07-27
 
 ### 🔧 修复"无故崩溃"：并发 map 写入 fatal error + goroutine recover 补全

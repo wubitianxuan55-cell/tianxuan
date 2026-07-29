@@ -709,11 +709,47 @@ func (c *Controller) NewSession() error {
 
 // RewindScope selects what a Rewind restores.
 // Resume seeds the session from a loaded transcript and pins the active file to
-// its path so auto-save keeps appending there.
+// its path so auto-save keeps appending there. It also preserves the current
+// executor system prompt (L1 + Instructions) so the resumed session uses the
+// same behaviour rules as a fresh session — the loaded file's system prompt may
+// be from an older version.
+//
+// V10.108: Resume now handles system prompt preservation internally instead of
+// requiring every caller to do it (and sometimes getting it wrong, e.g. replacing
+// the full L1+Instructions prompt with just L1 Identity, which strips behavioural
+// rules from the executor on restore).
 func (c *Controller) Resume(s *agent.Session, path string) {
+	// Preserve the current executor system prompt (L1 + Instructions) so the
+	// resumed session uses the same behaviour rules. The loaded JSONL may carry
+	// an older-version system prompt, or a partial one (e.g. just L1 Identity).
+	if c.executor != nil {
+		if cur := c.executor.Session(); cur != nil {
+			if msgs := cur.Snapshot(); len(msgs) > 0 && msgs[0].Role == provider.RoleSystem {
+				preserved := msgs[0].Content
+				if loadedMsgs := s.Messages; len(loadedMsgs) > 0 && loadedMsgs[0].Role == provider.RoleSystem {
+					loadedMsgs[0] = provider.Message{Role: provider.RoleSystem, Content: preserved}
+				}
+			}
+		}
+	}
+
 	if c.executor != nil {
 		c.executor.SetSession(s)
 	}
+
+	// V10.108: reset Hermes planner session so the planner doesn't carry stale
+	// context from a previous session across a restore. The planner will
+	// re-acquire project context on the next turn via injectProjectMap.
+	if h, ok := c.runner.(*agent.Hermes); ok {
+		h.ResetSession()
+	}
+
+	// V10.108: sync FlowLayer with the loaded session so TCCA metrics and
+	// compaction state reflect the restored history rather than staying empty.
+	if c.ctxMgr != nil {
+		c.ctxMgr.Flow().ReplaceMessages(s.Snapshot())
+	}
+
 	c.mu.Lock()
 	c.sessionPath = path
 	c.mu.Unlock()

@@ -65,15 +65,18 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
 
-	// Detect and preserve the file's line ending style.
+	// Detect and preserve the file's dominant line ending style.
 	fileLE := detectLineEnding(content)
 	if fileLE == "" {
 		fileLE = "\n" // default for files with no newlines
 	}
 
-	// Split preserving trailing newline if present.
-	hasTrailingNL := strings.HasSuffix(content, fileLE) || strings.HasSuffix(content, "\n")
-	lines := strings.Split(content, fileLE)
+	// Normalise CRLF to LF before splitting so line numbers match read_file
+	// (which scans on \n) even for mixed-line-ending files, and so a \r can
+	// never leak into the output as \r\r\n. The join below re-applies fileLE.
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	hasTrailingNL := strings.HasSuffix(content, "\n")
+	lines := strings.Split(content, "\n")
 	// If the file ends with the line ending, Split produces an empty trailing
 	// element — trim it so line numbers work correctly.
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -93,8 +96,15 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 	out = append(out, lines[:p.StartLine-1]...)
 
 	if p.NewContent != "" {
-		// Split new_content by \n (canonical) and join with the file's line ending.
-		newLines := strings.Split(p.NewContent, "\n")
+		// Normalise CRLF in new_content to LF so joining with the file's line
+		// ending never produces \r\r\n or mixed line endings. The trailing
+		// empty element from a new_content ending in \n is trimmed so it can't
+		// inject a blank line mid-file (the join below re-applies fileLE).
+		newContent := strings.ReplaceAll(p.NewContent, "\r\n", "\n")
+		newLines := strings.Split(newContent, "\n")
+		if len(newLines) > 0 && newLines[len(newLines)-1] == "" {
+			newLines = newLines[:len(newLines)-1]
+		}
 		out = append(out, newLines...)
 	}
 

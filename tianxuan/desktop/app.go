@@ -15,7 +15,6 @@ import (
 	"tianxuan/internal/control"
 	"tianxuan/internal/event"
 	"tianxuan/internal/i18n"
-	"tianxuan/internal/provider"
 	"tianxuan/internal/schedule"
 )
 

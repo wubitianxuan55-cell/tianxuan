@@ -1,3 +1,46 @@
+## [10.110.0] — 2026-07-31
+
+### 🔧 修复桌面端构建失败 — 移除 app.go 孤儿 import
+
+> V10.108.0 把 `app.go` 中 Resume 的 provider 逻辑移到别处后未清理 import，导致 desktop 独立 go module 编译失败（`imported and not used`）。根目录 `go build ./...` 不覆盖该 module 故未暴露。
+
+#### 根因
+- **`desktop/app.go`**：残留的孤儿 import（V10.108.0 遗留）——`desktop/` 是独立 go module，仅运行 `cd desktop && go build ./...` 时才暴露编译错误
+
+#### 修复
+- **`desktop/app.go`**：移除该孤儿 import 行（−1 行），恢复桌面端独立 module 构建
+
+#### 验证
+- `cd desktop && go build ./...` — 通过（EXIT 0）
+
+#### 文件变更
+- `desktop/app.go` — −1 行（移除孤儿 import）
+
+---
+
+## [10.109.0] — 2026-07-31
+
+### 🔧 修复 edit_lines 换行污染 — CRLF 归一化 + 行号对齐 read_file
+
+> 定位到 3 处根因导致 `edit_lines` 在 CRLF/混合换行文件上编辑错行、吞行甚至数据丢失，且 AI 发送 CRLF 内容时 `\r` 泄漏成 `\r\r\n` 污染文件。
+
+#### 根因（3 处）
+1. **行号错位**：content 按 `detectLineEnding` 单一风格 Split → 混合换行文件行数与 `read_file`（按 `\n` 计行）不一致，导致编辑错行/吞行/数据丢失
+2. **`\r` 泄漏**：`new_content` 按 `\n` 分割但不清 `\r` → AI 发 CRLF 内容时 `\r` 泄漏成 `\r\r\n`，文件被污染后 AI 只能整文件重写
+3. **尾空元素**：`new_content` 尾随 `\n` 的尾空元素未 trim → 每次编辑注入一个空行
+
+#### 修复
+- **`editlines.go`**：content 与 new_content 统一归一化 `\r\n→\n` 后处理，输出按原文件主导换行风格（fileLE）拼接，行号与 `read_file` 完全对齐
+
+#### 测试
+- 新增 `editlines_test.go` 8 个边界用例：CRLF 泄漏 / 混合换行 / 连续编辑 / 删除 / 追加 / 无尾换行，全部通过
+
+#### 文件变更
+- `internal/tool/builtin/editlines.go` — +16/−6 行（归一化 + 拼接）
+- `internal/tool/builtin/editlines_test.go` — 新增 +252 行
+
+---
+
 ## [10.108.0] — 2026-07-29
 
 ### 🔧 修复重启后旧会话上下文被清空

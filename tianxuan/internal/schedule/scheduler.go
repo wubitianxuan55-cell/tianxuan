@@ -137,7 +137,9 @@ func (sc *Scheduler) fire(s Schedule) {
 	if s.Scope == "workspace" && sc.ws != nil {
 		targetStore = sc.ws
 	}
-	_ = targetStore.Save(sc.schedulesForStore(s.Scope))
+	if serr := targetStore.Save(sc.schedulesForStore(s.Scope)); serr != nil {
+		slog.Error("scheduler: persist schedule state", "err", serr, "id", s.ID)
+	}
 
 	if sc.onChange != nil {
 		sc.onChange()

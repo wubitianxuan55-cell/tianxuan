@@ -7,6 +7,7 @@
 package context
 
 import (
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -74,9 +75,13 @@ func (l *FlowLayer) SetStore(s MessageStore) {
 	}
 }
 
-// Add appends a message to the conversation history.
+// Add appends a message to the conversation history. A store failure is logged
+// (not silent) so a broken backend can't drop context undetected.
 func (l *FlowLayer) Add(msg provider.Message) {
-	_ = l.store.Append(msg)
+	if err := l.store.Append(msg); err != nil {
+		slog.Error("flow: append message failed — message dropped from context",
+			"err", err, "role", msg.Role)
+	}
 }
 
 // Messages returns the current conversation history.
@@ -89,10 +94,16 @@ func (l *FlowLayer) Messages() []provider.Message {
 }
 
 // ReplaceMessages replaces the entire message list (used after compaction).
+// Store failures are logged so a broken backend can't silently lose history.
 func (l *FlowLayer) ReplaceMessages(msgs []provider.Message) {
-	_ = l.store.Truncate(0)
+	if err := l.store.Truncate(0); err != nil {
+		slog.Error("flow: truncate messages failed", "err", err)
+	}
 	for _, m := range msgs {
-		_ = l.store.Append(m)
+		if err := l.store.Append(m); err != nil {
+			slog.Error("flow: append message failed during replace — message dropped from context",
+				"err", err, "role", m.Role)
+		}
 	}
 }
 

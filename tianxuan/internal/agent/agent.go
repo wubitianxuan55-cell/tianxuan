@@ -394,6 +394,10 @@ type AgentRunner struct {
 	// offloadThresholdChars is the character threshold above which results are
 	// offloaded. Zero means use the default.
 	offloadThresholdChars int
+	// offloadDir is the configured offload base directory. Store creation is
+	// deferred until sessionID is set (see SetArchive), because the store's
+	// per-session subdirectory is derived from it.
+	offloadDir string
 }
 
 // SetActiveSchemas installs a tool subset for this session. Pass nil to revert
@@ -494,24 +498,47 @@ func (a *AgentRunner) SetPatternExtractor(e interface {
 func (a *AgentRunner) SetArchive(ar *archive.Store, sessionID string) {
 	a.archive = ar
 	a.sessionID = sessionID
+	// Offload store creation is deferred to here because its per-session
+	// subdirectory derives from sessionID (see SetOffload).
+	if a.offloadDir != "" && a.offloadStore == nil {
+		s, err := offload.NewStore(a.offloadDir, sessionID)
+		if err != nil {
+			a.offloadStore = nil
+			return
+		}
+		a.offloadStore = s
+	}
 }
 
 // SetOffload enables context offloading for this session. dir is the parent
 // directory for offloaded files; a session-specific subdirectory is created
 // automatically. Pass an empty dir to disable. thresholdChars is the output
 // size above which results are offloaded (0 = default).
+//
+// Store creation is deferred until sessionID is known (SetArchive), because
+// the per-session subdirectory derives from it. If called after SetArchive,
+// the store is created immediately.
 func (a *AgentRunner) SetOffload(dir string, thresholdChars int) {
+	a.offloadDir = dir
+	a.offloadThresholdChars = thresholdChars
 	if dir == "" {
 		a.offloadStore = nil
 		return
 	}
-	s, err := offload.NewStore(dir, a.sessionID)
-	if err != nil {
-		a.offloadStore = nil
-		return
+	if a.sessionID != "" {
+		s, err := offload.NewStore(dir, a.sessionID)
+		if err != nil {
+			a.offloadStore = nil
+			return
+		}
+		a.offloadStore = s
 	}
-	a.offloadStore = s
-	a.offloadThresholdChars = thresholdChars
+}
+
+// OffloadStore returns the active offload store, or nil when offloading is
+// disabled or not yet initialized (sessionID not set).
+func (a *AgentRunner) OffloadStore() *offload.Store {
+	return a.offloadStore
 }
 
 // CloseOffload cleans up the offload store, deleting all offloaded files.
@@ -709,6 +736,11 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	if opts.ActiveSchemas != nil {
 		r.activeSchemas = opts.ActiveSchemas
 	}
+	// Context offloading: enable when a base directory is configured. Store
+	// creation is deferred until SetArchive sets sessionID (per-session
+	// subdirectory). Only the executor (not planner) offloads — the planner
+	// runs with a read-only toolset and its own session.
+	r.SetOffload(opts.OffloadDir, opts.OffloadThresholdChars)
 	return r
 }
 

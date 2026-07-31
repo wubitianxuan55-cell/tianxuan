@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -178,7 +179,9 @@ func (c *sessionCache) save(dir string) {
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(filepath.Join(dir, sessionCacheFile), data, 0644)
+	if err := os.WriteFile(filepath.Join(dir, sessionCacheFile), data, 0644); err != nil {
+		slog.Warn("session: write cache file failed", "err", err, "dir", dir)
+	}
 }
 
 // previewSession returns the first user message (truncated) and the number of
@@ -235,7 +238,10 @@ func Archive(sessionPath string) error {
 	// best-effort: also move the .meta sidecar
 	metaPath := sessionPath + ".meta"
 	if _, err := os.Stat(metaPath); err == nil {
-		_ = os.Rename(metaPath, filepath.Join(archiveDir, base+".meta"))
+		if err := os.Rename(metaPath, filepath.Join(archiveDir, base+".meta")); err != nil {
+			slog.Warn("session: archive meta sidecar move failed (session file already archived)",
+				"err", err, "meta", metaPath)
+		}
 	}
 	return nil
 }
@@ -250,7 +256,10 @@ func Unarchive(archivePath string) error {
 	}
 	metaPath := archivePath + ".meta"
 	if _, err := os.Stat(metaPath); err == nil {
-		_ = os.Rename(metaPath, filepath.Join(parent, base+".meta"))
+		if err := os.Rename(metaPath, filepath.Join(parent, base+".meta")); err != nil {
+			slog.Warn("session: unarchive meta sidecar move failed (session file already restored)",
+				"err", err, "meta", metaPath)
+		}
 	}
 	return nil
 }

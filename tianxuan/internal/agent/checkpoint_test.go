@@ -3,6 +3,7 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"tianxuan/internal/provider"
@@ -184,4 +185,55 @@ func containsStr(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestSetOffloadDeferredUntilSessionID verifies the deferred store creation:
+// SetOffload before SetArchive records config but creates no store; SetArchive
+// then materialises it with a per-session subdirectory.
+func TestSetOffloadDeferredUntilSessionID(t *testing.T) {
+	dir := t.TempDir()
+	r := &AgentRunner{}
+	r.SetOffload(dir, 0)
+	if r.OffloadStore() != nil {
+		t.Fatal("expected nil store before sessionID is set")
+	}
+	r.SetArchive(nil, "sess-1")
+	st := r.OffloadStore()
+	if st == nil {
+		t.Fatal("expected store created after SetArchive")
+	}
+	if got := st.Dir(); !strings.HasSuffix(got, filepath.Join("sess-1")) {
+		t.Fatalf("store dir = %q, want per-session subdir ending sess-1", got)
+	}
+	// After the session, CloseOffload removes the files.
+	r.CloseOffload()
+	if r.OffloadStore() != nil {
+		t.Fatal("expected nil store after CloseOffload")
+	}
+	if _, err := os.Stat(st.Dir()); !os.IsNotExist(err) {
+		t.Fatalf("expected offload dir removed, stat err = %v", err)
+	}
+}
+
+// TestSetOffloadEmptyDisables verifies an empty dir leaves offloading off even
+// after sessionID becomes available.
+func TestSetOffloadEmptyDisables(t *testing.T) {
+	r := &AgentRunner{}
+	r.SetOffload("", 100)
+	r.SetArchive(nil, "sess-2")
+	if r.OffloadStore() != nil {
+		t.Fatal("expected nil store when offload dir is empty")
+	}
+}
+
+// TestSetOffloadImmediateAfterSessionID verifies SetOffload after SetArchive
+// creates the store immediately (no deferred step needed).
+func TestSetOffloadImmediateAfterSessionID(t *testing.T) {
+	dir := t.TempDir()
+	r := &AgentRunner{}
+	r.SetArchive(nil, "sess-3")
+	r.SetOffload(dir, 0)
+	if r.OffloadStore() == nil {
+		t.Fatal("expected store created immediately when sessionID already set")
+	}
 }

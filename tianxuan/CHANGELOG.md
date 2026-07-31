@@ -1,3 +1,37 @@
+## [10.111.0] — 2026-07-31
+
+### 🆕 接线激活上下文卸载（Context Offloading）+ 静默吞错隐患修复
+
+> 两项迭代：(1) offload 功能（设计自 manishiitg/mcpagent，代码早已存在但从未接线——`agent.Options.OffloadDir` 零消费、`WireSearchLargeOutputStore` 零调用）现已完整激活：大型工具输出自动落盘并替换为紧凑引用，模型用 `search_large_output` 按需读取，防止上下文窗口饱和。(2) 批量修复静默吞错——错误不再无声丢弃，改为记录日志。
+
+#### 功能：上下文卸载接线
+- **`config.go`**：`AgentConfig` 新增 `offload_dir` / `offload_threshold_chars` 字段；默认 `offload_dir = ".tianxuan/offload"`（启用），阈值 0 = 默认 10000 字符
+- **`agent.go`**：`agent.New` 消费 `Options.OffloadDir`/`OffloadThresholdChars`（此前死字段）；`SetOffload` 改为延迟初始化——per-session 子目录依赖 `sessionID`，在 `SetArchive` 时真正创建 store；新增 `OffloadStore()` getter
+- **`boot.go`**：相对 offload 路径基于 cwd 解析；`SetArchive` 兜底分支（archive 打开失败也设置 sessionID，确保 offload 仍初始化）；`WireSearchLargeOutputStore` 注入 `search_large_output` 工具；cleanup 包装追加 `CloseOffload()` 会话结束清理
+- **`checkpoint_test.go`**：新增 3 个接线测试（延迟初始化 / 空目录禁用 / sessionID 后即时创建）
+
+#### 修复：静默吞错 → 日志记录
+- **`context/flow.go`**：`Add`/`ReplaceMessages` 的 store 失败静默（会无声丢上下文）→ `slog.Error`
+- **`schedule/scheduler.go`**：调度状态持久化 `_ = Save(...)` 吞错（重启丢调度）→ `slog.Error`
+- **`tool/builtin/todo.go`**：进度 markdown 保存 `_ = WriteFile(...)` 吞错 → `slog.Error`
+- **`agent/session/save.go`**：会话缓存写入 + 归档/恢复时 meta sidecar 移动共 3 处吞错 → `slog.Warn`/`Error`
+
+#### 验证
+- `go build ./...` — EXIT 0
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/config/config.go` — +13 行（字段 + 默认值）
+- `internal/agent/agent.go` — +37/−6 行（消费 + 延迟初始化 + getter）
+- `internal/boot/boot.go` — +30/−5 行（接线 + 兜底 + 清理）
+- `internal/context/flow.go` — +15/−4 行（吞错修复）
+- `internal/schedule/scheduler.go` — +3/−1 行
+- `internal/tool/builtin/todo.go` — +4/−1 行
+- `internal/agent/session/save.go` — +12/−3 行
+- `internal/agent/checkpoint_test.go` — +52 行（新测试）
+
+---
+
 ## [10.110.0] — 2026-07-31
 
 ### 🔧 修复桌面端构建失败 — 移除 app.go 孤儿 import

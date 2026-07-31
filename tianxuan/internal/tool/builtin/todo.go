@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,7 +149,9 @@ func saveProgressMarkdown(todos []todoItem) {
 		b.WriteString(fmt.Sprintf("| %s | %s%s |\n", icon, prefix, t.Content))
 	}
 
-	_ = os.WriteFile(path, []byte(b.String()), 0o644)
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		slog.Error("todo: save progress markdown failed", "err", err, "path", path)
+	}
 }
 
 // findTianxuanDir walks up from dir looking for a .tianxuan/ directory.

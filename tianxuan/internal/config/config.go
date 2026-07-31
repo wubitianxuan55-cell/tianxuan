@@ -328,6 +328,14 @@ type AgentConfig struct {
 	// reasoning/thinking text. "" (default) means auto-detect from Language or
 	// $LANG; valid values: "zh", "en", "auto".
 	ReasoningLanguage string `toml:"reasoning_language"`
+	// OffloadDir is the directory where large tool outputs are offloaded.
+	// Empty disables context offloading. Each session gets a subdirectory
+	// named by its session ID.
+	OffloadDir string `toml:"offload_dir"`
+	// OffloadThresholdChars is the output character count above which results
+	// are offloaded to disk. Zero means use the default
+	// (offload.DefaultThresholdChars = 10000).
+	OffloadThresholdChars int `toml:"offload_threshold_chars"`
 }
 
 // PlannerTemp returns the effective temperature for the Hermes planner.
@@ -571,6 +579,11 @@ func Default() *Config {
 			// if you want a hard guard against runaway.
 			MaxSteps:      0,
 			PlannerEffort: "max",
+			// Context offloading on by default: tool outputs above the threshold
+			// are saved to <cwd>/.tianxuan/offload and replaced with compact
+			// references, keeping the context window lean. Set offload_dir = ""
+			// to disable.
+			OffloadDir: ".tianxuan/offload",
 		},
 		// Mode "ask" with no rules keeps `tianxuan run` autonomous (no TTY → ask
 		// resolves to allow) while `tianxuan chat` prompts before writers. Users add

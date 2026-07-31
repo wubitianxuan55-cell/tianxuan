@@ -316,6 +316,10 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		strictEvidence = true // dual-model: verify evidence against turn ledger
 	}
 	execSess := agent.NewSession(compiler.WithInstructions(execPrompt))
+	offloadDir := cfg.Agent.OffloadDir
+	if offloadDir != "" && !filepath.IsAbs(offloadDir) {
+		offloadDir = filepath.Join(cwd, offloadDir)
+	}
 	executor := agent.New(execProv, reg, execSess, agent.Options{
 		MaxSteps:      maxSteps,
 		Temperature:   cfg.Agent.Temperature,
@@ -327,16 +331,37 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		Dispatcher:    toolDispatcher,
 		StrictEvidence: strictEvidence,
+		OffloadDir:          offloadDir,
+		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 	}, sink)
 
-	// V7.0: session archive for cross-session Dream/Distill
+	// V7.0: session archive for cross-session Dream/Distill. The session ID is
+	// derived here and always set on the executor, because context offloading
+	// (V10.111) derives its per-session subdirectory from it too.
 	archiveDir := filepath.Join(cwd, ".tianxuan", "archive")
+	sid := filepath.Base(orDefault(opts.SessionDir, config.SessionDir()))
+	if sid == "" || sid == "." {
+		sid = fmt.Sprintf("session-%d", time.Now().Unix())
+	}
 	if ar, err := archive.Open(archiveDir); err == nil && ar != nil {
-		sid := filepath.Base(orDefault(opts.SessionDir, config.SessionDir()))
-		if sid == "" || sid == "." {
-			sid = fmt.Sprintf("session-%d", time.Now().Unix())
-		}
 		executor.SetArchive(ar, sid)
+	} else {
+		executor.SetArchive(nil, sid)
+	}
+	// V10.111: expose the offload store to search_large_output so the model can
+	// read/search offloaded tool outputs on demand.
+	if store := executor.OffloadStore(); store != nil {
+		builtin.WireSearchLargeOutputStore(store)
+	}
+	// V10.111: delete offloaded files at session end (they are per-session
+	// scratch — the model reads them via search_large_output during the turn,
+	// after which they have no value and would leak disk).
+	if executor.OffloadStore() != nil {
+		prev := cleanup
+		cleanup = func() {
+			prev()
+			executor.CloseOffload()
+		}
 	}
 
 	// Custom slash commands (.tianxuan/commands + user dir). Best-effort: a malformed

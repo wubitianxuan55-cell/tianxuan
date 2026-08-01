@@ -13,12 +13,11 @@ import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { ReadOnlyBatch } from "./ReadOnlyBatch";
 import { ProcessBrainIcon, ProcessPhaseIcon } from "./ProcessCard";
 import { displayReasoningText } from "../lib/reasoningDisplay";
+import { isNearBottom, shouldFollowAfterGrow } from "../lib/scrollFollow";
 import { buildTurnGroups, createWarmLayerState, warmPagination, warmUserPreview, warmLayerWithExpandedTurn, warmLayerWithNextColdPage, compactQuestionText, questionAnchorId, type WarmLayerState, type QuestionAnchor } from "../lib/transcriptGrouping";
 
 // ── Scroll helpers ──────────────────────────────────────────────────────
-const BOTTOM_THRESHOLD_PX = 80;
 const NOOP_SCROLL = () => {};
-function isNearBottom(el: HTMLElement) { return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX; }
 type ToolItem = Extract<Item, { kind: "tool" }>;
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
@@ -292,17 +291,24 @@ export function Transcript({
   const [showScrollDown, setShowScrollDown] = useState(false);
   const onScroll = useCallback(() => {
     const el = scrollRef.current; if (!el) return;
-    const atBottom = isNearBottom(el);
+    const atBottom = isNearBottom(el.scrollTop, el.scrollHeight, el.clientHeight);
     stick.current = atBottom;
     setShowScrollDown(!atBottom && el.scrollHeight > el.clientHeight);
   }, []);
 
+  // 修复 V10.144：rAF 回调执行前用真实 DOM 位置做决策，而不是只信 stick。
+  // React 的 onScroll 是合成事件（异步批处理），流式输出时 rAF 可能抢在
+  // onScroll 之前执行——用户向上滚动后 stick 仍是 true，旧实现会把位置拽回
+  // 底部（"输出时无法滚动查看前面"）。shouldFollowAfterGrow 同时检查 stick
+  // 与真实位置，用户离开底部后即使 stick 未及更新也不再跟随。
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current; if (!el || !stick.current) return;
     if (rAF.current !== null) cancelAnimationFrame(rAF.current);
     rAF.current = requestAnimationFrame(() => {
-      rAF.current = null; if (!stick.current) return;
-      el.scrollTop = el.scrollHeight;
+      rAF.current = null;
+      const e = scrollRef.current; if (!e) return;
+      if (!shouldFollowAfterGrow(stick.current, e.scrollTop, e.scrollHeight, e.clientHeight)) return;
+      e.scrollTop = e.scrollHeight;
     });
   }, []);
 

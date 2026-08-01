@@ -1,3 +1,46 @@
+## [10.144.0] — 2026-08-01
+
+### 🖱️ 修复对话输出时无法滚动查看前面 — rAF 与 React onScroll 竞争
+
+> 用户反复反馈的痛点（Dream 主题第 1 条）：对话流式输出时无法滑动滚轮查看
+> 前面内容，只能等输出完。根因是滚动跟随逻辑的时序竞争——不是滚动被禁止，
+> 而是刚向上滚就被拽回底部。
+
+#### 根因（5 级追溯）
+- 表象：流式输出期间滚轮上滚无效，位置立即被拉回底部，只能等输出完成。
+- 直接原因：`scrollToBottom` 的 rAF 回调无条件执行 `el.scrollTop = el.scrollHeight`
+  （只要 `stick.current` 为 true）；而 `stick` 由 React 合成 `onScroll` 事件更新
+  （委托到根节点、异步批处理）。流式输出时每个 chunk 更新 items → contentVersion
+  变化 → 排新的 rAF。
+- 本地根因：rAF 回调与 React scroll 事件存在窗口期——用户滚轮后浏览器原生滚动
+  已发生（scrollTop 已变），但 React 的 onScroll 尚未执行，`stick` 仍为 true；
+  下一帧 rAF 抢先执行把位置拽回底部。
+- 系统根因：决策只依赖 `stick` 标志（异步更新），未校验真实 DOM 位置；rAF 是
+  原生时机、onScroll 是 React 合成时机，两者不同步。
+- 过程根因：V10.87 引入的滚动逻辑只测试了"用户滚到底部后 stick 恢复"的正常路径，
+  未覆盖"输出中 rAF 抢跑"的高频竞争路径。
+
+#### 修复
+- **`lib/scrollFollow.ts`**（新增）：滚动决策提取为纯函数——`distanceToBottom` /
+  `isNearBottom` / `shouldFollowAfterGrow(stick, scrollTop, scrollHeight,
+  clientHeight)`。核心规则：**只有 stick 为 true 且真实位置仍在底部阈值内才跟随**；
+  即使 stick 未及更新，只要用户真实位置已离开底部（rAF 抢跑场景），拒绝拽回。
+- **`components/Transcript.tsx`**：`onScroll`/`scrollToBottom` 改用纯函数签名；
+  rAF 回调执行前用真实 `scrollTop/scrollHeight/clientHeight` 做 `shouldFollowAfterGrow`
+  决策，用户离开底部后不再被拉回。
+
+#### 测试
+- **`lib/scrollFollow.test.ts`**（新增，9 用例）：距离计算、贴底阈值（<80px）、
+  自定义阈值、stick=false 绝不跟随、stick=true 贴底跟随、**rAF 抢跑回归**
+  （stick 仍 true 但真实位置离开底部 → 不跟随）、内容增长贴底跟随、空容器、
+  阈值常量导出稳定。
+
+#### 验证
+- `tsc --noEmit` 0 错误；vitest 61/61 全绿（4 文件，含新增 9 用例）；
+  前端 build 通过（Wails 打包含前端编译）
+
+---
+
 ## [10.143.0] — 2026-08-01
 
 ### 🧠 记忆提取质量修复 — 控制块泄漏 + 重复候选堆积

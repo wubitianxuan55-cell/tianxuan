@@ -1,3 +1,29 @@
+## [10.117.0] — 2026-08-01
+
+### 🛡️ git 工具长输出截断保护 + verify_gate 截断统一
+
+> git_diff / git_log 此前把完整输出直接抛给模型——大 diff（全文件改动、批量重构）可达数十万字节，直接撑爆上下文窗口；同一份上下文保护逻辑在 bash（`truncateStream`）与 verify_gate（上一轮的 `truncateOutput`）里重复实现且细节不一致。本轮为 git 工具补上截断保护，并把 verify_gate 统一到唯一的 `truncateStream` 实现。
+
+#### 变更
+- **`git.go`**：新增 `gitOutputMaxBytes = 48KB`；`git_diff` 与 `git_log` 输出经 `truncateStream` 头尾保留（头部 diff 头 + 尾部末 hunk / 长 commit message 尾），截断时在输出顶部注入引导提示（diff 用 `path=<file>` 收窄、log 用 `count=/path=/author=` 收窄）
+- **`verify_gate.go`**：删除 V10.116 引入的重复实现 `truncateOutput`（+20 行 → −25 行），改调 `truncateStream(output, 2000)`——获得对称头尾 + elided 字节数提示 + 不过截保护；新增 `verifyGateMaxBytes` 常量
+- **`git_test.go`**：新增 2 个集成测试——在真实 git 仓库构造 6000 行全量修改 diff（约 200KB）与 6000 行 commit message（约 126KB），断言截断提示存在、头尾保留、中间省略；测试用 `t.Chdir` 模拟 agent 运行在仓库根（git 工具无 workDir 字段、继承进程 cwd）
+- **`tool_extra_test.go`**：删除 `truncateOutput` 的 3 个单测（由 `truncateStream` 既有测试覆盖）；保留 verify_gate 集成测试（尾部 FAIL 详情在对称截断下仍可见）
+
+#### 验证
+- TDD 红灯（旧实现 git_diff 204KB / git_log 126KB 全量返回）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/tool/builtin/git.go` — +16 行（截断保护 + 提示）
+- `internal/tool/builtin/verify_gate.go` — +3/−20 行（统一到 truncateStream）
+- `internal/tool/builtin/git_test.go` — 新增 +110 行（2 个集成测试）
+- `internal/tool/builtin/tool_extra_test.go` — −45 行（移除已覆盖的单测）
+
+---
+
 ## [10.116.0] — 2026-08-01
 
 ### 🔧 verify_gate 长输出截断保留头尾 — 失败详情不再丢失

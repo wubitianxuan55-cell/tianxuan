@@ -14,6 +14,10 @@ import (
 	"tianxuan/internal/tool"
 )
 
+// verifyGateMaxBytes caps each check's echoed output. Kept below the bash
+// ceiling because a gate echoes several checks in one response.
+const verifyGateMaxBytes = 2000
+
 func init() { tool.RegisterBuiltin(verifyGate{}) }
 
 type verifyGate struct {
@@ -109,7 +113,7 @@ func (v verifyGate) Execute(ctx context.Context, args json.RawMessage) (string, 
 			}
 		}
 
-		output := truncateOutput(strings.TrimSpace(string(out)))
+		output, _ := truncateStream(strings.TrimSpace(string(out)), verifyGateMaxBytes)
 
 		if exitCode == 0 {
 			passed++
@@ -138,25 +142,6 @@ func (v verifyGate) Execute(ctx context.Context, args json.RawMessage) (string, 
 	}
 
 	return b.String(), nil
-}
-
-// truncateOutput keeps a readable head and tail of long check output.
-// Failure details (test names, assertion lines) appear at the END of
-// go test output — a head-only truncation would hide the very lines the
-// model needs to fix the failing check. The middle is dropped.
-func truncateOutput(output string) string {
-	const (
-		maxLen   = 2000
-		headKeep = 600
-	)
-	r := []rune(output)
-	if len(r) <= maxLen {
-		return output
-	}
-	tailKeep := maxLen - headKeep
-	head := string(r[:headKeep])
-	tail := string(r[len(r)-tailKeep:])
-	return head + "\n...[truncated]...\n" + tail
 }
 
 func (v verifyGate) effectiveWorkDir() string {

@@ -18,6 +18,11 @@ import (
 	"tianxuan/internal/tool"
 )
 
+// gitOutputMaxBytes caps git tool output so large diffs/logs don't flood the
+// context window. head+tail survive via truncateStream, keeping both the
+// beginning of the diff and the final hunks visible.
+const gitOutputMaxBytes = 48 * 1024
+
 // --- shared helpers ----------------------------------------------------------
 
 func init() {
@@ -214,6 +219,10 @@ func (gitDiff) Execute(ctx context.Context, args json.RawMessage) (string, error
 	}
 	if strings.TrimSpace(out) == "" {
 		return "no diff", nil
+	}
+	out, truncated := truncateStream(out, gitOutputMaxBytes)
+	if truncated {
+		out = "[git output truncated — use path=<file> to narrow the diff]\n" + out
 	}
 	return out, nil
 }
@@ -489,5 +498,10 @@ func (gitLog) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(out), nil
+	out = strings.TrimSpace(out)
+	out, truncated := truncateStream(out, gitOutputMaxBytes)
+	if truncated {
+		out = "[git output truncated — use count=/path=/author= to narrow]\n" + out
+	}
+	return out, nil
 }

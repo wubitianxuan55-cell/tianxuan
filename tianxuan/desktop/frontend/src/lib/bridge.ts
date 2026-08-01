@@ -56,6 +56,7 @@ export interface AppBindings {
   SubmitDisplay(display: string, input: string): Promise<void>;
   Cancel(): Promise<void>;
   CancelAndSubmit(input: string): Promise<void>; // atomically cancel + submit (correct mode)
+  Steer(input: string): Promise<void>; // mid-turn correction injected into the running task (V10.137)
   Approve(id: string, allow: boolean, session: boolean): Promise<void>;
   AnswerQuestion(id: string, answers: QuestionAnswer[]): Promise<void>;
   SetAgentMode(mode: string): Promise<void>;

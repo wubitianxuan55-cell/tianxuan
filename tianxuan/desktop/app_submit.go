@@ -43,6 +43,15 @@ func (a *App) CancelAndSubmit(input string) {
 	}
 }
 
+// Steer injects a mid-turn correction into the running task (V10.137): the
+// message becomes guidance for the current turn at its next model step, without
+// cancelling it. Idle falls back to a normal Submit.
+func (a *App) Steer(input string) {
+	if ctrl := a.ctrlByTabID(""); ctrl != nil {
+		ctrl.Steer(input)
+	}
+}
+
 // Approve answers a pending approval_request by ID: allow runs the call, session
 // also remembers the grant for the rest of the session.
 func (a *App) Approve(id string, allow, session bool) {

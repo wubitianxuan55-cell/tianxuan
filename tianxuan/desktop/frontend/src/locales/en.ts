@@ -146,8 +146,8 @@ export const en = {
 
   // composer
   "composer.placeholder": "Message tianxuan…  ( / commands · @ files )",
-  "composer.placeholderRunning": "Replying… keep typing to queue",
-  "composer.queue": "Queue send",
+  "composer.placeholderRunning": "Replying… type and press Enter to steer mid-turn",
+  "composer.queue": "Steer send",
   "composer.modeExplore": "Explore",
   "composer.modeDevelop": "Develop",
   "composer.modeOrchestrate": "Orchestrate",

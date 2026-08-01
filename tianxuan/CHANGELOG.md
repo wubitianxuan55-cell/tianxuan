@@ -1,3 +1,40 @@
+## [10.137.0] — 2026-08-01
+
+### 🎯 单模型中途纠偏 — 运行中输入即时注入当前任务（steer）
+
+> 需求：单模型执行过程中，用户可中途输入信息纠偏（"跳过测试"、"改成方案 B"），
+> 无需等任务结束，也无需取消重来。Agent 层 `Steer` 机制早已存在（V1.12 蒸馏），
+> 但 Controller 无接口、前端无入口——运行中输入被排队等任务结束，纠偏能力从未
+> 暴露。本次全链路接通。
+
+#### 实现
+- **`control/controller.go`**：新增 `Steer(input)`——运行中注入 executor 的
+  steer 队列（下一模型步骤生效，不取消不重启），空闲时回退为 `Send`（正常开
+  新轮）；注入时 emit Notice 让用户看到"纠偏已注入"
+- **`desktop/app_submit.go`**：Wails 绑定 `Steer`（前端可调用）
+- **`desktop/frontend/src/lib/bridge.ts`** / **`mock.ts`**：AppBindings 加
+  `Steer(input)`（类型断言保证与 Go 方法同步）
+- **`desktop/frontend/src/components/Composer.tsx`**：运行中发送（Enter/按钮）
+  从"排队等任务结束"改为**立即注入纠偏**（`app.Steer`）；移除排队列表 UI 与
+  队列状态；Shift+Enter 取消+重发保留
+- **`desktop/frontend/src/lib/store.ts`** / **`types.ts`**：`steer` 事件渲染为
+  用户消息（用户在 transcript 中能看到自己发的纠偏内容）+ Notice
+- **locales**：zh / zh-TW / en 的占位符与按钮文案更新为纠偏语义
+
+#### 交互语义
+- 运行中：Enter 发送 = 纠偏指令，当前步骤完成后生效（前缀提示"不要当作新任务，
+  仅作为当前任务的附加指导"）
+- Shift+Enter：取消当前轮 + 立即重发（激进纠偏，保留原能力）
+- 空闲时：正常新任务
+
+#### 测试
+- **`control/steer_test.go`**（新增）：运行中 Steer 注入 executor 队列且不启动
+  新 turn；空闲 Steer 回退 Send
+- 前端：`tsc --noEmit` EXIT 0；vitest 52 用例全过；`go build ./...` /
+  `go vet ./...` / `go test ./...` 全绿
+
+---
+
 ## [10.136.0] — 2026-08-01
 
 ### 🔧 Adaptive Execution 细节打磨 — 同步骤失败宿主信号 + Solo 进度保护

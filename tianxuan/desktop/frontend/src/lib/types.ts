@@ -11,6 +11,7 @@ export type EventKind =
   | "usage"
   | "notice"
   | "phase"
+  | "steer"
   | "approval_request"
   | "ask_request"
   | "turn_done"

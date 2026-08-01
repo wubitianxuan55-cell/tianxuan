@@ -197,6 +197,10 @@ export function makeMockApp(): AppBindings {
       cancelled = true;
       emit({ kind: "turn_done" });
     },
+    async Steer(_input: string) {
+      // mock: mid-turn correction — surface as a notice so previews show it
+      emit({ kind: "notice", level: "info", text: "（mock）纠偏指令已注入" });
+    },
     async Approve() {},
     async AnswerQuestion() {},
     async SetAgentMode(_mode: string) {},

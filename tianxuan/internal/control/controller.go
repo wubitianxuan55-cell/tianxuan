@@ -313,6 +313,22 @@ func (c *Controller) Send(input string) {
 func (c *Controller) SendWithRaw(input, raw string) {
 	c.runGuarded(func(ctx context.Context) error { return c.runTurnWithRaw(ctx, input, raw) })
 }
+
+// Steer injects a mid-turn correction from the user while a turn is running:
+// the message is queued into the executor's steer buffer and consumed as
+// guidance at the next model step, without cancelling or restarting the turn.
+// When idle it falls back to Send (starts a normal turn). This is the
+// single-model Adaptive Execution counterpart to CancelAndSubmit — steer for
+// course corrections, cancel+resubmit for a full restart.
+func (c *Controller) Steer(input string) {
+	if c.Running() && c.executor != nil {
+		c.executor.Steer(input)
+		c.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+			Text: "纠偏指令已注入当前任务（下一步生效）"})
+		return
+	}
+	c.Send(input)
+}
 // runTurn runs one model turn.
 
 func (c *Controller) runTurn(ctx context.Context, input string) error {

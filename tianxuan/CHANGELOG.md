@@ -1,3 +1,30 @@
+## [10.116.0] — 2026-08-01
+
+### 🔧 verify_gate 长输出截断保留头尾 — 失败详情不再丢失
+
+> verify_gate 输出超过 2000 字符时此前只保留头部（`output[:2000]`）。而 `go test` 类失败详情——`--- FAIL: TestX`、断言行（`foo_test.go:12: expected 2, got 3`）——位于输出**尾部**，被截掉后模型只能看到 "GATE FAILED" 却不知道哪个测试失败、为什么失败，修复时只能盲目重跑或猜测。
+
+#### 根因
+- **`verify_gate.go`**：截断用 `output[:2000] + "...[truncated]"`，头部优先；长输出 + 尾部失败详情 = 关键信息丢失
+
+#### 修复
+- **`verify_gate.go`**：新增 `truncateOutput`——保留头 600 + 尾 1400 字符，中间省略标记；按 rune 切片避免截断切坏 UTF-8 多字节序列；成功/失败输出统一走该逻辑（成功场景尾部也含 `ok` 摘要，更利于确认）
+
+#### 测试
+- **`tool_extra_test.go`**：集成测试构造 250 行长输出 + 尾部 FAIL 详情（Windows cmd / POSIX bash 双命令），断言测试名与断言行在截断后仍可见；纯函数测试锁定短输出不动、头尾保留 + 中间丢弃、UTF-8 输出截断后仍合法
+
+#### 验证
+- TDD 红灯（旧实现截断在 `PASS lin`，尾部 FAIL 详情丢失）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/tool/builtin/verify_gate.go` — +20 行（truncateOutput + 调用点）
+- `internal/tool/builtin/tool_extra_test.go` — +80 行（4 个新测试）
+
+---
+
 ## [10.115.0] — 2026-08-01
 
 ### 🆕 Refresh 增量检测扩展到 Rust 项目

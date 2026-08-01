@@ -109,10 +109,7 @@ func (v verifyGate) Execute(ctx context.Context, args json.RawMessage) (string, 
 			}
 		}
 
-		output := strings.TrimSpace(string(out))
-		if len(output) > 2000 {
-			output = output[:2000] + "\n...[truncated]"
-		}
+		output := truncateOutput(strings.TrimSpace(string(out)))
 
 		if exitCode == 0 {
 			passed++
@@ -141,6 +138,25 @@ func (v verifyGate) Execute(ctx context.Context, args json.RawMessage) (string, 
 	}
 
 	return b.String(), nil
+}
+
+// truncateOutput keeps a readable head and tail of long check output.
+// Failure details (test names, assertion lines) appear at the END of
+// go test output — a head-only truncation would hide the very lines the
+// model needs to fix the failing check. The middle is dropped.
+func truncateOutput(output string) string {
+	const (
+		maxLen   = 2000
+		headKeep = 600
+	)
+	r := []rune(output)
+	if len(r) <= maxLen {
+		return output
+	}
+	tailKeep := maxLen - headKeep
+	head := string(r[:headKeep])
+	tail := string(r[len(r)-tailKeep:])
+	return head + "\n...[truncated]...\n" + tail
 }
 
 func (v verifyGate) effectiveWorkDir() string {

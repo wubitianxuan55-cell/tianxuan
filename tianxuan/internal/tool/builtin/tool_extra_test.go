@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // --- read_file extended tests ---
@@ -290,5 +292,76 @@ func TestVerifyGateInvalidArgs(t *testing.T) {
 	_, err := verifyGate{}.Execute(context.Background(), json.RawMessage(`{invalid`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// TestVerifyGateLongFailureKeepsTailDetails locks the truncation behavior for
+// long check output: go test 类长输出（>2000 字符）的 FAIL 详情位于输出尾部，
+// 头部截断会丢掉「哪个测试失败、为什么失败」，模型只能盲目重跑或猜测。
+// 截断必须保留尾部关键信息。
+func TestVerifyGateLongFailureKeepsTailDetails(t *testing.T) {
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = `(for /L %i in (1,1,250) do @echo PASS line %i) & echo --- FAIL: TestFoo & echo foo_test.go:12: expected 2, got 3 & exit /b 1`
+	} else {
+		cmd = `for i in $(seq 1 250); do echo PASS line $i; done; echo '--- FAIL: TestFoo'; echo 'foo_test.go:12: expected 2, got 3'; echo FAIL; exit 1`
+	}
+	out := runTool(t, verifyGate{}, map[string]any{
+		"checks": []map[string]any{
+			{"name": "unit tests", "command": cmd},
+		},
+	})
+	if !strings.Contains(out, "GATE FAILED") {
+		t.Fatalf("should report FAILED: %s", out)
+	}
+	if !strings.Contains(out, "--- FAIL: TestFoo") {
+		t.Errorf("FAIL header lost by truncation: %s", out)
+	}
+	if !strings.Contains(out, "foo_test.go:12: expected 2, got 3") {
+		t.Errorf("failure detail lost by truncation: %s", out)
+	}
+}
+
+func TestTruncateOutputShortUnchanged(t *testing.T) {
+	in := "short output\n"
+	if got := truncateOutput(in); got != in {
+		t.Errorf("short output should pass through unchanged, got %q", got)
+	}
+}
+
+func TestTruncateOutputKeepsHeadAndTail(t *testing.T) {
+	var b strings.Builder
+	for i := 1; i <= 500; i++ {
+		fmt.Fprintf(&b, "line %04d\n", i)
+	}
+	in := b.String()
+	got := truncateOutput(in)
+	if !strings.Contains(got, "line 0001") {
+		t.Errorf("head lost: %s", got[:60])
+	}
+	if !strings.Contains(got, "line 0500") {
+		t.Errorf("tail lost")
+	}
+	if !strings.Contains(got, "[truncated]") {
+		t.Errorf("truncation marker missing")
+	}
+	if strings.Contains(got, "line 0250") {
+		t.Errorf("middle should be dropped")
+	}
+}
+
+// TestTruncateOutputKeepsUTF8Valid locks rune-safe truncation: cutting raw
+// bytes mid-multibyte-sequence would corrupt the tool output the model reads.
+func TestTruncateOutputKeepsUTF8Valid(t *testing.T) {
+	var b strings.Builder
+	for i := 1; i <= 400; i++ {
+		fmt.Fprintf(&b, "第 %d 行 中文内容\n", i)
+	}
+	in := b.String()
+	if !utf8.ValidString(in) {
+		t.Fatal("fixture should be valid UTF-8")
+	}
+	if got := truncateOutput(in); !utf8.ValidString(got) {
+		t.Errorf("truncated output must stay valid UTF-8")
 	}
 }

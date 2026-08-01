@@ -1,3 +1,42 @@
+## [10.136.0] — 2026-08-01
+
+### 🔧 Adaptive Execution 细节打磨 — 同步骤失败宿主信号 + Solo 进度保护
+
+> 延续 V10.135 的单模型工作流：把 Failure adaptation 从"纯提示词自觉"升级为
+> "宿主检测 + 提示词兜底"，并补齐单模型缺失的进度保护。
+
+#### 细节 1 — 宿主级"同步骤持续失败"信号（V10.136）
+> 缺口：现有防护只覆盖"相同动作重复"（detectRepeatedSteps）与"同工具同错误"
+> （风暴断路）。单模型在同一步骤内用**不同动作**反复失败（read→edit→test
+> 各失败一次）时没有任何宿主信号，只能等模型自觉换方案。
+- **`agent/todo_step_nudge.go`**（新增）：`maybeNudgeStuckTodoStep`——跟踪当前
+  in_progress todo 步骤的失败轮次：每轮存在（非权限阻断的）工具失败则累计，
+  同一步骤连续 4 轮失败注入 Adaptive 引导（诊断根因→todo 调整→换方案→ask）；
+  todo 步骤变化或成功轮重置计数
+- **`agent/agent.go`**：`todoFailStep`/`todoFailCount` 状态字段
+- **`agent/agent_run.go`**：工具批次处理后接线（与 maybeInjectToolFeedback
+  互补：后者单轮多失败，本检测跨轮累计同一步骤）
+- **`agent/loop_limits.go`**：`TodoStepFailNudgeThreshold = 4`
+
+#### 细节 2 — Solo 进度保护（Progress guard）
+> 缺口：双模型执行者有提示词级 progress guard（8 轮无进展重新评估、16 轮交还
+> Hermes）；单模型（Solo）完全没有——模型可能陷入"既不成功也不失败"的循环
+> （反复读文件不行动、重复无意义操作）。
+- **`hermes_prompt.go`** SoloSystemPrompt 新增 Progress guard：连续 8 轮无新
+  完成/读取/命令/变更 → 重新评估 todo（签收/换方案/缩小范围/ask）；连续 16 轮
+  无进展 → 暂停并 ask 或报告阻塞。收敛对象是自己（Adaptive），不是"交还 Hermes"
+
+#### 测试
+- **`agent/todo_step_nudge_test.go`**（新增）：阈值触发、步骤切换重置、成功轮
+  中断、无 todo 不触发
+- **`agent/adaptive_workflow_test.go`**：新增 Progress guard 契约（8/16 轮关键词
+  + 不含"交还 Hermes"）
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.135.0] — 2026-08-01
 
 ### 🔄 单模型工作流重定义 — Adaptive Execution（回退 V10.134 AutoPlan）

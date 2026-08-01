@@ -413,6 +413,13 @@ type AgentRunner struct {
 	// autoSkillSeq guarantees unique synthetic tool IDs for auto-skill stat
 	// events across turns.
 	autoSkillSeq atomic.Int64
+
+	// todoFailStep / todoFailCount track the current in_progress todo step's
+	// consecutive tool-failure rounds for the Adaptive Execution nudge
+	// (V10.136). todoFailStep holds the step being counted; changing steps or
+	// a success round resets the counter.
+	todoFailStep  string
+	todoFailCount int
 }
 
 // SetAutoSkillStore installs the skill store used for automatic skill

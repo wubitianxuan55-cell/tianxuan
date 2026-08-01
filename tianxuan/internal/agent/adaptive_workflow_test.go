@@ -37,3 +37,18 @@ func TestSoloSystemPrompt_NoDualModelPlanContract(t *testing.T) {
 		}
 	}
 }
+
+// V10.136 契约：单模型必须有进度保护——连续无进展轮次后重新评估 todo /
+// 收敛（ask 或缩小范围），不能无限循环。收敛对象是自己（Adaptive），
+// 不是"交还 Hermes"（那是双模型执行者的语义）。
+func TestSoloSystemPrompt_ProgressGuard(t *testing.T) {
+	p := SoloSystemPrompt
+	for _, kw := range []string{"Progress guard", "连续 8 轮", "重新评估当前 todo", "连续 16 轮"} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing progress-guard keyword %q", kw)
+		}
+	}
+	if strings.Contains(p, "交还 Hermes") {
+		t.Error("Solo progress guard must converge itself, not hand back to Hermes")
+	}
+}

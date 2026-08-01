@@ -56,3 +56,7 @@ const RepeatSuccessAllowed = 2
 // BgStartKillStreakThreshold 后台启停循环检测阈值。
 // 连续启动→立即杀死后台任务且不读取输出的次数。
 const BgStartKillStreakThreshold = 3
+
+// TodoStepFailNudgeThreshold 同一 in_progress todo 步骤连续出现工具失败的
+// 轮数阈值，达到后注入 Adaptive 换方案引导（V10.136）。
+const TodoStepFailNudgeThreshold = 4

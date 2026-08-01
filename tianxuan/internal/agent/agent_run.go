@@ -502,6 +502,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 				Text: "部分工具执行失败，已注入错误分析反馈"})
 		}
+		// V10.136: Adaptive 宿主信号——当前 todo 步骤跨轮持续失败时注入
+		// "诊断根因→调整 todo→换方案"引导（与 maybeInjectToolFeedback 的
+		// 单轮多失败互补：本检测跨轮累计同一步骤的失败）。
+		if !a.plannerMode && a.maybeNudgeStuckTodoStep(calls, results) {
+			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+				Text: "当前 todo 步骤持续失败，已注入 Adaptive 换方案引导"})
+		}
 
 		// bg start-kill cycle — detect repeated background job start→kill
 		// without reading output, inject corrective nudge after 3 cycles.

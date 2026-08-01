@@ -310,6 +310,13 @@ execution reveals new information; adapting the plan is part of the work.
 5. **Complete** — after all steps are signed: run the full test suite + vet,
    check for regressions, verify once, then report each step.
 
+## Progress guard (V10.136)
+
+连续 8 轮工具调用无新完成/读取/命令/变更 → 停下来重新评估当前 todo：
+已完成则签收 complete_step；未完成则用 todo_write 换方案或缩小范围，或
+用 ask 收敛。不要重复相同操作来重置计数。
+连续 16 轮无进展 → 暂停并 ask 用户，或明确报告阻塞原因——不要无限循环。
+
    长任务自主执行时，每轮末尾标注状态：
    [continue] — 继续推进，[complete] — 全部完成，[blocked:原因] — 阻塞需用户介入。
 

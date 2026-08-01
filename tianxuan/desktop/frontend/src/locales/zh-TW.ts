@@ -145,8 +145,12 @@ export const zhTW: Record<DictKey, string> = {
 
   // composer
   "composer.placeholder": "向 tianxuan 發送訊息…（ / 指令 · @ 檔案）",
-  "composer.placeholderRunning": "回覆中…輸入內容按 Enter 立即注入糾偏",
-  "composer.queue": "糾偏發送",
+  "composer.placeholderRunning": "回覆中…輸入內容按 Enter 排隊，回覆結束後自動發送",
+  "composer.queue": "排隊中 ({n})",
+  "composer.queueSend": "排隊發送",
+  "composer.queueTitle": "排隊發送 ({n})",
+  "composer.steer": "糾偏（立即注入當前任務）",
+  "composer.cancelQueued": "取消排隊",
   "composer.modeExplore": "探索",
   "composer.modeDevelop": "開發",
   "composer.modeOrchestrate": "編排",

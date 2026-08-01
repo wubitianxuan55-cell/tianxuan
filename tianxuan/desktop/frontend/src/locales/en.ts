@@ -146,8 +146,12 @@ export const en = {
 
   // composer
   "composer.placeholder": "Message tianxuan…  ( / commands · @ files )",
-  "composer.placeholderRunning": "Replying… type and press Enter to steer mid-turn",
-  "composer.queue": "Steer send",
+  "composer.placeholderRunning": "Replying… press Enter to queue your message (sends when this finishes)",
+  "composer.queue": "Queued ({n})",
+  "composer.queueSend": "Queue send",
+  "composer.queueTitle": "Queue send ({n})",
+  "composer.steer": "Steer (inject into current task now)",
+  "composer.cancelQueued": "Remove from queue",
   "composer.modeExplore": "Explore",
   "composer.modeDevelop": "Develop",
   "composer.modeOrchestrate": "Orchestrate",

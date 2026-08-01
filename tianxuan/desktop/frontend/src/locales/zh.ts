@@ -147,8 +147,12 @@ export const zh: Record<DictKey, string> = {
 
   // 输入框
   "composer.placeholder": "给 tianxuan 发消息…  ( / 命令 · @ 文件 )",
-  "composer.placeholderRunning": "回复中… 输入内容按 Enter 立即注入纠偏",
-  "composer.queue": "纠偏发送",
+  "composer.placeholderRunning": "回复中… 输入内容按 Enter 排队，回复结束后自动发送",
+  "composer.queue": "排队中 ({n})",
+  "composer.queueSend": "排队发送",
+  "composer.queueTitle": "排队发送 ({n})",
+  "composer.steer": "纠偏（立即注入当前任务）",
+  "composer.cancelQueued": "取消排队",
   "composer.modeExplore": "探索",
   "composer.modeDevelop": "开发",
   "composer.modeOrchestrate": "编排",

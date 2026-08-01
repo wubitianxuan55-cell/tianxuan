@@ -17,9 +17,11 @@ description: V10.137.0 项目基线 — 当前版本、构建命令、发布文�
 ### 构建命令
 
 ```
-set PATH=D:\AI\tianxuanX\tools\go\bin;C:\Users\Administrator\go\bin;D:\AI\tianxuanX\tools\node;%PATH%
 cd D:\AI\tianxuanX && build-desktop.bat
 ```
+
+（V10.138 起脚本自动补齐 PATH：探测 `tools\go\bin` / `tools\node` / Wails CLI，
+无需手动设置环境。）
 
 `build-desktop.bat`：同步 `.tianxuan/skills` → `internal/skill/bundled`
 （robocopy /E，V10.127 修复 /MIR 误删）→ `cd desktop && wails build

@@ -1,3 +1,23 @@
+## [10.138.0] — 2026-08-01
+
+### 🔧 构建脚本自动补齐 PATH — build-desktop.bat 不再依赖手动环境设置
+
+> V10.137 发布时首次遇到：bat 直接运行时前端编译报 `'node' is not recognized`，
+> 必须手动把 Go/Wails/Node 路径加入 PATH 才能构建。本次把环境探测写进脚本。
+
+#### 修复
+- **`build-desktop.bat`**：脚本开头自动补齐构建 PATH——存在 `tools\go\bin`、
+  `tools\node`（node.exe / pnpm.cmd）则加入；`where wails` 找不到时回退探测
+  `%USERPROFILE%\go\bin\wails.exe`。双击/直接运行即可构建，无需手动环境
+- 注意：bat 为 ANSI 编码环境，注释必须纯 ASCII（中文注释会导致 cmd 解析乱码，
+  首次尝试已踩坑回退）
+
+#### 验证
+- 无手动 PATH 环境下 `build-desktop.bat` 直接运行：`[sync] OK` +
+  Wails 全流程 Done，`Built ... tianxuan-desktop.exe`，EXIT 0
+
+---
+
 ## [10.137.0] — 2026-08-01
 
 ### 🎯 单模型中途纠偏 — 运行中输入即时注入当前任务（steer）

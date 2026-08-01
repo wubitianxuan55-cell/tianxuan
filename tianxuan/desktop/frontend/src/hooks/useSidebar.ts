@@ -10,13 +10,11 @@ export function useSidebar() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const [sidebarResizing, setSidebarResizing] = useState(false);
-  const sidebarBeforeRef = useRef<boolean | null>(null);
   const effectiveSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const sidebarWidthRef = useRef(effectiveSidebarWidth);
   sidebarWidthRef.current = effectiveSidebarWidth;
 
   const toggleSidebar = useCallback(() => {
-    sidebarBeforeRef.current = null;
     setSidebarCollapsed((c) => {
       saveSidebarCollapsed(!c);
       return !c;
@@ -75,30 +73,11 @@ export function useSidebar() {
     [setExpandedSidebarWidth, sidebarCollapsed, sidebarWidth],
   );
 
-  // Preview mode: auto-collapse sidebar to make room, but allow manual re-expand.
-  // On preview exit, restore to the remembered collapse state.
-  const handleWorkspacePreviewModeChange = useCallback((active: boolean) => {
-    if (active) {
-      if (sidebarBeforeRef.current === null) sidebarBeforeRef.current = sidebarCollapsed;
-      if (!sidebarCollapsed) {
-        setSidebarCollapsed(true);
-        saveSidebarCollapsed(true);
-      }
-    } else {
-      const restore = sidebarBeforeRef.current;
-      sidebarBeforeRef.current = null;
-      if (restore !== null && restore !== sidebarCollapsed) {
-        setSidebarCollapsed(restore);
-        saveSidebarCollapsed(restore);
-      }
-    }
-  }, [sidebarCollapsed]);
-
   return {
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
     sidebarWidthRef,
     toggleSidebar, setExpandedSidebarWidth, startSidebarResize,
-    resizeSidebarWithKeyboard, handleWorkspacePreviewModeChange,
+    resizeSidebarWithKeyboard,
     setSidebarWidth, setSidebarCollapsed,
   };
 }

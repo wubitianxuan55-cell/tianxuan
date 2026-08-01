@@ -1054,75 +1054,15 @@ body {
 
 /*  workspace side panel  */
 .workspace-panel {
-  --workspace-tree-width: 280px;
-  --workspace-preview-min-width: 420px;
   position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--workspace-tree-width);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   background: var(--bg);
   border-left: 1px solid var(--border-soft);
-}
-.workspace-panel--tree-hidden {
-  grid-template-columns: minmax(0, 1fr);
-}
-.workspace-panel--tree-hidden .workspace-files {
-  display: none;
-}
-.workspace-panel--preview-hidden {
-  grid-template-columns: minmax(0, 1fr);
-}
-.workspace-panel--preview-hidden .workspace-files {
-  background: var(--bg);
-}
-.workspace-preview,
-.workspace-files {
-  min-width: 0;
-  min-height: 0;
-}
-.workspace-preview {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border-soft);
-}
-.workspace-tree-resizer {
-  --wails-draggable: no-drag;
-  position: absolute;
-  top: 0;
-  right: calc(var(--workspace-tree-width) - 4px);
-  bottom: 0;
-  z-index: 13;
-  width: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: col-resize;
-  touch-action: none;
-}
-.workspace-tree-resizer::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: transparent;
-  transition: background var(--dur-fast), box-shadow var(--dur-fast);
-}
-.workspace-tree-resizer:hover::after,
-.workspace-tree-resizer:focus-visible::after,
-.workspace-panel--tree-resizing .workspace-tree-resizer::after {
-  background: var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
-}
-.workspace-panel--tree-resizing,
-.workspace-panel--tree-resizing * {
-  cursor: col-resize !important;
-  user-select: none;
 }
 
 /*  history drawer: click-to-resume rows with rename/delete actions  */

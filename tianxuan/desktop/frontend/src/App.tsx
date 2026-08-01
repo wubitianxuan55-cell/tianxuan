@@ -152,7 +152,7 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
     sidebarWidthRef,
     toggleSidebar, setExpandedSidebarWidth, startSidebarResize,
-    resizeSidebarWithKeyboard, handleWorkspacePreviewModeChange,
+    resizeSidebarWithKeyboard,
   } = useSidebar();
 
   const {
@@ -160,7 +160,7 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
     workspacePreviewModeActive, effectiveWorkspacePanelWidth,
     setWorkspacePanel, toggleWorkspacePanel,
     startWorkspacePanelResize, resizeWorkspacePanelWithKeyboard,
-    setSavedWorkspacePanelWidth, setWorkspacePanelMaximized,
+    setSavedWorkspacePanelWidth,
   } = useWorkspacePanel(effectiveSidebarWidth, viewportWidth);
   const { alive: bridgeAlive, onReconnect } = useBridgeWatch();
   useEffect(() => {
@@ -528,11 +528,7 @@ onOpenSettings={() => setSettingsOpen(true)}
               <WorkspacePanel
                 open={workspacePanelOpen}
                 cwd={state.meta?.cwd}
-                maximized={workspacePanelMaximized}
-                panelWidth={workspacePanelMaximized ? viewportWidth - effectiveSidebarWidth : effectiveWorkspacePanelWidth}
                 onClose={() => { setWorkspacePanel(false); setPendingViewMode(null); }}
-                onToggleMaximized={() => setWorkspacePanelMaximized((value: boolean) => !value)}
-                onPreviewModeChange={handleWorkspacePreviewModeChange}
                 initialViewMode={pendingViewMode ?? undefined}
               />
             ) : rightTab === "runtime" ? (

@@ -13,6 +13,8 @@ description: V10.145.0 发布记录 — 全面清理废弃残留（web 前端目
 | 代码变更 | 删除 tianxuan/web/（11 文件 4761 行）+ .gitignore +3 |
 | 主题 | 全面清理废弃残留 |
 | 构建产物 | `tianxuan-desktop.exe` |
+| 文件大小 | 21,249,024 bytes (~20.3 MB) |
+| SHA256 | `7aceb613cec2528285171c79d1ed976a7f230c8882cbfef92983da30df4b0385` |
 
 ### 本发布包含的提交
 

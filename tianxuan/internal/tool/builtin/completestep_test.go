@@ -152,6 +152,43 @@ func TestCompleteStepRejectsUnverifiedHostEvidence(t *testing.T) {
 	}
 }
 
+// TestCompleteStepTodoMismatchListsTodos verifies that a strict-mode
+// complete_step whose step matches no todo item reports the current task
+// list, so the model can self-correct instead of guessing blindly.
+func TestCompleteStepTodoMismatchListsTodos(t *testing.T) {
+	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true)
+	ledger.Record(evidence.Receipt{
+		ToolName: "todo_write",
+		Success:  true,
+		Todos: []evidence.TodoItem{
+			{Content: "写失败测试", Status: "in_progress"},
+			{Content: "实现功能", Status: "pending"},
+		},
+	})
+	ledger.Record(evidence.Receipt{
+		ToolName: "read_file",
+		Success:  true,
+		Paths:    []string{"a.go"},
+		Read:     true,
+	})
+	ctx := evidence.WithLedger(context.Background(), ledger)
+
+	_, err := completeStep{}.Execute(ctx, json.RawMessage(`{
+		"step":"完全不同的标题",
+		"result":"done",
+		"evidence":[{"kind":"files","summary":"touched","paths":["a.go"]}]
+	}`))
+	if err == nil {
+		t.Fatal("mismatched step must be rejected in strict mode")
+	}
+	for _, want := range []string{"写失败测试", "实现功能", "step_index"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("mismatch error should mention %q for self-correction, got: %v", want, err)
+		}
+	}
+}
+
 func TestCompleteStepRejectsManualOnly(t *testing.T) {
 	ledger := evidence.NewLedger()
 	ledger.SetStrictVerification(true) // V10.8: 严格验证模式

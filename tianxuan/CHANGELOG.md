@@ -1,3 +1,45 @@
+## [10.132.0] — 2026-08-01
+
+### 🐛 修复执行时代办进度落后于实际完成 — complete_step 步骤匹配容错
+
+> 用户反馈：大部分计划执行完了，代办弹窗进度才走到一半。系统性调试：
+> 先梳理 todo 推进链路（todo_write → complete_step → advanceCanonicalTodo /
+> rebuildTodoState / verifyTodoStep），写复现测试确认根因，再修复。
+
+#### 根因（5 级追溯）
+- 表象：计划执行完成但代办面板只推进一部分。
+- 直接原因：`matchTodoStep` 对 complete_step.step 的解析只支持**纯数字索引**
+  （"2"、"2."），标题匹配是**完全相等**（TrimSpace + EqualFold）。
+- 本地根因：执行者按提示词习惯写 "步骤 2：标题" / "Step 3" / "步骤2:标题"，
+  或一侧带编号前缀一侧用纯标题（todo Content="实现功能"，step="步骤 2：实现功能"），
+  两种写法都无法命中 todo 项。
+- 系统根因：todo 匹配逻辑假定模型两侧用词完全一致，没有考虑编号前缀是计划
+  格式（"步骤 N："）的自然产物。
+- 过程根因：V10.99 引入 step_index 建议时只加了新字段，未增强既有 step 解析。
+
+#### 修复
+- **`evidence.go`** `parseStepIndex`：支持中英文编号前缀——"步骤 2"、"步骤2:标题"、
+  "Step 3: verify"、"step 3" 均解析为索引；纯数字（"2"、"2."、"2:"）保持。
+  标题中间的编号（"更新 file2.txt"）不会误当作索引
+- **`evidence.go`** `sameStepText`：比较前剥离任一侧的 "步骤 N："/"Step N:" 前缀
+  ——todo 带前缀而 step 用纯标题（或反向）也能精确匹配；仍是精确比较，
+  不引入包含匹配（防止短标题误推进错误任务）
+- **`completestep.go`** `verifyTodoStep`：严格模式下匹配失败时，报错附带当前
+  任务列表（`1="写失败测试", 2="实现功能"`）与 step_index 提示——模型重试时
+  不再瞎猜，直接引用列表中的标题或编号
+
+#### 测试
+- **`evidence/todo_match_test.go`**（新增）：中文/英文编号前缀解析、前缀标题 vs
+  纯标题双向匹配、纯数字兼容、防过度匹配（子串不匹配、标题中间数字不当索引）
+- **`tool/builtin/completestep_test.go`**：新增不匹配报错列出任务列表的用例
+
+#### 验证
+- 修复前：`MatchStep("步骤 2：实现功能", todos)` 返回 found=false（复现 RED）
+- 修复后：全部匹配；`go build ./...` EXIT 0；`go vet ./...` 无告警；
+  `go test ./...` 全 ok
+
+---
+
 ## [10.131.0] — 2026-08-01
 
 ### 🔄 双模型工作流闭环 II — 步骤覆盖度对照 / 修正计划补全漏签收步骤

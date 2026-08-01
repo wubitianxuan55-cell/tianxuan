@@ -220,7 +220,9 @@ func verifyTodoStep(ctx context.Context, step string) (evidence.TodoStepMatch, b
 		return evidence.TodoStepMatch{}, false, nil
 	}
 	if !match.Found {
-		return evidence.TodoStepMatch{}, true, fmt.Errorf("step %q has no matching todo_write item in this turn", step)
+		return evidence.TodoStepMatch{}, true, fmt.Errorf(
+			"step %q has no matching todo_write item in this turn%s——请用任务列表中的完整标题或 step_index 重试",
+			step, latestTodoHint(ledger))
 	}
 	switch match.Status {
 	case "pending", "in_progress", "completed":
@@ -228,6 +230,21 @@ func verifyTodoStep(ctx context.Context, step string) (evidence.TodoStepMatch, b
 	default:
 		return evidence.TodoStepMatch{}, true, fmt.Errorf("step %q matches todo %d (%q) but its status is %q; complete_step requires pending, in_progress, or completed", step, match.Index, match.Content, match.Status)
 	}
+}
+
+// latestTodoHint renders the current task list (number + title) so a
+// mismatched complete_step error tells the model exactly what it can
+// reference, instead of leaving it to guess.
+func latestTodoHint(ledger *evidence.Ledger) string {
+	todos, ok := ledger.LatestTodos()
+	if !ok || len(todos) == 0 {
+		return ""
+	}
+	var parts []string
+	for i, t := range todos {
+		parts = append(parts, fmt.Sprintf("%d=%q", i+1, t.Content))
+	}
+	return "；当前任务列表: " + strings.Join(parts, ", ")
 }
 
 func commandHints(ledger *evidence.Ledger) string {

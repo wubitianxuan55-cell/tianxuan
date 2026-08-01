@@ -508,16 +508,70 @@ func matchTodoStep(step string, todos []TodoItem) TodoStepMatch {
 	return TodoStepMatch{}
 }
 
+// parseStepIndex resolves a step identifier to a 1-based todo index.
+// Supported forms: plain numbers ("2", "2.", "2:"), and Chinese/English
+// numbered prefixes ("步骤 2", "步骤2", "Step 3", "步骤 2：标题").
+// A number inside a plain title ("更新 file2.txt") is NOT treated as an index.
 func parseStepIndex(step string) (int, bool) {
-	step = strings.TrimSpace(strings.TrimSuffix(step, "."))
-	n, err := strconv.Atoi(step)
-	return n, err == nil
+	s := strings.TrimSpace(step)
+	s = strings.TrimSuffix(s, ".")
+	s = strings.TrimSuffix(s, "：")
+	s = strings.TrimSuffix(s, ":")
+	if n, err := strconv.Atoi(s); err == nil {
+		return n, true
+	}
+	for _, prefix := range []string{"步骤 ", "Step ", "step ", "步骤", "Step", "step"} {
+		after, ok := strings.CutPrefix(s, prefix)
+		if !ok {
+			continue
+		}
+		after = strings.TrimSpace(after)
+		i := 0
+		for i < len(after) && after[i] >= '0' && after[i] <= '9' {
+			i++
+		}
+		if i == 0 {
+			continue
+		}
+		if n, err := strconv.Atoi(after[:i]); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }
 
+// sameStepText compares two step titles after stripping a numbered prefix
+// ("步骤 2：标题" → "标题", "Step 3: title" → "title") from either side.
+// This tolerates the common mismatch where one side carries the plan's
+// "步骤 N：" prefix and the other uses the bare title, while staying an
+// exact (case-insensitive) comparison — no substring matching.
 func sameStepText(a, b string) bool {
-	a = strings.TrimSpace(a)
-	b = strings.TrimSpace(b)
+	a = stripStepNumberPrefix(strings.TrimSpace(a))
+	b = stripStepNumberPrefix(strings.TrimSpace(b))
 	return a != "" && b != "" && strings.EqualFold(a, b)
+}
+
+// stripStepNumberPrefix removes a leading "步骤 N："/"Step N:" (or bare
+// "步骤 N"/"Step N") prefix from a title.
+func stripStepNumberPrefix(s string) string {
+	for _, prefix := range []string{"步骤 ", "Step ", "step ", "步骤", "Step", "step"} {
+		after, ok := strings.CutPrefix(s, prefix)
+		if !ok {
+			continue
+		}
+		i := 0
+		for i < len(after) && after[i] >= '0' && after[i] <= '9' {
+			i++
+		}
+		if i == 0 {
+			continue
+		}
+		rest := strings.TrimLeft(after[i:], "：: \t")
+		if rest != "" {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return s
 }
 
 func pathSet(paths []string) map[string]bool {

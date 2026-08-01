@@ -46,6 +46,14 @@ type Hermes struct {
 	// V10.54: workspace root for project map injection.
 	wsRoot          string
 	lastProjectHash string // hash of last injected ProjectMap; "" means not injected yet or stale
+	// V10.112: cached ProjectInfo + analyzed flag so injectProjectMap can use
+	// codegraph.Refresh's incremental check instead of re-scanning the whole
+	// workspace on every turn (Analyze walks every source file — ~1.8s on
+	// tianxuan itself). projectMapAnalyzed distinguishes "never analyzed"
+	// from "analyzed but unrecognized project" so the latter isn't re-scanned
+	// every turn either.
+	lastProjectInfo    codegraph.ProjectInfo
+	projectMapAnalyzed bool
 
 	executorSinkWrapped bool // V10.87: guard against double-wrapping executor sink
 }
@@ -566,15 +574,30 @@ func (h *Hermes) emitExecutorResult(r *TurnResult, execErr error, retriesExhaust
 }
 
 func (h *Hermes) injectProjectMap() {
-	pm := codegraph.Analyze(h.wsRoot)
-	pmHash := pm.Hash()
-	if pmHash != h.lastProjectHash {
-		h.hermesSess.Add(provider.Message{
-			Role:    provider.RoleUser,
-			Content: "## 项目代码图谱\n\n" + pm.Format() + "\n\n以上是当前项目的代码结构概览，规划时可直接引用其中的路径和类型名。",
-		})
-		h.lastProjectHash = pmHash
+	if h.wsRoot == "" {
+		return
 	}
+	var pm codegraph.ProjectInfo
+	if !h.projectMapAnalyzed {
+		pm = codegraph.Analyze(h.wsRoot)
+		h.projectMapAnalyzed = true
+	} else {
+		pm = codegraph.Refresh(h.wsRoot, h.lastProjectInfo)
+	}
+	h.lastProjectInfo = pm
+	pmHash := pm.Hash()
+	if pmHash == h.lastProjectHash {
+		return
+	}
+	h.lastProjectHash = pmHash
+	block := pm.Format()
+	if block == "" {
+		return // unrecognized project — never inject an empty map
+	}
+	h.hermesSess.Add(provider.Message{
+		Role:    provider.RoleUser,
+		Content: "## 项目代码图谱\n\n" + block + "\n\n以上是当前项目的代码结构概览，规划时可直接引用其中的路径和类型名。",
+	})
 }
 
 // planWithNote bundles a confirmed plan with any user note from confirmation.
@@ -793,6 +816,7 @@ func (h *Hermes) feedResultToPlanner(r *TurnResult) {
 	}
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {
 		h.lastProjectHash = ""
+		h.projectMapAnalyzed = false // force a fresh scan — do not trust modtime alone
 	}
 }
 

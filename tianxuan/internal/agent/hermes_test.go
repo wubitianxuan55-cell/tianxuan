@@ -2,8 +2,11 @@ package agent
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ── shouldSkipPlanner ──────────────────────────────────────
@@ -1012,5 +1015,82 @@ func TestResolveConfirmChoice_FreeText(t *testing.T) {
 	}
 	if note != "请添加更多测试" {
 		t.Fatalf("free text should become note, got %q", note)
+	}
+}
+
+// ── injectProjectMap 增量缓存 ─────────────────────────────
+
+func TestInjectProjectMap_DedupAndReinject(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.26\n")
+	pkgDir := filepath.Join(dir, "internal", "pkg")
+	mustMkdirAll(t, pkgDir)
+	mustWriteFile(t, filepath.Join(pkgDir, "x.go"), "package pkg\n\ntype Foo struct{}\n")
+
+	// 把 internal/ 目录 modtime 固定到过去，保证后续写入必然使其更新。
+	internalDir := filepath.Join(dir, "internal")
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(internalDir, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	h := &Hermes{wsRoot: dir, hermesSess: NewSession("")}
+
+	// 首次注入
+	h.injectProjectMap()
+	msgs := h.hermesSess.Snapshot()
+	if len(msgs) != 1 {
+		t.Fatalf("first injection should add 1 message, got %d", len(msgs))
+	}
+	if !strings.Contains(msgs[0].Content, "Project Map") {
+		t.Fatalf("injected message should contain Project Map, got %q", msgs[0].Content)
+	}
+
+	// 项目未变化 → 不重复注入
+	h.injectProjectMap()
+	if got := len(h.hermesSess.Snapshot()); got != 1 {
+		t.Fatalf("unchanged project must not re-inject, got %d messages", got)
+	}
+
+	// 结构变化（internal/ 下新增包）→ 重新注入
+	mustMkdirAll(t, filepath.Join(dir, "internal", "pkg2"))
+	mustWriteFile(t, filepath.Join(dir, "internal", "pkg2", "y.go"), "package pkg2\n\ntype Bar struct{}\n")
+	h.injectProjectMap()
+	msgs = h.hermesSess.Snapshot()
+	if len(msgs) != 2 {
+		t.Fatalf("structural change should re-inject, got %d messages", len(msgs))
+	}
+	if !strings.Contains(msgs[1].Content, "pkg2") {
+		t.Fatalf("re-injected map should include new package, got %q", msgs[1].Content)
+	}
+
+	// ResetSession 后新会话重新注入
+	h.ResetSession()
+	h.injectProjectMap()
+	msgs = h.hermesSess.Snapshot()
+	if len(msgs) != 1 {
+		t.Fatalf("fresh session should get exactly 1 map message, got %d", len(msgs))
+	}
+}
+
+func TestInjectProjectMap_EmptyRootSkips(t *testing.T) {
+	h := &Hermes{wsRoot: "", hermesSess: NewSession("")}
+	h.injectProjectMap()
+	if got := len(h.hermesSess.Snapshot()); got != 0 {
+		t.Fatalf("empty wsRoot must not inject a map, got %d messages", got)
+	}
+}
+
+func mustWriteFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustMkdirAll(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
 	}
 }

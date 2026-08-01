@@ -97,6 +97,12 @@ export function FactCard(p: {
               {fact.title || fact.name}
             </span>
             <span className="badge badge--muted shrink-0">{fact.type}</span>
+            {fact.scope === "global" && (
+              <span className="badge badge--accent shrink-0" title="跨项目共享记忆">{t("memory.globalBadge")}</span>
+            )}
+            {(fact.strength ?? 0) > 0 && (
+              <span className="badge badge--muted shrink-0" title="被自动召回次数">{t("memory.recalledBadge", { n: fact.strength ?? 0 })}</span>
+            )}
           </div>
           {fact.description && (
             <div className="text-fg-faint text-[11.5px] leading-relaxed mt-0.5 line-clamp-2">

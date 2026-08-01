@@ -432,6 +432,21 @@ export function makeMockApp(): AppBindings {
             description: "User prefers tabs",
             type: "user",
             body: "Indent with tabs.",
+            scope: "global",
+            strength: 3,
+          },
+        ],
+        pending: [
+          {
+            id: "pending-auto-fact",
+            name: "auto-fact",
+            title: "Auto-extracted candidate",
+            description: "Build with --race flag",
+            type: "project",
+            body: "Always run `go build -race` before submitting.",
+            reason: "auto-extracted: persistent working rule",
+            evidence: ["sess-1: 记住：构建时始终使用 --race 标志"],
+            source: "auto-extract",
           },
         ],
         archives: [
@@ -463,7 +478,7 @@ export function makeMockApp(): AppBindings {
       emit({ kind: "notice", level: "info", text: `forgot → ${name}` });
     },
     async MemoryForTab(_tabID: string) {
-      return { docs: [], facts: [], scopes: [], storeDir: "", archives: [], available: false };
+      return { docs: [], facts: [], scopes: [], storeDir: "", archives: [], pending: [], available: false };
     },
     async SaveDoc(path: string, _body: string) {
       emit({ kind: "notice", level: "info", text: `saved → ${path}` });

@@ -401,16 +401,8 @@ func (s Store) List() []Memory {
 	seen := map[string]bool{}
 	var out []Memory
 	for _, dir := range s.dirs() {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if e.IsDir() || e.Name() == indexFile || !strings.HasSuffix(e.Name(), ".md") {
-				continue
-			}
-			m, ok := loadMemory(filepath.Join(dir, e.Name()))
-			if !ok || seen[m.Name] {
+		for _, m := range s.listIn(dir) {
+			if seen[m.Name] {
 				continue // project-scoped copy wins over the global one
 			}
 			seen[m.Name] = true
@@ -418,6 +410,36 @@ func (s Store) List() []Memory {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// ListIn returns the saved memories of a single store directory (project or
+// global), sorted by name. Used by the desktop panel to label each fact's
+// scope (P1 cross-project design). A missing directory yields nil.
+func (s Store) ListIn(dir string) []Memory {
+	if dir == "" {
+		return nil
+	}
+	out := s.listIn(dir)
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// listIn reads the memory files of one directory without deduplication.
+func (s Store) listIn(dir string) []Memory {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []Memory
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == indexFile || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		if m, ok := loadMemory(filepath.Join(dir, e.Name())); ok {
+			out = append(out, m)
+		}
+	}
 	return out
 }
 

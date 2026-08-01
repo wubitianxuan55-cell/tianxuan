@@ -195,6 +195,26 @@ func BuildProfile(s Store) (ProjectProfile, error) {
 	return p, nil
 }
 
+// ReadProfile loads the persisted project profile (zero value + no error when
+// none has been built yet). Best-effort for the panel's overview card.
+func ReadProfile(s Store) (ProjectProfile, error) {
+	if s.Dir == "" {
+		return ProjectProfile{}, nil
+	}
+	b, err := os.ReadFile(filepath.Join(s.Dir, profileFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ProjectProfile{}, nil
+		}
+		return ProjectProfile{}, err
+	}
+	var p ProjectProfile
+	if err := json.Unmarshal(b, &p); err != nil {
+		return ProjectProfile{}, fmt.Errorf("parse %s: %w", profileFile, err)
+	}
+	return p, nil
+}
+
 // profileStopwords are common English words that add no concept signal.
 var profileStopwords = map[string]bool{
 	"the": true, "and": true, "for": true, "with": true, "this": true,

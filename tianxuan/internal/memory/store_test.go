@@ -178,3 +178,27 @@ func TestDisabledStoreIsNoOp(t *testing.T) {
 		t.Fatal("disabled store Save should error, not silently drop")
 	}
 }
+
+// TestListInScopesDirectories verifies ListIn returns only the memories of one
+// directory, letting the panel distinguish project-scoped from cross-project
+// facts (P1 design).
+func TestListInScopesDirectories(t *testing.T) {
+	s := Store{
+		Dir:       filepath.Join(t.TempDir(), "project"),
+		GlobalDir: filepath.Join(t.TempDir(), "global"),
+	}
+	if _, err := s.Save(Memory{Name: "project-fact", Description: "p", Type: TypeProject, Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Save(Memory{Name: "global-fact", Description: "g", Type: TypeUser, Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	project := s.ListIn(s.Dir)
+	global := s.ListIn(s.GlobalDir)
+	if len(project) != 1 || project[0].Name != "project-fact" {
+		t.Fatalf("project list = %+v, want only project-fact", project)
+	}
+	if len(global) != 1 || global[0].Name != "global-fact" {
+		t.Fatalf("global list = %+v, want only global-fact", global)
+	}
+}

@@ -103,6 +103,17 @@ type MemoryFact struct {
 	Description string `json:"description"`
 	Type        string `json:"type"`
 	Body        string `json:"body"`
+	Scope       string `json:"scope"` // "project" (this repo) or "global" (cross-project)
+	Strength    int    `json:"strength,omitempty"` // recall count (P6 reinforcement)
+}
+
+// ProjectProfileView is the panel-friendly project overview card payload.
+type ProjectProfileView struct {
+	UpdatedAt     string         `json:"updatedAt"`
+	TotalMemories int            `json:"totalMemories"`
+	TopConcepts   []string       `json:"topConcepts"`
+	TopTypes      map[string]int `json:"topTypes"`
+	CommonErrors  []string       `json:"commonErrors"`
 }
 
 // MemoryScope is one writable quick-add target (scope id + the file it writes to).
@@ -126,13 +137,15 @@ type MemoryArchive struct {
 // MemoryView is the whole memory panel payload: hierarchical docs, saved facts,
 // stored archives, and the writable scopes for the quick-add selector.
 type MemoryView struct {
-	Docs           []MemoryDoc     `json:"docs"`
-	Facts          []MemoryFact    `json:"facts"`
-	Scopes         []MemoryScope   `json:"scopes"`
-	StoreDir       string          `json:"storeDir"`
-	StoreGlobalDir string          `json:"storeGlobalDir,omitempty"`
-	Archives       []MemoryArchive `json:"archives"`
-	Available      bool            `json:"available"`
+	Docs           []MemoryDoc         `json:"docs"`
+	Facts          []MemoryFact        `json:"facts"`
+	Scopes         []MemoryScope       `json:"scopes"`
+	StoreDir       string              `json:"storeDir"`
+	StoreGlobalDir string              `json:"storeGlobalDir,omitempty"`
+	Archives       []MemoryArchive     `json:"archives"`
+	Pending        []MemorySuggestion  `json:"pending"`
+	Profile        *ProjectProfileView `json:"profile,omitempty"`
+	Available      bool                `json:"available"`
 }
 
 // writableScopes are the quick-add targets the panel offers, broad → specific.
@@ -394,7 +407,7 @@ func (a *App) SetModel(name string) error {
 func (a *App) Memory() MemoryView {
 	// Always return non-nil slices: a nil Go slice marshals to JSON `null`, which
 	// would crash the panel's `view.facts.length` / `.map`.
-	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}}
+	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}, Pending: []MemorySuggestion{}}
 	a.mu.RLock()
 	ctrl := a.ctrl
 	a.mu.RUnlock()
@@ -408,12 +421,21 @@ func (a *App) Memory() MemoryView {
 	view.StoreDir = set.Store.Dir
 	view.StoreGlobalDir = set.Store.GlobalDir
 	view.Available = true
+	view.Pending = pendingMemories(set)
+	view.Profile = profileView(set)
 	for _, d := range set.Docs {
 		view.Docs = append(view.Docs, MemoryDoc{Path: d.Path, Scope: string(d.Scope), Body: d.Body})
 	}
-	for _, f := range set.Store.List() {
+	for _, f := range set.Store.ListIn(set.Store.Dir) {
 		view.Facts = append(view.Facts, MemoryFact{
 			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+			Scope: "project", Strength: strengthCount(set.Store, f.Name),
+		})
+	}
+	for _, f := range set.Store.ListIn(set.Store.GlobalDir) {
+		view.Facts = append(view.Facts, MemoryFact{
+			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+			Scope: "global", Strength: strengthCount(set.Store, f.Name),
 		})
 	}
 	for _, a := range set.Store.ListArchived() {
@@ -447,7 +469,7 @@ func (a *App) Remember(scope, note string) (string, error) {
 // MemoryForTab returns memory for a specific tab. When tabID is empty, uses
 // the active tab.
 func (a *App) MemoryForTab(tabID string) MemoryView {
-	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}}
+	view := MemoryView{Docs: []MemoryDoc{}, Facts: []MemoryFact{}, Scopes: []MemoryScope{}, Archives: []MemoryArchive{}, Pending: []MemorySuggestion{}}
 	ctrl := a.ctrlByTabID(tabID)
 	if ctrl == nil {
 		return view
@@ -459,12 +481,21 @@ func (a *App) MemoryForTab(tabID string) MemoryView {
 	view.StoreDir = set.Store.Dir
 	view.StoreGlobalDir = set.Store.GlobalDir
 	view.Available = true
+	view.Pending = pendingMemories(set)
+	view.Profile = profileView(set)
 	for _, d := range set.Docs {
 		view.Docs = append(view.Docs, MemoryDoc{Path: d.Path, Scope: string(d.Scope), Body: d.Body})
 	}
-	for _, f := range set.Store.List() {
+	for _, f := range set.Store.ListIn(set.Store.Dir) {
 		view.Facts = append(view.Facts, MemoryFact{
 			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+			Scope: "project", Strength: strengthCount(set.Store, f.Name),
+		})
+	}
+	for _, f := range set.Store.ListIn(set.Store.GlobalDir) {
+		view.Facts = append(view.Facts, MemoryFact{
+			Name: f.Name, Title: f.Title, Description: f.Description, Type: string(f.Type), Body: f.Body,
+			Scope: "global", Strength: strengthCount(set.Store, f.Name),
 		})
 	}
 	for _, a := range set.Store.ListArchived() {
@@ -554,4 +585,37 @@ func parseScope(s string) memory.Scope {
 	default:
 		return memory.ScopeProject
 	}
+}
+
+// profileView maps the persisted project profile into the panel payload, or
+// nil when none has been built yet (the panel hides the overview card).
+func profileView(set *memory.Set) *ProjectProfileView {
+	if set == nil {
+		return nil
+	}
+	p, err := memory.ReadProfile(set.Store)
+	if err != nil || p.UpdatedAt.IsZero() {
+		return nil
+	}
+	types := make(map[string]int, len(p.TopTypes))
+	for t, n := range p.TopTypes {
+		types[string(t)] = n
+	}
+	return &ProjectProfileView{
+		UpdatedAt:     p.UpdatedAt.Format(time.RFC3339),
+		TotalMemories: p.TotalMemories,
+		TopConcepts:   p.TopConcepts,
+		TopTypes:      types,
+		CommonErrors:  p.CommonErrors,
+	}
+}
+
+// strengthCount returns the recall count of one memory (0 when never
+// reinforced), so the panel can show how often a fact was surfaced.
+func strengthCount(s memory.Store, name string) int {
+	st, err := memory.ReadStrength(s, name)
+	if err != nil {
+		return 0
+	}
+	return st.Count
 }

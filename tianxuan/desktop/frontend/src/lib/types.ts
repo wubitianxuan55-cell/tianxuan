@@ -259,6 +259,8 @@ export interface MemoryFact {
   description: string;
   type: string; // "user" | "feedback" | "project" | "reference"
   body: string;
+  scope?: string; // "project" (this repo) | "global" (cross-project)
+  strength?: number; // recall count (P6 reinforcement)
 }
 
 export interface MemoryScope {
@@ -274,6 +276,16 @@ export interface MemoryView {
   storeGlobalDir?: string;
   available: boolean;
   archives: MemoryArchive[];
+  pending: MemorySuggestion[];
+  profile?: ProjectProfileView;
+}
+
+export interface ProjectProfileView {
+  updatedAt: string;
+  totalMemories: number;
+  topConcepts: string[];
+  topTypes: Record<string, number>;
+  commonErrors: string[];
 }
 
 // Settings panel payloads (desktop/settings_app.go).

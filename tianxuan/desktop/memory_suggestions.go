@@ -96,8 +96,7 @@ func (a *App) MemorySuggestions() MemorySuggestionsView {
 
 	sessionDir := config.WorkspaceSessionDir("")
 	sessions := loadSuggestionSessions(sessionDir, suggestionSessionLimit)
-	view.Memories = pendingMemories(set)
-	view.Memories = append(view.Memories, suggestMemories(set, sessions)...)
+	view.Memories = suggestMemories(set, sessions)
 	view.Skills = suggestSkills("", ctrl.Skills(), sessions)
 	return view
 }
@@ -123,8 +122,7 @@ func (a *App) MemorySuggestionsForTab(tabID string) MemorySuggestionsView {
 
 	sessionDir := config.WorkspaceSessionDir("")
 	sessions := loadSuggestionSessions(sessionDir, suggestionSessionLimit)
-	view.Memories = pendingMemories(set)
-	view.Memories = append(view.Memories, suggestMemories(set, sessions)...)
+	view.Memories = suggestMemories(set, sessions)
 	view.Skills = suggestSkills("", ctrl.Skills(), sessions)
 	return view
 }

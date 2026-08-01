@@ -1,4 +1,4 @@
-import { Archive, Bookmark, Check, ChevronDown, ChevronRight, FileText, Pencil, Plus, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { Archive, Bookmark, Check, ChevronDown, ChevronRight, FileText, Inbox, Pencil, Plus, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
@@ -38,7 +38,7 @@ function writeAutoPref(v: boolean) {
   try { localStorage.setItem(AUTO_KEY, String(v)); } catch { /* noop */ }
 }
 
-export type SubTab = "saved" | "archived" | "docs" | "suggestions";
+export type SubTab = "saved" | "pending" | "archived" | "docs" | "suggestions";
 
 // ── MemoryPanelContent — 记忆面板核心，drawer 和 settings 两个入口共享 ──
 
@@ -122,8 +122,10 @@ export function MemoryPanelContent() {
 
   // ── derived ──
   const facts = view?.facts ?? [];
+  const pending = view?.pending ?? [];
   const archives = view?.archives ?? [];
   const docs = view?.docs ?? [];
+  const profile = view?.profile ?? null;
   const scopes = view?.scopes ?? [];
   const activeScope = scope || scopes.find((s) => s.scope === "project")?.scope || scopes[0]?.scope || "project";
   const factNames = useMemo(() => new Set(facts.map((f) => f.name)), [facts]);
@@ -247,10 +249,10 @@ export function MemoryPanelContent() {
     setBusy(true);
     try {
       await app.RejectPendingMemory(name);
-      await refreshSuggestions();
+      await reload();
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
-  }, [busy, refreshSuggestions]);
+  }, [busy, reload]);
 
   const acceptSkillSuggestion = useCallback(async (c: SkillSuggestion) => {
     if (busy) return;
@@ -291,6 +293,7 @@ export function MemoryPanelContent() {
   }
 
   const hasFacts = filteredFacts.length > 0;
+  const hasPending = pending.length > 0;
   const hasArchives = filteredArchives.length > 0;
   const hasDocs = filteredDocs.length > 0;
 
@@ -310,9 +313,10 @@ export function MemoryPanelContent() {
       )}
 
       {/* ── stats bar ── */}
-      {(facts.length > 0 || archives.length > 0 || docs.length > 0) && (
+      {(facts.length > 0 || pending.length > 0 || archives.length > 0 || docs.length > 0) && (
         <div className="flex items-center gap-3 text-[11px] text-fg-faint px-1 mb-1.5">
           {facts.length > 0 && <span><Bookmark size={11} className="inline mr-1 align-[-1px]" />{facts.length} 条记忆</span>}
+          {pending.length > 0 && <span><Inbox size={11} className="inline mr-1 align-[-1px]" />{pending.length} 条待确认</span>}
           {archives.length > 0 && <span><Archive size={11} className="inline mr-1 align-[-1px]" />{archives.length} 条归档</span>}
           {docs.length > 0 && <span><FileText size={11} className="inline mr-1 align-[-1px]" />{docs.length} 个文档</span>}
         </div>
@@ -320,7 +324,7 @@ export function MemoryPanelContent() {
 
       {/* ── sub-tabs ── */}
       <div className="mem-tabs">
-        {(["saved", "archived", "docs", "suggestions"] as SubTab[]).map((k) => (
+        {(["saved", "pending", "archived", "docs", "suggestions"] as SubTab[]).map((k) => (
           <button
             key={k}
             type="button"
@@ -328,10 +332,12 @@ export function MemoryPanelContent() {
             onClick={() => { setSubTab(k); if (k !== "saved" && k !== "archived") { setQuery(""); setTypeFilter("all"); } }}
           >
             {k === "saved" && <><Bookmark size={13} className="mr-1" />{t("memory.savedMemories")}</>}
+            {k === "pending" && <><Inbox size={13} className="mr-1" />{t("memory.pending")}</>}
             {k === "archived" && <><Archive size={13} className="mr-1" />{t("memory.archived")}</>}
             {k === "docs" && <><FileText size={13} className="mr-1" />{t("memory.instructionFiles")}</>}
             {k === "suggestions" && <><Sparkles size={13} className="mr-1" />{t("memory.suggestions")}</>}
             {k === "saved" && <span className="mem-count">{facts.length}</span>}
+            {k === "pending" && pending.length > 0 && <span className="mem-count mem-count--accent">{pending.length}</span>}
             {k === "archived" && <span className="mem-count">{archives.length}</span>}
             {k === "docs" && <span className="mem-count">{docs.length}</span>}
             {k === "suggestions" && suggestions && <span className="mem-count">{suggestions.memories.length + suggestions.skills.length}</span>}
@@ -375,6 +381,46 @@ export function MemoryPanelContent() {
         {/* ======== SAVED ======== */}
         {subTab === "saved" && (
           <>
+            {/* ── project profile overview (P6) ── */}
+            {profile && (
+              <section className="mem-profile mb-2">
+                <div className="mem-profile__head">
+                  <span className="mem-profile__title">{t("memory.profileOverview")}</span>
+                  <span className="mem-profile__meta">{t("memory.profileTotal", { n: profile.totalMemories })}</span>
+                </div>
+                {profile.topConcepts.length > 0 && (
+                  <div className="mem-profile__row">
+                    <span className="mem-profile__label">{t("memory.profileConcepts")}</span>
+                    <div className="mem-profile__chips">
+                      {profile.topConcepts.map((c) => (
+                        <span className="mem-chip mem-chip--static" key={c}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {Object.keys(profile.topTypes).length > 0 && (
+                  <div className="mem-profile__row">
+                    <span className="mem-profile__label">{t("memory.profileTypes")}</span>
+                    <div className="mem-profile__chips">
+                      {Object.entries(profile.topTypes).map(([ty, n]) => (
+                        <span className="mem-chip mem-chip--static" key={ty}>{factTypeLabel(t, ty)} × {n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {profile.commonErrors.length > 0 && (
+                  <div className="mem-profile__row">
+                    <span className="mem-profile__label">{t("memory.profileErrors")}</span>
+                    <div className="mem-profile__chips">
+                      {profile.commonErrors.map((e) => (
+                        <span className="mem-chip mem-chip--static mem-chip--warn" key={e}>{e}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* quick add — collapsible */}
             <section className="mem-section">
               <button
@@ -445,6 +491,41 @@ export function MemoryPanelContent() {
               {t("memory.storedUnder", { dir: view.storeDir })}
             </div>
           </>
+        )}
+
+        {/* ======== PENDING（自动提取 + Dream 候选，确认后落盘） ======== */}
+        {subTab === "pending" && (
+          <div className="mem-suggestions">
+            {!hasPending && (
+              <div className="mem-empty">
+                <Inbox size={28} className="mb-2 text-fg-faint/30" />
+                <p>{t("memory.noPending")}</p>
+                <p className="text-[11px] text-fg-faint mt-1">{t("memory.pendingHint")}</p>
+              </div>
+            )}
+            {hasPending && (
+              <>
+                <div className="mem-section__title mt-1">{t("memory.pendingCandidates")}</div>
+                {pending.map((s) => (
+                  <div className="mem-suggestion" key={s.id || s.name}>
+                    <div className="mem-suggestion__info">
+                      <span className="mem-suggestion__title">{s.title || s.name}</span>
+                      <span className="mem-suggestion__desc">{s.description}</span>
+                      <span className="mem-suggestion__reason">{s.reason}</span>
+                    </div>
+                    <div className="mem-suggestion__actions">
+                      <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
+                        <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
+                      </button>
+                      <button className="btn btn--small btn--ghost" onClick={() => void rejectPendingMemory(s.name)} disabled={busy} type="button">
+                        {t("memory.reject")}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
         )}
 
         {/* ======== ARCHIVED ======== */}
@@ -596,11 +677,6 @@ export function MemoryPanelContent() {
                             <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
                               <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
                             </button>
-                            {s.source === "auto-extract" && (
-                              <button className="btn btn--small btn--ghost" onClick={() => void rejectPendingMemory(s.name)} disabled={busy} type="button">
-                                {t("memory.reject")}
-                              </button>
-                            )}
                           </div>
                         )}
                       </div>

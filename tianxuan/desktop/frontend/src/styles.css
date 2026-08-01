@@ -2292,6 +2292,8 @@ body::after {
 }
 .mem-chip:hover { border-color: var(--fg-faint); color: var(--fg); }
 .mem-chip--active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.mem-chip--static { cursor: default; background: var(--bg-soft); }
+.mem-chip--warn { border-color: color-mix(in srgb, var(--err) 45%, transparent); color: var(--err); }
 
 .mem-filter {
   flex: 1; min-width: 0; height: 32px; padding: 0 8px;
@@ -2352,6 +2354,28 @@ body::after {
   font-size: 10px; padding: 0 5px; border-radius: 8px;
   background: var(--bg-soft); color: var(--fg-faint);
 }
+.mem-count--accent { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+/*  project profile overview (P6)  */
+.mem-profile {
+  border: 1px solid var(--border-soft); border-radius: 10px;
+  background: var(--bg-soft); padding: 10px 12px; margin-bottom: 8px;
+}
+.mem-profile__head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.mem-profile__title {
+  font-size: 12px; font-weight: 600; color: var(--fg);
+}
+.mem-profile__meta { font-size: 10.5px; color: var(--fg-faint); }
+.mem-profile__row {
+  display: flex; align-items: baseline; gap: 8px; margin-top: 6px;
+  font-size: 11px;
+}
+.mem-profile__label {
+  flex: none; width: 64px; color: var(--fg-faint); font-size: 10.5px;
+}
+.mem-profile__chips { display: flex; gap: 4px; flex-wrap: wrap; }
 
 /*  facts list  */
 .mem-facts { display: flex; flex-direction: column; gap: 4px; }

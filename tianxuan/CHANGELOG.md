@@ -1,3 +1,25 @@
+## [10.120.0] — 2026-08-01
+
+### 🧬 重蒸馏 superpowers v5.1.0 — finish-development-branch 内置技能
+
+> V10.50 蒸馏的是当时版本的 superpowers 方法论（设计优先/TDD/子代理）。v5.1.0（2026-04，204K⭐）演进出完整的收尾工作流技能 **finishing-a-development-branch**：任务完成后 → 验证测试 → 检测环境 → 4 选项决策（本地合并/推送建 PR/保留/丢弃）→ 归属式 worktree 清理。tianxuan 已有 `git_worktree` 工具（add/remove/list）但缺少这条收尾流程——分支做完后没有结构化的合并/PR/清理决策，worktree 容易遗留成垃圾。
+
+#### 变更
+- **`skill/bundled/finish-development-branch/SKILL.md`**：新增内置技能（embed 打包 + 启动提取 + 技能索引注入），按 tianxuan 工具集适配：验证门禁用 `verify_gate`/`bash`、环境检测用 `git_status`/`git_worktree list`、清理遵循归属检查（只删自己创建的 worktree、先回主仓库根再 remove、合并成功后才删分支、`git worktree prune` 自愈）；保留 superpowers 红线（测试未全绿禁止合并、丢弃需用户明确确认、不清理外部托管工作区、禁止未经询问 force-push）
+- **`skill/skill_test.go`**：新增 `TestBundledFinishDevelopmentBranch`——确保新技能可提取、可解析、描述为中文、正文含核心流程关键词、并出现在 Skills 索引
+
+#### 验证
+- TDD 红灯（技能未发现）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/skill/bundled/finish-development-branch/SKILL.md` — 新增（收尾工作流）
+- `internal/skill/skill_test.go` — +38 行（新测试）
+
+---
+
 ## [10.119.0] — 2026-08-01
 
 ### 🧬 蒸馏 Aider repo map — CoreTypes 按引用频率排名

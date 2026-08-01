@@ -66,6 +66,43 @@ func TestFlatAndDirLayout(t *testing.T) {
 	}
 }
 
+// TestBundledFinishDevelopmentBranch 蒸馏自 superpowers v5.1.0 的
+// finishing-a-development-branch：内置收尾技能必须可提取、可解析（中文描述）、
+// 正文包含核心流程（验证测试 / 4 选项决策 / 归属式 worktree 清理）且索引可见。
+func TestBundledFinishDevelopmentBranch(t *testing.T) {
+	home := t.TempDir()
+	if err := EnsureBundled(home); err != nil {
+		t.Fatal(err)
+	}
+	st := New(Options{HomeDir: home, DisableBuiltins: true})
+	list := st.List()
+
+	var sk Skill
+	found := false
+	for _, s := range list {
+		if s.Name == "finish-development-branch" {
+			sk = s
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("bundled finish-development-branch skill not discovered: %v", list)
+	}
+	if !strings.Contains(sk.Description, "收尾") {
+		t.Errorf("description should be a Chinese one-liner, got %q", sk.Description)
+	}
+	for _, want := range []string{"验证测试", "本地合并", "Pull Request", "丢弃", "worktree"} {
+		if !strings.Contains(sk.Body, want) {
+			t.Errorf("body missing %q", want)
+		}
+	}
+	idx := ApplyIndex("# Skills", []Skill{sk})
+	if !strings.Contains(idx, "finish-development-branch") {
+		t.Errorf("skill should appear in the Skills index: %s", idx)
+	}
+}
+
 func TestConventionDirsDiscovered(t *testing.T) {
 	proj := t.TempDir()
 	writeSkill(t, proj, ".claude/skills/fromclaude.md", "---\ndescription: c\n---\nb")

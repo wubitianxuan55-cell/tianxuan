@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -32,10 +33,47 @@ func init() {
 	tool.RegisterBuiltin(gitLog{})
 }
 
+// gitCandidatePaths lists well-known git install locations, probed in order
+// gitCandidatePaths lists well-known git install locations, probed in order
+// when `git` is not on PATH. The desktop process keeps the PATH it started
+// with — if git was installed after launch, exec.LookPath fails and these
+// paths let the git tools keep working without a restart.
+var gitCandidatePaths = []string{
+	`C:\Program Files\Git\cmd\git.exe`,
+	`C:\Program Files\Git\bin\git.exe`,
+	`/usr/bin/git`,
+	`/usr/local/bin/git`,
+}
+
+// probeGitCandidates returns the first candidate path that exists on disk,
+// or "" if none do. Callers fall back to "git" so a missing install still
+// surfaces a natural error instead of an empty path.
+func probeGitCandidates(candidates []string) string {
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+// gitExecPath resolves the git executable: PATH first, then well-known
+// install locations. The resolved path is used verbatim as the command.
+func gitExecPath() string {
+	if p, err := exec.LookPath("git"); err == nil {
+		return p
+	}
+	if p := probeGitCandidates(gitCandidatePaths); p != "" {
+		return p
+	}
+	return "git"
+}
+
 // runGit runs `git <args>` and returns stdout. stderr is folded into the error
-// on non-zero exit.
+// on non-zero exit. The executable is resolved via gitExecPath so tools keep
+// working when `git` is not on the process PATH snapshot.
 func runGit(ctx context.Context, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, gitExecPath(), args...)
 	hideBashWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

@@ -14,6 +14,44 @@ func gitAvailable() bool {
 	return err == nil
 }
 
+// TestProbeGitCandidates locks git executable discovery: when the process
+// PATH snapshot predates a git install (tianxuan-desktop keeps the PATH it
+// started with), the git tools must fall back to probing well-known install
+// locations instead of failing with "git not found".
+func TestProbeGitCandidates(t *testing.T) {
+	dir := t.TempDir()
+	fakeGit := filepath.Join(dir, "git.exe")
+	if err := os.WriteFile(fakeGit, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "nope.exe")
+
+	// 第一个存在的候选被选中；不存在的跳过。
+	got := probeGitCandidates([]string{missing, fakeGit})
+	if got != fakeGit {
+		t.Fatalf("probeGitCandidates = %q, want %q", got, fakeGit)
+	}
+	// 全部不存在返回空串 → 调用方回落 "git" 让错误自然浮现。
+	if got := probeGitCandidates([]string{missing}); got != "" {
+		t.Fatalf("probeGitCandidates(empty) = %q, want \"\"", got)
+	}
+}
+
+// TestGitCandidatePathsWindowsInstall locks that the default candidate list
+// covers the standard Git for Windows location, so a desktop process started
+// before git was installed still finds it.
+func TestGitCandidatePathsWindowsInstall(t *testing.T) {
+	found := false
+	for _, c := range gitCandidatePaths {
+		if strings.Contains(c, `Program Files\Git\cmd\git.exe`) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("gitCandidatePaths must include C:\\Program Files\\Git\\cmd\\git.exe")
+	}
+}
+
 func gitCmd(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)

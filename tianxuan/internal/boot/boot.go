@@ -334,6 +334,10 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		OffloadDir:          offloadDir,
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 	}, sink)
+	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
+	// 匹配技能的 playbook（tdd/systematic-debugging 等）。Hermes 规划者
+	// 走 plannerMode 不注入；subagent 技能已工具化，也不注入正文。
+	executor.SetAutoSkillStore(skillStore)
 
 	// V7.0: session archive for cross-session Dream/Distill. The session ID is
 	// derived here and always set on the executor, because context offloading

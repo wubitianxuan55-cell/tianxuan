@@ -11,11 +11,22 @@ import (
 	"tianxuan/internal/event"
 	"tianxuan/internal/evidence"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/skill"
 	"tianxuan/internal/tool"
 )
 
 func (a *AgentRunner) Run(ctx context.Context, input string) (*TurnResult, error) {
 	return a.runDirect(ctx, input)
+}
+
+// withAutoSkill 在用户输入前确定性注入匹配技能的 playbook（V10.122）。
+// 缓存安全：只修改 user 消息字节，不触碰 L1/L2/tools；同输入+同技能 →
+// 同字节（skill.InjectAutoSkill 是纯函数）。技能库未接线（nil）时不注入。
+func (a *AgentRunner) withAutoSkill(input string) string {
+	if a == nil || a.autoSkill == nil {
+		return input
+	}
+	return skill.InjectAutoSkill(input, a.autoSkill)
 }
 
 // runDirect is the original single-model execution path.
@@ -34,6 +45,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	// V10.46: planner skips language wrappers — its output is a plan, not user text.
 	if !a.plannerMode {
 		input = a.withTurnPreferences(input)
+		input = a.withAutoSkill(input)
 	}
 	// V10.88: executor receives the handoff message as input. The handoff
 	// has a structured marker prefix; App.History() in the UI layer filters

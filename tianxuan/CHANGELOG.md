@@ -1,3 +1,42 @@
+## [10.122.0] — 2026-08-01
+
+### ⚡ 技能自动触发层 — 把技能调用从"模型自觉"变成"系统决策"（缓存安全）
+
+> 技能不调用的根治方案：不再依赖模型主动 run_skill，而是系统在用户输入进入 agent 循环时，用**确定性规则**匹配技能并自动注入正文。与"把技能改成工具"相比，不膨胀 tools 列表、保留技能按需加载与用户可扩展性。
+
+#### 缓存安全设计（DeepSeek 前缀缓存适配）
+- **只修改 user 消息字节**：注入发生在 `runDirect` 中 `session.Add(user message)` 之前，包装为 `<auto-skill>...</auto-skill>` transient 块——与既有 `withTurnPreferences`（语言偏好块）同一模式，前端用 `StripTransientBlocks` 剥离，显示干净输入
+- **不触碰 L1/L2/tools**：不动态增删工具（规避 V8.0.2 filteredSchemas 事故），不注入 system prompt，`verifyPrefixAndShape` 守卫的 SystemHash/ToolsHash 均不变
+- **字节确定性**：`MatchSkill`/`InjectAutoSkill` 是纯函数——同输入 + 同技能 → 完全相同的注入字节；用户输入变化导致的缓存断开是任务本身的自然成本，无额外损失
+- **白名单触发**：只对核心 inline 技能注册规则（systematic-debugging / tdd / requesting-code-review / finish-development-branch）；subagent 技能（explore/review 等）已工具化、不注入正文；设计类技能不自动触发（避免误命中与正文过大）
+
+#### 变更
+- **`skill/autotrigger.go`**（新增）：`AutoTriggerRule` + 内置规则表 + `MatchSkill`（大小写不敏感子串匹配，确定性）+ `InjectAutoSkill`（inline 技能正文注入 `<auto-skill>` 块；subagent/缺失技能/不匹配一律原样返回）
+- **`agent/agent.go`**：AgentRunner 新增 `autoSkill *skill.Store` 字段 + `SetAutoSkillStore` setter（nil 禁用，向后兼容）
+- **`agent/agent_run.go`**：`runDirect` 中 `withTurnPreferences` 后调用 `withAutoSkill`（仅 `!plannerMode`——executor/solo 注入，Hermes 规划者不注入）
+- **`boot/boot.go`**：executor 构造后 `executor.SetAutoSkillStore(skillStore)` 接线
+- **`agent/session/transient.go`**：`StripTransientBlocks` 新增 `<auto-skill>` 分支（前端剥离）
+
+#### 测试
+- **`skill/autotrigger_test.go`**（新增）：匹配命中/不命中/优先级、注入字节确定性（同输入两次字节一致——缓存安全锁）、不匹配原样、subagent 技能不注入、缺失技能原样
+- **`agent/session/transient_test.go`**（新增）：`<auto-skill>` 块与混合 transient 块剥离
+
+#### 验证
+- TDD 红灯（InjectAutoSkill 未定义 + auto-skill 块未剥离）→ 绿灯
+- `go build ./...` — EXIT 0；`go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL（agent/skill/boot/session 全绿）
+
+#### 文件变更
+- `internal/skill/autotrigger.go` — 新增（+85 行）
+- `internal/skill/autotrigger_test.go` — 新增（+115 行）
+- `internal/agent/agent.go` — +7 行（字段 + setter）
+- `internal/agent/agent_run.go` — +11 行（接线 + withAutoSkill）
+- `internal/agent/session/transient.go` — +6 行（剥离分支）
+- `internal/agent/session/transient_test.go` — 新增（+15 行）
+- `internal/boot/boot.go` — +4 行（接线）
+
+---
+
 ## [10.121.0] — 2026-08-01
 
 ### 🎯 修复技能系统几乎不调用 — 触发指引 + 核心编程工作流技能化

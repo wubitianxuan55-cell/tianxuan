@@ -21,6 +21,7 @@ import (
 	"tianxuan/internal/nilutil"
 	"tianxuan/internal/planmode"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/skill"
 	"tianxuan/internal/tool"
 )
 
@@ -398,6 +399,18 @@ type AgentRunner struct {
 	// deferred until sessionID is set (see SetArchive), because the store's
 	// per-session subdirectory is derived from it.
 	offloadDir string
+
+	// autoSkill is the skill store consulted by withAutoSkill (V10.122).
+	// nil disables automatic skill injection. Injection is a deterministic
+	// pure function of (input, stored inline-skill body), so it never churns
+	// the DeepSeek prefix cache beyond the natural input bytes.
+	autoSkill *skill.Store
+}
+
+// SetAutoSkillStore installs the skill store used for automatic skill
+// injection (V10.122). nil disables it. Read-only; bodies are fetched per turn.
+func (a *AgentRunner) SetAutoSkillStore(st *skill.Store) {
+	a.autoSkill = st
 }
 
 // SetActiveSchemas installs a tool subset for this session. Pass nil to revert

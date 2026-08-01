@@ -77,6 +77,12 @@ func StripTransientBlocks(content string) string {
 			if !ok {
 				return content
 			}
+		case strings.HasPrefix(s, "<auto-skill>"):
+			var ok bool
+			s, ok = trimTransientBlock(s, "auto-skill")
+			if !ok {
+				return content
+			}
 		default:
 			return s
 		}

@@ -51,6 +51,8 @@ func Analyze(wsRoot string) ProjectInfo {
 		info.Language = "Rust"
 		info.EntryPoint = "Cargo.toml (workspace)"
 		info.DepsShort = extractKeyDeps(filepath.Join(wsRoot, "Cargo.toml"))
+		info.Packages = discoverRustPackages(wsRoot)
+		info.CoreTypes = discoverRustCoreTypes(wsRoot)
 		info.FileCount = countRSFiles(wsRoot)
 		if fi, err := os.Stat(filepath.Join(wsRoot, "Cargo.toml")); err == nil {
 			latestMod = fi.ModTime()
@@ -465,4 +467,119 @@ func countRSFiles(root string) int {
 		return nil
 	})
 	return count
+}
+
+// discoverRustPackages returns the module structure under src/: direct
+// subdirectories containing .rs files, plus top-level module files
+// (excluding the crate roots main.rs/lib.rs).
+func discoverRustPackages(root string) []string {
+	srcDir := filepath.Join(root, "src")
+	fi, err := os.Stat(srcDir)
+	if err != nil || !fi.IsDir() {
+		return nil
+	}
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return nil
+	}
+	var pkgs []string
+	for _, e := range entries {
+		if e.IsDir() {
+			if dirHasRSFiles(filepath.Join(srcDir, e.Name())) {
+				pkgs = append(pkgs, e.Name())
+			}
+		} else if strings.HasSuffix(e.Name(), ".rs") {
+			name := strings.TrimSuffix(e.Name(), ".rs")
+			if name != "main" && name != "lib" {
+				pkgs = append(pkgs, name)
+			}
+		}
+	}
+	sort.Strings(pkgs)
+	return pkgs
+}
+
+func dirHasRSFiles(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".rs") {
+			return true
+		}
+	}
+	return false
+}
+
+// discoverRustCoreTypes scans .rs files under src/ for prominent public type
+// definitions (struct/enum/trait/type). Reads only the first 40 lines of each
+// file to keep startup fast.
+func discoverRustCoreTypes(root string) []string {
+	srcDir := filepath.Join(root, "src")
+	fi, err := os.Stat(srcDir)
+	if err != nil || !fi.IsDir() {
+		return nil
+	}
+	var types []string
+	filepath.Walk(srcDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() || !strings.HasSuffix(fi.Name(), ".rs") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		lines := strings.Split(string(b), "\n")
+		limit := 40
+		if len(lines) < limit {
+			limit = len(lines)
+		}
+		for _, line := range lines[:limit] {
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "pub") {
+				continue
+			}
+			kw := rustTypeKeyword(trimmed)
+			if kw == "" {
+				continue
+			}
+			parts := strings.Fields(trimmed)
+			for i, p := range parts {
+				if p != kw || i+1 >= len(parts) {
+					continue
+				}
+				name := strings.TrimSuffix(parts[i+1], ",")
+				if name != "" {
+					types = append(types, name+" ("+filepath.Base(filepath.Dir(path))+")")
+				}
+				break
+			}
+		}
+		return nil
+	})
+	// Deduplicate
+	seen := map[string]bool{}
+	var unique []string
+	for _, t := range types {
+		if !seen[t] {
+			seen[t] = true
+			unique = append(unique, t)
+		}
+	}
+	if len(unique) > 15 {
+		unique = unique[:15]
+	}
+	return unique
+}
+
+// rustTypeKeyword returns the type keyword (struct/enum/trait/type) declared
+// on a pub line, or "" when the line declares something else (fn, mod, use...).
+func rustTypeKeyword(trimmed string) string {
+	for _, kw := range []string{"struct", "enum", "trait", "type"} {
+		if strings.Contains(trimmed, " "+kw+" ") {
+			return kw
+		}
+	}
+	return ""
 }

@@ -1,3 +1,25 @@
+## [10.118.0] — 2026-08-01
+
+### 🆕 Rust 项目地图补模块与核心类型 — 规划者可见 Rust 项目结构
+
+> Rust 项目此前的地图只有 Language/Entry/Deps/FileCount，没有 Go 项目那样的 Packages 与 CoreTypes——规划者看不到 Rust 项目的模块划分和公共类型。本轮为 Rust 补上结构发现，与 Go 支持对齐。
+
+#### 变更
+- **`codegraph/projectmap.go`**：Analyze Rust 分支新增 `discoverRustPackages`（`src/` 下含 .rs 的直接子目录 + 顶层模块文件，排除 crate 根 `main.rs`/`lib.rs`）与 `discoverRustCoreTypes`（`src/` 下 .rs 文件前 40 行内的 `pub struct/enum/trait/type`，忽略 `pub fn/mod/use` 等非类型声明，输出 `Name (目录)` 格式并去重截断至 15）
+- **`codegraph/projectmap_test.go`**：新增 `TestAnalyze_RustStructure`——构造 lib.rs（Engine/Runner）、lexer.rs（TokenKind）、parser/mod.rs（Ast），锁定 Packages 排序与 CoreTypes 格式，并断言 `pub fn` 不误收为类型
+
+#### 验证
+- TDD 红灯（旧实现 Packages 为空）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/codegraph/projectmap.go` — +95 行（Rust 结构发现 + 3 个 helper）
+- `internal/codegraph/projectmap_test.go` — +52 行（新测试）
+
+---
+
 ## [10.117.0] — 2026-08-01
 
 ### 🛡️ git 工具长输出截断保护 + verify_gate 截断统一

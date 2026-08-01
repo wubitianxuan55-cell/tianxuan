@@ -151,3 +151,46 @@ func TestRefresh_RustIncremental(t *testing.T) {
 		t.Fatalf("root-level file change should NOT re-analyze, got %d", got.FileCount)
 	}
 }
+
+// TestAnalyze_RustStructure locks Rust project-map structure support:
+// src/ subdirectories and top-level module files surface as Packages,
+// public type definitions surface as CoreTypes — mirroring the Go support.
+func TestAnalyze_RustStructure(t *testing.T) {
+	dir := t.TempDir()
+	writeFileT(t, filepath.Join(dir, "Cargo.toml"), "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n")
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(filepath.Join(srcDir, "parser"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileT(t, filepath.Join(srcDir, "main.rs"), "fn main() {}\n")
+	writeFileT(t, filepath.Join(srcDir, "lib.rs"), "pub struct Engine {}\npub trait Runner {}\n")
+	writeFileT(t, filepath.Join(srcDir, "lexer.rs"), "pub enum TokenKind {}\n")
+	writeFileT(t, filepath.Join(srcDir, "parser", "mod.rs"), "pub struct Ast {}\npub fn parse() {}\n")
+
+	info := Analyze(dir)
+	if info.Language != "Rust" {
+		t.Fatalf("expected Rust language, got %q", info.Language)
+	}
+	wantPkgs := []string{"lexer", "parser"}
+	if len(info.Packages) != len(wantPkgs) {
+		t.Fatalf("expected %d packages, got %v", len(wantPkgs), info.Packages)
+	}
+	for i, want := range wantPkgs {
+		if info.Packages[i] != want {
+			t.Errorf("package[%d] = %q, want %q (full: %v)", i, info.Packages[i], want, info.Packages)
+		}
+	}
+
+	got := map[string]bool{}
+	for _, ct := range info.CoreTypes {
+		got[ct] = true
+	}
+	for _, want := range []string{"Engine (src)", "Runner (src)", "TokenKind (src)", "Ast (parser)"} {
+		if !got[want] {
+			t.Errorf("core type %q missing: %v", want, info.CoreTypes)
+		}
+	}
+	if got["parse (src)"] {
+		t.Errorf("pub fn must not be collected as a core type: %v", info.CoreTypes)
+	}
+}

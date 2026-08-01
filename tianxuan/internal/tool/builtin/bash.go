@@ -98,6 +98,18 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
 	argv, _ := sandbox.Command(b.sb, sh, p.Command)
 
+	// V10.127: 服务类命令防呆——前台启动服务器/监听进程会阻塞 turn 直到
+	// 120s 超时，且超时后服务进程可能仍持有输出管道写端，使 cmd.Wait()
+	// 永久阻塞（整个进程卡死、只能重启）。检测到服务类命令且未显式
+	// run_in_background 时自动转后台：立即返回 job id，kill_shell 可随时停。
+	autoBackground := false
+	if !p.RunInBackground && isServiceCommand(p.Command) {
+		if _, ok := jobs.FromContext(ctx); ok {
+			p.RunInBackground = true
+			autoBackground = true
+		}
+	}
+
 	if p.RunInBackground {
 		jm, ok := jobs.FromContext(ctx)
 		if !ok {
@@ -142,7 +154,11 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			}
 			return "", err
 		})
-		return fmt.Sprintf("Started background job %q. It keeps running across turns; read new output with bash_output(job_id=%q), wait for it with wait, or stop it with kill_shell(job_id=%q).", job.ID, job.ID, job.ID), nil
+		hint := ""
+		if autoBackground {
+			hint = "（服务类命令已自动转入后台——前台执行会阻塞到超时且可能卡死；用 bash_output 读输出、kill_shell 停止）"
+		}
+		return fmt.Sprintf("Started background job %q. It keeps running across turns; read new output with bash_output(job_id=%q), wait for it with wait, or stop it with kill_shell(job_id=%q).%s", job.ID, job.ID, job.ID, hint), nil
 	}
 
 	start := time.Now()
@@ -186,11 +202,26 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		if jobErr == nil {
 			defer syscall.CloseHandle(jobHandle)
 		}
-		err = cmd.Wait()
-		if jobErr != nil {
+		// V10.127: Wait 永不永久阻塞——命令派生的进程可能持有 stdout/stderr
+		// 管道写端（服务进程），Go 的 Wait 要等所有写端关闭（EOF）才返回；
+		// 超时/取消时立即返回，进程树由上面的 kill goroutine 清理。
+		waitCh := make(chan error, 1)
+		go func() { waitCh <- cmd.Wait() }()
+		select {
+		case err = <-waitCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+		if jobErr != nil && ctx.Err() == nil {
 			// Job Object failed (e.g. sandbox restriction); fall back to taskkill.
 			killProcessTree(cmd)
 		}
+	}
+
+	if ctx.Err() != nil {
+		// 超时/取消：Wait 已提前返回，但 copy goroutine 可能仍在写输出 buffer
+		// （服务进程持有管道写端）——不读取 buffer，避免数据竞争。
+		return "", fmt.Errorf("command timed out (> %s); process tree kill in progress", bashTimeout)
 	}
 
 	// JSON output mode: return structured result with separated stdout/stderr.
@@ -241,9 +272,6 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	const plainMaxBytes = 48 * 1024
 	out, _ = truncateStream(out, plainMaxBytes)
 
-	if ctx.Err() == context.DeadlineExceeded {
-		return out, fmt.Errorf("command timed out (> %s)", bashTimeout)
-	}
 	if err != nil {
 		// Non-zero exit: feed output and error back so the model can self-correct.
 		return out, fmt.Errorf("command exited: %w", err)
@@ -285,6 +313,31 @@ func commandPreview(cmd string) string {
 		return string(r[:max]) + "…"
 	}
 	return cmd
+}
+
+// serviceCommandMarkers 识别"启动后会长时间运行/监听"的服务类命令。
+// 匹配采用子串（大小写不敏感），核心服务启动器与监听/跟踪关键词带空格
+// 前缀以避免误伤普通词（如 serverless、preserve、watchman）。
+var serviceCommandMarkers = []string{
+	"http.server", "uvicorn", "gunicorn", "ngrok", "nodemon",
+	"compose up", "npm run dev", "npm run start", "npm run serve", "npm run preview",
+	"npm start", "pnpm dev", "pnpm start", "pnpm run dev", "pnpm run start",
+	"yarn dev", "yarn start", "yarn serve", "cargo run", "cargo watch",
+	"go run",
+	"tail -f", "smee", "cloudflared", "frpc", "ssh -R", "ssh -L", "adb reverse",
+	" serve", " server", " listen", " daemon", " watch",
+}
+
+// isServiceCommand 报告命令是否属于服务类（启动服务器/监听/持续跟踪），
+// 这类命令前台执行会阻塞 turn，应自动转后台。
+func isServiceCommand(cmd string) bool {
+	lower := strings.ToLower(strings.TrimSpace(cmd))
+	for _, m := range serviceCommandMarkers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // killProcessTree 在命令执行完毕后清理 shell 可能残留的子进程树。

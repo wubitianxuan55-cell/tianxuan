@@ -1,3 +1,27 @@
+## [10.127.0] — 2026-08-01
+
+### 🐛 修复 bash 启动服务类命令堵死进程 — 自动后台化 + Wait 永不阻塞
+
+> 根因（5 级追溯）：表象 = 用 bash 启动服务（npm run dev / node server.js / go run server）后 tianxuan 整个进程卡死，无法强制关闭，只能重启。直接原因 = 前台 bash 的 `cmd.Wait()` 要等 stdout/stderr 管道 EOF 才返回，而服务进程持有管道写端永不关闭；120s 超时 Kill shell 后服务进程仍存活，Wait 仍阻塞（Go exec 的 copy goroutine 等 EOF）。本地根因 = 前台路径假定命令会退出，没有服务类命令的防护；卡住的 bash 没有 job id，`kill_shell` 无从下手。系统根因 = 服务类命令允许前台执行。过程根因 = bash 描述虽有 run_in_background 提示但靠模型自觉，无防呆兜底。
+
+#### 修复
+- **`bash.go` 服务类命令自动转后台**：新增 `isServiceCommand`（关键词表：http.server/uvicorn/gunicorn/ngrok/nodemon/compose up/npm run dev/npm start/pnpm/yarn dev/cargo run/go run/tail -f/ssh -R/ssh -L/ serve/ server/ listen/ daemon/ watch 等，带空格前缀避免误伤 serverless/watchman 等）。未显式 `run_in_background` 的服务命令自动转后台：立即返回 job id + 中文提示，`kill_shell` 可随时强制关闭——从源头杜绝"前台等 120s"
+- **`bash.go` 前台 Wait 兜底**：`cmd.Wait()` 改为 goroutine + `select { waitCh | ctx.Done() }`——任何前台命令超时/取消时**立即返回**（进程树由既有 kill goroutine 清理），永不永久阻塞主进程；超时分支不读取输出 buffer（copy goroutine 可能仍在写入，避免数据竞争）
+
+#### 测试
+- **`bash_service_test.go`**（新增）：`TestIsServiceCommand`——12 个服务命令命中（npm run dev/python http.server/docker compose up/node server.js/go run server/tail -f/ngrok/cargo run 等）+ 8 个普通命令不命中（echo/go test/git status/ls/grep/rm/npm install/python 脚本）
+- `TestBashServiceCommandAutoBackground`——真实 node http 服务命令：Execute **0.01s 立即返回** job 信息（不阻塞 turn），并验证 `kill_shell` 可停止；无 node 环境自动跳过
+
+#### 验证
+- 修复前：服务命令前台执行 120s 超时后仍卡死（测试超时 + 残留 node 进程）
+- 修复后：自动后台 0.01s 返回；`go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全部 ok
+
+#### 文件变更
+- `internal/tool/builtin/bash.go` — +40 行（服务检测 + 自动后台 + Wait 兜底）
+- `internal/tool/builtin/bash_service_test.go` — 新增（+110 行）
+
+---
+
 ## [10.126.0] — 2026-08-01
 
 ### 🧹 全量工具梳理与完善 — compact 接线 / Kind 一致化 / 工具集补全

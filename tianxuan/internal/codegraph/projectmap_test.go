@@ -3,6 +3,7 @@ package codegraph
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -192,5 +193,40 @@ func TestAnalyze_RustStructure(t *testing.T) {
 	}
 	if got["parse (src)"] {
 		t.Errorf("pub fn must not be collected as a core type: %v", info.CoreTypes)
+	}
+}
+
+// TestCoreTypesRankedByReference distills Aider's repo-map insight: the map
+// should surface the most-referenced types, not the first N in scan order.
+// Alpha is defined late (internal/e) but referenced from many files, so it
+// must rank above Zeta which is defined first but barely used.
+func TestCoreTypesRankedByReference(t *testing.T) {
+	dir := t.TempDir()
+	writeFileT(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.26\n")
+	for _, pkg := range []string{"a", "b", "c", "d", "e"} {
+		if err := os.MkdirAll(filepath.Join(dir, "internal", pkg), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFileT(t, filepath.Join(dir, "internal", "a", "a.go"), "package a\n\ntype Zeta struct{}\n")
+	writeFileT(t, filepath.Join(dir, "internal", "e", "e.go"), "package e\n\ntype Alpha struct{}\n")
+	for _, pkg := range []string{"b", "c", "d"} {
+		var b strings.Builder
+		b.WriteString("package " + pkg + "\n\n")
+		for i := 0; i < 5; i++ {
+			b.WriteString("var _ = e.Alpha{}\n")
+		}
+		writeFileT(t, filepath.Join(dir, "internal", pkg, pkg+".go"), b.String())
+	}
+
+	info := Analyze(dir)
+	if len(info.CoreTypes) < 2 {
+		t.Fatalf("expected at least 2 core types, got %v", info.CoreTypes)
+	}
+	if info.CoreTypes[0] != "Alpha (e)" {
+		t.Errorf("top core type should be Alpha (e) — most referenced — got %v", info.CoreTypes)
+	}
+	if info.CoreTypes[1] != "Zeta (a)" {
+		t.Errorf("second core type should be Zeta (a), got %v", info.CoreTypes)
 	}
 }

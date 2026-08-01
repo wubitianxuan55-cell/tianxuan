@@ -407,6 +407,7 @@ func discoverCoreTypes(root string) []string {
 			unique = append(unique, t)
 		}
 	}
+	unique = rankCoreTypes(unique, internalDir, ".go")
 	if len(unique) > 15 {
 		unique = unique[:15]
 	}
@@ -567,10 +568,81 @@ func discoverRustCoreTypes(root string) []string {
 			unique = append(unique, t)
 		}
 	}
+	unique = rankCoreTypes(unique, srcDir, ".rs")
 	if len(unique) > 15 {
 		unique = unique[:15]
 	}
 	return unique
+}
+
+// rankCoreTypes reorders "Name (dir)" entries by descending whole-identifier
+// reference frequency across the scanned tree — Aider repo-map 蒸馏：地图展示
+// 被引用最多的类型，而非扫描顺序的前 N 个。同频次按名称字母序保证确定性。
+func rankCoreTypes(items []string, scanDir, ext string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	counts := make(map[string]int, len(items))
+	for _, it := range items {
+		counts[typeNameOf(it)] = 0
+	}
+	filepath.Walk(scanDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() || !strings.HasSuffix(fi.Name(), ext) {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		content := string(b)
+		for name := range counts {
+			counts[name] += countIdentifier(content, name)
+		}
+		return nil
+	})
+	sort.Slice(items, func(i, j int) bool {
+		ni, nj := typeNameOf(items[i]), typeNameOf(items[j])
+		if counts[ni] != counts[nj] {
+			return counts[ni] > counts[nj]
+		}
+		return ni < nj
+	})
+	return items
+}
+
+// typeNameOf extracts the identifier from a "Name (dir)" entry.
+func typeNameOf(entry string) string {
+	fields := strings.Fields(entry)
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
+}
+
+// countIdentifier counts occurrences of name as a whole identifier in content
+// (letter/digit/underscore boundaries), ignoring substring matches like
+// "Handler" inside "HTTPHandler".
+func countIdentifier(content, name string) int {
+	n := 0
+	i := 0
+	for i < len(content) {
+		j := strings.Index(content[i:], name)
+		if j < 0 {
+			break
+		}
+		start := i + j
+		end := start + len(name)
+		if (start == 0 || !isIdentByte(content[start-1])) &&
+			(end >= len(content) || !isIdentByte(content[end])) {
+			n++
+		}
+		i = end
+	}
+	return n
+}
+
+func isIdentByte(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
 
 // rustTypeKeyword returns the type keyword (struct/enum/trait/type) declared

@@ -1,3 +1,28 @@
+## [10.119.0] — 2026-08-01
+
+### 🧬 蒸馏 Aider repo map — CoreTypes 按引用频率排名
+
+> Aider 的 repo map 用 tree-sitter 提取符号并构建引用图，地图展示**被引用最多的标识符**（PageRank 排名），而非扫描顺序的前 N 个。tianxuan 的 `discoverCoreTypes` 此前按文件遍历顺序取前 15 个类型——扫到谁就是谁，与重要性无关。本轮蒸馏：项目地图的 Core Types 改为按全库引用频率降序排名（同频次按名称字母序，保证确定性）。
+
+#### 变更
+- **`codegraph/projectmap.go`**：
+  - 新增 `rankCoreTypes`——统计每个类型名在扫描树（Go: `internal/`，Rust: `src/`）全部源码文件中的**完整标识符出现次数**，按次数降序排序后截断至 15
+  - 新增 `countIdentifier`/`isIdentByte`——按标识符边界（字母/数字/下划线）计数，避免 `Handler` 被 `HTTPHandler` 的子串污染
+  - `discoverCoreTypes`（Go）与 `discoverRustCoreTypes`（Rust）去重后统一接入排名
+- **`codegraph/projectmap_test.go`**：新增 `TestCoreTypesRankedByReference`——Alpha 定义在 internal/e（扫描靠后）但被 b/c/d 频繁引用，断言其排名超过先扫描到的 Zeta
+
+#### 验证
+- TDD 红灯（旧实现 `[Zeta (a) Alpha (e)]` 扫描序）→ 绿灯（`[Alpha (e) Zeta (a)]` 引用序）
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/codegraph/projectmap.go` — +72 行（排名 + 计数 helper）
+- `internal/codegraph/projectmap_test.go` — +49 行（新测试）
+
+---
+
 ## [10.118.0] — 2026-08-01
 
 ### 🆕 Rust 项目地图补模块与核心类型 — 规划者可见 Rust 项目结构

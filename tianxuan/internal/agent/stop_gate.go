@@ -11,13 +11,17 @@ import (
 // Triple gate for solo (single-model) mode. All three skip in plannerMode.
 // Each gate has a reentry cap of 3 to prevent infinite loops.
 
-// stopGateOrchestrateVerifyNudge prompts the model to run tests before
-// declaring completion.
+// stopGateOrchestrateVerifyNudge prompts the model to run the check that
+// matches the change before declaring completion (V10.141: scoped verification —
+// simple/frontend/docs changes no longer force the full backend suite).
 const stopGateOrchestrateVerifyNudge = "[system] All tasks appear complete. " +
-	"Before declaring done, verify your work: " +
-	"run the project's test suite (go test ./... or equivalent), " +
-	"check for regressions, and confirm the output matches expectations. " +
-	"Only stop after tests pass."
+	"Before declaring done, verify your work with the check that matches the change: " +
+	"Go code changed -> go build + affected package tests (go test ./<pkg>); " +
+	"frontend files changed -> tsc --noEmit / frontend tests / build (no backend tests needed); " +
+	"docs/config only -> content check, no test suite required; " +
+	"cross-module or refactor -> full suite (go test ./... or equivalent). " +
+	"Check for regressions and confirm the output matches expectations. " +
+	"Only stop after the matching checks pass."
 
 // taskGate checks the canonical todo list for incomplete items. When any
 // remain, it injects a nudge listing them and asking the model to complete

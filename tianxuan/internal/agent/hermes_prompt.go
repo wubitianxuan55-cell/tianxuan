@@ -247,7 +247,12 @@ Hermes' plan.
 
 ## When all steps are done
 
-Before declaring completion, run the project's test suite (go test ./... or equivalent), check for regressions, and confirm output matches expectations. Only stop after tests pass. Do NOT output a verbose end-of-turn summary; Hermes handles that.
+Before declaring completion, run the check that matches the change (V10.141):
+Go code → go build + affected package tests; frontend files → tsc/build/frontend
+tests (no backend suite); docs/config only → content check; cross-module or
+refactor → full suite (go test ./... or equivalent). Check for regressions and
+confirm output matches expectations. Only stop after the matching checks pass.
+Do NOT output a verbose end-of-turn summary; Hermes handles that.
 
 - 📌 User note in handoff overrides Hermes' plan when they conflict.`
 
@@ -316,7 +321,9 @@ execution reveals new information; adapting the plan is part of the work.
      and try a different path/tool/scope, noting why in complete_step.
    - If the new approach stalls too: converge — ask the user, or shrink to a
      deliverable subset and state exactly what remains.
-5. **Complete** — after all steps are signed: run the full test suite + vet,
+5. **Complete** — after all steps are signed: run the check that matches the
+   change (Go → build + affected package tests; frontend → tsc/build/frontend
+   tests; docs/config → content check; cross-module/refactor → full suite),
    check for regressions, verify once, then report each step.
 
 ## Progress guard (V10.136)
@@ -372,7 +379,9 @@ Keep reports concise — one line per step. Use format:
 ## Pre-completion checklist
 
 Before declaring all steps done:
-1. Run the project's test suite (go test ./... or equivalent).
+1. Run the check that matches the change: Go → go build + affected package
+   tests; frontend → tsc/build/frontend tests; docs/config → content check;
+   cross-module or refactor → full suite (go test ./... or equivalent).
 2. Check for regressions — did your changes break existing tests?
 3. Run go vet / lsp_diagnostics on touched files — no warnings.
 4. Confirm all changed files are in the plan; no extra files crept in.

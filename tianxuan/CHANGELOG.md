@@ -1,3 +1,35 @@
+## [10.141.0] — 2026-08-01
+
+### 🔧 验证分级 — 简单修改/前端修改不再强制后端全量测试套件
+
+> 用户反馈：每轮完成时系统强制要求运行完整测试套件（go test ./...）太过机械
+> ——简单修改、前端修改也要跑后端全量测试，成本和反馈延迟不成比例。本次把
+> 验证改为按变更范围分级。
+
+#### 分级规则
+| 变更范围 | 验证方式 |
+|----------|----------|
+| Go 代码 | `go build` + 受影响包测试（`go test ./<pkg>`） |
+| 前端文件（.ts/.tsx/.css 等） | `tsc --noEmit` / 前端测试 / build，**不需要后端测试** |
+| 文档/配置（.md/.toml/.json） | 内容核对，不强制测试 |
+| 跨模块/重构 | 全量套件（`go test ./...` 或等价） |
+
+#### 改动
+- **`agent/stop_gate.go`**：verify_gate 强制提示文案改为分级验证——模型完成前
+  按本次变更选择匹配的验证方式，只有对应检查通过才允许结束
+- **`agent/hermes_prompt.go`**：SoloSystemPrompt 的 Pre-completion checklist 与
+  Complete 段落、HephaestusSystemPrompt 的完成前检查同步为分级规则
+
+#### 测试
+- **`agent/scoped_verify_test.go`**（新增）：verify_gate nudge 与 Solo/Hephaestus
+  提示词必须包含分级验证关键词（matches the change / affected package tests /
+  frontend / no backend tests needed / docs/config / full suite）
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.140.0] — 2026-08-01
 
 ### 🐛 修复单模型下技能几乎不触发 — 自动触发关键词扩展 + inline 技能主动调用

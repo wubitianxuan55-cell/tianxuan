@@ -380,6 +380,11 @@ Before declaring all steps done:
 
 ## Sub-agents — default for investigation (V10.139)
 
+Inline 技能（tdd / systematic-debugging / requesting-code-review /
+receiving-code-review / finish-development-branch）在任务匹配时**主动调用
+run_skill** 获取完整 playbook——自动注入只覆盖关键词命中的高频场景，未命中
+但任务匹配（V10.140）时仍要调用；不要凭记忆省略技能步骤。
+
 调查默认走子代理。原则：**只有决策、实现、验证所需的信息才进主上下文**；
 批量调查的中间信息（多文件阅读、大文件内容、深度搜索、外部研究）不需要进
 主上下文——派发子代理在隔离上下文消化，只接收精炼结论（带 file:line 锚点）。

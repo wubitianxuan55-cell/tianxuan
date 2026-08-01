@@ -70,3 +70,14 @@ func TestSoloSystemPrompt_SubagentDefaultInvestigation(t *testing.T) {
 		}
 	}
 }
+
+// V10.140 契约：inline 技能（tdd/systematic-debugging 等）在任务匹配时必须
+// 主动 run_skill 获取完整 playbook——自动注入只覆盖关键词命中的高频场景。
+func TestSoloSystemPrompt_InlineSkillActiveInvocation(t *testing.T) {
+	p := SoloSystemPrompt
+	for _, kw := range []string{"主动调用", "run_skill", "systematic-debugging", "自动注入只覆盖"} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing inline-skill invocation keyword %q", kw)
+		}
+	}
+}

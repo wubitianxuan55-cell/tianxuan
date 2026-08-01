@@ -347,6 +347,28 @@ func TestHermesPrompt_ContainsEssentials(t *testing.T) {
 	}
 }
 
+func TestHermesPrompt_PlanFormatHasFileAnchors(t *testing.T) {
+	p := HermesPrompt
+	// V10.112 P1: 主计划模板必须提供 File(s) 锚点（与修正计划格式对齐），
+	// 让执行者直接使用规划阶段已验证的文件路径，不再要求自行搜索定位。
+	if !strings.Contains(p, "- **File(s)**") {
+		t.Error("HermesPrompt plan format must include a File(s) anchor field")
+	}
+	if strings.Contains(p, "不需要指定 file paths") {
+		t.Error("HermesPrompt must not tell Hermes to omit file paths from plans")
+	}
+}
+
+func TestHephaestusSystemPrompt_FileAnchorsFirst(t *testing.T) {
+	p := HephaestusSystemPrompt
+	if !strings.Contains(p, "File(s)") {
+		t.Error("HephaestusSystemPrompt must reference plan File(s) anchors")
+	}
+	if strings.Contains(p, "find the right files and anchors yourself") {
+		t.Error("HephaestusSystemPrompt must not require self-locating anchors")
+	}
+}
+
 func TestPromptsAreDistinct(t *testing.T) {
 	if SoloSystemPrompt == HephaestusSystemPrompt {
 		t.Fatal("SoloSystemPrompt and HephaestusSystemPrompt must differ")

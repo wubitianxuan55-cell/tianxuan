@@ -24,7 +24,7 @@ type ProjectInfo struct {
 	Packages   []string // key packages (internal/ names)
 	CoreTypes  []string // important struct/interface names
 	DepsShort  []string // <= 10 key dependencies from go.mod
-	FileCount  int      // total .go files in the project (Go) or .ts/.tsx files (TS)
+	FileCount  int      // total source files (.go / .ts/.tsx / .rs) in the project
 	LastModified time.Time // latest modtime across scanned files
 }
 
@@ -51,6 +51,10 @@ func Analyze(wsRoot string) ProjectInfo {
 		info.Language = "Rust"
 		info.EntryPoint = "Cargo.toml (workspace)"
 		info.DepsShort = extractKeyDeps(filepath.Join(wsRoot, "Cargo.toml"))
+		info.FileCount = countRSFiles(wsRoot)
+		if fi, err := os.Stat(filepath.Join(wsRoot, "Cargo.toml")); err == nil {
+			latestMod = fi.ModTime()
+		}
 	} else if hasFile(wsRoot, "package.json") {
 		info.Language = detectNodeLanguage(wsRoot)
 		if hasFile(wsRoot, "tsconfig.json") {
@@ -167,6 +171,19 @@ func Refresh(wsRoot string, old ProjectInfo) ProjectInfo {
 	// Node/TS: package.json + src/
 	if hasFile(wsRoot, "package.json") {
 		fi, err := os.Stat(filepath.Join(wsRoot, "package.json"))
+		if err == nil && !fi.ModTime().After(old.LastModified) {
+			srcDir := filepath.Join(wsRoot, "src")
+			if fi2, err := os.Stat(srcDir); err == nil && fi2.IsDir() {
+				if !fi2.ModTime().After(old.LastModified) {
+					return old
+				}
+			}
+		}
+		return Analyze(wsRoot)
+	}
+	// Rust: Cargo.toml + src/
+	if hasFile(wsRoot, "Cargo.toml") {
+		fi, err := os.Stat(filepath.Join(wsRoot, "Cargo.toml"))
 		if err == nil && !fi.ModTime().After(old.LastModified) {
 			srcDir := filepath.Join(wsRoot, "src")
 			if fi2, err := os.Stat(srcDir); err == nil && fi2.IsDir() {
@@ -424,6 +441,25 @@ func countTSFiles(root string) int {
 			return nil
 		}
 		if strings.HasSuffix(fi.Name(), ".ts") || strings.HasSuffix(fi.Name(), ".tsx") {
+			count++
+		}
+		return nil
+	})
+	return count
+}
+
+// countRSFiles counts Rust source files (.rs), skipping build artifacts
+// (target/) and VCS/dependency directories.
+func countRSFiles(root string) int {
+	var count int
+	filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil || fi.IsDir() {
+			return nil
+		}
+		if strings.Contains(path, "target") || strings.Contains(path, ".git") || strings.Contains(path, "node_modules") {
+			return nil
+		}
+		if strings.HasSuffix(fi.Name(), ".rs") {
 			count++
 		}
 		return nil

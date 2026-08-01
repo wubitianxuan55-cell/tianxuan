@@ -856,7 +856,7 @@ func formatExecutionFeedback(r *TurnResult) string {
 }
 
 // hasStructuralChange checks whether any file path indicates a structural change
-// that would invalidate the cached ProjectMap (go.mod, package.json, or internal/ paths).
+// that would invalidate the cached ProjectMap (go.mod, package.json, Cargo.toml, or internal/ paths).
 func hasStructuralChange(created, modified []string) bool {
 	check := func(paths []string) bool {
 		for _, p := range paths {

@@ -105,3 +105,49 @@ func TestRefresh_GoIncremental(t *testing.T) {
 		t.Fatalf("new internal package should trigger re-analysis (FileCount=2), got %d", got.FileCount)
 	}
 }
+
+// TestRefresh_RustIncremental locks the Rust incremental semantics:
+// Cargo.toml + src/ unchanged → reuse cache; src/ change → re-analyze;
+// root-level file change → no re-analysis (src/ is the structure proxy).
+func TestRefresh_RustIncremental(t *testing.T) {
+	dir := t.TempDir()
+	writeFileT(t, filepath.Join(dir, "Cargo.toml"), "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n")
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileT(t, filepath.Join(srcDir, "main.rs"), "fn main() {}\n")
+
+	// Cargo.toml 比 src/ 新：LastModified 以 Cargo.toml 为准，src 更旧才可增量。
+	chtimesPast(t, filepath.Join(dir, "Cargo.toml"), 2)
+	chtimesPast(t, srcDir, 3)
+
+	first := Analyze(dir)
+	if first.Language != "Rust" {
+		t.Fatalf("expected Rust language, got %q", first.Language)
+	}
+	if first.FileCount != 1 {
+		t.Fatalf("expected 1 rs file, got %d", first.FileCount)
+	}
+
+	// 未变化 → 返回缓存值
+	got := Refresh(dir, first)
+	if got.FileCount != 1 || got.Language != "Rust" {
+		t.Fatalf("unchanged rust project should reuse cached info, got %+v", got)
+	}
+
+	// src/ 下新增文件 → 触发重扫
+	writeFileT(t, filepath.Join(srcDir, "lib.rs"), "pub fn f() {}\n")
+	got = Refresh(dir, first)
+	if got.FileCount != 2 {
+		t.Fatalf("new src file should trigger re-analysis (FileCount=2), got %d", got.FileCount)
+	}
+
+	// src/ 外新增文件 → 不触发重扫（增量语义：src/ 是结构代理）
+	chtimesPast(t, srcDir, 3) // 固定 src modtime 回到基准之前，模拟增量窗口
+	writeFileT(t, filepath.Join(dir, "build.rs"), "fn main() {}\n")
+	got = Refresh(dir, got)
+	if got.FileCount != 2 {
+		t.Fatalf("root-level file change should NOT re-analyze, got %d", got.FileCount)
+	}
+}

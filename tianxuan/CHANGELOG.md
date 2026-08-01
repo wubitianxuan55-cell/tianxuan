@@ -1,3 +1,27 @@
+## [10.115.0] — 2026-08-01
+
+### 🆕 Refresh 增量检测扩展到 Rust 项目
+
+> codegraph.Refresh 此前只对 Go（go.mod + internal/）与 Node/TS（package.json + src/）做增量判断，Rust 项目（Cargo.toml）每轮都全量 Analyze。新增 Cargo.toml + src/ 的结构代理检测：manifest 与 src/ modtime 均未变化时直接复用缓存 ProjectInfo；src/ 内变化才重扫。同时 Rust 分支补上 Source Files 统计（.rs 计数，跳过 target/ 构建产物），使项目地图信息与 Go/TS 对齐、重扫结果可观测。
+
+#### 变更
+- **`codegraph/projectmap.go`**：Analyze Rust 分支补 `FileCount`（新增 `countRSFiles`，跳过 target/.git/node_modules）与 `LastModified`（Cargo.toml）基准；Refresh 新增 Rust 分支（Cargo.toml + src/ 未变化 → 复用缓存）；`ProjectInfo.FileCount` 字段注释同步覆盖 .rs
+- **`codegraph/projectmap_test.go`**：新增 `TestRefresh_RustIncremental`，锁定 Rust 增量语义（未变化复用 / src/ 变化重扫 / src/ 外变化不重扫）
+- **`agent/hermes.go`**：`hasStructuralChange` 注释同步补充 Cargo.toml（代码早已覆盖，仅文档对齐）
+
+#### 验证
+- TDD 红灯（旧实现 Rust FileCount=0）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/codegraph/projectmap.go` — +22 行（增量分支 + 计数 + 注释）
+- `internal/codegraph/projectmap_test.go` — +46 行（新测试）
+- `internal/agent/hermes.go` — 注释 −1/+1 行（文档同步）
+
+---
+
 ## [10.111.0] — 2026-07-31
 
 ### 🆕 接线激活上下文卸载（Context Offloading）+ 静默吞错隐患修复

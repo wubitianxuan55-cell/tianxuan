@@ -26,6 +26,9 @@ mem.prof
 .codegraph/
 .reasonix/
 
+# Local toolchains (Go/Node installs for the desktop build - never commit)
+/tools/
+
 # Desktop build outputs
 tianxuan/desktop/build/*
 !tianxuan/desktop/build/appicon.png

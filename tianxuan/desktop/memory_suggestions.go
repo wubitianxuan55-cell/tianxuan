@@ -224,6 +224,9 @@ func suggestMemories(set *memory.Set, sessions []suggestionSession) []MemorySugg
 			if msg.Role != provider.RoleUser {
 				continue
 			}
+			if isTransientBlock(msg.Content) {
+				continue
+			}
 			statement, reason := extractMemoryStatement(msg.Content)
 			if statement == "" {
 				continue
@@ -333,7 +336,57 @@ func existingCovers(existing []string, key string) bool {
 		return true
 	}
 	for _, text := range existing {
-		if text != "" && (strings.Contains(text, key) || strings.Contains(key, text)) {
+		if text == "" {
+			continue
+		}
+		if strings.Contains(text, key) || strings.Contains(key, text) {
+			return true
+		}
+		if sharesCorePhrase(text, key) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTransientBlock mirrors internal/memory: host-injected control blocks
+// (<memory-update>, <session-facts>, <background-jobs>) matched anywhere, plus
+// prefix-only bracket blocks ([auto-recall], [system]) that can legitimately
+// appear mid-message in user prose. Without this, an embedded <memory-update>
+// block leaked into memory suggestions.
+func isTransientBlock(content string) bool {
+	text := strings.TrimSpace(content)
+	for _, tag := range []string{"<memory-update>", "<session-facts>", "<background-jobs>"} {
+		if strings.Contains(text, tag) {
+			return true
+		}
+	}
+	for _, prefix := range []string{"[auto-recall]", "[system]"} {
+		if strings.HasPrefix(text, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// minSharedSubstrRunes mirrors internal/memory: the smallest common substring
+// that marks two statements as near-duplicates.
+const minSharedSubstrRunes = 10
+
+// sharesCorePhrase reports whether two normalized statements share a common
+// substring of at least minSharedSubstrRunes runes.
+func sharesCorePhrase(a, b string) bool {
+	ra := []rune(a)
+	rb := []rune(b)
+	if len(ra) < minSharedSubstrRunes || len(rb) < minSharedSubstrRunes {
+		return false
+	}
+	short, long := ra, rb
+	if len(short) > len(long) {
+		short, long = long, short
+	}
+	for i := 0; i+minSharedSubstrRunes <= len(short); i++ {
+		if strings.Contains(string(long), string(short[i:i+minSharedSubstrRunes])) {
 			return true
 		}
 	}

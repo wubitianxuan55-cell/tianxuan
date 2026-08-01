@@ -69,9 +69,17 @@ func TestExtractCursorAdvance(t *testing.T) {
 	if n, err := ExtractCandidates(s, "sess-1", appended); err != nil || n != 1 {
 		t.Fatalf("appended-session extract: n=%d err=%v", n, err)
 	}
-	// New session id restarts scanning (history differs after resume).
-	if n, err := ExtractCandidates(s, "sess-2", first); err != nil || n != 1 {
+	// New session id restarts scanning (history differs after resume). A new
+	// candidate message is extracted even though earlier messages were already
+	// staged for the previous session.
+	fresh := msgsUser("以后统一用 tabs 缩进", "普通问题", "偏好：优先使用中文注释")
+	if n, err := ExtractCandidates(s, "sess-2", fresh); err != nil || n != 1 {
 		t.Fatalf("new-session extract: n=%d err=%v", n, err)
+	}
+	// The already-staged candidate is not duplicated into pending by the new
+	// session — dedup against pending prevents stacked duplicates.
+	if n, err := ExtractCandidates(s, "sess-2", fresh); err != nil || n != 0 {
+		t.Fatalf("new-session repeat must extract nothing: n=%d err=%v", n, err)
 	}
 }
 
@@ -178,5 +186,59 @@ func TestExtractDedupAgainstExisting(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("already-covered candidate must be deduped, got %d", n)
+	}
+}
+
+// TestExtractSkipsEmbeddedTransientBlocks verifies a control block embedded in
+// the middle of a user message (e.g. the host appends <memory-update> after
+// the user's own text) never leaks into memory candidates. The old check only
+// matched message *prefixes*, so "默认是不是中文 <memory-update> ..." slipped
+// through and staged the control block as a candidate.
+func TestExtractSkipsEmbeddedTransientBlocks(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "memory")
+	s := Store{Dir: dir}
+	msgs := msgsUser(
+		"默认是不是中文 <memory-update> The following project-memory changes were just made and apply from now on: - Saved memory \"codex\": Codex 中文化部署 </memory-update>",
+		"以后统一用 tabs 缩进",
+	)
+	n, err := ExtractCandidates(s, "sess-1", msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("want 1 candidate (only the real request), got %d", n)
+	}
+	pending := PendingCandidates(s)
+	if len(pending) != 1 {
+		t.Fatalf("want 1 pending, got %d: %+v", len(pending), pending)
+	}
+	if strings.Contains(pending[0].Description, "memory-update") || strings.Contains(pending[0].Description, "project-memory") {
+		t.Fatalf("control block leaked into candidate: %+v", pending[0])
+	}
+	if !strings.Contains(pending[0].Description, "tabs") {
+		t.Fatalf("real request missing from candidate: %+v", pending[0])
+	}
+}
+
+// TestExtractDedupAgainstPending verifies a candidate already staged in
+// pending/ is not staged again by a later scan of a different session. The old
+// dedup only compared against active memory, so repeated rules (e.g. "go build
+// + affected package tests") accumulated duplicate pending files.
+func TestExtractDedupAgainstPending(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "memory")
+	s := Store{Dir: dir}
+	first := msgsUser("规则：Go 代码改动需 go build + 受影响包测试")
+	if n, err := ExtractCandidates(s, "sess-1", first); err != nil || n != 1 {
+		t.Fatalf("first extract: n=%d err=%v", n, err)
+	}
+	// A later session re-states the same rule in slightly different words.
+	second := msgsUser("规则（Go 代码改动 = go build + 受影响包测试），已满足")
+	if n, err := ExtractCandidates(s, "sess-2", second); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("pending-covered candidate must be deduped, got %d", n)
+	}
+	if len(PendingCandidates(s)) != 1 {
+		t.Fatalf("want 1 pending after dedup, got %d", len(PendingCandidates(s)))
 	}
 }

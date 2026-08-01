@@ -96,6 +96,42 @@ func TestExistingCovers(t *testing.T) {
 	}
 }
 
+// TestIsTransientBlockEmbedded verifies an embedded <memory-update> control
+// block in the middle of a user message is rejected — the old prefix-only
+// check let "默认是不是中文 <memory-update> ..." leak into suggestions.
+func TestIsTransientBlockEmbedded(t *testing.T) {
+	cases := []struct {
+		content string
+		want    bool
+	}{
+		{"默认是不是中文 <memory-update> The following project-memory changes were just made </memory-update>", true},
+		{"<memory-update>\nSome memory changed\n</memory-update>", true},
+		{"[system] This session has saved memory", true},
+		{"[auto-recall] 相关记忆自动检索结果\n- foo: bar", true},
+		{"以后统一用 tabs 缩进", false},
+		{"我在看 [system] 是什么", false},
+	}
+	for _, tc := range cases {
+		if got := isTransientBlock(tc.content); got != tc.want {
+			t.Errorf("isTransientBlock(%q) = %v, want %v", tc.content, got, tc.want)
+		}
+	}
+}
+
+// TestSharesCorePhrase verifies reworded duplicate rules share a core phrase
+// even though neither string fully contains the other.
+func TestSharesCorePhrase(t *testing.T) {
+	if !sharesCorePhrase("规则：Go 代码改动需 go build + 受影响包测试", "规则（Go 代码改动 = go build + 受影响包测试），已满足") {
+		t.Error("reworded duplicate rules must share a core phrase")
+	}
+	if sharesCorePhrase("规则：使用 tabs 缩进", "偏好：使用中文注释") {
+		t.Error("unrelated statements must not share a core phrase")
+	}
+	if sharesCorePhrase("短", "短句") {
+		t.Error("statements below the minimum length must not match")
+	}
+}
+
 func TestOneLine(t *testing.T) {
 	// oneLine collapses all whitespace (including newlines) into single spaces.
 	tests := []struct {

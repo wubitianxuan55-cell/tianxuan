@@ -68,16 +68,20 @@ func pendingPath(s Store, name string) string {
 
 // isTransientBlock reports whether a message is an auto-injected control block
 // rather than real user/assistant content — such blocks must never become
-// memory candidates.
+// memory candidates. Angle-bracket blocks (<memory-update>, <session-facts>,
+// <background-jobs>) are host-injected and matched anywhere in the message —
+// the host can append them after the user's own text, so a prefix-only check
+// let them leak into candidates. Bracket blocks ([auto-recall], [system]) keep
+// prefix semantics because those tokens can legitimately appear mid-message in
+// user prose.
 func isTransientBlock(content string) bool {
 	text := strings.TrimSpace(content)
-	for _, prefix := range []string{
-		"<memory-update>",
-		"<session-facts>",
-		"<background-jobs>",
-		"[auto-recall]",
-		"[system]",
-	} {
+	for _, tag := range []string{"<memory-update>", "<session-facts>", "<background-jobs>"} {
+		if strings.Contains(text, tag) {
+			return true
+		}
+	}
+	for _, prefix := range []string{"[auto-recall]", "[system]"} {
 		if strings.HasPrefix(text, prefix) {
 			return true
 		}
@@ -215,7 +219,14 @@ func ExtractCandidates(s Store, sessionID string, msgs []provider.Message) (int,
 	if err := os.MkdirAll(filepath.Join(s.Dir, pendingDir), 0o755); err != nil {
 		return 0, err
 	}
+	// Dedup baseline: active memory plus already-staged pending candidates. A
+	// later session re-stating the same rule must not stack duplicate pending
+	// files — without this, repeated workflows accumulated go-build style
+	// duplicates in pending/.
 	existing := existingMemoryKeys(s)
+	for _, c := range PendingCandidates(s) {
+		existing = append(existing, normalizeKey(c.Description))
+	}
 	seen := map[string]bool{}
 	written := 0
 	for _, m := range slice {
@@ -344,7 +355,41 @@ func existingCovers(existing []string, key string) bool {
 		return true
 	}
 	for _, text := range existing {
-		if text != "" && (strings.Contains(text, key) || strings.Contains(key, text)) {
+		if text == "" {
+			continue
+		}
+		if strings.Contains(text, key) || strings.Contains(key, text) {
+			return true
+		}
+		if sharesCorePhrase(text, key) {
+			return true
+		}
+	}
+	return false
+}
+
+// minSharedSubstrRunes is the smallest common substring that marks two
+// statements as near-duplicates. Rules restated with different wording (e.g.
+// "go build + 受影响包测试" vs "Go 代码改动 = go build + 受影响包测试") share their
+// core phrase even though neither string fully contains the other.
+const minSharedSubstrRunes = 10
+
+// sharesCorePhrase reports whether two normalized statements share a common
+// substring of at least minSharedSubstrRunes runes. It complements the
+// contains-based check for reworded duplicates that no longer nest.
+func sharesCorePhrase(a, b string) bool {
+	ra := []rune(a)
+	rb := []rune(b)
+	if len(ra) < minSharedSubstrRunes || len(rb) < minSharedSubstrRunes {
+		return false
+	}
+	// Slide the shorter window over the longer text.
+	short, long := ra, rb
+	if len(short) > len(long) {
+		short, long = long, short
+	}
+	for i := 0; i+minSharedSubstrRunes <= len(short); i++ {
+		if strings.Contains(string(long), string(short[i:i+minSharedSubstrRunes])) {
 			return true
 		}
 	}

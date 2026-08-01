@@ -1,3 +1,43 @@
+## [10.143.0] — 2026-08-01
+
+### 🧠 记忆提取质量修复 — 控制块泄漏 + 重复候选堆积
+
+> 用户反馈驱动：pending 待确认区堆积 10 个候选，大量是控制块泄漏、重复规则、
+> 半截噪声。定位到两个根因：(1) `isTransientBlock` 只做前缀匹配（HasPrefix），
+> 宿主在用户消息尾部追加的 `<memory-update>` 块（如 "默认是不是中文 <memory-update>..."）
+> 逃过过滤，连同 "默认" 标记一起被提取成记忆候选；(2) 去重基准只查 active memory，
+> 不查 pending 内已有候选，且只做包含式匹配——同一规则换措辞重复出现（go build
+> 三兄弟）不断堆积新 pending 文件。
+
+#### 修复
+- **`memory/extract.go`**：`isTransientBlock` 尖括号控制块（`<memory-update>`/
+  `<session-facts>`/`<background-jobs>`）改为任意位置匹配；`[auto-recall]`/`[system]`
+  保留前缀语义（用户行文中可出现方括号字样）
+- **去重基准合入 pending**：`ExtractCandidates` 的 existing 集合追加 `PendingCandidates`
+  描述——新 session 重述同一规则不再重复 staging
+- **`sharesCorePhrase`**：`existingCovers` 增加 ≥10 runes 公共子串检测，覆盖换措辞
+  重复（"go build + 受影响包测试" 类核心短语）
+- **`desktop/memory_suggestions.go`**：同源修复——`suggestMemories` 补 transient 过滤 +
+  公共子串去重（此前桌面建议入口同样泄漏 `<memory-update>` 块）
+
+#### 测试
+- **`memory/extract_test.go`**：`TestExtractSkipsEmbeddedTransientBlocks`（嵌入控制块
+  不得泄漏，RED→GREEN）、`TestExtractDedupAgainstPending`（pending 内候选跨 session
+  去重）、`TestExtractCursorAdvance` 更新（新 session 提取新消息、重复消息不堆积）
+- **`desktop/memory_suggestions_test.go`**：`TestIsTransientBlockEmbedded`、
+  `TestSharesCorePhrase`
+
+#### 清理
+- pending 待确认区 10 → 2：删除控制块泄漏（memory-update 候选）、半截噪声
+  （bash-shell / candidate-*）、重复规则（go-go-build 变体）、已被记忆覆盖项
+  （codex 清理瞬时状态 / git PATH）；保留 Dream 机制产物 + go-build 规则候选
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./internal/memory/` 无告警；
+  `go test ./internal/memory/ ./internal/control/` 全 ok；desktop `go test ./...` 全 ok
+
+---
+
 ## [10.141.0] — 2026-08-01
 
 ### 🔧 验证分级 — 简单修改/前端修改不再强制后端全量测试套件

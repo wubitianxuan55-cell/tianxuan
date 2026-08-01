@@ -13,12 +13,15 @@ import (
 // simple tasks; never changes system prompts (executor always uses
 // HephaestusSystemPrompt).
 
-// PlannerRoute is the decision: executor_only skips the planner, plan_and_execute
-// runs the full plan → confirm → execute pipeline.
+// PlannerRoute is the decision. Three-way semantics (O5):
+//   - executor_only:   skip the planner, execute directly
+//   - planner_chat:    planner answers directly — no plan, no executor
+//   - plan_and_execute: full plan → confirm → execute pipeline
 type PlannerRoute string
 
 const (
 	RouteExecOnly      PlannerRoute = "executor_only"
+	RoutePlannerChat   PlannerRoute = "planner_chat"
 	RoutePlanAndExec   PlannerRoute = "plan_and_execute"
 )
 
@@ -32,10 +35,12 @@ type PlannerDecision struct {
 func DecidePlannerRoute(input string) PlannerDecision {
 	text := strings.TrimSpace(input)
 	if text == "" {
-		return execDecision("empty")
+		return chatDecision("empty")
 	}
 	if strings.HasPrefix(text, "/") {
-		return execDecision("slash_command")
+		// 斜杠命令在 Controller.Submit 层已拦截；到达此处仅 headless
+		// "run /xxx" 路径——由规划者处理，保持原有行为。
+		return chatDecision("slash_command")
 	}
 	if _, ok := shouldSkipPlanner(input); ok {
 		return execDecision("bang_prefix")
@@ -44,19 +49,19 @@ func DecidePlannerRoute(input string) PlannerDecision {
 	lower := strings.ToLower(text)
 
 	if isShortReply(lower) {
-		return execDecision("short_reply")
+		return chatDecision("short_reply")
 	}
 	if isConversational(lower) {
-		return execDecision("conversation")
+		return chatDecision("conversation")
 	}
 	if isLowRiskQuestion(lower) {
-		return execDecision("low_risk_question")
+		return chatDecision("low_risk_question")
 	}
 
 	f := planFeatures(text, lower)
 
 	if !f.work {
-		return execDecision("no_work")
+		return chatDecision("no_work")
 	}
 	if f.highRisk {
 		return planDecision("high_risk")
@@ -104,4 +109,8 @@ func execDecision(reason string) PlannerDecision {
 
 func planDecision(reason string) PlannerDecision {
 	return PlannerDecision{Route: RoutePlanAndExec, Reason: reason}
+}
+
+func chatDecision(reason string) PlannerDecision {
+	return PlannerDecision{Route: RoutePlannerChat, Reason: reason}
 }

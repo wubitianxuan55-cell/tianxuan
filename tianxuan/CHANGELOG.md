@@ -1,3 +1,57 @@
+## [10.129.0] — 2026-08-01
+
+### 🧠 双模型架构优化 II — 漏标记补偿 / 路由三值化 / 规划者步数默认上限
+
+> 承接 V10.128.0 的评审清单：`<!--plan-->` 漏标记静默吞任务（P1）、
+> RouteExecOnly 语义重载（P2）、planner_max_steps 无默认上限（P2）、
+> 只读注册表注释债务（P3）。全部 TDD，`go build` / `go vet` / `go test ./...` 全绿。
+
+#### O4 — `<!--plan-->` 漏标记补偿检测（P1）
+> 根因：`isAnswerNotAction` 只认 `<!--plan-->` 标记；规划者漏写标记时，计划被
+> 当作聊天回复，任务**静默不执行**且无任何报错。
+- **`hermes.go` / `planparse.go`**：新增 `looksLikePlan`——无标记但呈计划结构
+  （≥2 个步骤行，或 1 个步骤行带 Verify/File(s)/Files/Delta 字段）→ 仍视为计划，
+  走确认流程（交互模式用户可点"仅聊天"纠错；headless 自动确认直接执行）。
+  普通聊天/回答不含"步骤 N："标题格式，不误伤
+
+#### O5 — 路由三值化消除语义重载（P2）
+> 根因：`RouteExecOnly` 同时承载"直接执行"与"规划者回答"两种语义，Run 只能靠
+> reason 白名单（atomic_edit/read_only/directive）区分——枚举含义与执行行为
+> 不一致，9 种 reason 中 6 种落入规划者但代码不表达这层意图。
+- **`planner_route.go`**：新增 `RoutePlannerChat`（规划者直接回答，无计划无执行）；
+  empty/slash_command/short_reply/conversation/low_risk_question/no_work 归入。
+  `RouteExecOnly` 现在只表示"跳过规划者直接执行"
+- **`hermes.go`**：Run 的 auto-skip 条件从 reason 白名单简化为 `Route == RouteExecOnly`
+- 运行时行为不变（chat 类输入原来就由规划者处理），但语义自文档化
+- **`planner_gate.go`**：词表一致性修复——`rename` 在 `planAtomicTerms` 却不在
+  `planWorkTerms`/`planMutationTerms`，导致英文 rename 指令永远无法命中 atomic
+  分支（work 前置条件不满足），实际走了 no_work
+
+#### O6 — planner_max_steps 默认上限（P2）
+> 根因：`planner_max_steps` 未配置时 0 = 无限轮只读调查，规划者没有自然停止
+> 条件，成本无界。
+- **`config.go`**：新增 `DefaultPlannerMaxSteps = 12` + `PlannerMaxStepsVal()`——
+  未配置（0）时应用保守默认，显式大值仍可获得近似无限；`boot.go` 接线
+- **`tianxuan.example.toml`**：注释同步
+
+#### O7 — 注释债务（P3）
+- **`boot.go`**：`newReadOnlyRegistry` 注释声称"子代理工具一律排除（保护缓存
+  前缀）"，与实际实现（Boot 显式加回只读版 task/run_skill/parallel_skills）不符，
+  更新为真实的安全理由：默认子代理工具集是全量注册表，会经 headlessGate 写文件
+
+#### 测试
+- **`plan_marker_test.go`**（新增）：漏标计划结构 → 非回答；无结构 → 回答；有标记 → 计划
+- **`planner_route_chat_test.go`**（新增）：聊天/问题/空输入/斜杠 → planner_chat；
+  原子编辑/只读/指令 → executor_only
+- **`planner_max_steps_test.go`**（新增，config 包）：未配置 → 12；显式 5 → 5
+- `hermes_test.go`：`DefaultIsExecutor` 改名 `NoWorkIsPlannerChat`（hello → planner_chat）；
+  Directives 用例剔除不在 work 词表的"保存会话/提交代码"
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.128.0] — 2026-08-01
 
 ### 🧠 双模型架构优化 — 规划者压缩保留 / 完成判定以计划为准 / 计划解析统一

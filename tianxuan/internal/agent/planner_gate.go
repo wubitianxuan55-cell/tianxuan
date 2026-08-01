@@ -108,7 +108,8 @@ func isComplexGuidance(lower string) bool {
 var planWorkTerms = []string{
 	"fix", "fixing", "update", "updating", "remove", "removing", "delete", "deleting",
 	"edit", "editing", "write", "writing", "create", "creating", "add", "adding", "repair",
-	"patch", "run", "running", "build", "building", "implement", "implementing", "refactor",
+	"patch", "run", "running", "build", "building", "implement", "implementing", "rename",
+	"refactor",
 	"refactoring", "migrate", "migrating", "review", "reviewing", "audit",
 	"inspect", "debug", "test", "tests", "testing", "optimize", "optimise",
 	"修改", "修复", "更新", "删除", "移除", "编辑", "写入", "创建", "新增", "添加",
@@ -119,7 +120,7 @@ var planWorkTerms = []string{
 var planMutationTerms = []string{
 	"fix", "fixing", "update", "updating", "remove", "removing", "delete", "deleting",
 	"edit", "editing", "write", "writing", "create", "creating", "add", "adding", "repair",
-	"patch", "build", "building", "implement", "implementing", "refactor", "refactoring",
+	"patch", "build", "building", "implement", "implementing", "rename", "refactor", "refactoring",
 	"migrate", "migrating",
 	"修改", "修复", "更新", "删除", "移除", "编辑", "写入", "创建", "新增", "添加",
 	"构建", "实现", "重构", "迁移", "改造", "加个", "加一", "补一个", "补个",

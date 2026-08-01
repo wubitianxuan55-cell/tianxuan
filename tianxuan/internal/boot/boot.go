@@ -498,7 +498,7 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			readOnlyReg.Add(skill.NewRunSkillTool(skillStore, plannerSkillRunner))
 			readOnlyReg.Add(skill.NewParallelSkillsTool(skillStore, plannerSkillRunner))
 
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxSteps, pe.ContextWindow, config.ArchiveDir(), cwd)
+			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxStepsVal(), pe.ContextWindow, config.ArchiveDir(), cwd)
 		// V10.89: emit warning if planner context window differs from provider default.
 		if pe.ContextWindow < entry.ContextWindow {
 			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
@@ -826,19 +826,18 @@ func resolvePatternsPath() (string, error) {
 // included — CodeGraph is a code-intelligence engine whose graph tools are
 // inherently read-only and essential for efficient planning.
 // Subagent-spawning tools (task, explore, research, review, security_review,
-// run_skill, parallel_skills) are excluded regardless of ReadOnly — the planner
-// must not spawn sub-agents that create independent API calls and evict its
-// cache prefix.
+// run_skill, parallel_skills) are excluded here regardless of ReadOnly: their
+// default sub-agent toolset is the full registry, which would let a planner-
+// spawned sub-agent write files through the headless gate. The dual-model
+// wiring in Boot re-adds them explicitly with a read-only sub-agent registry
+// (subagentReg), so planner sub-agents stay investigation-only.
 func newReadOnlyRegistry(full *tool.Registry) *tool.Registry {
 	ro := tool.NewRegistry()
 	if full == nil {
 		return ro
 	}
-	// Subagent-spawning tools are excluded regardless of ReadOnly — the planner
-	// must not spawn sub-agents that create independent API calls and evict its
-	// cache prefix. explore/research/review/security_review report ReadOnly=true
-	// (they are conceptually read-only) but each spawns a full-toolset sub-agent
-	// that can write files through headlessGate.
+	// Subagent-spawning tools are excluded regardless of ReadOnly (see the
+	// function doc for why); Boot re-adds read-only versions explicitly.
 	exclude := map[string]bool{
 		"task": true, "run_skill": true, "parallel_skills": true, "parallel_tasks": true,
 		"explore": true, "research": true, "review": true, "security_review": true,

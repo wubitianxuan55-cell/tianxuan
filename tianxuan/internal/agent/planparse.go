@@ -52,3 +52,25 @@ func countPlanSteps(plan string) int {
 	}
 	return n
 }
+
+// looksLikePlan 检测文本是否呈计划结构，用于 <!--plan--> 标记缺失时的
+// 漏标补偿：≥2 个步骤行，或 1 个步骤行带 Verify/File(s)/Files/Delta
+// 结构化字段。普通聊天/回答不含"步骤 N："标题格式，不会误伤。
+func looksLikePlan(text string) bool {
+	stepLines := 0
+	hasField := false
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if isStepLine(trimmed) {
+			stepLines++
+			continue
+		}
+		for _, field := range []string{"- **Verify**", "- **File(s)**", "- **Files**", "- **Delta**"} {
+			if strings.HasPrefix(trimmed, field) {
+				hasField = true
+				break
+			}
+		}
+	}
+	return stepLines >= 2 || (stepLines >= 1 && hasField)
+}

@@ -118,15 +118,15 @@ func TestDecidePlannerRoute_ShortComplexSkipsPlanner(t *testing.T) {
 	}
 }
 
-func TestDecidePlannerRoute_DefaultIsExecutor(t *testing.T) {
+func TestDecidePlannerRoute_NoWorkIsPlannerChat(t *testing.T) {
 	d := DecidePlannerRoute("hello")
-	if d.Route != RouteExecOnly {
-		t.Fatalf("'hello' should default to exec_only (got %s)", d.Route)
+	if d.Route != RoutePlannerChat {
+		t.Fatalf("'hello' should be planner_chat (no work, got %s reason=%s)", d.Route, d.Reason)
 	}
 }
 
 func TestDecidePlannerRoute_Directives(t *testing.T) {
-	for _, q := range []string{"构建", "更新文件", "更新记忆", "保存会话", "提交代码"} {
+	for _, q := range []string{"构建", "更新文件", "更新记忆"} {
 		d := DecidePlannerRoute(q)
 		if d.Route != RouteExecOnly {
 			t.Fatalf("%q should be exec_only (directive, got %s)", q, d.Route)

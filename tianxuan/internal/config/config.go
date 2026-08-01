@@ -304,7 +304,8 @@ type AgentConfig struct {
 	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
 	SubagentEffort string `toml:"subagent_effort"`
 	// PlannerMaxSteps caps the planner model's tool-call rounds per planning
-	// turn. 0 (default) means unlimited — the planner decides when to stop.
+	// turn. 0 (default) applies DefaultPlannerMaxSteps via PlannerMaxStepsVal —
+	// an unlimited read-only planner can investigate without bound.
 	PlannerMaxSteps int `toml:"planner_max_steps"`
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
@@ -336,6 +337,21 @@ type AgentConfig struct {
 	// are offloaded to disk. Zero means use the default
 	// (offload.DefaultThresholdChars = 10000).
 	OffloadThresholdChars int `toml:"offload_threshold_chars"`
+}
+
+// DefaultPlannerMaxSteps is the conservative tool-round cap applied when
+// planner_max_steps is unset. The planner is read-only, so an unbounded
+// investigation loop has no natural stop and only burns tokens.
+const DefaultPlannerMaxSteps = 12
+
+// PlannerMaxStepsVal returns the effective planner tool-round cap:
+// the configured value, or DefaultPlannerMaxSteps when unset (0).
+// Want effectively unlimited rounds? Set a large explicit value.
+func (a AgentConfig) PlannerMaxStepsVal() int {
+	if a.PlannerMaxSteps <= 0 {
+		return DefaultPlannerMaxSteps
+	}
+	return a.PlannerMaxSteps
 }
 
 // PlannerTemp returns the effective temperature for the Hermes planner.

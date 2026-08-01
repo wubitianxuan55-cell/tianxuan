@@ -228,8 +228,9 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 	// (atomic edits, read-only work, short directives like "构建").
 	// Pure chat / questions / short replies still go through Hermes —
 	// the planner answers directly without producing a plan.
-	if d := DecidePlannerRoute(input); d.Route == RouteExecOnly &&
-		(d.Reason == "atomic_edit" || d.Reason == "read_only" || d.Reason == "directive") {
+	// O5: RouteExecOnly now exclusively means "skip planner, execute" —
+	// chat-class inputs map to RoutePlannerChat and fall through below.
+	if d := DecidePlannerRoute(input); d.Route == RouteExecOnly {
 		h.sink.Emit(event.Event{Kind: event.Phase, Text: h.hephaestus.ProvName() + " · executing (auto-skip: " + d.Reason + ")"})
 		defer h.wrapExecutorSink()()
 		execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
@@ -1104,10 +1105,16 @@ func shouldSkipPlanner(input string) (string, bool) {
 
 // isAnswerNotAction checks whether the planner's output is a direct answer
 // that needs no executor. The planner self-marks executable plans with
-// <!--plan--> — if absent, Hermes answered directly.
+// <!--plan-->; O4: when the marker is missing but the output has plan
+// structure (step lines / Verify / File(s) / Delta), treat it as a plan
+// instead of silently dropping the task — the confirmation dialog lets the
+// user choose "仅聊天" if it was actually a reply.
 func isAnswerNotAction(plan string) bool {
 	trimmed := strings.TrimSpace(plan)
-	return !strings.Contains(trimmed, "<!--plan-->")
+	if strings.Contains(trimmed, "<!--plan-->") {
+		return false
+	}
+	return !looksLikePlan(trimmed)
 }
 
 func formatHandoff(task, plan, userNote, projectRoot string) string {

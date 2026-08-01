@@ -22,6 +22,7 @@ var autoTriggerRules = []AutoTriggerRule{
 	{SkillName: "systematic-debugging", Keywords: []string{"崩溃", "报错", "测试失败", "修 bug", "修bug", "调试", "排查", "定位问题", "异常"}},
 	{SkillName: "tdd", Keywords: []string{"tdd", "测试驱动", "先写测试", "红绿", "写测试用例"}},
 	{SkillName: "requesting-code-review", Keywords: []string{"code review", "代码审查", "审查一下", "review 一下", "合并前审查"}},
+	{SkillName: "receiving-code-review", Keywords: []string{"审查意见", "审查反馈", "review 反馈", "review 意见", "按反馈修改"}},
 	{SkillName: "finish-development-branch", Keywords: []string{"收尾", "合并分支", "清理 worktree", "开发分支收尾"}},
 }
 

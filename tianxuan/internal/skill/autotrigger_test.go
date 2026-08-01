@@ -15,6 +15,8 @@ func TestMatchSkill(t *testing.T) {
 		{"帮我排查这个定位问题", "systematic-debugging"},
 		{"合并前帮我 review 一下代码", "requesting-code-review"},
 		{"帮我做代码审查", "requesting-code-review"},
+		{"按审查意见修改一下代码", "receiving-code-review"},
+		{"根据 review 反馈调整实现", "receiving-code-review"},
 		{"开发完成了，帮我收尾这个分支", "finish-development-branch"},
 		{"帮我写一个网页", ""},
 		{"今天天气怎么样", ""},

@@ -1,3 +1,29 @@
+## [10.125.0] — 2026-08-01
+
+### 🧬 蒸馏 superpowers receiving-code-review — 审查反馈接收技能
+
+> 审查闭环补全：requesting-code-review（主动请求审查）已有，receiving-code-review（收到反馈后如何正确回应）缺失——AGENTS.md 只有"拒绝谄媚"原则，没有操作流程。蒸馏 superpowers v5.1.0 的 receiving-code-review，把"先验证再实现、技术正确性优先于社交舒适"落成 6 步可执行流程。
+
+#### 变更
+- **`skill/bundled/receiving-code-review/SKILL.md`**：新增内置技能——6 步响应（读→理解→验证→评估→回应→逐项实现）、禁止表演性同意（"你说得完全对"等）、模糊反馈先澄清不部分实现、外部审查 5 条检查清单、YAGNI 检查（先 grep 确认是否被使用）、实现顺序（阻塞→简单→复杂，每项单独测试）、反驳条件
+- **`skill/autotrigger.go`**：自动触发规则新增 receiving-code-review（关键词：审查意见/审查反馈/review 反馈/review 意见/按反馈修改）
+
+#### 测试
+- **`skill/autotrigger_test.go`**：`TestMatchSkill` 新增 2 个命中用例（"按审查意见修改"、"根据 review 反馈调整"）
+- **`skill/skill_test.go`**：`TestBundledCoreWorkflowSkills` 断言表加入 receiving-code-review（描述带"必须"触发规则）
+
+#### 验证
+- TDD 红灯（技能缺失 + 规则未命中）→ 绿灯
+- `go build ./...` — EXIT 0；`go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/skill/bundled/receiving-code-review/SKILL.md` — 新增
+- `internal/skill/autotrigger.go` — +1 行（触发规则）
+- `internal/skill/autotrigger_test.go` — +2 行；`internal/skill/skill_test.go` — +1 行
+
+---
+
 ## [10.124.0] — 2026-08-01
 
 ### 🧹 工具与技能重新分离 — subagent 工作流回归技能单一入口

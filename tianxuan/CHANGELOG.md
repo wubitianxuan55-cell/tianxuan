@@ -1,3 +1,31 @@
+## [10.121.0] — 2026-08-01
+
+### 🎯 修复技能系统几乎不调用 — 触发指引 + 核心编程工作流技能化
+
+> 诊断（5 级追溯）：表象 = 模型从不调用 run_skill。直接原因 = (1) run_skill 工具描述自我贬低——"Prefer dedicated top-level tools (explore/review/etc) when available" 暗示技能是次选；(2) 技能索引里 10 个技能 8 个是 UI/设计向（banner-design/brand/design/slides 等），编程任务找不到匹配项。本地根因 = 内置技能库与 tianxuan 主场景（编程）错配。系统根因 = 编程方法论全部写死在提示词（AGENTS.md 铁律），技能库无对应 playbook，技能系统对编程场景零增量价值 → 整体被忽略。过程根因 = 技能库沿设计向蒸馏演进，核心编程工作流从未技能化注入。
+
+#### 修复
+- **`skill/tools.go`**：run_skill 描述移除 "Prefer dedicated top-level tools" 自我贬低，改为触发指引——"任务匹配技能描述时必须调用"，明确技能承载提示词之外的详细工作流（tdd / systematic-debugging / requesting-code-review / finish-development-branch），禁止用通用工具自行拼凑
+- **`skill/bundled/tdd/SKILL.md`**：新增——红绿重构循环（写失败测试→确认失败→最小实现→确认通过→重构），铁律"无失败测试禁止产品代码"，反模式清单；描述带触发规则"功能开发或修复 bug 前必须使用"
+- **`skill/bundled/systematic-debugging/SKILL.md`**：新增——4 阶段根因定位（调查→假设→最小修复→验证），含 5 级追溯与复现测试要求；描述带触发规则"提出修复前必须使用"
+- **`skill/bundled/requesting-code-review/SKILL.md`**：新增——任务完成/主要功能/合并前强制审查，review 子代理上下文构造，按严重性分级处理反馈；描述带触发规则"完成任务或合并前必须使用"
+
+#### 测试
+- **`skill/skill_test.go`**：`TestRunSkillToolDescriptionGuidesTrigger` 锁定描述不再自我贬低且含触发指引；`TestBundledCoreWorkflowSkills` 锁定 3 个核心技能可提取、描述带"必须"触发规则、正文非空
+
+#### 验证
+- TDD 红灯（描述含 "Prefer dedicated top-level tools" + 3 技能缺失）→ 绿灯
+- `go build ./...` — EXIT 0
+- `go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/skill/tools.go` — 描述 −1/+1（触发指引）
+- `internal/skill/bundled/{tdd,systematic-debugging,requesting-code-review}/SKILL.md` — 新增 3 个技能
+- `internal/skill/skill_test.go` — +54 行（2 个新测试）
+
+---
+
 ## [10.120.0] — 2026-08-01
 
 ### 🧬 重蒸馏 superpowers v5.1.0 — finish-development-branch 内置技能

@@ -43,7 +43,7 @@ func (*runSkillTool) Name() string { return "run_skill" }
 func (*runSkillTool) ReadOnly() bool { return false }
 
 func (*runSkillTool) Description() string {
-	return "Invoke a playbook from the Skills index. Use bare name (e.g. 'explore'), not the [🧬 subagent] tag. Subagent skills spawn isolated loop — only final answer returns, supply arguments as task. Inline skills fold body as tool result. Prefer dedicated top-level tools (explore/review/etc) when available."
+	return "Invoke a playbook from the Skills index. Use bare name (e.g. 'tdd'), not the [🧬 subagent] tag. 任务匹配技能描述时必须调用——技能承载提示词之外的详细工作流（tdd / systematic-debugging / requesting-code-review / finish-development-branch），跳过会遗漏关键步骤。Subagent skills spawn an isolated loop — only final answer returns; supply arguments as task. Inline skills fold the body as tool result. 领域工作流一律通过 run_skill 获取完整 playbook，不要用通用工具自行拼凑。"
 }
 
 func (*runSkillTool) Schema() json.RawMessage {

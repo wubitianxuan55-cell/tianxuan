@@ -103,6 +103,53 @@ func TestBundledFinishDevelopmentBranch(t *testing.T) {
 	}
 }
 
+// TestRunSkillToolDescriptionGuidesTrigger locks the run_skill description:
+// it must steer the model toward matching skills, not discourage them with
+// "Prefer dedicated top-level tools" — a self-deprecating hint is a direct
+// reason the model never calls skills.
+func TestRunSkillToolDescriptionGuidesTrigger(t *testing.T) {
+	desc := NewRunSkillTool(nil, nil).Description()
+	if strings.Contains(desc, "Prefer dedicated top-level tools") {
+		t.Errorf("run_skill description must not discourage skill use: %s", desc)
+	}
+	if !strings.Contains(desc, "必须") {
+		t.Errorf("run_skill description should tell the model when a skill MUST be invoked: %s", desc)
+	}
+}
+
+// TestBundledCoreWorkflowSkills locks core programming-workflow skills into the
+// bundle: TDD / debugging / code review cover the high-frequency coding
+// scenarios the index can match, and each description carries a trigger rule
+// ("必须") so the model knows when to invoke.
+func TestBundledCoreWorkflowSkills(t *testing.T) {
+	home := t.TempDir()
+	if err := EnsureBundled(home); err != nil {
+		t.Fatal(err)
+	}
+	st := New(Options{HomeDir: home, DisableBuiltins: true})
+	byName := map[string]Skill{}
+	for _, s := range st.List() {
+		byName[s.Name] = s
+	}
+	for name, trigger := range map[string]string{
+		"tdd":                    "必须",
+		"systematic-debugging":   "必须",
+		"requesting-code-review": "必须",
+	} {
+		sk, ok := byName[name]
+		if !ok {
+			t.Errorf("core workflow skill %q missing", name)
+			continue
+		}
+		if !strings.Contains(sk.Description, trigger) {
+			t.Errorf("%s description should carry a trigger rule (%q): %q", name, trigger, sk.Description)
+		}
+		if sk.Body == "" {
+			t.Errorf("%s body is empty", name)
+		}
+	}
+}
+
 func TestConventionDirsDiscovered(t *testing.T) {
 	proj := t.TempDir()
 	writeSkill(t, proj, ".claude/skills/fromclaude.md", "---\ndescription: c\n---\nb")

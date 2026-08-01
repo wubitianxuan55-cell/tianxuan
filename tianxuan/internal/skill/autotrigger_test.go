@@ -97,3 +97,25 @@ func TestInjectAutoSkillMissingSkillPassthrough(t *testing.T) {
 		t.Errorf("missing skill should pass through unchanged, got %q", got)
 	}
 }
+
+// TestInjectAutoSkillTruncatesLongBody: 超长技能正文注入截断到上限，
+// 控制每轮注入的缓存 miss token 成本；截断必须是确定性的。
+func TestInjectAutoSkillTruncatesLongBody(t *testing.T) {
+	home := t.TempDir()
+	writeSkill(t, home, ".tianxuan/skills/long.md",
+		"---\ndescription: long skill\n---\n"+strings.Repeat("正文内容很长。", 2000))
+	st := New(Options{HomeDir: home, DisableBuiltins: true})
+	rules := []AutoTriggerRule{{SkillName: "long", Keywords: []string{"长技能"}}}
+	in := "长技能场景"
+	out1 := injectAutoSkill(in, st, rules)
+	out2 := injectAutoSkill(in, st, rules)
+	if out1 != out2 {
+		t.Fatal("truncation must be byte-deterministic (cache safety)")
+	}
+	if !strings.Contains(out1, "已截断") {
+		t.Errorf("should note truncation")
+	}
+	if got := len([]rune(out1)); got > maxAutoSkillBodyChars+len([]rune(in))+120 {
+		t.Errorf("injected body too large: %d runes (cap %d)", got, maxAutoSkillBodyChars)
+	}
+}

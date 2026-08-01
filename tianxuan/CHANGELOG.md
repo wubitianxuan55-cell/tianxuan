@@ -1,3 +1,38 @@
+## [10.123.0] — 2026-08-01
+
+### 🛡️ 技能自动注入缓存加固 — 全部消息前缀不变性
+
+> DeepSeek 前缀缓存匹配的是**整个消息数组的连续前缀**（`L1 system | L2 runtime | tools | user | assistant | tool_result | ...`）——任何一条已入库消息的字节变化都会从该位置起全部断裂，不只是 system/tools。V10.122 的技能注入据此重新审计：注入只发生在消息首次进入会话时（turn 入口一次），注入后的字节一经 `session.Add` 便固定，历史消息从不重写。本轮再加三重加固，把"每轮重复注入正文"的成本和风险消除。
+
+#### 加固
+- **会话内去重（`agent_run.go` / `agent.go`）**：`AgentRunner.autoInjected` 记录已注入技能——同一技能后续轮次不再重复注入，后续 user 消息保持接近原始输入（重复正文每轮都会按缓存 miss token 重新计费，去重后只付一次）
+- **compaction 后重置（`compact.go`）**：`compact()` 重写历史后清空 `autoInjected`——摘要可能丢弃技能正文，允许后续匹配重新注入（新 user 消息携带正文，正常按新增消息计费）
+- **注入长度上限（`skill/autotrigger.go`）**：`maxAutoSkillBodyChars = 2000` runes，超长 playbook 确定性截断并提示（每注入一个字符 = 该轮一个 miss token，上限控制单轮成本）
+
+#### 缓存安全结论（与约束对齐）
+- 命中率不受损：注入字节落在**本轮新增消息**区域（与用户输入一样按新 token 计费），不改变已入库历史 → 每轮命中的前缀量与非注入版本一致
+- 真正会断缓存的行为已被排除：历史消息重写（不重写）、注入非确定性（纯函数 + 测试锁定字节）、同一消息跨请求字节变化（session.Add 持久化）
+- 全部消息前缀不变性由 e2e 测试直接锁定
+
+#### 测试
+- **`agent/auto_skill_test.go`**（新增）：`TestWithAutoSkillDedup`（同技能只注入一次 / 不同技能仍注入 / 重置后重新注入）、`TestCacheHitPrefixStableWithAutoSkill`（e2e：注入技能后多轮请求 `hitChars[i] == reqChars[i-1]`，即每轮缓存前缀 = 上一轮完整请求，字节稳定）
+- **`skill/autotrigger_test.go`**：`TestInjectAutoSkillTruncatesLongBody`（截断确定性 + 上限 + 提示）
+
+#### 验证
+- TDD 红灯（`maxAutoSkillBodyChars`/`autoInjected` 未定义）→ 绿灯
+- `go build ./...` — EXIT 0；`go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/agent/agent_run.go` — +15 行（去重逻辑）
+- `internal/agent/agent.go` — +6 行（autoInjected 字段）
+- `internal/agent/compact.go` — +4 行（compaction 重置）
+- `internal/skill/autotrigger.go` — +8 行（长度上限 + 截断）
+- `internal/agent/auto_skill_test.go` — 新增（+85 行，含 e2e 前缀稳定性）
+- `internal/skill/autotrigger_test.go` — +24 行（截断测试）
+
+---
+
 ## [10.122.0] — 2026-08-01
 
 ### ⚡ 技能自动触发层 — 把技能调用从"模型自觉"变成"系统决策"（缓存安全）

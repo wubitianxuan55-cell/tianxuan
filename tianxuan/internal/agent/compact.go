@@ -213,6 +213,9 @@ func (a *AgentRunner) compact(ctx context.Context, trigger, instructions string,
 	compacted = append(compacted, msgs[start:]...)
 	a.session.Replace(compacted)
 	a.session.IncrementRewrite()
+	// V10.123: compaction 重写历史——技能正文可能被摘要丢弃，允许后续
+	// 匹配再次注入（新的 user 消息携带正文，正常按新增消息计费）。
+	a.autoInjected = nil
 
 	a.sink.Emit(event.Event{Kind: event.CompactionDone,
 		Compaction: event.Compaction{Trigger: trigger, Messages: len(fold), Summary: summary, Archive: archived}})

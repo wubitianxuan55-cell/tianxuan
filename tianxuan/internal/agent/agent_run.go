@@ -20,13 +20,27 @@ func (a *AgentRunner) Run(ctx context.Context, input string) (*TurnResult, error
 }
 
 // withAutoSkill 在用户输入前确定性注入匹配技能的 playbook（V10.122）。
-// 缓存安全：只修改 user 消息字节，不触碰 L1/L2/tools；同输入+同技能 →
-// 同字节（skill.InjectAutoSkill 是纯函数）。技能库未接线（nil）时不注入。
+// 缓存安全：注入只发生在消息首次进入会话时（turn 入口），历史消息从不
+// 重写——DeepSeek 前缀缓存匹配整个消息数组，任何已入库消息的字节变化
+// 都会从该位置起全部断裂，因此注入后的字节一经 session.Add 便固定。
+// 同一技能会话内只注入一次（V10.123），避免重复正文重复计费。
+// 技能库未接线（nil）时不注入。
 func (a *AgentRunner) withAutoSkill(input string) string {
 	if a == nil || a.autoSkill == nil {
 		return input
 	}
-	return skill.InjectAutoSkill(input, a.autoSkill)
+	name := skill.MatchSkill(input)
+	if name == "" || a.autoInjected[name] {
+		return input
+	}
+	out := skill.InjectAutoSkill(input, a.autoSkill)
+	if out != input {
+		if a.autoInjected == nil {
+			a.autoInjected = make(map[string]bool)
+		}
+		a.autoInjected[name] = true
+	}
+	return out
 }
 
 // runDirect is the original single-model execution path.

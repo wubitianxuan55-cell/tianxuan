@@ -405,6 +405,11 @@ type AgentRunner struct {
 	// pure function of (input, stored inline-skill body), so it never churns
 	// the DeepSeek prefix cache beyond the natural input bytes.
 	autoSkill *skill.Store
+	// autoInjected tracks skills already auto-injected this session (V10.123),
+	// so a matching later turn does not re-inject the same body — repeated
+	// injection would re-bill the body as cache-miss tokens every turn.
+	// Reset on compaction, because the summary may drop the injected block.
+	autoInjected map[string]bool
 }
 
 // SetAutoSkillStore installs the skill store used for automatic skill

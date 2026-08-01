@@ -2,6 +2,12 @@ package skill
 
 import "strings"
 
+// maxAutoSkillBodyChars caps how much of a skill body is auto-injected.
+// Every injected rune lands in the current turn's new messages and is billed
+// as a cache-miss token, so oversized playbooks are truncated (deterministically)
+// to keep the per-turn cost bounded.
+const maxAutoSkillBodyChars = 2000
+
 // AutoTriggerRule 定义一条技能自动触发规则：输入包含任一关键词即命中。
 type AutoTriggerRule struct {
 	SkillName string
@@ -60,10 +66,14 @@ func injectAutoSkill(input string, store *Store, rules []AutoTriggerRule) string
 	if sk.RunAs != RunInline {
 		return input
 	}
+	body := sk.Body
+	if r := []rune(body); len(r) > maxAutoSkillBodyChars {
+		body = string(r[:maxAutoSkillBodyChars]) + "\n…(正文过长已截断，如需全文请 run_skill)"
+	}
 	var b strings.Builder
 	b.WriteString("<auto-skill>\n")
 	b.WriteString("[自动加载技能] 你的输入匹配技能 " + name + "，执行前请通读并遵守其 playbook：\n\n")
-	b.WriteString(sk.Body)
+	b.WriteString(body)
 	b.WriteString("\n</auto-skill>\n\n")
 	b.WriteString(input)
 	return b.String()

@@ -43,6 +43,36 @@ func (a *AgentRunner) withAutoSkill(input string) string {
 	return out
 }
 
+// withAutoSkillEvent 与 withAutoSkill 同语义，额外返回实际注入的技能名
+// （"" = 未注入），供调用方发出技能使用统计事件——自动注入此前对前端
+// 完全不可见，技能侧栏恒为 0。
+func (a *AgentRunner) withAutoSkillEvent(input string) (string, string) {
+	if a == nil || a.autoSkill == nil {
+		return input, ""
+	}
+	out := a.withAutoSkill(input)
+	if out == input {
+		return input, ""
+	}
+	// 注入发生——再次匹配技能名（纯字符串匹配，无副作用）
+	return out, skill.MatchSkill(input)
+}
+
+// emitAutoSkillEvent 为自动注入的技能发出合成的 run_skill 工具事件，使
+// 前端工具/技能统计（toolCounts/skillCounts）能反映自动加载——等价于
+// 一次 run_skill(name) 调用，但不进 session、不产生 API 流量。
+func (a *AgentRunner) emitAutoSkillEvent(name string) {
+	args, err := json.Marshal(map[string]any{"name": name})
+	if err != nil {
+		return
+	}
+	id := fmt.Sprintf("auto-skill-%s-%d", name, a.autoSkillSeq.Add(1))
+	t := event.Tool{ID: id, Name: "run_skill", Args: string(args), ReadOnly: true}
+	a.sink.Emit(event.Event{Kind: event.ToolDispatch, Tool: t})
+	t.Output = "skill auto-loaded (playbook injected into input)"
+	a.sink.Emit(event.Event{Kind: event.ToolResult, Tool: t})
+}
+
 // runDirect is the original single-model execution path.
 func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult, error) {
 	// generate trace ID for this turn
@@ -59,7 +89,11 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	// V10.46: planner skips language wrappers — its output is a plan, not user text.
 	if !a.plannerMode {
 		input = a.withTurnPreferences(input)
-		input = a.withAutoSkill(input)
+		var autoSkillName string
+		input, autoSkillName = a.withAutoSkillEvent(input)
+		if autoSkillName != "" {
+			a.emitAutoSkillEvent(autoSkillName)
+		}
 	}
 	// V10.88: executor receives the handoff message as input. The handoff
 	// has a structured marker prefix; App.History() in the UI layer filters

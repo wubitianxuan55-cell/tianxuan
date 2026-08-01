@@ -1,3 +1,49 @@
+## [10.133.0] — 2026-08-01
+
+### 🐛 修复技能/子代理使用统计恒为 0 — 自动注入可观测 + Solo 子代理指引
+
+> 用户反馈：发布版测试中技能使用为 0、子代理使用为 0。系统性调试：
+> 梳理 工具注册（addBuiltins + boot 无条件注册）→ 技能索引注入 → 自动触发
+> （withAutoSkill）→ run_skill → 子代理（NestedSink）→ 前端统计（useToolStats /
+> StatsPanel）全链路，定位为两个可观测性盲区，而非工具缺失。
+
+#### 根因（5 级追溯）
+- 表象：技能侧栏与统计面板的技能/子代理使用恒为 0。
+- 直接原因 1：V10.122 技能自动触发层把高频内联技能（tdd / systematic-debugging /
+  requesting-code-review 等）的 playbook 直接注入输入，模型不再调用 run_skill；
+  而前端统计只统计 run_skill 工具事件 → 技能实际被使用但统计恒 0。
+- 直接原因 2：SoloSystemPrompt 的 Sub-agents 章节只写 "explore sub-agent /
+  review sub-agent"，未说明子代理技能要通过 run_skill 显式派发（自动注入仅覆盖
+  内联技能）→ 模型主动调用子代理技能率低。
+- 本地根因：自动注入路径（withAutoSkill）不发出任何事件，注入对前端完全不可见；
+  子代理技能缺少调用指引。
+- 系统根因：技能统计以"run_skill 调用"为唯一信号，没有覆盖"自动注入"这条
+  使用路径。
+- 过程根因：V10.122 引入自动注入时只考虑了缓存与去重，未同步统计口径。
+
+#### 修复
+- **`agent_run.go`**：新增 `withAutoSkillEvent`（返回注入的技能名）与
+  `emitAutoSkillEvent`——自动注入时发出合成的 run_skill 工具事件（ToolDispatch +
+  ToolResult，args 含技能名）。事件只进前端统计，不进 session、不产生 API 流量、
+  不影响缓存前缀；前端 toolCounts["run_skill"] 与 skillCounts["tdd"] 立即可见
+- **`hermes_prompt.go`**：SoloSystemPrompt 的 Sub-agents 章节补充说明——子代理
+  技能在技能索引中标记 [🧬 subagent]，通过 `run_skill(name, arguments)` 显式派发，
+  自动注入只覆盖内联技能
+
+#### 测试
+- **`skill_stats_test.go`**（新增）：`TestAutoSkillInjectionEmitsStatEvent`——
+  "用 TDD 实现这个功能" 触发自动注入后必须发出含技能名的 run_skill 统计事件
+  （修复前 RED：无事件）；`TestSoloSystemPrompt_GuidesSubagentRunSkill`——
+  提示词必须包含 run_skill / [🧬 subagent] / explore / review 指引
+- 既有 `TestWithAutoSkillDedup` / `TestCacheHitPrefixStableWithAutoSkill` 保持通过
+  （去重与缓存前缀不变性未破坏）
+
+#### 验证
+- 修复前：自动注入无任何事件（RED 复现）；修复后：合成 run_skill 事件可统计。
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.132.0] — 2026-08-01
 
 ### 🐛 修复执行时代办进度落后于实际完成 — complete_step 步骤匹配容错

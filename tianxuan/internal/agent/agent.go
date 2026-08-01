@@ -410,6 +410,9 @@ type AgentRunner struct {
 	// injection would re-bill the body as cache-miss tokens every turn.
 	// Reset on compaction, because the summary may drop the injected block.
 	autoInjected map[string]bool
+	// autoSkillSeq guarantees unique synthetic tool IDs for auto-skill stat
+	// events across turns.
+	autoSkillSeq atomic.Int64
 }
 
 // SetAutoSkillStore installs the skill store used for automatic skill

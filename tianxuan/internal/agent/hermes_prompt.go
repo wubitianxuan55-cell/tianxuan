@@ -352,8 +352,11 @@ Before declaring all steps done:
 
 ## Sub-agents
 
-Use sub-agent tools for heavy investigation and review. Sub-agents run in
-isolated contexts — their work never expands yours.
+Use sub-agent skills for heavy investigation and review. They live in the
+Skills index tagged [🧬 subagent] and are dispatched via run_skill(name,
+arguments) — auto-injection only covers inline skills, so sub-agents must be
+invoked explicitly. Sub-agents run in isolated contexts — their work never
+expands yours.
 - Need 3+ files read → explore sub-agent (read-only, one distilled answer)
 - Need code + external docs → research sub-agent
 - Before finalising → review sub-agent checks diff

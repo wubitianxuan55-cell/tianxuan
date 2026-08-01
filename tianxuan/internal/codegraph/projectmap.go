@@ -146,25 +146,38 @@ func (p ProjectInfo) Hash() string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// Refresh checks whether go.mod has changed or directory structure has changed
-// since the last analysis. If nothing changed, returns old unchanged.
-// Otherwise performs a full re-analysis.
+// Refresh checks whether the manifest or structure directory has changed since
+// the last analysis. If nothing changed, returns old unchanged; otherwise
+// performs a full re-analysis. Structure proxies: internal/ for Go, src/ for
+// Node/TS. Projects without a recognized manifest always re-analyze.
 func Refresh(wsRoot string, old ProjectInfo) ProjectInfo {
-	// Check go.mod modtime change
+	// Go: go.mod + internal/
 	if hasFile(wsRoot, "go.mod") {
 		fi, err := os.Stat(filepath.Join(wsRoot, "go.mod"))
 		if err == nil && !fi.ModTime().After(old.LastModified) {
-			// go.mod not newer — check directory structure
 			internalDir := filepath.Join(wsRoot, "internal")
 			if fi2, err := os.Stat(internalDir); err == nil && fi2.IsDir() {
 				if !fi2.ModTime().After(old.LastModified) {
-					// Neither go.mod nor internal/ changed — return old
 					return old
 				}
 			}
 		}
+		return Analyze(wsRoot)
 	}
-	// Something changed — re-analyze
+	// Node/TS: package.json + src/
+	if hasFile(wsRoot, "package.json") {
+		fi, err := os.Stat(filepath.Join(wsRoot, "package.json"))
+		if err == nil && !fi.ModTime().After(old.LastModified) {
+			srcDir := filepath.Join(wsRoot, "src")
+			if fi2, err := os.Stat(srcDir); err == nil && fi2.IsDir() {
+				if !fi2.ModTime().After(old.LastModified) {
+					return old
+				}
+			}
+		}
+		return Analyze(wsRoot)
+	}
+	// Unrecognized manifest — no incremental detection; full re-analysis
 	return Analyze(wsRoot)
 }
 

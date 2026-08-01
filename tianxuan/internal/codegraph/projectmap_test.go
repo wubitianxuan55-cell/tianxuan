@@ -1,0 +1,107 @@
+package codegraph
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+// chtimesPast fixes a file/dir modtime to (now - hours) so later writes
+// deterministically advance it on any filesystem.
+func chtimesPast(t *testing.T, path string, hours int) {
+	t.Helper()
+	past := time.Now().Add(-time.Duration(hours) * time.Hour)
+	if err := os.Chtimes(path, past, past); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFileT(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRefresh_NodeIncremental locks the Node/TS incremental semantics:
+// package.json + src/ unchanged → reuse cache; src/ change → re-analyze;
+// root-level file change → no re-analysis (src/ is the structure proxy).
+func TestRefresh_NodeIncremental(t *testing.T) {
+	dir := t.TempDir()
+	writeFileT(t, filepath.Join(dir, "package.json"), `{"name":"demo","main":"src/index.ts"}`)
+	writeFileT(t, filepath.Join(dir, "tsconfig.json"), `{"compilerOptions":{"strict":true}}`)
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileT(t, filepath.Join(srcDir, "index.ts"), "export const a = 1;\n")
+
+	// package.json 比 src/ 新：LastModified 以 package.json 为准，src 更旧才可增量。
+	chtimesPast(t, filepath.Join(dir, "package.json"), 2)
+	chtimesPast(t, srcDir, 3)
+
+	first := Analyze(dir)
+	if first.FileCount != 1 {
+		t.Fatalf("expected 1 TS file, got %d", first.FileCount)
+	}
+
+	// 未变化 → 返回缓存值
+	got := Refresh(dir, first)
+	if got.FileCount != 1 || got.Language != "TypeScript" {
+		t.Fatalf("unchanged node project should reuse cached info, got %+v", got)
+	}
+
+	// src/ 下新增文件 → 触发重扫
+	writeFileT(t, filepath.Join(srcDir, "extra.ts"), "export const b = 2;\n")
+	got = Refresh(dir, first)
+	if got.FileCount != 2 {
+		t.Fatalf("new src file should trigger re-analysis (FileCount=2), got %d", got.FileCount)
+	}
+
+	// src/ 外新增文件 → 不触发重扫（增量语义：src/ 是结构代理）
+	chtimesPast(t, srcDir, 3) // 固定 src modtime 回到基准之前，模拟增量窗口
+	writeFileT(t, filepath.Join(dir, "root.ts"), "export const c = 3;\n")
+	got = Refresh(dir, got)
+	if got.FileCount != 2 {
+		t.Fatalf("root-level file change should NOT re-analyze, got %d", got.FileCount)
+	}
+}
+
+// TestRefresh_GoIncremental locks the Go incremental semantics already present
+// in Refresh: go.mod + internal/ unchanged → reuse cache; internal/ change → re-analyze.
+func TestRefresh_GoIncremental(t *testing.T) {
+	dir := t.TempDir()
+	writeFileT(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.26\n")
+	pkgDir := filepath.Join(dir, "internal", "pkg")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileT(t, filepath.Join(pkgDir, "x.go"), "package pkg\n\ntype Foo struct{}\n")
+	internalDir := filepath.Join(dir, "internal")
+
+	// internal/ 比 go.mod 新：LastModified 以 internal 为准。
+	chtimesPast(t, filepath.Join(dir, "go.mod"), 3)
+	chtimesPast(t, internalDir, 2)
+
+	first := Analyze(dir)
+	if first.FileCount != 1 {
+		t.Fatalf("expected 1 go file, got %d", first.FileCount)
+	}
+
+	// 未变化 → 返回缓存值
+	got := Refresh(dir, first)
+	if got.FileCount != 1 {
+		t.Fatalf("unchanged go project should reuse cached info, got %d", got.FileCount)
+	}
+
+	// internal/ 下新增包（创建直接子目录 → internal modtime 更新）→ 触发重扫
+	if err := os.MkdirAll(filepath.Join(dir, "internal", "pkg2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileT(t, filepath.Join(dir, "internal", "pkg2", "z.go"), "package pkg2\n\ntype Bar struct{}\n")
+	got = Refresh(dir, first)
+	if got.FileCount != 2 {
+		t.Fatalf("new internal package should trigger re-analysis (FileCount=2), got %d", got.FileCount)
+	}
+}

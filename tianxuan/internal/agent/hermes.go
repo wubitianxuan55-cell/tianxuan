@@ -300,7 +300,12 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 			slog.Info("hermes: retry loop exited without resolution")
 			break
 		}
-		if h.allStepsPassed(result) {
+		// O2: 以最近执行的计划（可能来自 fixPlan）为 ground truth。
+		plan := initial.text
+		if result.Plan != "" {
+			plan = result.Plan
+		}
+		if h.allStepsPassed(result, plan) {
 			if round > 2 {
 				slog.Info("hermes: fix round succeeded", "round", round-1)
 			}
@@ -336,7 +341,7 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 		})
 	}
 
-	if result != nil && !h.allStepsPassed(result) && err == nil {
+	if result != nil && !h.allStepsPassed(result, result.Plan) && err == nil {
 		slog.Info("hermes: 3 rounds exhausted with failures")
 		h.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 			Text: "已尝试 3 轮自动修正，仍有失败步骤，请手动检查"})
@@ -345,22 +350,25 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 	// V10.87: if retries happened, emit a single final TurnResultEvent.
 	// Rounds 2/3 suppressed theirs so the frontend sees exactly one result card.
 	if len(fixHistory) > 0 {
-		h.emitExecutorResult(result, err, !h.allStepsPassed(result), false)
+		h.emitExecutorResult(result, err, !h.allStepsPassed(result, result.Plan), false)
 	}
 
 	return execRound{result: result, err: err}
 }
 
 // allStepsPassed checks whether every step in the execution result succeeded.
+// plan is the executed plan text (ground truth for step count).
 //
 // Decision order (most reliable signal first):
 //  1. StepResults non-empty + all "success" → pass (ignore Success/Errors —
 //     non-fatal tool errors like loop-guard blocks don't negate completed steps).
 //  2. StepResults non-empty + any non-"success" → fail.
-//  3. No StepResults + files changed → pass (work done, just not tracked via
-//     complete_step; e.g. maxSteps exhaustion before signing off).
-//  4. No StepResults + no files changed → delegate to Success field.
-func (h *Hermes) allStepsPassed(r *TurnResult) bool {
+//  3. No StepResults + plan has steps → fail (executor signed off nothing;
+//     O2: files changed alone no longer proves completion — maxSteps could
+//     have stopped mid-plan before any complete_step).
+//  4. No StepResults + plan has no steps → delegate to Success/Errors
+//     (read-only tasks produce no plan steps and no file changes).
+func (h *Hermes) allStepsPassed(r *TurnResult, plan string) bool {
 	if r == nil {
 		return false
 	}
@@ -372,17 +380,16 @@ func (h *Hermes) allStepsPassed(r *TurnResult) bool {
 		}
 		return true // all steps passed — ignore non-fatal tool errors in r.Errors
 	}
-	// No step results collected (e.g. complete_step evidence rejected,
-	// or maxSteps exhausted before complete_step). If files were
-	// actually changed, the work is real — errors in r.Errors
-	// (like "paused after maxSteps") shouldn't override that.
-	if len(r.FilesCreated) > 0 || len(r.FilesModified) > 0 {
-		return true
+	// No step results collected: if the plan had steps, the executor
+	// produced no complete_step evidence — treat as incomplete regardless
+	// of file changes (mid-plan maxSteps stop, evidence rejection, etc.).
+	if countPlanSteps(plan) > 0 {
+		return false
 	}
-	// No visible work AND no step tracking: check for concrete failures.
+	// No plan steps AND no step tracking: check for concrete failures.
 	// Read-only tasks (e.g. "运行测试", auto-skipped from planner) produce
-	// no file changes and typically no complete_step calls, but are valid
-	// successful runs when there are no errors and Success is true.
+	// no plan steps, no file changes and no complete_step calls, but are
+	// valid successful runs when there are no errors and Success is true.
 	if len(r.Errors) > 0 || !r.Success {
 		return false
 	}
@@ -399,8 +406,9 @@ func (h *Hermes) planFix(ctx context.Context, origInput string, originalPlan str
 	// V10.100: save/restore session around fix planning — fix plan messages
 	// are transient and must not pollute the planner's persistent context.
 	preFixMsgs := h.hermesSess.Snapshot()
+	preFixV0 := h.hermesSess.RewriteVersion()
 	planText, err := h.planWithTools(ctx, fixInput)
-	h.hermesSess.Replace(preFixMsgs)
+	h.restorePlannerBaseline(preFixMsgs, preFixV0)
 	if err != nil {
 		return nil, fmt.Errorf("hermes: fix plan failed: %w", err)
 	}
@@ -613,31 +621,32 @@ type planWithNote struct {
 // Session management: planning messages are transient — only execution
 // feedback (injected by feedResultToPlanner) persists across turns. A
 // snapshot is saved at entry and restored on every exit path (including
-// auto-confirm), so that compaction during planning cannot corrupt the
-// pre-plan baseline.
+// auto-confirm); O1: if planning triggered compaction, the compaction
+// digest survives the restore instead of being discarded.
 //
 // V10.100: direct answers and chat-only turns now inject a conversation
 // record so the next turn knows what Hermes said — without this, replies
 // like "同意" have no referent and Hermes treats them as new sessions.
 func (h *Hermes) planWithConfirmation(ctx context.Context, input string) (*planWithNote, error) {
 	prePlanMsgs := h.hermesSess.Snapshot() // baseline: system + historical feedback
+	prePlanV0 := h.hermesSess.RewriteVersion()
 	var revisedNote string                 // V10.87: carry user feedback across revise→replan loop
 	for {
 		// honour cancellation — stop planning immediately.
 		select {
 		case <-ctx.Done():
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			return nil, ctx.Err()
 		default:
 		}
 
 		plan, err := h.plan(ctx, input)
 		if err != nil {
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			return nil, fmt.Errorf("hermes: %w", err)
 		}
 		if isAnswerNotAction(plan) {
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			h.injectTurnRecord(input, plan) // so next turn knows what was discussed
 			return nil, nil                 // Hermes answered directly
 		}
@@ -646,18 +655,18 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string) (*planW
 		// round-trip — unless the user explicitly asked for a revision, in which
 		// case the replanned version must be shown.
 		if h.asker != nil && shouldAutoConfirm(plan) && revisedNote == "" {
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			h.injectPlanBrief(plan) // plan context for the next turn
 			return &planWithNote{text: plan, userNote: revisedNote}, nil
 		}
 
 		userNote, chatOnly, revise, err := h.confirmPlan(ctx, input, plan)
 		if err != nil {
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			return nil, err
 		}
 		if chatOnly {
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			h.injectTurnRecord(input, plan) // so next turn knows what was discussed
 			return nil, nil
 		}
@@ -673,7 +682,7 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string) (*planW
 			// embedded in `input` (which plan() will add as a new User
 			// message), so the planner still gets full context without
 			// the intermediate plan messages bloating the session.
-			h.hermesSess.Replace(prePlanMsgs)
+			h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 			continue
 		}
 		// Carry revised note through to final result (non-revise exits).
@@ -682,9 +691,41 @@ func (h *Hermes) planWithConfirmation(ctx context.Context, input string) (*planW
 			note = revisedNote
 		}
 		// Restore baseline: intermediate plans from revise loop are discarded.
-		h.hermesSess.Replace(prePlanMsgs)
+		h.restorePlannerBaseline(prePlanMsgs, prePlanV0)
 		h.injectPlanBrief(plan) // plan context for the next turn
 		return &planWithNote{text: plan, userNote: note}, nil
+	}
+}
+
+// restorePlannerBaseline 在规划结束后恢复会话基线。若规划期间发生过
+// 重写（compaction/trim），压缩 digest 是有效的历史抽象，必须保留——
+// 否则持久 session 永不缩减，每轮重复支付 summarizer 调用。仅当没有
+// 重写时才整体恢复规划前快照（丢弃中间规划消息）。
+func (h *Hermes) restorePlannerBaseline(preMsgs []provider.Message, v0 int) {
+	if h.hermesSess.RewriteVersion() != v0 || len(h.hermesSess.Snapshot()) < len(preMsgs) {
+		h.trimPlannerTurn(preMsgs)
+		return
+	}
+	h.hermesSess.Replace(preMsgs)
+}
+
+// trimPlannerTurn 从重写后的 session 中移除本轮规划追加的消息，保留
+// 压缩 digest 与重写产物。策略：从尾部向前找到规划前快照的最后一条
+// 消息（重写保留的 tail 原样存在），截断其后；找不到（基线消息已被
+// 折叠进 digest）时保守保留整个重写结果，不丢信息。
+func (h *Hermes) trimPlannerTurn(preMsgs []provider.Message) {
+	if len(preMsgs) == 0 {
+		return
+	}
+	last := preMsgs[len(preMsgs)-1]
+	msgs := h.hermesSess.Snapshot()
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == last.Role && msgs[i].Content == last.Content {
+			if i+1 < len(msgs) {
+				h.hermesSess.Replace(msgs[:i+1])
+			}
+			return
+		}
 	}
 }
 

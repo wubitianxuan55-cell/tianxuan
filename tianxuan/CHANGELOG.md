@@ -1,3 +1,56 @@
+## [10.128.0] — 2026-08-01
+
+### 🧠 双模型架构优化 — 规划者压缩保留 / 完成判定以计划为准 / 计划解析统一
+
+> 三项目标明确：修复规划者压缩被快照恢复抵消的长期缺陷（P0，成本+上下文失控）、
+> 修复完成判定掩盖未完成轮次（P0，maxSteps 中途停止被误判成功）、收敛三处重复的
+> 计划步骤解析（P1，格式演进不同步风险）。全部 TDD：先写失败测试→确认 RED→
+> 最小实现→GREEN，`go build ./...` / `go vet ./...` / `go test ./...` 全绿。
+
+#### O1 — 规划者压缩 digest 不再被丢弃
+> 根因（5 级追溯）：表象 = 长期会话中规划者上下文持续膨胀、超阈值后每轮重复出现
+> compaction。直接原因 = `planWithConfirmation`/`planFix` 每次退出都
+> `Replace(prePlanMsgs)`，把规划期间 `maybeCompact` 生成的 `<compaction-summary>`
+> digest 连同中间规划消息一起还原掉。本地根因 = 快照/恢复模式把"压缩产物"当成
+> 瞬态规划消息一并丢弃。系统根因 = 规划者会话没有获得与执行者一致的压缩语义
+> （压缩触发于 AgentRunner.Run 内部，而会话恢复发生在 Hermes 编排层，两者无契约）。
+> 过程根因 = V10.34 引入快照恢复时只考虑"中间计划不污染持久上下文"，未考虑压缩。
+- **`hermes.go`**：新增 `restorePlannerBaseline`——退出时若 `RewriteVersion` 变化
+  或消息数减少（发生过 compaction/trim），调用 `trimPlannerTurn` 只移除本轮规划
+  追加的尾部消息、保留压缩 digest；否则维持原快照恢复。`planWithConfirmation`
+  全部 8 个退出点与 `planFix` 统一走新逻辑
+- 规划消息仍为瞬态（用户输入/中间计划不残留），但 digest 作为历史抽象存活，
+  持久 session 可真正缩减，超阈值后不再每轮重复支付 summarizer 全量调用
+
+#### O2 — allStepsPassed 以计划步数为 ground truth
+> 根因：旧分支"无 StepResults + 文件变更 → pass"掩盖了 maxSteps 中途停止的轮次
+> （文件改了一半、一个 complete_step 都没签收，却判成功，3 轮修复循环不触发）。
+- **`hermes.go`**：`allStepsPassed(r, plan)` 新增计划参数；无 StepResults 时若计划
+  含步骤 → 判未完成并进入自动修复循环；仅计划无步骤（read-only 任务）退回
+  Success/Errors 判定。StepResults 全 success 仍直接通过（执行器允许合并步骤，
+  不做步数完整性硬校验，避免误伤）
+- **`planparse.go`**：新增 `countPlanSteps`（复用统一步骤行判定）
+
+#### O3 — 统一计划解析器
+- **`planparse.go`**（新增）：`isStepLine`/`extractStepTitle` 单一实现 + 契约测试
+- **`hermes_confirm.go`** / **`hermes_sdd.go`**：删除重复实现（`planLineRE`、
+  旧 `isStepLine`、旧 `extractStepTitle`），调用点统一引用
+- 顺带修复：`extractStepTitle` 对多位数步骤号（"步骤 12："）只跳过一个数字的缺陷
+
+#### 测试
+- **`hermes_compact_test.go`**（新增）：SSE mock 强制触发 planner 压缩，断言
+  `planWithConfirmation`/`planFix` 退出后 digest 存活且本轮规划输入不残留
+- **`allsteps_plan_test.go`**（新增）：计划有步骤但零 complete_step 证据 → 失败；
+  全部签收 → 通过；合并步骤 → 通过；无计划步骤退回旧判定
+- **`planparse_test.go`**（新增）：中英文步骤行/多位数/边界契约
+- `hermes_test.go`：既有 allStepsPassed 用例迁移到新签名，maxSteps+文件变更+错误
+  场景期望从"通过"改为"不通过"（O2 新契约）
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.127.0] — 2026-08-01
 
 ### 🐛 修复 bash 启动服务类命令堵死进程 — 自动后台化 + Wait 永不阻塞

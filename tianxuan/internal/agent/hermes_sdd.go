@@ -41,7 +41,7 @@ func parseStepDeltas(plan string) map[string]string {
 		if !inPlan {
 			continue
 		}
-		if planLineRE(trimmed) {
+		if isStepLine(trimmed) {
 			// Step header: extract title after the number
 			currentStep = extractStepTitle(trimmed)
 			continue
@@ -56,22 +56,6 @@ func parseStepDeltas(plan string) map[string]string {
 		}
 	}
 	return out
-}
-
-// extractStepTitle returns the step title from a "步骤 N：title" or "Step N：title" line.
-func extractStepTitle(trimmed string) string {
-	for _, prefix := range []string{"步骤 ", "Step "} {
-		after, ok := strings.CutPrefix(trimmed, prefix)
-		if !ok {
-			continue
-		}
-		if len(after) == 0 || after[0] < '0' || after[0] > '9' {
-			continue
-		}
-		// Skip the digit and optional "：" / ":" / space.
-		return strings.TrimLeft(after[1:], "：: \t")
-	}
-	return trimmed
 }
 
 // extractFieldValue returns the value after a **Key**： or **Key**: marker.
@@ -218,7 +202,7 @@ func extractPlanFiles(plan string) map[string]bool {
 		// Multi-line file list continuation: lines starting with exactly one level of indent
 		// and no bullet (e.g. "internal/bar.go" on the next line after File(s)).
 		if inFilesField {
-			if planLineRE(trimmed) || strings.HasPrefix(trimmed, "- **") {
+			if isStepLine(trimmed) || strings.HasPrefix(trimmed, "- **") {
 				inFilesField = false
 				continue
 			}
@@ -394,18 +378,4 @@ func buildVerifyTriad(r *TurnResult, plan string) string {
 	}
 
 	return strings.Join(parts, " ")
-}
-
-// planLineRE is a helper that checks whether a trimmed line is a plan step
-// header, matching the same logic as isStepLine in hermes_confirm.go.
-// Redeclared here to keep sdd.go self-contained.
-func planLineRE(trimmed string) bool {
-	for _, prefix := range []string{"步骤 ", "Step "} {
-		if after, ok := strings.CutPrefix(trimmed, prefix); ok {
-			if len(after) > 0 && after[0] >= '0' && after[0] <= '9' {
-				return true
-			}
-		}
-	}
-	return false
 }

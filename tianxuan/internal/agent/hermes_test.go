@@ -710,14 +710,14 @@ func TestFormatSummary_RetriesExhausted(t *testing.T) {
 // ── allStepsPassed ─────────────────────────────────────────
 
 func TestAllStepsPassed_Nil(t *testing.T) {
-	if (&Hermes{}).allStepsPassed(nil) {
+	if (&Hermes{}).allStepsPassed(nil, "") {
 		t.Fatal("nil TurnResult should not pass")
 	}
 }
 
 func TestAllStepsPassed_NotSuccess(t *testing.T) {
 	r := &TurnResult{Success: false}
-	if (&Hermes{}).allStepsPassed(r) {
+	if (&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("!Success should not pass")
 	}
 }
@@ -730,7 +730,7 @@ func TestAllStepsPassed_FailedStep(t *testing.T) {
 			{Step: "step2", Status: "error"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r) {
+	if (&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("result with failed step should not pass")
 	}
 }
@@ -742,7 +742,7 @@ func TestAllStepsPassed_BlockedStep(t *testing.T) {
 			{Step: "step1", Status: "blocked"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r) {
+	if (&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("result with blocked step should not pass")
 	}
 }
@@ -755,7 +755,7 @@ func TestAllStepsPassed_AllSuccess(t *testing.T) {
 			{Step: "step2", Status: "success"},
 		},
 	}
-	if !(&Hermes{}).allStepsPassed(r) {
+	if !(&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("result with all-success steps should pass")
 	}
 }
@@ -764,24 +764,25 @@ func TestAllStepsPassed_NoStepResults(t *testing.T) {
 	// Success=true, no step results, no files, no errors → pass.
 	// Read-only tasks (auto-skipped from planner) are valid successful runs.
 	r := &TurnResult{Success: true}
-	if !(&Hermes{}).allStepsPassed(r) {
+	if !(&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("Success=true with no errors should pass (read-only task)")
 	}
 	// Success=false, no step results, no files → fail (genuine failure).
 	rFail := &TurnResult{Success: false, Errors: []string{"build failed"}}
-	if (&Hermes{}).allStepsPassed(rFail) {
+	if (&Hermes{}).allStepsPassed(rFail, "") {
 		t.Fatal("Success=false with errors should NOT pass")
 	}
-	// With file changes present, it should pass (work was done).
+	// No plan steps + file changes + no errors → pass (work was done).
 	r2 := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
-	if !(&Hermes{}).allStepsPassed(r2) {
-		t.Fatal("file changes should pass")
+	if !(&Hermes{}).allStepsPassed(r2, "") {
+		t.Fatal("file changes with no plan steps should pass")
 	}
-	// File changes + errors should still pass.
+	// O2: file changes + errors must NOT pass — errors signal unresolved
+	// work and should trigger the correction loop, not be masked.
 	r3 := &TurnResult{Success: true, FilesModified: []string{"b.go"},
 		Errors: []string{"paused after 5 tool-call rounds (agent.max_steps)"}}
-	if !(&Hermes{}).allStepsPassed(r3) {
-		t.Fatal("file changes should pass even with system-level errors")
+	if (&Hermes{}).allStepsPassed(r3, "") {
+		t.Fatal("file changes with errors must NOT pass (O2)")
 	}
 }
 
@@ -801,7 +802,7 @@ func TestAllStepsPassed_StepSuccessOverridesNonFatalErrors(t *testing.T) {
 			{Step: "步骤3", Status: "success", Result: "完成"},
 		},
 	}
-	if !(&Hermes{}).allStepsPassed(r) {
+	if !(&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("all-success StepResults should pass even when Success=false due to non-fatal errors")
 	}
 }
@@ -818,7 +819,7 @@ func TestAllStepsPassed_StepSuccessButMixedWithMaxSteps(t *testing.T) {
 		},
 		FilesModified: []string{"a.go"},
 	}
-	if !(&Hermes{}).allStepsPassed(r) {
+	if !(&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("all-success steps with file changes should pass even with maxSteps exhaustion")
 	}
 }
@@ -834,7 +835,7 @@ func TestAllStepsPassed_PartialSuccessStillFails(t *testing.T) {
 			{Step: "步骤2", Status: "error", Result: "build failed"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r) {
+	if (&Hermes{}).allStepsPassed(r, "") {
 		t.Fatal("mixed success/error StepResults should not pass")
 	}
 }

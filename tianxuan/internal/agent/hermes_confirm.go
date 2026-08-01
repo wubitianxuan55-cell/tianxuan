@@ -111,22 +111,6 @@ func hasUnverifiableSteps(plan string) bool {
 	return stepCount > 0 && !hasVerify
 }
 
-// isStepLine checks whether a trimmed line is a step header, supporting both
-
-// isStepLine checks whether a trimmed line is a step header, supporting both
-// Chinese "步骤 N：" and English "Step N：" prefixes.
-func isStepLine(trimmed string) bool {
-	for _, prefix := range []string{"步骤 ", "Step "} {
-		if strings.HasPrefix(trimmed, prefix) {
-			rest := strings.TrimPrefix(trimmed, prefix)
-			if len(rest) > 0 && rest[0] >= '0' && rest[0] <= '9' {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // resolveConfirmChoice maps the user's confirmation dialog choice to
 // (note, chatOnly, revise, err). Extracted from confirmPlan so the
 // decision logic can be unit-tested without an interactive Asker.

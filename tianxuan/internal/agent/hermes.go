@@ -235,6 +235,11 @@ func (h *Hermes) Run(ctx context.Context, input string) (*TurnResult, error) {
 		defer h.wrapExecutorSink()()
 		execResult, execErr := h.hephaestus.Run(ctx, formatHandoff(input, input, "", h.wsRoot))
 		h.emitExecutorResult(execResult, execErr, false, true)
+		// W1: 直接执行的结果回灌规划者 session——否则下一轮"继续"类请求
+		// 规划者没有任何关于刚才工作的上下文。
+		if execResult != nil {
+			h.feedResultToPlanner(execResult, 1)
+		}
 		return execResult, execErr
 	}
 
@@ -279,7 +284,7 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 	var fixHistory []fixAttempt // V10.87: accumulate fix history for round-3 reflection
 
 	// Round 1: execute the original plan (emit TurnResultEvent normally)
-	result, err := h.executePlan(ctx, input, initial, false)
+		result, err := h.executePlan(ctx, input, initial, false, 1)
 
 	for round := 2; round <= 3; round++ {
 		// honour cancellation — stop retrying immediately.
@@ -324,8 +329,15 @@ func (h *Hermes) executePlanWithRetry(ctx context.Context, input string, initial
 			break
 		}
 
+		// W3: 自动修正计划对用户可见——修正由规划者生成并自动执行，
+		// 用户应当看到本轮要修什么，而不是只有一行 Phase。
+		if brief := displayPlan(fixPlan.text); brief != "" {
+			h.sink.Emit(event.Event{Kind: event.Text,
+				Text: "🔧 自动修正计划（轮 " + strconv.Itoa(round) + "）：\n" + truncateString(brief, 800)})
+		}
+
 		// Execute the fix plan — suppress TurnResultEvent (emit once at end)
-		result, err = h.executePlan(ctx, input, *fixPlan, true)
+		result, err = h.executePlan(ctx, input, *fixPlan, true, round)
 
 		// Record this fix attempt so round 3 can reflect on prior failures
 		feedback := ""
@@ -545,6 +557,10 @@ func (h *Hermes) runFastPath(ctx context.Context, input string) (*TurnResult, er
 	// matching executePlan's behaviour. Pre-injection stays as `task` — the "!"
 	// marker is a Hermes-layer signal and must not leak to the executor.
 	h.emitExecutorResult(execResult, execErr, false, true)
+	// W1: 快速路径结果同样回灌规划者，保持多轮对话上下文连续。
+	if execResult != nil {
+		h.feedResultToPlanner(execResult, 1)
+	}
 	return execResult, execErr
 }
 
@@ -773,7 +789,7 @@ func (h *Hermes) injectPlanBrief(plan string) {
 // back to the planner session, and emits TurnResultEvent for the frontend.
 // When suppressResultEvent is true, TurnResultEvent is skipped — the caller
 // (executePlanWithRetry) will emit a single final event after all retries.
-func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNote, suppressResultEvent bool) (*TurnResult, error) {
+func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNote, suppressResultEvent bool, round int) (*TurnResult, error) {
 	plan := p.text
 	userNote := p.userNote
 
@@ -806,7 +822,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 
 	// Feed results back to the planner and emit TurnResultEvent.
 	if execResult != nil {
-		h.feedResultToPlanner(execResult)
+		h.feedResultToPlanner(execResult, round)
 		if !suppressResultEvent {
 			h.sink.Emit(event.Event{
 				Kind: event.TurnResultEvent,
@@ -828,7 +844,7 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 			Summary: hermesSummary,
 		}
 		// V10.89: use feedResultToPlanner for consistent SDD Enhanced format.
-		h.feedResultToPlanner(synth)
+		h.feedResultToPlanner(synth, round)
 		if !suppressResultEvent {
 			h.sink.Emit(event.Event{
 				Kind: event.TurnResultEvent,
@@ -845,15 +861,23 @@ func (h *Hermes) executePlan(ctx context.Context, origInput string, p planWithNo
 }
 
 // feedResultToPlanner injects execution feedback into the planner's session
-// and invalidates the project map cache on structural changes.
+// and invalidates the project map cache on structural changes. round=1 is a
+// regular execution; round>1 marks an auto-fix execution so the planner can
+// tell the original run apart from later fix rounds.
 // V10.89: uses enhanced SDD feedback with Delta + Verify triad.
-func (h *Hermes) feedResultToPlanner(r *TurnResult) {
+func (h *Hermes) feedResultToPlanner(r *TurnResult, round int) {
 	hasContent := r.Summary != "" || len(r.Errors) > 0 ||
 		len(r.FilesCreated) > 0 || len(r.FilesModified) > 0
 	if hasContent {
+		content := formatExecutionFeedbackEnhanced(r, r.Plan)
+		if round > 1 {
+			// W2: 修正轮次标识——规划者看到多条反馈时能区分原始执行与
+			// 第 N 轮修复执行，不会混淆时间线。
+			content = fmt.Sprintf("[第 %d 轮修正执行结果]\n%s", round, content)
+		}
 		h.hermesSess.Add(provider.Message{
 			Role:    provider.RoleUser,
-			Content: formatExecutionFeedbackEnhanced(r, r.Plan),
+			Content: content,
 		})
 	}
 	if h.wsRoot != "" && hasStructuralChange(r.FilesCreated, r.FilesModified) {

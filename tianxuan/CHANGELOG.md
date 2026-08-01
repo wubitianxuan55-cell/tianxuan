@@ -1,3 +1,46 @@
+## [10.130.0] — 2026-08-01
+
+### 🔄 双模型工作流闭环 — 直接执行回灌规划者 / 修正轮次标识 / 修正计划可见
+
+> 本次聚焦规划→确认→执行→修复→反馈的工作流闭环，修复三处断裂：
+> 直接执行结果对规划者不可见（"继续"类请求丢上下文）、修复轮次反馈无法区分、
+> 自动修正对用户不透明。全部 TDD，`go build` / `go vet` / `go test ./...` 全绿。
+
+#### W1 — 直接执行结果回灌规划者（多轮连续性）
+> 根因（5 级追溯）：表象 = 用户执行简单任务后说"继续"，规划者答非所问。直接原因 =
+> auto-skip（atomic/read_only/directive）与 `!` 快速路径直接调 executor，结果只
+> 发前端事件，从不注入 `hermesSess`。本地根因 = 这两条路径被设计为"绕过规划者"
+> 时只考虑了省成本，没考虑后续对话需要上下文。系统根因 = 回灌（feedResultToPlanner）
+> 只挂在完整执行路径上，快速路径没有等价闭环。过程根因 = V10.31/V10.102 引入快速
+> 路径时未把"执行结果必须回到规划者 session"作为不变式。
+- **`hermes.go`**：`runFastPath` 与 auto-skip 分支执行成功后调用
+  `feedResultToPlanner(execResult, 1)`——规划者 session 记录 [上一轮执行结果]，
+  下一轮"继续"、"接着改刚才的文件"等请求有上下文锚点
+
+#### W2 — 修正轮次反馈标识
+> 根因：自动修复轮次（round 2/3）的执行反馈与原始执行格式相同，规划者看到多条
+> [上一轮执行结果] 无法区分时间线。
+- **`hermes.go`**：`feedResultToPlanner(r, round)` 新增轮次参数；`executePlan` 透传
+  round（原始执行=1，修复执行=2/3）；round>1 时反馈以 `[第 N 轮修正执行结果]`
+  开头，规划者能明确区分原始执行与每次修复
+
+#### W3 — 自动修正计划对用户可见
+> 根因：自动修正完全在后台进行，前端只有一行 Phase "修正执行 (轮 2/3)"，用户
+> 不知道规划者本轮打算修什么。
+- **`hermes.go`**：修复计划生成后 emit Text 事件，展示 `<!--plan-->` 后的计划
+  摘要（截断 800 runes）——用户看到"🔧 自动修正计划（轮 N）"再配合最终结果卡
+
+#### 测试
+- **`workflow_test.go`**（新增）：`TestHermesDirectExecutionFeedsPlanner`（auto-skip
+  后 planner session 含执行反馈且规划者零调用）、`TestHermesFastPathFeedsPlanner`、
+  `TestHermesFeedResultToPlanner_RoundMarker`（round=2 带轮次标识、round=1 保持
+  旧格式）
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.129.0] — 2026-08-01
 
 ### 🧠 双模型架构优化 II — 漏标记补偿 / 路由三值化 / 规划者步数默认上限

@@ -13,6 +13,8 @@ description: V10.146.0 发布记录 — 修复 edit_lines compact schema 丢失 
 | 代码变更 | 2 文件（compact.go +1 行、compact_wiring_test.go +测试）|
 | 主题 | edit_lines 报错修复 |
 | 构建产物 | `tianxuan-desktop.exe` |
+| 文件大小 | 21,249,024 bytes (~20.3 MB) |
+| SHA256 | `87ff967412806f6fff33b22fcc14779c8e400793ac007f7dda0205634499a68a` |
 
 ### 本发布包含的提交
 

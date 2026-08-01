@@ -12,6 +12,9 @@ description: V10.143.0 发布记录 — 记忆提取质量修复（控制块泄�
 | 发布日期 | 2026-08-01 |
 | 代码变更 | 4 文件（internal/memory/extract.go + test、desktop/memory_suggestions.go + test）|
 | 主题 | 记忆提取质量修复 |
+| 构建产物 | `tianxuan-desktop.exe` |
+| 文件大小 | 21,249,024 bytes (~20.3 MB) |
+| SHA256 | `c50b6f14016a07cc0ef439379a8eb72e596f9f3e9c72c3ff4d62f96c61a8c9c1` |
 
 ### 本发布包含的提交
 

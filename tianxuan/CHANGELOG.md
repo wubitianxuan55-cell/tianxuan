@@ -362,6 +362,54 @@
 
 ---
 
+## [10.114.0] — 2026-08-01
+
+### 🆕 Refresh 增量检测扩展到 Node/TS 项目
+
+> codegraph.Refresh 此前只对 Go 项目（go.mod + internal/）做增量判断，Node/TS 项目每轮都全量 Analyze。新增 package.json + src/ 的结构代理检测：manifest 与 src/ modtime 均未变化时直接复用缓存 ProjectInfo；src/ 内变化才重扫。Rust 等无识别 manifest 的项目保持全量分析（不退化）。
+
+#### 测试
+- **`codegraph/projectmap_test.go`**：新增 `TestRefresh_NodeIncremental`——未变化复用 / src/ 变化重扫 / src/ 外变化不重扫
+
+#### 验证
+- TDD 红灯（Node root 级文件旧实现重扫）→ 绿灯；`go build ./...` EXIT 0；`go test ./internal/...` 全部 ok
+
+#### 文件变更
+- `internal/codegraph/projectmap.go` — +27 行；`internal/codegraph/projectmap_test.go` — +107 行
+
+---
+
+## [10.113.0] — 2026-08-01
+
+### 📌 计划 File(s) 锚点交接 — 执行阶段免重复定位调查
+
+> Hermes 规划时的调查轨迹只留在 planner session，Hephaestus 收到 handoff 后需要重新定位文件。主计划格式加入 File(s) 字段（与修正计划格式对齐），要求 Hermes 输出规划中已验证的文件路径锚点；Hephaestus 提示词改为优先使用锚点直接进入实现，仅锚点缺失/失效时才重新调查并报告偏差。
+
+#### 收益
+- 执行阶段省去 1~3 轮 LLM 定位往返；File(s) 锚点辅助 parallel_tasks 的 disjoint file lists 判断
+
+#### 验证
+- TDD 红灯（旧措辞断言失败）→ 绿灯；`go build ./...` EXIT 0；`go test ./internal/...` 全部 ok
+
+#### 文件变更
+- `internal/agent/hermes_prompt.go` — +16/−6 行；`internal/agent/hermes_test.go` — +22 行
+
+---
+
+## [10.112.0] — 2026-08-01
+
+### ⚡ Hermes 项目地图增量缓存 — 消除每轮规划前全量扫描
+
+> injectProjectMap 此前每次 Run/planFix 都调用 codegraph.Analyze 全量遍历工作区（tianxuan 自身约 1.8s/次，539 个 .go 文件）。改用已有 codegraph.Refresh 做增量检测：仅首次 Analyze，后续仅当 go.mod/internal/ 变化时才重扫；结构变化（feedResultToPlanner）强制失效重扫，不依赖 modtime。同时修复空 wsRoot 会注入空地图消息的缺陷。
+
+#### 验证
+- 性能实测 Analyze 486ms-1.78s → Refresh 0ms；`go build ./...` EXIT 0；`go test ./internal/...` 全部 ok
+
+#### 文件变更
+- `internal/agent/hermes.go` — +38/−7 行；`internal/agent/hermes_test.go` — +80 行
+
+---
+
 ## [10.111.0] — 2026-07-31
 
 ### 🆕 接线激活上下文卸载（Context Offloading）+ 静默吞错隐患修复

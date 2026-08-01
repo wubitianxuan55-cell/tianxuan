@@ -1,3 +1,37 @@
+## [10.131.0] — 2026-08-01
+
+### 🔄 双模型工作流闭环 II — 步骤覆盖度对照 / 修正计划补全漏签收步骤
+
+> 工作流深挖：规划者此前只能从 StepResults 数量与文件维度判断执行质量，
+> 无法感知"计划有 3 步但执行者只签收了 2 步且全部成功"（合并步骤是允许的，
+> 所以不能硬校验数量）。新增步骤标题的软对照：完全无匹配的步骤进入 verify
+> 反馈，并强制进入修正计划。TDD，`go build` / `go vet` / `go test ./...` 全绿。
+
+#### W4 — 步骤覆盖度对照（coverage 维度）
+> 根因：执行者可能跳过计划中的某一步或全部改写步骤标题，StepResults 仍全
+> success → allStepsPassed=true，漏掉的部分永远不会被修复（V10.128 为防
+> 合并误伤放弃了数量硬校验，留下这个盲区）。
+- **`planparse.go`**：新增 `extractPlanStepTitles` / `normalizeStepTitle` /
+  `similarStepTitle` / `checkStepCoverage`——归一化（小写、去"步骤 N："编号
+  与图标、压缩空白）后做包含匹配（容忍"实现+重构"这类合并与措辞微调），
+  返回计划中存在但零签收匹配的步骤标题
+- **`hermes_sdd.go`**：`buildVerifyTriad` 从三维扩为四维——`coverage=ok|warn(N)`，
+  仅在有 StepResults 且计划含步骤时输出；warn 是信号不是失败判定（合并/改写
+  合法，由规划者判断）
+- **`hermes.go`**：`buildFixPrompt` 在失败步骤之外附加"计划中存在但执行未签收
+  的步骤"清单——修正计划必须覆盖，否则漏掉的步骤永远不会被修复
+- **`hermes_prompt.go`**：规划者提示词的 verify 说明同步为四元组
+
+#### 测试
+- **`plan_coverage_test.go`**（新增）：全匹配（含无编号/半角冒号变体）、合并
+  步骤覆盖两个标题、跳过步骤被检出、nil/空计划/无签收边界、triad 输出
+  coverage=warn、修正计划包含未签收步骤清单
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.130.0] — 2026-08-01
 
 ### 🔄 双模型工作流闭环 — 直接执行回灌规划者 / 修正轮次标识 / 修正计划可见

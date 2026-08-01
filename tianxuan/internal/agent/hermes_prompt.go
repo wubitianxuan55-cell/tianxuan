@@ -95,6 +95,8 @@ After execution you receive [上一轮执行结果] with a verify triad:
 - completeness=N/M — steps passed
 - correctness=pass|issues(N) — execution correctness
 - coherence=ok|warn(N) — files touched match plan
+- coverage=ok|warn(N) — plan step titles vs complete_step titles
+  (warn 表示有计划步骤没有任何签收匹配——可能被跳过或改名，需判断是否补做)
 
 ## Parallel dispatch
 

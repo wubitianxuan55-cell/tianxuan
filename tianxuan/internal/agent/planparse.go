@@ -74,3 +74,88 @@ func looksLikePlan(text string) bool {
 	}
 	return stepLines >= 2 || (stepLines >= 1 && hasField)
 }
+
+// extractPlanStepTitles 提取 <!--plan--> 之后所有步骤标题（保留原始标题
+// 文本，供 coverage 对照与展示）。
+func extractPlanStepTitles(plan string) []string {
+	var titles []string
+	inPlan := false
+	for _, line := range strings.Split(plan, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "<!--plan-->") {
+			inPlan = true
+			continue
+		}
+		if !inPlan {
+			continue
+		}
+		if isStepLine(trimmed) {
+			titles = append(titles, extractStepTitle(trimmed))
+		}
+	}
+	return titles
+}
+
+// normalizeStepTitle 归一化步骤标题用于相似匹配：小写、去除"步骤 N："
+// 编号前缀与常见图标、压缩空白。
+func normalizeStepTitle(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	for _, prefix := range []string{"步骤 ", "step "} {
+		if after, ok := strings.CutPrefix(s, prefix); ok {
+			i := 0
+			for i < len(after) && after[i] >= '0' && after[i] <= '9' {
+				i++
+			}
+			if i > 0 {
+				s = strings.TrimLeft(after[i:], "：: \t")
+				break
+			}
+		}
+	}
+	s = strings.TrimLeft(s, "✅❌⚠️🔧📌 ")
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// similarStepTitle 判断两个归一化标题是否相似：任一包含另一即视为覆盖。
+// 执行者可以合并步骤（"实现+重构"）或微调措辞，包含匹配容忍这类改写。
+func similarStepTitle(a, b string) bool {
+	return a != "" && b != "" && (strings.Contains(a, b) || strings.Contains(b, a))
+}
+
+// checkStepCoverage 对照计划步骤标题与执行者的 complete_step 步骤名，
+// 返回计划中存在但没有任何签收步骤相似匹配的标题。信息性信号——执行者
+// 合并/改写步骤是允许的，因此结果不参与 pass/fail 判定，只进入 verify
+// 反馈与修正计划上下文，供规划者判断是否漏做。
+func checkStepCoverage(plan string, r *TurnResult) []string {
+	if r == nil || len(r.StepResults) == 0 {
+		return nil
+	}
+	planTitles := extractPlanStepTitles(plan)
+	if len(planTitles) == 0 {
+		return nil
+	}
+	var signed []string
+	for _, sr := range r.StepResults {
+		if n := normalizeStepTitle(sr.Step); n != "" {
+			signed = append(signed, n)
+		}
+	}
+	var missing []string
+	for _, pt := range planTitles {
+		pn := normalizeStepTitle(pt)
+		if pn == "" {
+			continue
+		}
+		matched := false
+		for _, sn := range signed {
+			if similarStepTitle(pn, sn) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			missing = append(missing, pt)
+		}
+	}
+	return missing
+}

@@ -347,7 +347,7 @@ func buildDeltaLines(r *TurnResult, plan string) []string {
 }
 
 // buildVerifyTriad constructs the OpenSpec-style verify summary:
-// completeness / correctness / coherence.
+// completeness / correctness / coherence / coverage.
 func buildVerifyTriad(r *TurnResult, plan string) string {
 	var parts []string
 
@@ -375,6 +375,17 @@ func buildVerifyTriad(r *TurnResult, plan string) string {
 		parts = append(parts, "coherence=ok")
 	} else {
 		parts = append(parts, fmt.Sprintf("coherence=warn(%d)", len(cohWarnings)))
+	}
+
+	// Coverage: plan step titles vs complete_step titles (informational —
+	// executors may merge or rephrase steps, so a warn is a signal for the
+	// planner to check, not a hard failure).
+	if len(r.StepResults) > 0 {
+		if missing := checkStepCoverage(plan, r); len(missing) > 0 {
+			parts = append(parts, fmt.Sprintf("coverage=warn(%d)", len(missing)))
+		} else if countPlanSteps(plan) > 0 {
+			parts = append(parts, "coverage=ok")
+		}
 	}
 
 	return strings.Join(parts, " ")

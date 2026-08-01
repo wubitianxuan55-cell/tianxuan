@@ -458,6 +458,13 @@ func buildFixPrompt(origInput, originalPlan string, failed *TurnResult, round in
 		fixTarget = "执行反馈中未收集到步骤级别的失败信息——检查是否所有 complete_step 调用都成功了。确认任务实际完成状态，若已完成则直接结束，否则补充缺失的修复。"
 	}
 
+	// W4: 计划中存在但执行未签收的步骤——执行者可能跳过或全部改写标题。
+	// 修正计划必须补上这些步骤，否则漏掉的部分永远不会被修复。
+	if uncovered := checkStepCoverage(originalPlan, failed); len(uncovered) > 0 {
+		fixTarget += fmt.Sprintf("\n\n计划中存在但执行未签收的步骤（可能被跳过或改名，修正计划必须覆盖）:\n%s",
+			strings.Join(uncovered, "\n"))
+	}
+
 	if round == 2 || len(fixHistory) == 0 {
 		// Round 2: targeted fix — only patch the broken steps
 		return fmt.Sprintf(`以下步骤执行失败，请创建最小修正计划，仅修正失败的步骤：

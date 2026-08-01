@@ -1,3 +1,56 @@
+## [10.134.0] — 2026-08-01
+
+### 🧠 单模型架构优化 — AutoPlan 接线：复杂任务自动计划→确认→执行
+
+> 单模型（Solo）架构的系统性缺口：planmode 计划模式基础设施（只读门 + Marker）
+> 与 auto_plan 配置（off|ask|on）全部是死代码——SetPlanMode 无调用者、Marker
+> 无注入点、AutoPlan 无读取方，用户配置 auto_plan 完全无效。本次接线完整激活。
+
+#### 根因（5 级追溯）
+- 表象：单模型模式下复杂任务直接执行，没有计划确认环节；配置 auto_plan 无效。
+- 直接原因：`planmode.Marker` / `SetPlanMode` / `AutoPlan` 三者各自实现完整，
+  但没有任何调用链把它们连起来。
+- 本地根因：V10.22 蒸馏 Plan Mode（Claude Code）时只移植了门与策略，控制器
+  层没有"何时进入计划模式"的决策。
+- 系统根因：双模型模式有 Hermes 自带计划确认，单模型模式缺少同等的宿主级
+  规划阶段；AutoPlan 配置因此沦为占位。
+- 过程根因：计划模式随双模型开发引入，Solo 路径从未被同一套机制覆盖。
+
+#### 实现
+- **`agent/planner_route.go`**：新增 `ShouldAutoPlan(input, mode)`——复用
+  DecidePlannerRoute，仅复杂/多步骤任务（RoutePlanAndExec：high_risk /
+  cross_surface / structured / complex）进入计划模式；原子编辑/只读/指令/
+  聊天保持直接执行
+- **`control/controller.go`**：`Options.AutoPlan` 接线；交互模式下 Solo 模式
+  （runner 非 Hermes）复杂任务自动 `SetPlanMode(true)` 并注入 `planmode.Marker`；
+  计划模式严格限定本 turn（defer 退出，无跨轮泄漏）；`Ask` 增加批准钩子——
+  用户选择"提交执行"即退出只读门，同轮继续执行；"按意见修改"保持计划模式
+  重新规划；"取消"结束
+- **`planmode/policy.go`**：Marker 补充 ask 批准工作流（输出计划后必须调 ask
+  请求批准，选项固定为 提交执行/按意见修改/取消）；顺带修正 Marker 指引的
+  `read_only_task`/`read_only_skill` 为实际不存在的工具——改为只读工具
+  （read_file/grep/glob/web_search）自行调查，并明确计划模式下禁止派发子代理
+- **`boot/boot.go`**：`cfg.Agent.AutoPlan` 传入 controller
+
+#### 启用方式
+- `config.toml` 的 `[agent]` 加 `auto_plan = "ask"`（或 "on"）。交互桌面/Web
+  模式下复杂任务会先进入计划模式：模型只读调查 → 输出分层计划 → ask 确认卡 →
+  批准后同轮执行
+
+#### 测试
+- **`agent/auto_plan_test.go`**（新增）：off/空/非法模式禁用；ask/on + 复杂任务
+  启用（high_risk/complex/cross_surface/multi-file）；简单任务（聊天/原子编辑/
+  指令/只读）不启用
+- **`planmode/policy_test.go`**（新增）：Marker 必须包含 ask 批准工作流关键词
+- **`control/auto_plan_test.go`**（新增）：批准退出只读门 + autoPlanActive 复位；
+  修改/取消保持计划门；非交互/off/nil executor 不启用
+- `agent.go`：新增 `PlanMode()` getter 供断言与诊断
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.133.0] — 2026-08-01
 
 ### 🐛 修复技能/子代理使用统计恒为 0 — 自动注入可观测 + Solo 子代理指引

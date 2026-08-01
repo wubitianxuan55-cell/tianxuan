@@ -437,6 +437,14 @@ func (a *AgentRunner) SetPlanMode(v bool) {
 	a.planModeGate.Store(v)
 }
 
+// PlanMode reports whether the read-only plan-mode gate is currently active.
+func (a *AgentRunner) PlanMode() bool {
+	if a == nil {
+		return false
+	}
+	return a.planModeGate.Load()
+}
+
 // SetPlanModePolicy installs the plan-mode tool safety policy.
 func (a *AgentRunner) SetPlanModePolicy(p planmode.Policy) {
 	a.planModePolicy = p

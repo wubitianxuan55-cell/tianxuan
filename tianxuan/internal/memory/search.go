@@ -2,8 +2,11 @@ package memory
 
 import (
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -22,6 +25,10 @@ type SearchIndex struct {
 	avgDocLen float64
 	// previews stores memory name → one-line description for display.
 	previews map[string]string
+	// bodies stores memory name → full body text (for recall injection).
+	bodies map[string]string
+	// mtimes stores memory name → file modification time (for freshness).
+	mtimes map[string]time.Time
 	// kinds stores memory name → Kind (for filtering).
 	kinds map[string]Kind
 
@@ -40,6 +47,8 @@ type SearchMatch struct {
 	Name    string // memory slug
 	Score   float64
 	Preview string // one-line description for display (from frontmatter)
+	Body    string     // full memory body (for auto-recall injection)
+	Mtime   time.Time  // file mtime (for freshness caveats)
 	Kind    Kind   // semantic / episodic / procedural
 }
 
@@ -56,6 +65,8 @@ func (s Store) BuildSearchIndex(docs []Source) *SearchIndex {
 		entries:  make(map[string][]tfEntry),
 		docLen:   make(map[string]int),
 		previews: make(map[string]string),
+		bodies:   make(map[string]string),
+		mtimes:   make(map[string]time.Time),
 		kinds:    make(map[string]Kind),
 		k1:       1.2,
 		b:        0.75,
@@ -64,14 +75,14 @@ func (s Store) BuildSearchIndex(docs []Source) *SearchIndex {
 	// Index Store memories.
 	for _, m := range memories {
 		text := strings.ToLower(m.Title + " " + m.Description + " " + m.Body)
-		idx.indexDoc(m.Name, text, m.Title, m.Description, m.Kind)
+		idx.indexDoc(m.Name, text, m.Title, m.Description, m.Kind, m.Body, s.mtimeOf(m.Name))
 	}
 
 	// Index Docs (AGENTS.md etc.) under a "doc:" prefix namespace.
 	for _, d := range docs {
 		name := "doc:" + d.Path
 		text := strings.ToLower(d.Body)
-		idx.indexDoc(name, text, filepathBase(d.Path), "", KindSemantic)
+		idx.indexDoc(name, text, filepathBase(d.Path), "", KindSemantic, d.Body, docMtime(d.Path))
 	}
 
 	// Compute average document length.
@@ -98,7 +109,7 @@ func filepathBase(path string) string {
 }
 
 // indexDoc adds one document (memory or doc) to the index.
-func (idx *SearchIndex) indexDoc(name, text, title, desc string, kind Kind) {
+func (idx *SearchIndex) indexDoc(name, text, title, desc string, kind Kind, body string, mtime time.Time) {
 	tokens := tokenize(text)
 	if len(tokens) == 0 {
 		return
@@ -116,6 +127,8 @@ func (idx *SearchIndex) indexDoc(name, text, title, desc string, kind Kind) {
 		preview += " — " + desc
 	}
 	idx.previews[name] = preview
+	idx.bodies[name] = body
+	idx.mtimes[name] = mtime
 
 	// Token frequency in this document.
 	tf := make(map[string]int)
@@ -202,6 +215,8 @@ func (idx *SearchIndex) searchFiltered(query string, kind Kind) []SearchMatch {
 			Name:    name,
 			Score:   score,
 			Preview: idx.previews[name],
+			Body:    idx.bodies[name],
+			Mtime:   idx.mtimes[name],
 			Kind:    idx.kinds[name],
 		})
 	}
@@ -213,6 +228,27 @@ func (idx *SearchIndex) searchFiltered(query string, kind Kind) []SearchMatch {
 	})
 
 	return matches
+}
+
+// mtimeOf returns the modification time of the memory file with the given
+// name, or the zero time when the file cannot be stat'ed.
+func (s Store) mtimeOf(name string) time.Time {
+	for _, dir := range s.dirs() {
+		info, err := os.Stat(filepath.Join(dir, name+".md"))
+		if err == nil {
+			return info.ModTime()
+		}
+	}
+	return time.Time{}
+}
+
+// docMtime returns the modification time of a doc source path (zero on error).
+func docMtime(path string) time.Time {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
 }
 
 // --- Tokenization ---

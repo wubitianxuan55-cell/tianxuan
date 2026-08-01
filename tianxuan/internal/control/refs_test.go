@@ -60,6 +60,85 @@ func TestClassifyRef(t *testing.T) {
 	}
 }
 
+// TestClassifyRefSession verifies @session:<id> resolves as a session ref
+// without touching the filesystem.
+func TestClassifyRefSession(t *testing.T) {
+	known := map[string]bool{}
+	exists := func(string) bool { return false }
+	r, ok := classifyRef("session:abc123", known, exists)
+	if !ok {
+		t.Fatal("@session:<id> must classify as a session reference")
+	}
+	if r.kind != refSession {
+		t.Fatalf("kind = %v, want refSession", r.kind)
+	}
+	if r.raw != "abc123" {
+		t.Fatalf("raw session id = %q, want abc123", r.raw)
+	}
+}
+
+// TestSessionDigestKeepsTextAndCompressesToolResults verifies the digest
+// preserves user/assistant text, compresses tool results to one line, and
+// keeps the newest content within budget.
+func TestSessionDigestKeepsTextAndCompressesToolResults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sess.jsonl")
+	var b strings.Builder
+	msgs := []struct {
+		role, content string
+	}{
+		{"user", "修复登录超时"},
+		{"assistant", "我来排查连接池配置"},
+		{"tool", "读取 config.toml 成功，内容 2048 字节"},
+		{"user", "结果如何"},
+		{"assistant", "已修复，连接池大小调为 50"},
+	}
+	for _, m := range msgs {
+		b.WriteString(`{"role":"` + m.role + `","content":"` + m.content + `"}` + "\n")
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	digest, err := sessionDigest(path, 8192)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(digest, "修复登录超时") || !strings.Contains(digest, "已修复") {
+		t.Fatalf("digest must keep user/assistant text:\n%s", digest)
+	}
+	if strings.Contains(digest, "2048 字节") {
+		t.Fatalf("tool result must be compressed out of the digest:\n%s", digest)
+	}
+}
+
+// TestSessionDigestBudgetKeepsNewest verifies a small budget drops older
+// messages while keeping the newest tail and marks the omission.
+func TestSessionDigestBudgetKeepsNewest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sess.jsonl")
+	var b strings.Builder
+	for i := 0; i < 20; i++ {
+		b.WriteString(`{"role":"user","content":"message ` + string(rune('A'+i)) + `"}` + "\n")
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := sessionDigest(path, 60) // tiny budget
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(digest, "omitted") && !strings.Contains(digest, "truncated") {
+		t.Fatalf("small-budget digest must mark omitted earlier content:\n%s", digest)
+	}
+	if strings.Contains(digest, "message A") {
+		t.Fatalf("small-budget digest must drop the oldest messages:\n%s", digest)
+	}
+	if !strings.Contains(digest, "message S") {
+		t.Fatalf("small-budget digest must keep the newest tail:\n%s", digest)
+	}
+}
+
 func TestReadFileRef(t *testing.T) {
 	dir := t.TempDir()
 

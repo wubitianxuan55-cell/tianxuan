@@ -242,6 +242,16 @@ export function MemoryPanelContent() {
     finally { setBusy(false); }
   }, [busy, reload]);
 
+  const rejectPendingMemory = useCallback(async (name: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await app.RejectPendingMemory(name);
+      await refreshSuggestions();
+    } catch (e) { setError(String(e)); }
+    finally { setBusy(false); }
+  }, [busy, refreshSuggestions]);
+
   const acceptSkillSuggestion = useCallback(async (c: SkillSuggestion) => {
     if (busy) return;
     setBusy(true);
@@ -582,9 +592,16 @@ export function MemoryPanelContent() {
                         {acceptedSuggestions.has(s.id || s.name) ? (
                           <span className="mem-saved-badge">{t("memory.savedBadge")}</span>
                         ) : (
-                          <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
-                            <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
-                          </button>
+                          <div className="mem-suggestion__actions">
+                            <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
+                              <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
+                            </button>
+                            {s.source === "auto-extract" && (
+                              <button className="btn btn--small btn--ghost" onClick={() => void rejectPendingMemory(s.name)} disabled={busy} type="button">
+                                {t("memory.reject")}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}

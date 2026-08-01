@@ -3,12 +3,14 @@ package control
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -27,6 +29,7 @@ const (
 	refResource refKind = iota // an MCP resource: @<server>:<uri>
 	refFile                    // a local file or directory: @<path>
 	refImage                   // a local image attachment: @.tianxuan/attachments/<file>
+	refSession                 // a past session: @session:<id>
 )
 
 // ref is a resolved @reference found in a submitted line.
@@ -62,6 +65,11 @@ func parseRefTokens(line string) []string {
 // is a file. Anything else (an @mention, an email) is not a reference. exists is
 // injected so the rule is testable without touching the filesystem.
 func classifyRef(token string, known map[string]bool, exists func(string) bool) (ref, bool) {
+	// @session:<id> references a persisted conversation for cross-session
+	// reuse (Qwen Code @session). Resolved purely by prefix; never a file.
+	if id, ok := strings.CutPrefix(token, "session:"); ok && id != "" && !strings.ContainsAny(id, `/\`) {
+		return ref{kind: refSession, raw: id}, true
+	}
 	if i := strings.Index(token, ":"); i > 0 && i+1 < len(token) && known[token[:i]] {
 		return ref{kind: refResource, server: token[:i], uri: token[i+1:], raw: token}, true
 	}
@@ -128,9 +136,103 @@ func (c *Controller) ResolveRefs(ctx context.Context, line string) (block string
 			appendRefBlock(&b, tag, `path="`+r.path+`"`, text)
 		case refImage:
 			appendRefBlock(&b, "image", `path="`+r.path+`"`, "[image attachment available at @"+r.path+"; use an image/OCR/vision MCP tool if visual understanding is needed]")
+		case refSession:
+			path := filepath.Join(c.sessionDir, r.raw+".jsonl")
+			text, err := sessionDigest(path, maxSessionRefBytes)
+			if err != nil {
+				errs = append(errs, "@session:"+r.raw+" — "+err.Error())
+				continue
+			}
+			appendRefBlock(&b, "session", `ref="@session:`+r.raw+`"`, text)
 		}
 	}
 	return b.String(), errs
+}
+
+// maxSessionRefBytes caps how much of a referenced session is injected,
+// mirroring Qwen Code's 8k token budget for @session summaries: the newest
+// content is kept, older parts are omitted with a marker.
+const maxSessionRefBytes = 8 * 1024
+
+// sessionDigest renders a deterministic, read-only summary of a JSONL session:
+// user/assistant text is kept, tool results are compressed to a one-line
+// status, and only the newest content within budget is retained (older parts
+// marked omitted). No LLM call; failures are returned to the caller.
+func sessionDigest(path string, budgetBytes int) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	type sessionMsg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+		Name    string `json:"name"`
+	}
+	var msgs []sessionMsg
+	dec := json.NewDecoder(f)
+	for {
+		var m sessionMsg
+		if err := dec.Decode(&m); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return "", fmt.Errorf("decode session %s: %w", path, err)
+		}
+		msgs = append(msgs, m)
+	}
+
+	var kept []string
+	used := 0
+	omitted := false
+	for i := len(msgs) - 1; i >= 0; i-- {
+		line := renderSessionLine(msgs[i])
+		if line == "" {
+			continue
+		}
+		if budgetBytes > 0 && used+len(line) > budgetBytes {
+			omitted = true
+			break
+		}
+		kept = append(kept, line)
+		used += len(line)
+	}
+
+	var b strings.Builder
+	if omitted {
+		b.WriteString("[earlier content omitted — deterministic session summary]\n")
+	}
+	for i := len(kept) - 1; i >= 0; i-- {
+		b.WriteString(kept[i])
+		b.WriteString("\n")
+	}
+	return b.String(), nil
+}
+
+// renderSessionLine turns one message into a digest line: text roles are kept
+// verbatim (trimmed), tool results collapse to a one-line status.
+func renderSessionLine(m struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+	Name    string `json:"name"`
+}) string {
+	switch m.Role {
+	case "user", "assistant":
+		if t := strings.TrimSpace(m.Content); t != "" {
+			return m.Role + ": " + t
+		}
+		return ""
+	case "tool":
+		name := m.Name
+		if name == "" {
+			name = "tool"
+		}
+		n := len([]rune(strings.TrimSpace(m.Content)))
+		return "[tool:" + name + "] output " + strconv.Itoa(n) + " chars"
+	default:
+		return ""
+	}
 }
 
 func appendRefBlock(b *strings.Builder, tag, attr, body string) {

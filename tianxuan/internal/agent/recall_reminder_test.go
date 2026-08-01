@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"tianxuan/internal/memory"
 	"tianxuan/internal/provider"
@@ -79,3 +81,67 @@ func TestRecallReminderOneShot(t *testing.T) {
 
 // compile-time check: stubMemQueue satisfies memory.Queue
 var _ memory.Queue = stubMemQueue{}
+
+// TestAutoRecallInjectsBodyAndFreshness verifies the auto-recall block carries
+// the memory body (truncated) and a staleness caveat for old memories.
+func TestAutoRecallInjectsBodyAndFreshness(t *testing.T) {
+	old := time.Now().Add(-72 * time.Hour)
+	MemorySearchFunc = func(query string, limit int) []MemoryResult {
+		return []MemoryResult{{
+			Name:    "build-rule",
+			Preview: "Build Rule — Always build with race detector",
+			Body:    "Always run `go build -race` before submitting changes.",
+			Mtime:   old,
+		}}
+	}
+	t.Cleanup(func() { MemorySearchFunc = nil })
+
+	s := NewSession("")
+	s.Add(provider.Message{Role: provider.RoleUser, Content: "怎么构建这个项目？"})
+	a := &AgentRunner{session: s}
+	before := len(s.Messages)
+	a.maybeAutoRecall()
+	if len(s.Messages) != before+1 {
+		t.Fatalf("expected +1 injected message, got +%d", len(s.Messages)-before)
+	}
+	last := s.Messages[len(s.Messages)-1]
+	if !strings.Contains(last.Content, "go build -race") {
+		t.Fatalf("recall block must carry the memory body:\n%s", last.Content)
+	}
+	if !strings.Contains(last.Content, "3 days") && !strings.Contains(last.Content, "outdated") {
+		t.Fatalf("recall block must note staleness for old memory:\n%s", last.Content)
+	}
+}
+
+// TestAutoRecallDedupPerSession verifies the same memory is injected at most
+// once per session even when a later query matches it again.
+func TestAutoRecallDedupPerSession(t *testing.T) {
+	MemorySearchFunc = func(query string, limit int) []MemoryResult {
+		return []MemoryResult{{Name: "build-rule", Preview: "Build Rule"}}
+	}
+	t.Cleanup(func() { MemorySearchFunc = nil })
+
+	s := NewSession("")
+	s.Add(provider.Message{Role: provider.RoleUser, Content: "怎么构建？"})
+	a := &AgentRunner{session: s}
+	a.maybeAutoRecall()
+	if n := countAutoRecall(s.Snapshot()); n != 1 {
+		t.Fatalf("first recall: want 1 injected block, got %d", n)
+	}
+	// A second, different query still matches the same memory — must not re-inject.
+	s.Add(provider.Message{Role: provider.RoleUser, Content: "构建命令是什么？"})
+	a.maybeAutoRecall()
+	if n := countAutoRecall(s.Snapshot()); n != 1 {
+		t.Fatalf("second recall: want still 1 injected block (dedup), got %d", n)
+	}
+}
+
+func countAutoRecall(msgs []provider.Message) int {
+	n := 0
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "[auto-recall]") {
+			n++
+		}
+	}
+	return n
+}

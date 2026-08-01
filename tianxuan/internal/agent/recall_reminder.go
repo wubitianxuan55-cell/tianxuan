@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"tianxuan/internal/provider"
 )
@@ -57,12 +59,18 @@ func (a *AgentRunner) maybeRecallReminder() {
 
 // MemoryResult 是自动记忆检索的结果条目。
 type MemoryResult struct {
-	Name    string // 记忆名称
-	Preview string // 预览描述
+	Name    string    // 记忆名称
+	Preview string    // 预览描述
+	Body    string    // 记忆正文（用于截断注入）
+	Mtime   time.Time // 记忆文件修改时间（用于新鲜度提示）
 }
 
 // MemorySearchFunc 是注入的记忆搜索函数。boot 在初始化时设置。
 var MemorySearchFunc func(query string, limit int) []MemoryResult
+
+// maxRecallBodyChars caps the injected memory body so a single auto-recall
+// block cannot blow the context budget (Qwen Code uses 1200).
+const maxRecallBodyChars = 1200
 
 func (a *AgentRunner) maybeAutoRecall() {
 	if MemorySearchFunc == nil {
@@ -85,14 +93,36 @@ func (a *AgentRunner) maybeAutoRecall() {
 	if len(hits) == 0 {
 		return
 	}
+	// Session-level dedup: skip memories already injected in this session.
+	if a.recalledMemories == nil {
+		a.recalledMemories = map[string]bool{}
+	}
+	fresh := hits[:0]
+	for _, h := range hits {
+		if !a.recalledMemories[h.Name] {
+			a.recalledMemories[h.Name] = true
+			fresh = append(fresh, h)
+		}
+	}
+	if len(fresh) == 0 {
+		return
+	}
 	var b strings.Builder
 	b.WriteString("[auto-recall] 相关记忆自动检索结果:\n")
-	for _, h := range hits {
+	for _, h := range fresh {
 		b.WriteString("- ")
 		b.WriteString(h.Name)
 		if h.Preview != "" {
 			b.WriteString(": ")
 			b.WriteString(h.Preview)
+		}
+		if body := truncateRecallBody(h.Body); body != "" {
+			b.WriteString("\n  ")
+			b.WriteString(body)
+		}
+		if caveat := recallFreshnessCaveat(h.Mtime); caveat != "" {
+			b.WriteString("\n  ")
+			b.WriteString(caveat)
 		}
 		b.WriteString("\n")
 	}
@@ -100,6 +130,33 @@ func (a *AgentRunner) maybeAutoRecall() {
 		Role:    provider.RoleUser,
 		Content: b.String(),
 	})
+}
+
+// truncateRecallBody caps the injected body to maxRecallBodyChars.
+func truncateRecallBody(body string) string {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return ""
+	}
+	r := []rune(body)
+	if len(r) <= maxRecallBodyChars {
+		return body
+	}
+	return string(r[:maxRecallBodyChars]) + "…(truncated)"
+}
+
+// recallFreshnessCaveat returns a staleness warning for memories older than a
+// day, mirroring Qwen's memoryFreshnessText: memories are point-in-time
+// observations, not live state.
+func recallFreshnessCaveat(mtime time.Time) string {
+	if mtime.IsZero() {
+		return ""
+	}
+	days := int(time.Since(mtime).Hours() / 24)
+	if days <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("> Note: this memory is %d days old — verify against current code before relying on it.", days)
 }
 
 // lastUserContent 返回最近一条 user 消息的内容，用于记忆检索查询。

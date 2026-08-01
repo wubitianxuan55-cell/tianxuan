@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // TestSearchIndexBuildAndSearch validates the full index→search pipeline.
@@ -58,6 +59,38 @@ func TestSearchIndexBuildAndSearch(t *testing.T) {
 	matches = idx.Search("xyzzy_nonexistent")
 	if len(matches) != 0 {
 		t.Fatalf("expected 0 matches for nonexistent, got %d", len(matches))
+	}
+}
+
+// TestSearchMatchCarriesBodyAndMtime verifies recall payloads include the
+// memory body and the file's modification time so auto-recall can inject
+// truncated content plus a freshness caveat.
+func TestSearchMatchCarriesBodyAndMtime(t *testing.T) {
+	dir := t.TempDir()
+	store := Store{Dir: dir}
+	if _, err := store.Save(Memory{
+		Name:        "build-rule",
+		Title:       "Build Rule",
+		Description: "Always build with race detector",
+		Type:        TypeProject,
+		Body:        "Always run `go build -race` before submitting changes.",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	idx := store.BuildSearchIndex(nil)
+	matches := idx.Search("build race")
+	if len(matches) == 0 {
+		t.Fatal("no match for build-rule")
+	}
+	m := matches[0]
+	if m.Body == "" {
+		t.Fatal("SearchMatch must carry the memory body")
+	}
+	if m.Mtime.IsZero() {
+		t.Fatal("SearchMatch must carry the memory file mtime")
+	}
+	if age := time.Since(m.Mtime); age < 0 || age > time.Hour {
+		t.Fatalf("mtime should be recent (file just saved), got age %v", age)
 	}
 }
 

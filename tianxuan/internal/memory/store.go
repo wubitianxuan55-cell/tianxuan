@@ -98,7 +98,17 @@ func StoreFor(userDir, cwd string) Store {
 	if userDir == "" {
 		return Store{}
 	}
-	return Store{Dir: filepath.Join(userDir, "projects", slugify(absOf(cwd)), "memory")}
+	// Key the store by the nearest git root so every subdirectory of one
+	// repository shares the same memory (Qwen/Claude convention); an
+	// un-versioned working directory falls back to its own cwd slug.
+	key := absOf(cwd)
+	if root := gitRoot(absOf(cwd)); root != "" {
+		key = root
+	}
+	return Store{
+		Dir:       filepath.Join(userDir, "projects", slugify(key), "memory"),
+		GlobalDir: filepath.Join(userDir, "memories"),
+	}
 }
 
 // indexFile is the human-readable index of saved memories.
@@ -112,17 +122,60 @@ func slugify(absPath string) string {
 	return r.Replace(absPath)
 }
 
-// Index returns the MEMORY.md contents (the per-line index of saved memories),
-// or "" if there are none yet. This is what loads into the cached prefix.
+// migrateLegacyStore moves a store created under a pre-git-root key (the cwd
+// slug) into the git-root-keyed location so memory saved before that change is
+// not orphaned when a session starts from a subdirectory. No-op when there is
+// no git root, the legacy directory is missing, or the target already exists —
+// migration never merges two stores.
+func migrateLegacyStore(userDir, cwd string) error {
+	if userDir == "" {
+		return nil
+	}
+	abs := absOf(cwd)
+	root := gitRoot(abs)
+	if root == "" {
+		return nil
+	}
+	oldKey := slugify(abs)
+	newKey := slugify(root)
+	if oldKey == newKey {
+		return nil
+	}
+	oldDir := filepath.Join(userDir, "projects", oldKey, "memory")
+	newDir := filepath.Join(userDir, "projects", newKey, "memory")
+	if _, err := os.Stat(oldDir); os.IsNotExist(err) {
+		return nil
+	}
+	if _, err := os.Stat(newDir); err == nil {
+		return nil // target exists — never merge
+	}
+	if err := os.MkdirAll(filepath.Dir(newDir), 0o755); err != nil {
+		return err
+	}
+	return os.Rename(oldDir, newDir)
+}
+
+// Index returns the merged MEMORY.md contents (the per-line index of saved
+// memories) from the cross-project directory followed by the project one, or ""
+// if there are none yet. This is what loads into the cached prefix.
 func (s Store) Index() string {
-	if s.Dir == "" {
+	if s.Dir == "" && s.GlobalDir == "" {
 		return ""
 	}
-	b, err := os.ReadFile(filepath.Join(s.Dir, indexFile))
-	if err != nil {
-		return ""
+	var parts []string
+	for _, dir := range []string{s.GlobalDir, s.Dir} {
+		if dir == "" {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, indexFile))
+		if err != nil {
+			continue
+		}
+		if t := strings.TrimSpace(string(b)); t != "" {
+			parts = append(parts, t)
+		}
 	}
-	return strings.TrimSpace(string(b))
+	return strings.Join(parts, "\n\n")
 }
 
 // Path returns the absolute file path a memory with the given name lives at.
@@ -130,26 +183,40 @@ func (s Store) Path(name string) string {
 	return filepath.Join(s.Dir, slug(name)+".md")
 }
 
+// saveDir returns the directory a memory should be written to: user-type and
+// feedback-type facts go cross-project (GlobalDir) when one is configured so
+// they survive project switches; everything else stays project-scoped.
+func (s Store) saveDir(m Memory) string {
+	if s.GlobalDir != "" && s.GlobalDir != s.Dir {
+		t := NormalizeType(string(m.Type))
+		if t == TypeUser || t == TypeFeedback {
+			return s.GlobalDir
+		}
+	}
+	return s.Dir
+}
+
 // Save writes (or overwrites) a memory file and refreshes its MEMORY.md index
 // line. It is the single mutation entry point — the `remember` tool, the desktop
 // editor, and any future importer all go through here so the index never drifts
 // from the files. Returns the path written.
 func (s Store) Save(m Memory) (string, error) {
-	if s.Dir == "" {
+	if s.Dir == "" && s.GlobalDir == "" {
 		return "", fmt.Errorf("memory store unavailable (no user config dir)")
 	}
 	name := slug(m.Name)
 	if name == "" {
 		return "", fmt.Errorf("memory needs a name")
 	}
-	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+	dir := s.saveDir(m)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(s.Dir, name+".md")
+	path := filepath.Join(dir, name+".md")
 	if err := os.WriteFile(path, []byte(render(m, name)), 0o644); err != nil {
 		return "", err
 	}
-	if err := s.reindex(name, m); err != nil {
+	if err := s.reindexIn(dir, name, m); err != nil {
 		return path, err
 	}
 	return path, nil
@@ -159,19 +226,20 @@ func (s Store) Save(m Memory) (string, error) {
 // so wrong memories remain traceable and recoverable. The MEMORY.md index line
 // is still removed. A missing file is not an error.
 func (s Store) Archive(name string) (string, error) {
-	if s.Dir == "" {
+	if s.Dir == "" && s.GlobalDir == "" {
 		return "", fmt.Errorf("memory store unavailable (no user config dir)")
 	}
 	name = slug(name)
 	if name == "" {
 		return "", fmt.Errorf("memory needs a name")
 	}
-	file := name + ".md"
-	src := filepath.Join(s.Dir, file)
-	if _, err := os.Stat(src); os.IsNotExist(err) {
+	dir := s.findDir(name)
+	if dir == "" {
 		return "", nil // nothing to archive
 	}
-	archiveDir := filepath.Join(s.Dir, ".archive")
+	file := name + ".md"
+	src := filepath.Join(dir, file)
+	archiveDir := filepath.Join(dir, ".archive")
 	if err := os.MkdirAll(archiveDir, 0700); err != nil {
 		return "", err
 	}
@@ -180,7 +248,7 @@ func (s Store) Archive(name string) (string, error) {
 	if err := os.Rename(src, dest); err != nil {
 		return "", err
 	}
-	if err := s.flushIndex(s.indexLinesExcept(name)); err != nil {
+	if err := s.flushIndexIn(dir, s.indexLinesExceptIn(dir, name)); err != nil {
 		return dest, err
 	}
 	return dest, nil
@@ -198,12 +266,16 @@ func (s Store) Delete(name string) error {
 // or demote to "project"/"feedback"). The memory is reloaded from disk, its
 // Type updated, and re-saved — all other fields are preserved.
 func (s Store) ChangeType(name string, newType Type) error {
-	if s.Dir == "" {
+	if s.Dir == "" && s.GlobalDir == "" {
 		return fmt.Errorf("memory store unavailable (no user config dir)")
 	}
 	name = slug(name)
 	if name == "" {
 		return fmt.Errorf("memory needs a name")
+	}
+	oldDir := s.findDir(name)
+	if oldDir == "" {
+		return fmt.Errorf("memory %q not found", name)
 	}
 	var target *Memory
 	for _, m := range s.List() {
@@ -217,8 +289,18 @@ func (s Store) ChangeType(name string, newType Type) error {
 		return fmt.Errorf("memory %q not found", name)
 	}
 	target.Type = newType
-	_, err := s.Save(*target)
-	return err
+	newDir := s.saveDir(*target)
+	if _, err := s.Save(*target); err != nil {
+		return err
+	}
+	if newDir != oldDir {
+		// Move semantics: drop the file and index line from the old location.
+		if err := os.Remove(filepath.Join(oldDir, name+".md")); err != nil {
+			return err
+		}
+		return s.flushIndexIn(oldDir, s.indexLinesExceptIn(oldDir, name))
+	}
+	return nil
 }
 
 // render serializes a memory to frontmatter + body. The frontmatter mirrors the
@@ -251,10 +333,21 @@ func render(m Memory, name string) string {
 // MEMORY.md.
 var indexLineRe = regexp.MustCompile(`\]\(([^)]+)\.md\)`)
 
-// indexLinesExcept returns the managed MEMORY.md lines keyed by filename stem,
-// dropping the entry for name (a missing index → empty map).
-func (s Store) indexLinesExcept(name string) map[string]string {
-	existing, _ := os.ReadFile(filepath.Join(s.Dir, indexFile))
+// findDir returns the store directory currently holding the memory file with
+// the given slug name, or "" when it is not saved in either directory.
+func (s Store) findDir(name string) string {
+	for _, dir := range s.dirs() {
+		if _, err := os.Stat(filepath.Join(dir, name+".md")); err == nil {
+			return dir
+		}
+	}
+	return ""
+}
+
+// indexLinesExceptIn returns the managed MEMORY.md lines of dir keyed by
+// filename stem, dropping the entry for name (a missing index → empty map).
+func (s Store) indexLinesExceptIn(dir, name string) map[string]string {
+	existing, _ := os.ReadFile(filepath.Join(dir, indexFile))
 	keep := map[string]string{}
 	for _, line := range strings.Split(string(existing), "\n") {
 		if mt := indexLineRe.FindStringSubmatch(line); mt != nil && mt[1] != name {
@@ -264,8 +357,8 @@ func (s Store) indexLinesExcept(name string) map[string]string {
 	return keep
 }
 
-// flushIndex rewrites MEMORY.md from the managed lines, sorted by filename.
-func (s Store) flushIndex(lines map[string]string) error {
+// flushIndexIn rewrites dir/MEMORY.md from the managed lines, sorted by filename.
+func (s Store) flushIndexIn(dir string, lines map[string]string) error {
 	names := make([]string, 0, len(lines))
 	for n := range lines {
 		names = append(names, n)
@@ -278,15 +371,15 @@ func (s Store) flushIndex(lines map[string]string) error {
 		b.WriteString(lines[n])
 		b.WriteString("\n")
 	}
-	return os.WriteFile(filepath.Join(s.Dir, indexFile), []byte(b.String()), 0o644)
+	return os.WriteFile(filepath.Join(dir, indexFile), []byte(b.String()), 0o644)
 }
 
-// reindex rewrites the MEMORY.md line for name, preserving every other managed
-// line. The line is "- [<title>](<name>.md) — <description>"; title falls back
-// to a de-kebabed name so the index reads as a label, never a bare slug.
+// reindexIn rewrites the MEMORY.md line for name in dir, preserving every other
+// managed line. The line is "- [<title>](<name>.md) — <description>"; title
+// falls back to a de-kebabed name so the index reads as a label, never a bare slug.
 // Kind is shown as a prefix tag when non-semantic: [E] for episodic, [P] for procedural.
-func (s Store) reindex(name string, m Memory) error {
-	lines := s.indexLinesExcept(name)
+func (s Store) reindexIn(dir, name string, m Memory) error {
+	lines := s.indexLinesExceptIn(dir, name)
 	kindTag := ""
 	switch NormalizeKind(string(m.Kind)) {
 	case KindEpisodic:
@@ -295,26 +388,32 @@ func (s Store) reindex(name string, m Memory) error {
 		kindTag = "[P] "
 	}
 	lines[name] = fmt.Sprintf("- %s[%s](%s.md) — %s", kindTag, displayTitle(m.Title, name), name, oneLine(m.Description))
-	return s.flushIndex(lines)
+	return s.flushIndexIn(dir, lines)
 }
 
 // List returns the saved memories parsed from their files, sorted by name. Used
 // by `/memory` and the desktop memory panel. Files that fail to parse are
 // skipped so one bad file never hides the rest.
 func (s Store) List() []Memory {
-	if s.Dir == "" {
+	if s.Dir == "" && s.GlobalDir == "" {
 		return nil
 	}
-	entries, err := os.ReadDir(s.Dir)
-	if err != nil {
-		return nil
-	}
+	seen := map[string]bool{}
 	var out []Memory
-	for _, e := range entries {
-		if e.IsDir() || e.Name() == indexFile || !strings.HasSuffix(e.Name(), ".md") {
+	for _, dir := range s.dirs() {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
 			continue
 		}
-		if m, ok := loadMemory(filepath.Join(s.Dir, e.Name())); ok {
+		for _, e := range entries {
+			if e.IsDir() || e.Name() == indexFile || !strings.HasSuffix(e.Name(), ".md") {
+				continue
+			}
+			m, ok := loadMemory(filepath.Join(dir, e.Name()))
+			if !ok || seen[m.Name] {
+				continue // project-scoped copy wins over the global one
+			}
+			seen[m.Name] = true
 			out = append(out, m)
 		}
 	}

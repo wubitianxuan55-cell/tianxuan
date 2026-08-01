@@ -486,6 +486,7 @@ export function makeMockApp(): AppBindings {
     async AcceptMemorySuggestion(_candidate: MemorySuggestion) {
       return "mock-memory-path";
     },
+    async RejectPendingMemory(_name: string) {},
     async AcceptSkillSuggestion(_candidate: SkillSuggestion) {
       return "mock-skill-path";
     },

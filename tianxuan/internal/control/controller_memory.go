@@ -2,7 +2,10 @@ package control
 
 import (
 	"fmt"
+	"log/slog"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"tianxuan/internal/memory"
 	"tianxuan/internal/tool/builtin"
@@ -211,8 +214,117 @@ func (c *Controller) SaveSession(m memory.Memory) string {
 	return "Saved to session memory (\"" + slugifyName(m.Name) + "\"): " + m.Description
 }
 
+// autoExtract stages durable statements from the finished turn into the
+// pending directory (user confirmation required before they reach active
+// memory). It runs after the per-turn snapshot so the session file exists
+// before the cursor advances. Failures are surfaced loudly and never fail the
+// turn.
+func (c *Controller) autoExtract() {
+	if c.mem == nil || c.executor == nil {
+		return
+	}
+	sessionID := sessionIDFromPath(c.SessionPath())
+	if sessionID == "" {
+		return
+	}
+	msgs := c.History()
+	if len(msgs) == 0 {
+		return
+	}
+	n, err := memory.ExtractCandidates(c.mem.Store, sessionID, msgs)
+	if err != nil {
+		slog.Warn("controller: auto-extract", "err", err)
+		return
+	}
+	if n > 0 {
+		c.notice(fmt.Sprintf("已从本轮会话提取 %d 条记忆候选，待确认后落盘", n))
+	}
+}
+
+// autoDream checks the Dream scheduler gate after a turn and, when it opens,
+// stages one consolidated candidate from sessions finished since the last
+// dream pass. Failures surface loudly and never fail the turn.
+func (c *Controller) autoDream() {
+	if c.mem == nil || c.executor == nil {
+		return
+	}
+	sessionID := sessionIDFromPath(c.SessionPath())
+	if sessionID == "" {
+		return
+	}
+	meta, err := memory.ReadDreamMetadata(c.mem.Store)
+	if err != nil {
+		slog.Warn("controller: auto-dream metadata", "err", err)
+		return
+	}
+	sessionDir := c.sessionDir
+	if sessionDir == "" {
+		return
+	}
+	files := memory.NewSessionFiles(sessionDir, meta.LastDreamAt, sessionID)
+	allowed, _ := memory.DreamGateAllowed(c.mem.Store, meta, sessionID, len(files), time.Now())
+	if !allowed {
+		return
+	}
+	// 低频维护随 dream 门控执行：归档过期弱记忆 + 重建项目画像。
+	if _, err := memory.EvictStale(c.mem.Store, 90*24*time.Hour, time.Now()); err != nil {
+		slog.Warn("controller: memory eviction", "err", err)
+	}
+	if _, err := memory.BuildProfile(c.mem.Store); err != nil {
+		slog.Warn("controller: project profile", "err", err)
+	}
+	n, err := memory.RunDream(c.mem.Store, sessionDir, sessionID, time.Now())
+	if err != nil {
+		slog.Warn("controller: auto-dream", "err", err)
+		return
+	}
+	if n > 0 {
+		c.notice("已整合过去多轮会话知识为 1 条记忆候选，待确认后落盘")
+	}
+}
+
+// PendingMemories returns the auto-extracted candidates awaiting user
+// confirmation.
+func (c *Controller) PendingMemories() []memory.Candidate {
+	if c.mem == nil {
+		return nil
+	}
+	return memory.PendingCandidates(c.mem.Store)
+}
+
+// AcceptPendingMemory confirms one staged candidate, writing it into active
+// memory. Returns the written path.
+func (c *Controller) AcceptPendingMemory(name string) (string, error) {
+	if c.mem == nil {
+		return "", fmt.Errorf("memory unavailable")
+	}
+	path, err := memory.AcceptCandidate(c.mem.Store, name)
+	if err == nil {
+		c.QueueMemory("Memory candidate \"" + name + "\" confirmed and saved.")
+	}
+	return path, err
+}
+
+// RejectPendingMemory discards one staged candidate without writing it.
+func (c *Controller) RejectPendingMemory(name string) error {
+	if c.mem == nil {
+		return fmt.Errorf("memory unavailable")
+	}
+	return memory.RejectCandidate(c.mem.Store, name)
+}
+
 func slugifyName(name string) string {
 	s := strings.ToLower(strings.TrimSpace(name))
 	s = strings.NewReplacer(" ", "-", "_", "-", ".", "-").Replace(s)
 	return s
+}
+
+// sessionIDFromPath derives a stable session id from a JSONL session path,
+// used as the auto-extract cursor key. Returns "" for an empty path.
+func sessionIDFromPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	base := filepath.Base(path)
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }

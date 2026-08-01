@@ -490,6 +490,7 @@ export const zh: Record<DictKey, string> = {
   "memory.newBadge": "新建",
   "memory.newSkillBadge": "新技能",
   "memory.accept": "采纳",
+  "memory.reject": "拒绝",
   "memory.create": "创建",
   "memory.savedBadge": "✓ 已保存",
   "memory.createdBadge": "✓ 已创建",

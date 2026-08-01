@@ -220,6 +220,8 @@ type AgentRunner struct {
 	recallReminderFired bool
 	// V10.100: maybeAutoRecall 去重缓存 — 相同查询跳过搜索
 	lastRecallQuery string
+	// V10.101: session 级记忆去重 — 同一记忆本会话只注入一次（Qwen excludedFilePaths）
+	recalledMemories map[string]bool
 
 	// Stop gates (stop_gate.go) — triple gate for solo mode, skipped in plannerMode.
 	// taskGate checks incomplete canonical todos, goalGate verifies session goal,

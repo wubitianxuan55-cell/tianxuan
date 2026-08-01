@@ -39,6 +39,9 @@ func Load(opts Options) *Set {
 	if cwd == "" {
 		cwd = "."
 	}
+	if opts.UserDir != "" {
+		_ = migrateLegacyStore(opts.UserDir, cwd)
+	}
 	store := StoreFor(opts.UserDir, cwd)
 	docs := discoverDocs(cwd, opts.UserDir)
 	return &Set{

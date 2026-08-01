@@ -32,6 +32,7 @@ type MemorySuggestion struct {
 	Body        string   `json:"body"`
 	Reason      string   `json:"reason"`
 	Evidence    []string `json:"evidence"`
+	Source      string   `json:"source"` // "local-history" or "auto-extract"
 }
 
 // SkillSuggestion is a user-confirmed candidate for a reusable skill.
@@ -95,7 +96,8 @@ func (a *App) MemorySuggestions() MemorySuggestionsView {
 
 	sessionDir := config.WorkspaceSessionDir("")
 	sessions := loadSuggestionSessions(sessionDir, suggestionSessionLimit)
-	view.Memories = suggestMemories(set, sessions)
+	view.Memories = pendingMemories(set)
+	view.Memories = append(view.Memories, suggestMemories(set, sessions)...)
 	view.Skills = suggestSkills("", ctrl.Skills(), sessions)
 	return view
 }
@@ -121,7 +123,8 @@ func (a *App) MemorySuggestionsForTab(tabID string) MemorySuggestionsView {
 
 	sessionDir := config.WorkspaceSessionDir("")
 	sessions := loadSuggestionSessions(sessionDir, suggestionSessionLimit)
-	view.Memories = suggestMemories(set, sessions)
+	view.Memories = pendingMemories(set)
+	view.Memories = append(view.Memories, suggestMemories(set, sessions)...)
 	view.Skills = suggestSkills("", ctrl.Skills(), sessions)
 	return view
 }
@@ -131,6 +134,12 @@ func (a *App) AcceptMemorySuggestion(candidate MemorySuggestion) (string, error)
 	ctrl := a.ctrlByTabID("")
 	if ctrl == nil {
 		return "", nil
+	}
+	// Auto-extracted candidates are confirmed through the pending path so the
+	// staged file is removed and the store write goes through the single entry
+	// point (with its turn-tail queue note).
+	if candidate.Source == "auto-extract" {
+		return ctrl.AcceptPendingMemory(candidate.Name)
 	}
 	desc := oneLine(candidate.Description)
 	body := strings.TrimSpace(candidate.Body)
@@ -149,6 +158,15 @@ func (a *App) AcceptMemorySuggestion(candidate MemorySuggestion) (string, error)
 		Type:        memory.NormalizeType(candidate.Type),
 		Body:        body,
 	})
+}
+
+// RejectPendingMemory discards one auto-extracted candidate without writing it.
+func (a *App) RejectPendingMemory(name string) error {
+	ctrl := a.ctrlByTabID("")
+	if ctrl == nil {
+		return nil
+	}
+	return ctrl.RejectPendingMemory(name)
 }
 
 // AcceptSkillSuggestion writes a previewed skill candidate.
@@ -229,11 +247,36 @@ func suggestMemories(set *memory.Set, sessions []suggestionSession) []MemorySugg
 				Body:        memoryCandidateBody(statement, reason, sess),
 				Reason:      reason,
 				Evidence:    []string{sessionEvidence(sess, statement)},
+				Source:      "local-history",
 			})
 			if len(out) >= memorySuggestionLimit {
 				return out
 			}
 		}
+	}
+	return out
+}
+
+// pendingMemories maps auto-extracted staged candidates into the suggestion
+// view so the desktop panel can confirm or reject them.
+func pendingMemories(set *memory.Set) []MemorySuggestion {
+	if set == nil {
+		return []MemorySuggestion{}
+	}
+	pending := memory.PendingCandidates(set.Store)
+	out := make([]MemorySuggestion, 0, len(pending))
+	for _, c := range pending {
+		out = append(out, MemorySuggestion{
+			ID:          "pending-" + c.Name,
+			Name:        c.Name,
+			Title:       c.Title,
+			Description: c.Description,
+			Type:        string(c.Type),
+			Body:        c.Body,
+			Reason:      "auto-extracted: " + c.Reason,
+			Evidence:    []string{c.Evidence},
+			Source:      "auto-extract",
+		})
 	}
 	return out
 }

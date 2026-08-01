@@ -132,9 +132,15 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			if len(matches) > limit {
 				matches = matches[:limit]
 			}
+			// 强化召回：命中即记一次访问，供 TTL 衰减/画像统计（agentmemory 蒸馏）。
+			for _, m := range matches {
+				if !strings.HasPrefix(m.Name, "doc:") {
+					_ = memory.ReinforceAccess(mem.Store, m.Name)
+				}
+			}
 			results := make([]agent.MemoryResult, len(matches))
 			for i, m := range matches {
-				results[i] = agent.MemoryResult{Name: m.Name, Preview: m.Preview}
+				results[i] = agent.MemoryResult{Name: m.Name, Preview: m.Preview, Body: m.Body, Mtime: m.Mtime}
 			}
 			return results
 		}

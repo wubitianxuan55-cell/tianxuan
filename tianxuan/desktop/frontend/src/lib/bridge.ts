@@ -129,6 +129,7 @@ export interface AppBindings {
   MemorySuggestions(): Promise<MemorySuggestionsView>;
   MemorySuggestionsForTab(tabID: string): Promise<MemorySuggestionsView>;
   AcceptMemorySuggestion(candidate: MemorySuggestion): Promise<string>;
+  RejectPendingMemory(name: string): Promise<void>;
   AcceptSkillSuggestion(candidate: SkillSuggestion): Promise<string>;
   SelectTab(tabID: string): Promise<void>;
   TabMeta(): Promise<TabMeta[]>;

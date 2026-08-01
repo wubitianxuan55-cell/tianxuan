@@ -491,6 +491,7 @@ export const en = {
   "memory.newBadge": "New",
   "memory.newSkillBadge": "New skill",
   "memory.accept": "Accept",
+  "memory.reject": "Reject",
   "memory.create": "Create",
   "memory.savedBadge": "✓ Saved",
   "memory.createdBadge": "✓ Created",

@@ -524,6 +524,7 @@ export interface MemorySuggestion {
   body: string;
   reason: string;
   evidence: string[];
+  source?: string;
 }
 
 export interface SkillSuggestion {

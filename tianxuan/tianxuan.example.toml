@@ -14,8 +14,8 @@ guessing; keep changes minimal and correct; briefly summarize what you did."""
 # system_prompt_file = "prompts/system.md"   # overrides system_prompt when set
 max_steps   = 25
 temperature = 0.0
-auto_plan   = "ask"   # off|ask|on; ask/on auto-enter plan mode for complex tasks
-# auto_plan_classifier = "deepseek-flash"   # optional; only used for borderline tasks
+# auto_plan   = "ask"   # reserved (not wired): 单模型用 Adaptive Execution，双模型用 Hermes 自带确认
+# auto_plan_classifier = "deepseek-flash"   # reserved（同上）
 # planner_model = "mimo-pro"   # optional: enable two-model collaboration
 # planner_max_steps = 12       # optional: cap planner tool-call rounds (0 = default 12)
 # subagent_model = "deepseek-pro"   # optional default for runAs=subagent skills

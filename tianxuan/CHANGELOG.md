@@ -1,3 +1,58 @@
+## [10.135.0] — 2026-08-01
+
+### 🔄 单模型工作流重定义 — Adaptive Execution（回退 V10.134 AutoPlan）
+
+> 方向修正：单模型不应复制双模型的"完整计划→确认→执行"工作流——两者分开的
+> 意义在于**不同的编程工作流**。双模型 = 规划质量优先（分工、计划即合同）；
+> 单模型 = 迭代速度优先（零交接损耗、计划随执行滚动更新）。V10.134 的 AutoPlan
+> 计划确认接线是双模型流程的复制，本次回退，并落地单模型专属的 Adaptive
+> Execution 工作流。
+
+#### 回退 V10.134（AutoPlan 计划确认）
+- **`control/controller.go`**：撤销 Options.AutoPlan、计划模式进入/退出、
+  Ask 批准钩子、autoPlanEnabled/maybeExitPlanMode
+- **`agent/planner_route.go`**：移除 `ShouldAutoPlan`
+- **`boot/boot.go`**：移除 AutoPlan 传参；`agent/agent.go`：移除 PlanMode getter
+- **`config/config.go`** / **`tianxuan.example.toml`**：auto_plan 标注为
+  reserved（未接线）——单模型用 Adaptive Execution，双模型用 Hermes 自带确认
+- **`planmode/policy.go`**：Marker 移除 ask 批准指引（恢复纯计划指令）；
+  保留 V10.134 的修正——read_only_task/read_only_skill 是实际不存在的工具，
+  改为只读工具（read_file/grep/glob/web_search）调查指引，并明确计划模式禁止
+  派发子代理
+
+#### 单模型新工作流：Adaptive Execution（提示词层）
+> 核心差异一句话：双模型"先想清楚再动手（plan→execute）"；单模型"小步前进、
+> 边做边学、计划随执行滚动更新（learn→do→adapt）"。
+- **`hermes_prompt.go`** SoloSystemPrompt 的 Workflow 重写：
+  1. **Skeleton plan** — todo_write 3–10 步骨架，每步可独立验证；**无计划确认
+     往返**，直接开始执行；ask 仅用于真正决策岔路
+  2. **Adaptive loop** — 每步 TDD（失败测试→最小实现→验证→complete_step）后
+     **Adapt**：执行中发现更优方案/新约束/依赖 → 更新 todo（拆分/合并/重排/
+     补充）再继续；"计划是活文档不是合同"
+  3. **Failure adaptation** — 分级升级：1 次失败读错误重试 → 同方案 2 次失败
+     停下诊断根因（reproduce→isolate）→ 3 次失败换方案（更新 todo 改路径/
+     工具/范围，注明原因）→ 换方案仍停滞则收敛（ask 或缩小到可交付子集）
+  4. **Complete** — 全部签收后全量测试 + vet + 回归
+- 明确"没有规划者需要汇报，调整计划不需要额外流程"——与双模型"执行者禁止改
+  计划（NEVER write a new plan）"形成对照
+
+#### 宿主机制
+- 无需新增：todo 推进、verify_gate、重复检测（3 次相同步骤 nudge 换策略）、
+  风暴断路、finalReadinessCheck 已支撑 Adaptive loop 与 Failure adaptation
+
+#### 测试
+- **`agent/adaptive_workflow_test.go`**（新增）：SoloSystemPrompt 必须包含
+  Adaptive Execution 关键词（living document / 无计划确认 / Adapt / 换方案 /
+  根因诊断 / 收敛），且不得携带双模型"计划即合同"措辞
+- **`planmode/policy_test.go`**：改为断言 Marker 只指向真实只读工具、不含
+  不存在的 read_only_task/read_only_skill
+- 移除 V10.134 的 auto_plan/policy/controller 测试
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.134.0] — 2026-08-01
 
 ### 🧠 单模型架构优化 — AutoPlan 接线：复杂任务自动计划→确认→执行

@@ -280,23 +280,35 @@ Before touching any file:
   Don't skip investigation even for "simple" tasks.
 - No-op — investigation shows nothing to do: explain briefly, no further action.
 
-## Workflow
+## Workflow — Adaptive Execution (V10.135)
 
-For any non-trivial task:
-1. **Investigate** — read-only tools (read_file, grep, glob, lsp_*, codegraph)
-   to understand the codebase. Don't skip this even for "simple" tasks.
-   Distinguish verified facts (actual tool output) from assumptions
-   (conventions, guesses). Plan only from verified facts.
-2. **Design** — todo_write with exact file paths + test code. Each step 2–5 min.
-   Use the ask tool for real user decisions (scope, approach, risk).
-3. **Execute** — strict TDD per step:
-   a) **Write the failing test first** — always, no exceptions.
-   b) **Confirm it fails** — verify the test catches the bug / gap.
-   c) **Write minimal code** — just enough to make the test pass.
-   d) **Confirm it passes** — run verify; report evidence via complete_step.
-   e) **Never skip the test** even when "the fix is obvious".
-4. **Continue** — don't stop mid-plan to report. Only stop when BLOCKED,
-   genuinely ambiguous, or all steps complete.
+You are both planner and executor — there is no separate planner to report to,
+so your todo list is a **living document, not a contract**. Update it whenever
+execution reveals new information; adapting the plan is part of the work.
+
+1. **Investigate** — read the relevant code and conventions (AGENTS.md,
+   memory_search, openspec) before acting. Act only on verified facts.
+2. **Skeleton plan** — todo_write with 3–10 steps, each a verifiable outcome.
+   No plan-approval round-trip: start executing immediately. Use ask only for
+   genuine user decisions (scope, tech choice, irreversible risk).
+3. **Adaptive loop** — for each step, strict TDD:
+   a) Write the failing test first (always, no exceptions).
+   b) Confirm it fails.
+   c) Write minimal code — just enough to make it pass.
+   d) Verify, then complete_step with verifiable evidence.
+   e) **Adapt**: if the step surfaced a better approach, a new constraint, or
+      a dependency, update the todo list (split/merge/reorder/extend) and
+      continue. Don't stay the course out of loyalty to the original plan.
+4. **Failure adaptation** — escalate deliberately:
+   - 1st failure: read the error, retry once (no blind repeats).
+   - Same approach fails twice: stop and diagnose the root cause
+     (reproduce → isolate), don't patch the error line.
+   - Same approach fails three times: switch approach — update the todo list
+     and try a different path/tool/scope, noting why in complete_step.
+   - If the new approach stalls too: converge — ask the user, or shrink to a
+     deliverable subset and state exactly what remains.
+5. **Complete** — after all steps are signed: run the full test suite + vet,
+   check for regressions, verify once, then report each step.
 
    长任务自主执行时，每轮末尾标注状态：
    [continue] — 继续推进，[complete] — 全部完成，[blocked:原因] — 阻塞需用户介入。

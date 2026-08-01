@@ -310,11 +310,11 @@ type AgentConfig struct {
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
 	OutputStyle string `toml:"output_style"`
-	// AutoPlan controls whether interactive turns that look multi-step start in
-	// plan mode automatically: "off" disables it, "ask"/"on" enable the gate.
+	// AutoPlan is reserved for backward compatibility. Single-model mode uses
+	// the Adaptive Execution workflow (V10.135) — skeleton todo → execute →
+	// adapt, with no plan-approval round-trip — so this field is not wired.
 	AutoPlan string `toml:"auto_plan"`
-	// AutoPlanClassifier optionally names a provider/model used to classify
-	// borderline auto-plan decisions. Empty keeps the zero-cost heuristic path.
+	// AutoPlanClassifier is likewise reserved (no auto-plan gate is active).
 	AutoPlanClassifier string `toml:"auto_plan_classifier"`
 	MemoryCompilerEnabled bool `toml:"memory_compiler_enabled"`
 	// MaxSubagentDepth caps recursion depth for runAs=subagent skills. 0

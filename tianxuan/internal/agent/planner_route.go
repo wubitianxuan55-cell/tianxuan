@@ -114,16 +114,3 @@ func planDecision(reason string) PlannerDecision {
 func chatDecision(reason string) PlannerDecision {
 	return PlannerDecision{Route: RoutePlannerChat, Reason: reason}
 }
-
-// ShouldAutoPlan 判定交互输入是否应在单模型（Solo）模式下自动进入计划
-// 模式。mode: "" | "off" 禁用；"ask" | "on" 对复杂/多步骤任务启用。
-// 复用 DecidePlannerRoute——只有 RoutePlanAndExec（需要完整规划的任务）
-// 才进入计划模式，原子编辑/只读/指令/聊天保持直接执行。
-func ShouldAutoPlan(input, mode string) bool {
-	switch mode {
-	case "ask", "on":
-		return DecidePlannerRoute(input).Route == RoutePlanAndExec
-	default:
-		return false
-	}
-}

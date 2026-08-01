@@ -2,13 +2,17 @@ package planmode
 
 import "testing"
 
-// V10.134 契约：单模型 auto-plan 模式下，Marker 必须指引模型在输出计划
-// 后用 ask 工具请求用户批准（宿主据此切换出只读计划门），否则计划模式
-// 只能调查、无法衔接执行。
-func TestMarker_GuidesAskApproval(t *testing.T) {
-	for _, kw := range []string{"ask", "提交执行", "按意见修改", "取消", "plan"} {
+// Marker 契约：计划模式指令必须指向真实存在的只读调查方式，不能指引
+// 不存在的工具（V10.135 修正 read_only_task/read_only_skill 引用）。
+func TestMarker_NamesRealReadOnlyTools(t *testing.T) {
+	for _, kw := range []string{"read_file", "grep", "glob", "todo_write", "ask"} {
 		if !containsAny(Marker, kw) {
-			t.Errorf("Marker should contain %q (ask-approval workflow)", kw)
+			t.Errorf("Marker should name real read-only tool %q", kw)
+		}
+	}
+	for _, ghost := range []string{"read_only_task", "read_only_skill"} {
+		if containsAny(Marker, ghost) {
+			t.Errorf("Marker must not reference non-existent tool %q", ghost)
 		}
 	}
 }

@@ -555,7 +555,6 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		PluginCtx:     ctx,
 		CtxMgr:           ctxMgr,
 		WorkspaceRoot:    cwd,
-		AutoPlan:         cfg.Agent.AutoPlan,
 	}
 	return control.New(ctrlOpts), nil
 }

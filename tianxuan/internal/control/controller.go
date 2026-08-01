@@ -31,7 +31,6 @@ import (
 	"tianxuan/internal/memory"
 	"tianxuan/internal/nilutil"
 	"tianxuan/internal/permission"
-	"tianxuan/internal/planmode"
 	"tianxuan/internal/plugin"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/skill"
@@ -116,13 +115,6 @@ type Controller struct {
 	turn int
 	autoApprove bool
 
-	// autoPlan / autoPlanActive / interactive drive the single-model auto-plan
-	// workflow: a complex interactive turn enters read-only plan mode, the model
-	// presents a plan and asks for approval; approving flips the gate off so the
-	// same turn can execute. Plan mode never leaks past the turn (deferred reset).
-	autoPlan       string
-	autoPlanActive bool
-	interactive    bool
 
 	// permLevel controls permission strictness: "ask" (prompt before writes, default),
 	// "auto" (allow writes without asking), or "yolo" (skip all prompts).
@@ -178,11 +170,6 @@ type Options struct {
 	// WorkspaceRoot is the project root checkpoint restores are confined to ("" =
 	// no confinement). Frontends pass the cwd they launched the session in.
 	WorkspaceRoot string
-	// AutoPlan is the single-model interactive auto-plan config (off|ask|on).
-	// When set and the runner is not a Hermes dual-model wrapper, complex
-	// multi-step turns auto-enter read-only plan mode and ask for approval
-	// before execution (V10.134).
-	AutoPlan string
 }
 
 // New builds a Controller. A nil Sink is replaced with event.Discard.
@@ -217,7 +204,6 @@ func New(opts Options) *Controller {
 		pluginCtx:    pluginCtx,
 		ctxMgr:           opts.CtxMgr,
 		cpRoot:           opts.WorkspaceRoot,
-		autoPlan:         opts.AutoPlan,
 		permLevel:    "ask",
 		approvals:    map[string]chan approvalReply{},
 		asks:         map[string]chan []event.AskAnswer{},
@@ -353,18 +339,6 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	}
 
 	input = c.Compose(input)
-	// V10.134: 单模型交互模式 auto-plan——复杂任务自动进入只读计划模式：
-	// 模型调查并输出分层计划，经 ask 请求批准；批准后宿主退出只读门，
-	// 同轮继续执行。计划模式严格限定在本 turn（defer 退出，无跨轮泄漏）。
-	if c.autoPlanEnabled() && agent.ShouldAutoPlan(input, c.autoPlan) {
-		c.executor.SetPlanMode(true)
-		c.autoPlanActive = true
-		defer func() {
-			c.executor.SetPlanMode(false)
-			c.autoPlanActive = false
-		}()
-		input = planmode.Marker + "\n\n" + input
-	}
 	// Open a checkpoint for this turn before the user message is appended, so the
 	// recorded message boundary precedes it and pre-edit snapshots land here.
 	c.beginCheckpoint(agent.StripTransientBlocks(input))
@@ -501,7 +475,6 @@ func (c *Controller) Approve(id string, allow, session bool) {
 // frontends (chat, desktop) call this; the headless run keeps the silent gate and
 // a nil asker from setup.
 func (c *Controller) EnableInteractiveApproval() {
-	c.interactive = true
 	if c.executor != nil {
 		c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
 		c.executor.SetAsker(c)
@@ -509,35 +482,6 @@ func (c *Controller) EnableInteractiveApproval() {
 	// V10.34: wire Hermes plan confirmation — planner asks user before executing.
 	if hermes, ok := c.runner.(*agent.Hermes); ok {
 		hermes.SetAsker(c)
-	}
-}
-
-// autoPlanEnabled reports whether the single-model auto-plan workflow should
-// engage for this turn: interactive session + auto_plan configured (ask|on) +
-// Solo mode (runner is not a Hermes dual-model wrapper, which has its own plan
-// confirmation) + executor available.
-func (c *Controller) autoPlanEnabled() bool {
-	if !c.interactive || c.executor == nil || c.autoPlan == "" || c.autoPlan == "off" {
-		return false
-	}
-	_, isHermes := c.runner.(*agent.Hermes)
-	return !isHermes
-}
-
-// maybeExitPlanMode handles the auto-plan approval hook: when the model's ask
-// was a plan-approval request and the user picked "提交执行" (or an equivalent
-// approval wording), flip the read-only plan gate off so the same turn can
-// proceed to execution.
-func (c *Controller) maybeExitPlanMode(ans []event.AskAnswer) {
-	for _, a := range ans {
-		for _, s := range a.Selected {
-			if strings.Contains(s, "提交执行") || strings.Contains(s, "批准") ||
-				strings.EqualFold(strings.TrimSpace(s), "approve") {
-				c.executor.SetPlanMode(false)
-				c.autoPlanActive = false
-				return
-			}
-		}
 	}
 }
 
@@ -559,11 +503,6 @@ func (c *Controller) Ask(ctx context.Context, questions []event.AskQuestion) ([]
 
 	select {
 	case ans := <-reply:
-		// V10.134: auto-plan 批准钩子——模型在计划模式下经 ask 请求批准，
-		// 用户选择"提交执行"即退出只读计划门，允许同轮继续执行。
-		if c.autoPlanActive {
-			c.maybeExitPlanMode(ans)
-		}
 		return ans, nil
 	case <-ctx.Done():
 		c.mu.Lock()

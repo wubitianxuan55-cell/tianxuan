@@ -113,9 +113,12 @@ func TestAutoRecallInjectsBodyAndFreshness(t *testing.T) {
 	}
 }
 
-// TestAutoRecallDedupPerSession verifies the same memory is injected at most
-// once per session even when a later query matches it again.
-func TestAutoRecallDedupPerSession(t *testing.T) {
+// TestAutoRecallRunsOncePerSession verifies auto-recall injects only on the
+// first turn of a session — under the four-domain cache, per-turn injection
+// would place dynamic bytes before the assistant reply and break the
+// stable prefix; a single first-turn block becomes cached history for every
+// later turn.
+func TestAutoRecallRunsOncePerSession(t *testing.T) {
 	MemorySearchFunc = func(query string, limit int) []MemoryResult {
 		return []MemoryResult{{Name: "build-rule", Preview: "Build Rule"}}
 	}
@@ -126,13 +129,13 @@ func TestAutoRecallDedupPerSession(t *testing.T) {
 	a := &AgentRunner{session: s}
 	a.maybeAutoRecall()
 	if n := countAutoRecall(s.Snapshot()); n != 1 {
-		t.Fatalf("first recall: want 1 injected block, got %d", n)
+		t.Fatalf("first turn: want 1 injected block, got %d", n)
 	}
-	// A second, different query still matches the same memory — must not re-inject.
+	// A second user message must NOT trigger another recall injection.
 	s.Add(provider.Message{Role: provider.RoleUser, Content: "构建命令是什么？"})
 	a.maybeAutoRecall()
 	if n := countAutoRecall(s.Snapshot()); n != 1 {
-		t.Fatalf("second recall: want still 1 injected block (dedup), got %d", n)
+		t.Fatalf("second turn: want still 1 injected block (first-turn only), got %d", n)
 	}
 }
 

@@ -54,8 +54,9 @@ func (a *AgentRunner) maybeRecallReminder() {
 // 与 jcode 不同，tianxuan 用 FTS5 BM25 替代向量嵌入（零外部依赖）。
 // MemorySearchFunc 由 boot 在初始化时注入。
 //
-// V10.100: 添加去重缓存 — 相同查询不重复搜索，连续相同查询只注入一次。
-// 避免多轮对话中重复 BM25 搜索和 session 膨胀。
+// V10.101: 改为会话级一次性召回 — 四域缓存下每轮注入的动态块都落在
+// 缓存未命中区（user 消息之后、assistant 之前），且 MEMORY.md 索引已折入
+// boot 前缀；因此只在首轮注入一次，成为稳定历史供后续轮次命中缓存。
 
 // MemoryResult 是自动记忆检索的结果条目。
 type MemoryResult struct {
@@ -76,40 +77,25 @@ func (a *AgentRunner) maybeAutoRecall() {
 	if MemorySearchFunc == nil {
 		return
 	}
+	// 会话级一次性：首轮注入后不再重复（前缀稳定优先）。
+	if a.autoRecallFired {
+		return
+	}
+	a.autoRecallFired = true
 	// 获取最近一条 user 消息作为搜索查询
 	query := a.lastUserContent()
 	if len(query) < 5 {
 		return
 	}
-	// V10.100: 去重 — 相同查询跳过，避免每轮重复搜索和注入。
-	// 仅在用户发送了与上一轮不同的新消息时才执行搜索。
-	if query == a.lastRecallQuery {
-		return
-	}
-	a.lastRecallQuery = query
 
 	// FTS5 BM25 搜索记忆
 	hits := MemorySearchFunc(query, 3) // 最多 3 条
 	if len(hits) == 0 {
 		return
 	}
-	// Session-level dedup: skip memories already injected in this session.
-	if a.recalledMemories == nil {
-		a.recalledMemories = map[string]bool{}
-	}
-	fresh := hits[:0]
-	for _, h := range hits {
-		if !a.recalledMemories[h.Name] {
-			a.recalledMemories[h.Name] = true
-			fresh = append(fresh, h)
-		}
-	}
-	if len(fresh) == 0 {
-		return
-	}
 	var b strings.Builder
 	b.WriteString("[auto-recall] 相关记忆自动检索结果:\n")
-	for _, h := range fresh {
+	for _, h := range hits {
 		b.WriteString("- ")
 		b.WriteString(h.Name)
 		if h.Preview != "" {

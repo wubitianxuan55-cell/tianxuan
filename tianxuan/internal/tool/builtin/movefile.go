@@ -38,6 +38,8 @@ func (moveFile) Schema() json.RawMessage {
 
 func (moveFile) ReadOnly() bool { return false }
 func (moveFile) Kind() tool.ToolKind { return tool.KindMove }
+func (moveFile) CompactDescription() string { return compactDesc["move_file"] }
+func (moveFile) CompactSchema() json.RawMessage { return compactSchema["move_file"] }
 
 func (m moveFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {

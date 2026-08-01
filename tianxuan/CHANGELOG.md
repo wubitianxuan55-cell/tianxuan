@@ -1,3 +1,32 @@
+## [10.126.0] — 2026-08-01
+
+### 🧹 全量工具梳理与完善 — compact 接线 / Kind 一致化 / 工具集补全
+
+> 盘点全部 27 个内置工具（名称/只读分类/Kind/描述/schema/compact），修复 5 类问题：两个工具的 compact 条目存在但接口未接线（每轮全量描述进上下文）、verify_gate 分类自相矛盾、coding 工具集漏配新工具、git_commit 描述携带内部版本标记、read_skill 描述缺少使用引导。
+
+#### 变更
+- **`codeindex.go` / `movefile.go`**：实现 `CompactDescriptor`——`compactDesc`/`compactSchema` 里早已有 code_index/move_file 条目但类型从未实现接口（每轮全量 278+643 / 165+263 字节进上下文）；接线后走一行中文描述 + 精简 schema，每轮省 ~75% token
+- **`verify_gate.go`**：`Kind()` 从 `KindExecute` 改为 `KindRead`——此前 `ReadOnly=true`（可并行、无权限拦截）却标 `KindExecute`（`IsMutator=true`），分类自相矛盾；统一为只读验证门控语义
+- **`tool.go`**：`DefaultToolsets["coding"]` 补全 5 个漏配工具——`edit_lines`、`verify_gate`、`notebook_edit`、`git_worktree`、`search_large_output`（此前配置 `toolsets=[coding]` 的用户会静默丢失这些能力）
+- **`git.go`**：git_commit 描述移除内部版本标记 "V10.6: "（描述是给模型的，只保留行为警告）
+- **`readskill.go`**：read_skill 描述从 64 字节扩为引导式——说明正文按需加载、run_skill 前可用它预览技能玩法
+
+#### 测试
+- **`tool/builtin/compact_wiring_test.go`**（新增）：code_index/move_file 必须实现 CompactDescriptor（单行描述 + 非空 schema）；verify_gate Kind=read 与 ReadOnly 一致；git_commit 描述不含版本标记但保留 main 警告；read_skill 描述含 run_skill 引导
+- **`tool/toolset_test.go`**（新增）：`TestCodingToolsetComplete`——coding 工具集必须包含 5 个新工具
+
+#### 验证
+- TDD 红灯（4 项失败：compact 未接线 / Kind 矛盾 / 描述标记 / 工具集缺失）→ 绿灯
+- `go build ./...` — EXIT 0；`go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL
+
+#### 文件变更
+- `internal/tool/builtin/codeindex.go` — +2 行；`movefile.go` — +2 行；`verify_gate.go` — 1 行；`git.go` — 描述 1 行；`readskill.go` — 描述 +4 行
+- `internal/tool/tool.go` — +3/−2 行（工具集补全）
+- `internal/tool/builtin/compact_wiring_test.go` — 新增；`internal/tool/toolset_test.go` — 新增
+
+---
+
 ## [10.125.0] — 2026-08-01
 
 ### 🧬 蒸馏 superpowers receiving-code-review — 审查反馈接收技能

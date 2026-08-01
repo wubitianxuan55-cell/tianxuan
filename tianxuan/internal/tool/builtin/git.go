@@ -237,7 +237,7 @@ func (gitCommit) Name() string        { return "git_commit" }
 func (gitCommit) ReadOnly() bool      { return false }
 func (gitCommit) Kind() tool.ToolKind  { return tool.KindExecute }
 func (gitCommit) Description() string {
-	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 V10.6: warns when committing directly to main/master — use a feature branch instead. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted."
+	return "Commit staged changes using Conventional Commits (feat/fix/chore/docs/test/refactor). 🔴 Warns when committing directly to main/master — use a feature branch instead. Pass stage_all=true to auto-stage, amend=true to amend. Message auto-generated from diff when omitted."
 }
 func (gitCommit) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"message":{"type":"string","description":"commit message (empty = auto-generate from diff)"},"stage_all":{"type":"boolean","description":"if true, run ` + "`git add -u`" + ` before committing"},"amend":{"type":"boolean","description":"if true, amend the last commit instead of creating a new one"}},"required":[]}`)

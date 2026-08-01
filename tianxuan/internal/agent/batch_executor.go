@@ -198,8 +198,7 @@ func partitionToolCalls(r *tool.Registry, calls []provider.ToolCall) []toolCallB
 // Prefix ! marks global conflict keys (always serial).
 func getConflictKey(call provider.ToolCall) string {
 	switch call.Name {
-	case "task", "explore", "research", "review", "security_review",
-		"run_skill", "install_skill":
+	case "task", "run_skill", "install_skill":
 		return "!spawn"
 	case "complete_step", "todo_write":
 		return "!ledger"

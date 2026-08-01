@@ -38,10 +38,6 @@ const TOOL_DESC: Record<string, string> = {
   ask: "向用户提供多选项问题",
   // 子代理
   task: "派发子代理执行聚焦子任务",
-  explore: "隔离子代理——只读代码库调查",
-  research: "隔离子代理——web搜索+代码阅读",
-  review: "隔离子代理——审查分支diff",
-  security_review: "隔离子代理——安全审查分支diff",
   // 技能
   run_skill: "调用Skills索引中的playbook",
   parallel_skills: "并行派发多个子代理技能",
@@ -80,7 +76,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: "子代理",
-    items: ["task", "explore", "research", "review", "security_review"],
+    items: ["task"],
   },
   {
     title: "技能",

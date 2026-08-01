@@ -282,9 +282,6 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	for _, st := range cache.BuiltinSpawnTemplates() {
 		cache.RegisterSpawnTemplate(st)
 	}
-	for _, t := range skill.BuiltinSubagentTools(skillStore, skillRunner) {
-		reg.Add(t)
-	}
 
 	compiler.SetRegistry(reg)
 
@@ -500,9 +497,6 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			}
 			readOnlyReg.Add(skill.NewRunSkillTool(skillStore, plannerSkillRunner))
 			readOnlyReg.Add(skill.NewParallelSkillsTool(skillStore, plannerSkillRunner))
-			for _, t := range skill.BuiltinSubagentTools(skillStore, plannerSkillRunner) {
-				readOnlyReg.Add(t)
-			}
 
 			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxSteps, pe.ContextWindow, config.ArchiveDir(), cwd)
 		// V10.89: emit warning if planner context window differs from provider default.

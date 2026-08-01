@@ -87,30 +87,26 @@ func TestCleanSkillName(t *testing.T) {
 	}
 }
 
-func TestBuiltinSubagentToolsRunner(t *testing.T) {
+// TestRunSkillInvokesBuiltinSubagent locks the post-separation path (V10.124):
+// explore/research/review/security-review are skills now — the model reaches
+// them exclusively via run_skill, which must dispatch the built-in subagent
+// body to the runner with the arguments as its task.
+func TestRunSkillInvokesBuiltinSubagent(t *testing.T) {
 	var ran string
 	runner := func(_ context.Context, sk Skill, task string) (string, error) {
 		ran = sk.Name + ":" + task
 		return "ok", nil
 	}
-	tools := BuiltinSubagentTools(New(Options{HomeDir: t.TempDir()}), runner)
-	var explore interface {
-		Name() string
-		Execute(context.Context, json.RawMessage) (string, error)
-	}
-	for _, tl := range tools {
-		if tl.Name() == "explore" {
-			explore = tl
-		}
-	}
-	if explore == nil {
-		t.Fatal("explore wrapper tool not built")
-	}
-	if _, err := explore.Execute(context.Background(), json.RawMessage(`{"task":"map the loop"}`)); err != nil {
+	tl := NewRunSkillTool(New(Options{HomeDir: t.TempDir()}), runner)
+	out, err := tl.Execute(context.Background(), json.RawMessage(`{"name":"explore","arguments":"map the loop"}`))
+	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if ran != "explore:map the loop" {
 		t.Errorf("runner not invoked correctly: %q", ran)
+	}
+	if !strings.Contains(out, "ok") {
+		t.Errorf("expected runner output, got %s", out)
 	}
 }
 

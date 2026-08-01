@@ -1,3 +1,40 @@
+## [10.124.0] — 2026-08-01
+
+### 🧹 工具与技能重新分离 — subagent 工作流回归技能单一入口
+
+> 技能系统可用后（自动触发 V10.122 + 可观测性），不再需要"勉强把技能做成工具"来保证使用。本轮把 explore / research / review / security_review 从顶层工具外壳还原为**纯技能**：模型通过 `run_skill` 调用（技能索引 `[🧬 subagent]` 条目 + Hermes 提示词指引），工具列表回归"原子操作 + 技能系统入口"的干净边界。调用统计也统一进入技能侧栏（可观测性一致）。
+
+#### 变更
+- **`skill/tools.go`**：删除 `subagentSkillTool` 与 `BuiltinSubagentTools`（工具外壳 ~150 行）——subagent 技能统一走 `run_skill`（其 Execute 已支持 RunAs=subagent 派发 runner）
+- **`skill/builtins.go`**：删除无调用方的 `BuiltinNames`（死代码）
+- **`boot/boot.go`**：移除 executor 与 planner 两处 `BuiltinSubagentTools` 注册
+- **`agent/batch_executor.go`**：conflict key 移除 4 个工具名（`run_skill` 已是 `!spawn`，串行隔离语义不变）
+- **`planmode/policy.go`**：安全工具表移除 4+1 个别名（`run_skill` 已允许，plan mode 下隔离子代理调查路径不变）
+- **`agent/hermes_prompt.go`**：规划者提示词"Sub-agents"段改为"Sub-agent skills（run_skill 调用，索引标记 [🧬 subagent]）"
+- **`desktop/frontend/.../RuntimePanel.tsx`**：工具面板移除 4 个子代理条目（与工具注册表一致）
+
+#### 保留不动（本就是原子操作/系统入口）
+- `verify_gate`（shell 验证门控）、`bash`、文件编辑系、`git_*`、`lsp_*`、`code_index`、`task`、`run_skill`/`install_skill`/`parallel_skills` 等
+
+#### 测试
+- **`skill/tools_test.go`**：`TestBuiltinSubagentToolsRunner` 替换为 `TestRunSkillInvokesBuiltinSubagent`——锁定分离后的正确路径：`run_skill({name:"explore"})` 派发 builtin subagent 正文到 runner，arguments 即子代理任务
+
+#### 验证
+- `go build ./...` — EXIT 0；`go vet ./...` — 无告警
+- `go test ./...` — 全部 ok，无 FAIL（skill/agent/boot/planmode 全绿）
+
+#### 文件变更
+- `internal/skill/tools.go` — −155 行（工具外壳删除）
+- `internal/skill/builtins.go` — −12 行（死代码）
+- `internal/boot/boot.go` — −4 行
+- `internal/agent/batch_executor.go` — −2/+1 行
+- `internal/planmode/policy.go` — −5 行
+- `internal/agent/hermes_prompt.go` — −1/+1 行（提示词更新）
+- `internal/skill/tools_test.go` — −27/+22 行（路径测试替换）
+- `desktop/frontend/src/components/RuntimePanel.tsx` — −5 行
+
+---
+
 ## [10.123.0] — 2026-08-01
 
 ### 🛡️ 技能自动注入缓存加固 — 全部消息前缀不变性

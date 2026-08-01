@@ -30,6 +30,28 @@ func TestCompactDescriptorsWired(t *testing.T) {
 	}
 }
 
+// TestEditLinesCompactSchemaMinimum 回归：模型看到的是 CompactSchema（每轮省
+// ~75% token），它必须保留 start_line/end_line 的 minimum:1 约束——否则模型不
+// 认为行号必须 >=1，会漏传或传 0（真实事故：模型调用 edit_lines 只传
+// end_line/new_content，start_line 反序列化为 0 → "start_line must be >= 1"）。
+// 完整 Schema 有 minimum，压缩版丢失正是根因。
+func TestEditLinesCompactSchemaMinimum(t *testing.T) {
+	tl, ok := tool.LookupBuiltin("edit_lines")
+	if !ok {
+		t.Fatal("edit_lines not found")
+	}
+	cd, ok := tl.(tool.CompactDescriptor)
+	if !ok {
+		t.Fatal("edit_lines must implement CompactDescriptor")
+	}
+	schema := string(cd.CompactSchema())
+	for _, want := range []string{`"start_line":{"type":"integer","minimum":1}`, `"end_line":{"type":"integer","minimum":1}`} {
+		if !strings.Contains(schema, want) {
+			t.Errorf("compact schema missing %s (full schema has it; model sees compact → 漏传/传 0 根因)\nfull: %s", want, schema)
+		}
+	}
+}
+
 // TestVerifyGateKindConsistent: verify_gate 声明 ReadOnly=true（可并行、
 // 无权限拦截），Kind 却标 execute（IsMutator=true）——矛盾分类。
 // 统一为 KindRead，与只读验证门控的语义一致。

@@ -1,3 +1,37 @@
+## [10.146.0] — 2026-08-01
+
+### 🔧 修复 edit_lines 报 "start_line must be >= 1" — compact schema 丢失 minimum 约束
+
+> 用户反馈：edit_lines 反复报 start_line >= 1 错误，疑似前端 bug。排查后确认
+> **不是前端问题**——是模型看到的工具 Schema（压缩版）缺失行号约束，导致模型
+> 漏传 start_line 或传 0。
+
+#### 根因（5 级追溯）
+- 表象：模型调用 edit_lines 报 `start_line must be >= 1`。
+- 直接原因：模型参数里没有 start_line（或为 0）——反序列化后触发校验。
+- 本地根因：模型看到的 **CompactSchema**（compact.go）里 `start_line`/`end_line`
+  只有 `{"type":"integer"}`，**没有 `minimum:1`**；完整 Schema（editlines.go）
+  有 minimum，但模型每轮看到的是压缩版（省 ~75% token）。
+- 系统根因：compact schema 是手写压缩，压缩过程中丢掉了 minimum 约束——
+  模型无法从 schema 感知"行号必须 ≥1"，偶尔漏传/传 0。
+- 过程根因：compact.go 引入时按"省 token"优先精简字段，未对照完整 Schema
+  逐字段保留约束（description 可删，minimum 不可删）。
+
+#### 修复
+- **`tool/builtin/compact.go`**：edit_lines 的 CompactSchema 中 start_line/end_line
+  补回 `"minimum":1`——模型看到的 schema 与完整版约束一致
+
+#### 测试
+- **`tool/builtin/compact_wiring_test.go`**：`TestEditLinesCompactSchemaMinimum`
+  （新增）——断言 compact schema 必须包含 `"minimum":1`（RED→GREEN），防止
+  未来压缩 schema 再次丢失行号约束
+
+#### 验证
+- `go test ./internal/tool/builtin/ -count=1` 全 ok；`go vet` 无告警；
+  `go build ./...` EXIT 0
+
+---
+
 ## [10.145.0] — 2026-08-01
 
 ### 🧹 全面清理废弃残留 — web 前端目录 + 根目录杂物

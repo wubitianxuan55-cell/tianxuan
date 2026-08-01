@@ -51,7 +51,7 @@ var compactSchema = map[string]json.RawMessage{
 	"multi_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"edits":{"type":"array","items":{"type":"object","properties":{"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["old_string","new_string"]}}},"required":["path","edits"]}`),
 	"edit_lines": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer"},"end_line":{"type":"integer"},"new_content":{"type":"string"}},"required":["path","start_line","end_line","new_content"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1},"new_content":{"type":"string"}},"required":["path","start_line","end_line","new_content"]}`),
 	"delete_range": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"inclusive":{"type":"boolean"}},"required":["path","start_anchor","end_anchor"]}`),
 	"delete_symbol": json.RawMessage(

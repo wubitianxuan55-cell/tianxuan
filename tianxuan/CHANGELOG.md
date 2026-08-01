@@ -2159,3 +2159,58 @@
 - release/v10.11.0/tianxuan-desktop.exe (16MB Wails)
 
 ---
+## [10.142.0] — 2026-08-01
+
+### 🧠 记忆系统重构 — 项目归一存储 + 自动提取 + 跨会话记忆 + 自主进化
+
+> 需求：以项目为基准强化会话持久性、跨会话记忆、自主进化；调研 GitHub 同类
+> 产品（Qwen Code Managed Auto-Memory / Claude Code / agentmemory / Letta）并蒸馏
+> 实现。全部按四域缓存前缀不变性约束落地：记忆变更一律 turn-tail 注入、下一
+> session 才折入前缀，不破坏 DeepSeek 前缀缓存。
+
+#### P1 项目基准归一
+- **`memory/store.go`**：`StoreFor` 按 git-root slug 分目录——同一仓库任何
+  子目录共享同一份记忆；无 git 回退 cwd slug
+- **跨项目记忆**：新增 `GlobalDir=<userDir>/memories`，user/feedback 类型事实
+  自动路由过去，`Save`/`ChangeType`/`Archive` 跨目录定位、同名项目级优先
+- **`migrateLegacyStore`**：`Load` 时一次性迁移旧 cwd-slug 存储（目标存在则不
+  合并）；`Index()` 合并 global+project，`ListIn(dir)` 按目录列出
+
+#### P2 自动 Extract（用户确认后落盘）
+- **`memory/extract.go`**：每轮 turn 后扫描 user+assistant 消息，extract-cursor
+  游标（sessionId+offset）防重复、压缩后 clamp；候选暂存 `pending/`，过滤
+  `<memory-update>`/`[auto-recall]` 等 transient 块，与已有记忆去重
+- **`control/controller_memory.go`**：`autoExtract` 回合尾部触发；桌面面板新增
+  「待确认」入口，接受/拒绝后落盘
+
+#### P3 召回增强 + 缓存对齐
+- **`memory/search.go`**：`SearchMatch` 携带 Body+Mtime；auto-recall 注入正文
+  截断（1200 字符）+ 新鲜度提示（>1 天警告"时点观察需验证"）
+- **`agent/recall_reminder.go`**：`maybeAutoRecall` 改为**会话级一次性**（首轮
+  注入），避免每轮动态块落在缓存未命中区；命中记忆强化访问计数
+
+#### P4 Dream 自动化
+- **`memory/dream.go`**：24h/5 会话/same_session 门控 + `NewSessionFiles` mtime
+  扫描 + `RunDream` 机械整合跨会话主题为 1 条候选；门控通过时顺带执行
+  `EvictStale`（90 天 TTL 弱记忆归档）+ `BuildProfile` 项目画像
+
+#### P5 @session 跨会话引用
+- **`control/refs.go`**：`@session:<id>` 注入确定性只读摘要——保留 user/
+  assistant 文本、工具结果压成单行长度、8k 预算保最新并标记省略，无 LLM 调用
+
+#### P6 项目画像 + 强化衰减
+- **`memory/strength.go`**：`strength.json` 强化计数 + `EvictStale` TTL 归档
+  （可恢复）+ `profile.json` 画像（top concepts/类型分布/common errors）
+
+#### 桌面端
+- **记忆面板重排**：新增「待确认」subTab（自动提取+Dream 候选）、saved 区分
+  项目/跨项目来源徽章、项目画像卡、召回次数 badge
+- **文件预览弹窗化**：点击文件树/变更列表文件 → Modal 弹窗预览，不再内嵌占用
+  面板宽度
+- **发送排队恢复**：运行中 Enter 恢复排队（列表可视化、逐条取消、发送按钮
+  badge），纠偏改为显式 ⚡ 按钮，Shift+Enter 取消+重发保留
+
+#### 测试
+- 新增 store_roots / extract / dream / strength / search / recall / refs /
+  controller extract 测试；全仓 `go test ./...` 无 FAIL、go vet 通过、
+  `tsc --noEmit` 0 错误、vitest 52 用例全过、desktop `wails build` 通过

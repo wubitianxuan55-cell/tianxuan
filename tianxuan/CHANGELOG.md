@@ -1,3 +1,45 @@
+## [10.139.0] — 2026-08-01
+
+### 🧵 子代理并行优先 — 调查默认走子代理，主上下文只留决策/实现/验证
+
+> 问题：tianxuan 几乎不使用子代理，主 agent 自己用 read_file/grep 做大批量
+> 调查，中间信息（多文件内容、大文件、搜索细节）永久堆积在主上下文——而这些
+> 信息本不需要传递到上下文，只需结论。本次把"调查默认子代理"写成工作流规则，
+> 并加宿主信号兜底。
+
+#### 信息分类原则（核心）
+- **需要进主上下文**：决策、实现、验证所需的信息
+- **不需要进主上下文**：批量调查的中间信息（多文件阅读、大文件内容、深度
+  搜索、外部研究）——由子代理在隔离上下文消化，只回传精炼结论（file:line 锚点）
+
+#### 提示词强化（三个提示词统一）
+- **`hermes_prompt.go`** SoloSystemPrompt 的 Sub-agents 重写为
+  "default for investigation"：3+ 文件/跨模块/深度搜索/外部研究 → run_skill
+  派发 explore/research；多个独立调查 → parallel_skills 并行；主上下文只用于
+  单文件定位（≤2）/决策/实现/验证；子代理结论是事实锚点
+- **HephaestusSystemPrompt**：执行阶段的编辑锚点/调用链调查同样子代理优先，
+  禁止在主上下文批量 read_file（上下文留给实现与验证）
+- **HermesPrompt**：规划阶段 2+ 独立调查必须并行派发，禁止顺序铺开大调查
+
+#### 宿主信号（兜底）
+- **`agent/investigation_nudge.go`**（新增）：`maybeNudgeInvestigation`——单轮
+  调查类工具调用 ≥8（read_file/grep/glob/ls/code_index/web/codegraph）且无写
+  工具（纯调查轮）→ 注入"改用 explore 子代理 + parallel_skills"引导；每 turn
+  上限 3 次（`InvestigationNudgeThreshold` / `InvestigationNudgeCap`）
+- **`agent_run.go`**：工具批次后接线 + turn 开始重置计数
+
+#### 测试
+- **`agent/investigation_nudge_test.go`**（新增）：阈值触发、低于阈值静默、
+  混入写工具不触发（执行非调查）、per-turn 上限
+- **`agent/subagent_priority_test.go`**（新增）：Solo/Hephaestus/Hermes 提示词
+  包含子代理优先关键词
+- **`adaptive_workflow_test.go`**：Solo 子代理默认调查契约
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./...` 无告警；`go test ./...` 全 ok
+
+---
+
 ## [10.138.0] — 2026-08-01
 
 ### 🔧 构建脚本自动补齐 PATH — build-desktop.bat 不再依赖手动环境设置

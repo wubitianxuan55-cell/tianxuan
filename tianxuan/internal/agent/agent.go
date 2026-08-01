@@ -420,6 +420,10 @@ type AgentRunner struct {
 	// a success round resets the counter.
 	todoFailStep  string
 	todoFailCount int
+
+	// investigationNudgeCount counts subagent-priority nudges injected this
+	// turn (capped by InvestigationNudgeCap, reset at turn start).
+	investigationNudgeCount int
 }
 
 // SetAutoSkillStore installs the skill store used for automatic skill

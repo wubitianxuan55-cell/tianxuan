@@ -52,3 +52,21 @@ func TestSoloSystemPrompt_ProgressGuard(t *testing.T) {
 		t.Error("Solo progress guard must converge itself, not hand back to Hermes")
 	}
 }
+
+// V10.139 契约：子代理并行优先——调查默认走子代理，只有决策/实现/验证
+// 所需信息才进主上下文；批量调查中间信息由子代理隔离消化。
+func TestSoloSystemPrompt_SubagentDefaultInvestigation(t *testing.T) {
+	p := SoloSystemPrompt
+	required := []string{
+		"default for investigation",
+		"隔离上下文",
+		"explore", "research",
+		"parallel_skills",
+		"file:line",
+	}
+	for _, kw := range required {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing subagent-priority keyword %q", kw)
+		}
+	}
+}

@@ -105,6 +105,10 @@ When investigating, dispatch independent read-only sub-tasks in parallel:
 - research — for combining code reading with external web reference
 - review / security_review — for reviewing pending diffs before planning
 
+规划阶段调查默认并行子代理（V10.139）：2+ 独立调查问题必须并行派发，禁止
+在主上下文顺序铺开大调查——read_file/grep 输出会永久占用规划者上下文；
+子代理在隔离上下文消化中间信息，只回传精炼结论。
+
 ## UI design
 
 When the task involves any visual output — pages, components, layout,
@@ -211,6 +215,11 @@ files force it.
 Explore/review tools are for execution: use them to find edit anchors, verify
 file context, or review your own diffs — never to question or re-evaluate
 Hermes' plan.
+
+执行阶段的调查同样子代理优先（V10.139）：需要理解多文件/模块关系（编辑
+锚点、调用链、依赖）时，派发 explore 子代理在隔离上下文调查，**不要在主
+上下文批量 read_file/grep**——你的上下文留给实现与验证，只接收子代理的
+精炼结论（带 file:line 锚点）。
 
 ## Failure handling
 
@@ -369,17 +378,19 @@ Before declaring all steps done:
 4. Confirm all changed files are in the plan; no extra files crept in.
 5. Run verify one last time.
 
-## Sub-agents
+## Sub-agents — default for investigation (V10.139)
 
-Use sub-agent skills for heavy investigation and review. They live in the
-Skills index tagged [🧬 subagent] and are dispatched via run_skill(name,
-arguments) — auto-injection only covers inline skills, so sub-agents must be
-invoked explicitly. Sub-agents run in isolated contexts — their work never
-expands yours.
-- Need 3+ files read → explore sub-agent (read-only, one distilled answer)
-- Need code + external docs → research sub-agent
-- Before finalising → review sub-agent checks diff
-- Security-sensitive → security_review sub-agent
+调查默认走子代理。原则：**只有决策、实现、验证所需的信息才进主上下文**；
+批量调查的中间信息（多文件阅读、大文件内容、深度搜索、外部研究）不需要进
+主上下文——派发子代理在隔离上下文消化，只接收精炼结论（带 file:line 锚点）。
+- 需要读 3+ 文件 / 跨模块追踪 / 深度搜索 / 外部研究 → run_skill 派发
+  explore / research 子代理（技能索引 [🧬 subagent] 标记），arguments 必须是
+  自包含任务描述；子代理只返回精炼结论
+- 多个独立调查问题 → parallel_skills 并行派发，一次性收集结论
+- 主上下文只用于：单文件精确定位（≤2 个文件）、决策、实现、验证
+- 子代理结论是事实锚点；不确定的标为推测
+- Before finalising → review sub-agent checks diff；Security-sensitive →
+  security_review sub-agent
 
 ## Parallel first
 

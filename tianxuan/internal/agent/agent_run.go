@@ -130,6 +130,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
 	a.repeatMu.Unlock()
 	a.toolFeedbackCount = 0     // V10.89: 每轮重置工具反馈计数
+	a.investigationNudgeCount = 0 // V10.139: 每轮重置调查膨胀引导计数
 	// V10.101: 每轮重置 stop gate 计数器——这些门的「最多 3 次」是 per-turn
 	// 上限，不是整个会话累计（否则第二个用户 turn 后就全部永久失效）。
 	a.taskGateReentry = 0
@@ -508,6 +509,12 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 		if !a.plannerMode && a.maybeNudgeStuckTodoStep(calls, results) {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 				Text: "当前 todo 步骤持续失败，已注入 Adaptive 换方案引导"})
+		}
+		// V10.139: 子代理并行优先——单轮纯调查膨胀时注入"改用 explore 子代理"
+		// 引导，避免调查中间信息永久堆积在主上下文。
+		if a.maybeNudgeInvestigation(calls) {
+			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
+				Text: "检测到大量调查调用，已注入子代理优先引导"})
 		}
 
 		// bg start-kill cycle — detect repeated background job start→kill

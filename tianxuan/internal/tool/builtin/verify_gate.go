@@ -58,7 +58,7 @@ func (verifyGate) Schema() json.RawMessage {
 func (verifyGate) ReadOnly() bool { return true }
 func (verifyGate) Kind() tool.ToolKind { return tool.KindRead }
 
-func (verifyGate) CompactDescription() string { return "shell 验证门控(退出码裁决 pass/fail)" }
+func (verifyGate) CompactDescription() string { return compactDesc["verify_gate"] }
 func (verifyGate) CompactSchema() json.RawMessage {
 	return compactSchema["verify_gate"]
 }

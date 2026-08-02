@@ -43,7 +43,7 @@ var compactDesc = map[string]string{
 // descriptions/constraints), used by CompactDescriptor.
 var compactSchema = map[string]json.RawMessage{
 	"read_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer"},"limit":{"type":"integer"},"line_numbers":{"type":"boolean"}},"required":["path"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1},"line_numbers":{"type":"boolean"}},"required":["path"]}`),
 	"edit_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"}},"required":["path","old_string","new_string"]}`),
 	"write_file": json.RawMessage(
@@ -61,27 +61,27 @@ var compactSchema = map[string]json.RawMessage{
 	"glob": json.RawMessage(
 		`{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]}`),
 	"grep": json.RawMessage(
-		`{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string"}},"required":["pattern"]}`),
+		`{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string"},"sort_by":{"type":"string","enum":["path","relevance"]}},"required":["pattern"]}`),
 	"ls": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"}}}`),
 	"bash": json.RawMessage(
-		`{"type":"object","properties":{"command":{"type":"string"},"run_in_background":{"type":"boolean"}},"required":["command"]}`),
+		`{"type":"object","properties":{"command":{"type":"string"},"run_in_background":{"type":"boolean"},"output_format":{"type":"string","enum":["plain","json"]}},"required":["command"]}`),
 	"bash_output": json.RawMessage(
 		`{"type":"object","properties":{"job_id":{"type":"string"},"filter":{"type":"string"}},"required":["job_id"]}`),
 	"kill_shell": json.RawMessage(
 		`{"type":"object","properties":{"job_id":{"type":"string"}},"required":["job_id"]}`),
 	"wait": json.RawMessage(
-		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"}},"timeout_seconds":{"type":"integer"}}}`),
+		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"}},"timeout_seconds":{"type":"integer","minimum":1}}}`),
 	"web_fetch": json.RawMessage(
-		`{"type":"object","properties":{"url":{"type":"string"},"retries":{"type":"integer"}},"required":["url"]}`),
+		`{"type":"object","properties":{"url":{"type":"string"},"retries":{"type":"integer","minimum":0}},"required":["url"]}`),
 	"web_search": json.RawMessage(
-		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer"}},"required":["query"]}`),
+		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer","minimum":1}},"required":["query"]}`),
 	"todo_write": json.RawMessage(
-		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string"},"activeForm":{"type":"string"},"level":{"type":"integer"}},"required":["content","status"]}}},"required":["todos"]}`),
+		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"},"level":{"type":"integer","enum":[0,1]}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(
-		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer"},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
+		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer","minimum":1},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["verification","diff","files","manual"]},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
 	"notebook_edit": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string"},"edit_mode":{"type":"string"}},"required":["path"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string","enum":["code","markdown"]},"edit_mode":{"type":"string","enum":["replace","insert","delete"]}},"required":["path"]}`),
 	"git_status": json.RawMessage(
 		`{"type":"object","properties":{},"required":[]}`),
 	"git_diff": json.RawMessage(
@@ -91,15 +91,15 @@ var compactSchema = map[string]json.RawMessage{
 	"git_log": json.RawMessage(
 		`{"type":"object","properties":{"count":{"type":"integer"},"path":{"type":"string"},"author":{"type":"string"}}}`),
 	"git_worktree": json.RawMessage(
-		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
+		`{"type":"object","properties":{"action":{"type":"string","enum":["add","remove","list"]},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
 	"memory_search": json.RawMessage(
-		`{"type":"object","properties":{"query":{"type":"string"},"kind":{"type":"string"}},"required":["query"]}`),
+		`{"type":"object","properties":{"query":{"type":"string"},"kind":{"type":"string","enum":["semantic","episodic","procedural"]}},"required":["query"]}`),
 	"read_skill": json.RawMessage(
 		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
 	"code_index": json.RawMessage(
-		`{"type":"object","properties":{"action":{"type":"string"},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer"}},"required":["action"]}`),
+		`{"type":"object","properties":{"action":{"type":"string","enum":["outline","search"]},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer","minimum":1}},"required":["action"]}`),
 	"search_large_output": json.RawMessage(
 		`{"type":"object","properties":{"operation":{"type":"string","enum":["list","read","search"]},"name":{"type":"string"},"query":{"type":"string"}},"required":["operation"]}`),
 	"verify_gate": json.RawMessage(
-		`{"type":"object","properties":{"checks":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"command":{"type":"string"},"timeout":{"type":"integer"}},"required":["name","command"]}}},"required":["checks"]}`),
+		`{"type":"object","properties":{"checks":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"command":{"type":"string"},"timeout":{"type":"integer","minimum":1}},"required":["name","command"]}}},"required":["checks"]}`),
 }

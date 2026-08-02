@@ -1,3 +1,43 @@
+## [10.148.0] — 2026-08-02
+
+### 🛡️ 修复 compact schema 系统性丢失 enum/minimum 约束（13 工具 18 处）
+
+> V10.146 只修了 edit_lines 的 minimum:1，但同类根因并未根治：compact schema
+> 是手写压缩，没有自动化防线，模型每轮看到的是压缩版，完整 Schema 的约束
+> 一旦丢失，模型就会漏传或传非法值（V10.146 真实事故模式）。
+
+#### 根因（5 级追溯）
+- 表象：部分工具模型偶发传非法参数（如 code_index 传未知 action、
+  complete_step 传 step_index=0、todo_write 传非法 status）。
+- 直接原因：CompactSchema 缺失 enum/minimum，模型无法感知合法取值。
+- 本地根因：compact.go 手写压缩时只保留 type，丢掉了全部 enum/minimum 约束。
+- 系统根因：压缩逻辑无"约束保留"校验——V10.146 修 edit_lines 时只补了
+  2 个字段，未建立覆盖全部工具的自动化防线，同类问题必然复发。
+- 过程根因：修复停留在单点，未做全量清单审计。
+
+#### 修复
+- **`tool/builtin/compact.go`**：补全 13 个工具 18 处丢失约束——
+  - minimum：read_file.offset(0)/limit(1)、code_index.limit(1)、
+    complete_step.step_index(1)、wait.timeout_seconds(1)、web_fetch.retries(0)、
+    web_search.topK(1)、verify_gate.checks[].timeout(1)
+  - enum：bash.output_format、code_index.action、complete_step.evidence[].kind、
+    git_worktree.action、grep.sort_by、memory_search.kind、notebook_edit.edit_mode/
+    cell_type、todo_write.todos[].status/level
+- **`tool/builtin/verify_gate.go`**：CompactDescription 改为引用 compactDesc map
+  （与其他工具一致，消除硬编码重复，防文本漂移）
+
+#### 测试
+- **`tool/builtin/compact_wiring_test.go`**：新增 `TestCompactSchemaKeepsConstraints`
+  （通用防线，RED→GREEN）——遍历所有 CompactDescriptor 工具，递归对比完整
+  Schema 与 CompactSchema，断言 required/enum/minimum（含嵌套 items[].prop）
+  全部保留；未来任何工具新增约束丢失都会在此拦截
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet ./internal/...` 无警告
+- `go test ./internal/...` 全绿（含 30 个 CompactDescriptor 工具的约束审计）
+
+---
+
 ## [10.147.0] — 2026-08-02
 
 ### 🧬 技能系统重构 — 子代理化 + 工具化 + 压缩

@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -50,6 +51,133 @@ func TestEditLinesCompactSchemaMinimum(t *testing.T) {
 			t.Errorf("compact schema missing %s (full schema has it; model sees compact → 漏传/传 0 根因)\nfull: %s", want, schema)
 		}
 	}
+}
+
+// TestCompactSchemaKeepsConstraints 系统性防线（V10.148）：V10.146 只修了
+// edit_lines 的 minimum:1，但审计发现同根因还有 18 处、13 个工具的
+// enum/minimum 约束在 compact schema 中系统性丢失——手写压缩没有自动化
+// 校验。此测试对每个 CompactDescriptor 工具递归对比完整 Schema 与
+// CompactSchema，断言 required/enum/minimum（含嵌套 items[].prop）全部保留，
+// 防止未来任何工具新增约束时再次丢失。
+func TestCompactSchemaKeepsConstraints(t *testing.T) {
+	for _, tl := range tool.Builtins() {
+		cd, ok := tl.(tool.CompactDescriptor)
+		if !ok {
+			continue
+		}
+		name := tl.Name()
+		full := analyzeSchemaForTest(tl.Schema())
+		compact := analyzeSchemaForTest(cd.CompactSchema())
+
+		for _, r := range full.required {
+			if !stringInSlice(compact.required, r) {
+				t.Errorf("%s: compact schema 丢失 required %q（完整 schema 有）", name, r)
+			}
+		}
+		for key, en := range full.enums {
+			ce, ok := compact.enums[key]
+			if !ok {
+				t.Errorf("%s: compact schema 完全缺失属性 %q（完整有 enum %v）", name, key, en)
+				continue
+			}
+			if !sameEnum(ce, en) {
+				t.Errorf("%s: 属性 %q enum 不一致：full=%v compact=%v", name, key, en, ce)
+			}
+		}
+		for key, m := range full.mins {
+			cm, ok := compact.mins[key]
+			if !ok {
+				t.Errorf("%s: compact schema 完全缺失属性 %q（完整有 minimum %d）", name, key, m)
+				continue
+			}
+			if cm != m {
+				t.Errorf("%s: 属性 %q minimum 不一致：full=%d compact=%d", name, key, m, cm)
+			}
+		}
+	}
+}
+
+type schemaAudit struct {
+	required []string
+	enums    map[string][]json.RawMessage
+	mins     map[string]int64
+}
+
+// analyzeSchemaForTest 将 schema 拍平为路径键：顶层 "kind"、数组项
+// "evidence[].kind"、嵌套对象 "evidence.kind"。enum 用 JSON 值比较，
+// 整数 enum（如 todos[].level 的 [0,1]）也能正确对比。
+func analyzeSchemaForTest(raw json.RawMessage) schemaAudit {
+	audit := schemaAudit{enums: map[string][]json.RawMessage{}, mins: map[string]int64{}}
+	var walk func(raw json.RawMessage, prefix string, isRoot bool)
+	walk = func(raw json.RawMessage, prefix string, isRoot bool) {
+		var s struct {
+			Required   []string                   `json:"required"`
+			Properties map[string]json.RawMessage `json:"properties"`
+		}
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return
+		}
+		if isRoot {
+			audit.required = s.Required
+		}
+		for name, p := range s.Properties {
+			key := name
+			if prefix != "" {
+				key = prefix + "." + name
+			}
+			var ps struct {
+				Enum       []json.RawMessage `json:"enum"`
+				Minimum    *int64            `json:"minimum"`
+				Type       string            `json:"type"`
+				Items      *json.RawMessage  `json:"items"`
+				Properties json.RawMessage   `json:"properties"`
+			}
+			if err := json.Unmarshal(p, &ps); err != nil {
+				continue
+			}
+			if len(ps.Enum) > 0 {
+				audit.enums[key] = ps.Enum
+			}
+			if ps.Minimum != nil {
+				audit.mins[key] = *ps.Minimum
+			}
+			if ps.Type == "array" && ps.Items != nil {
+				walk(*ps.Items, key+"[]", false)
+			} else if ps.Type == "object" && len(ps.Properties) > 0 {
+				walk(p, key, false)
+			}
+		}
+	}
+	walk(raw, "", true)
+	return audit
+}
+
+func stringInSlice(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func sameEnum(a, b []json.RawMessage) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, av := range a {
+		found := false
+		for _, bv := range b {
+			if string(av) == string(bv) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // TestVerifyGateKindConsistent: verify_gate 声明 ReadOnly=true（可并行、

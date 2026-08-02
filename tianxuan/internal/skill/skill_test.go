@@ -495,3 +495,36 @@ func TestEnsureBundledExtracts(t *testing.T) {
 		t.Error("EnsureBundled overwrote a user-modified file")
 	}
 }
+
+// TestTasteSkillBundledSubagent verifies the distilled taste-skill ships in
+// bundled skills, survives EnsureBundled extraction, and parses as a subagent
+// skill with the expected read-only tool scope.
+func TestTasteSkillBundledSubagent(t *testing.T) {
+	home := t.TempDir()
+	if err := EnsureBundled(home); err != nil {
+		t.Fatalf("EnsureBundled: %v", err)
+	}
+	st := New(Options{HomeDir: home})
+	sk, ok := st.Read("taste-skill")
+	if !ok {
+		t.Fatal("taste-skill not discovered after EnsureBundled")
+	}
+	if sk.RunAs != RunSubagent {
+		t.Errorf("taste-skill runAs = %v, want subagent", sk.RunAs)
+	}
+	for _, want := range []string{"read_file", "ls", "grep", "bash"} {
+		found := false
+		for _, got := range sk.AllowedTools {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("taste-skill allowed-tools missing %q (got %v)", want, sk.AllowedTools)
+		}
+	}
+	if !strings.Contains(sk.Description, "审美") || !strings.Contains(sk.Description, "anti-slop") {
+		t.Errorf("taste-skill description should describe the anti-slop role: %q", sk.Description)
+	}
+}

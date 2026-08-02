@@ -267,7 +267,7 @@ func NewDesignRouterTool(store *Store) tool.Tool {
 func (*designRouterTool) Name() string { return "design_router" }
 
 func (*designRouterTool) Description() string {
-	return "Route a design task to the right sub-agent skill. 快速判断设计任务类型并返回应派发的子代理技能与任务描述：banner/横幅→banner-design；演示/幻灯片→slides；品牌→brand；token/组件规范→design-system；logo/图标→design 脚本；UI/配色/字体/UX→ui-ux-pro-max；样式实现→ui_styling 工具。"
+	return "Route a design task to the right sub-agent skill. 快速判断设计任务类型并返回应派发的子代理技能与任务描述：banner/横幅→banner-design；演示/幻灯片→slides；品牌→brand；token/组件规范→design-system；logo/图标→design 脚本；审美/反模板/landing/作品集/改版→taste-skill；UI/配色/字体/UX→ui-ux-pro-max；样式实现→ui_styling 工具。"
 }
 
 func (*designRouterTool) Schema() json.RawMessage {
@@ -290,7 +290,7 @@ func (t *designRouterTool) Execute(ctx context.Context, args json.RawMessage) (s
 }
 
 func (*designRouterTool) CompactDescription() string {
-	return "路由设计任务到对应子代理技能（banner/slides/brand/design-system/ui-ux-pro-max/ui_styling）"
+	return "路由设计任务到对应子代理技能（banner/slides/brand/design-system/taste-skill/ui-ux-pro-max/ui_styling）"
 }
 
 func (*designRouterTool) CompactSchema() json.RawMessage {
@@ -329,6 +329,8 @@ func routeDesignTask(store *Store, task string) string {
 		return `{"subagent":"design","task":"` + task + `","hint":"design 技能内含 logo/icon 生成脚本(.tianxuan/skills/design/scripts/logo|icon),按 SKILL.md 的脚本调用方式执行"}`
 	case hasAny(lower, "tailwind", "shadcn", "样式实现", "css"):
 		return routeJSON(route{"ui_styling", "调用 ui_styling 工具(action=config|guide)生成配置或读取组件指南"})
+	case hasAny(lower, "landing", "portfolio", "作品集", "审美", "品味", "anti-slop", "反模板", "模板风", "千篇一律", "设计风格", "界面风格", "redesign", "改版"):
+		return routeJSON(route{"taste-skill", "派发 taste-skill 子代理做审美判断：先读需求输出 Design Read，再定三拨盘与设计系统，返回反 AI Tells 的验收清单"})
 	case hasAny(lower, "ui", "界面", "页面", "配色", "色板", "字体", "typography", "ux", "组件", "响应式"):
 		return routeJSON(route{"ui-ux-pro-max", "派发 ui-ux-pro-max 检索子代理,返回综合设计推荐包"})
 	default:

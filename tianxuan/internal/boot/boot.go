@@ -853,6 +853,11 @@ var subagentSkillToolDescs = []struct {
 		desc:        "Security-focused review of the current branch diff in an isolated read-only sub-agent. 在隔离的只读子代理中做安全专项审查：注入、越权、密钥泄露、反序列化、路径穿越、加密误用；按严重度标注并给出 file:line。只读，不提交不改文件。",
 		compactDesc: "在隔离只读子代理中做安全专项审查，按严重度返回风险清单",
 	},
+	{
+		name:        "taste-skill",
+		desc:        "Frontend aesthetic judgment in an isolated read-only sub-agent (distilled from Leonxlnx/taste-skill, MIT). 在隔离只读子代理中做前端审美判断与反模板验收：先读需求推断设计方向（Design Read），按 DESIGN_VARIANCE/MOTION_INTENSITY/VISUAL_DENSITY 三拨盘定视觉基调，映射真实设计系统，输出布局/排版/配色/动效指令与 AI Tells 反模式清单。适合 landing page、作品集、改版等界面设计的前置决策与评审；只读，返回建议，主代理实现。",
+		compactDesc: "在隔离只读子代理中做前端审美判断（Design Read+三拨盘+设计系统映射+AI Tells 验收）",
+	},
 }
 
 // subagentSkillToolDescsBySkill indexes the custom descriptions by skill name.

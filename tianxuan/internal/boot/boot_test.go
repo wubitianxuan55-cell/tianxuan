@@ -160,6 +160,7 @@ model = "x"
 api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 `)
 	writeFile(t, dir, ".tianxuan/skills/banner-design/SKILL.md", "---\nname: banner-design\ndescription: Banner design\nrunas: subagent\nallowed-tools: read_file, write_file\n---\nbody")
+	writeFile(t, dir, ".tianxuan/skills/taste-skill/SKILL.md", "---\nname: taste-skill\ndescription: Frontend aesthetic judgment\nrunas: subagent\nallowed-tools: read_file, ls, grep, bash\n---\nbody")
 
 	ctrl, err := Build(context.Background(), Options{})
 	if err != nil {
@@ -168,7 +169,7 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 	defer ctrl.Close()
 
 	names := ctrl.ToolNames()
-	for _, want := range []string{"explore", "research", "review", "security_review", "banner_design", "ui_styling", "design_router", "run_skill", "task"} {
+	for _, want := range []string{"explore", "research", "review", "security_review", "banner_design", "taste_skill", "ui_styling", "design_router", "run_skill", "task"} {
 		found := false
 		for _, n := range names {
 			if n == want {

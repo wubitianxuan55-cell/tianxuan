@@ -122,6 +122,9 @@ func TestDesignRouter(t *testing.T) {
 		{"做一份产品发布幻灯片", "slides"},
 		{"更新品牌声音指南", "brand"},
 		{"生成 design token 规范", "design-system"},
+		{"做一个 landing page，要求有品味不要模板风", "taste-skill"},
+		{"作品集网站审美评审", "taste-skill"},
+		{"改版公司官网设计", "taste-skill"},
 		{"给后台页面配一套配色", "ui-ux-pro-max"},
 		{"用 shadcn 实现一个 dialog 组件", "ui_styling"},
 	}

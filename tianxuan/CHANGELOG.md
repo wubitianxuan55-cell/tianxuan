@@ -1,5 +1,37 @@
 ## [10.148.0] — 2026-08-02
 
+### 🎨 蒸馏 taste-skill 为前端审美子代理技能
+
+> 用户要求将 Leonxlnx/taste-skill（MIT）蒸馏进 tianxuan。该技能是 Claude 生态
+> 知名的"反模板（anti-slop）"前端审美技能：先读需求推断设计方向（Design Read）、
+> 按三拨盘（DESIGN_VARIANCE / MOTION_INTENSITY / VISUAL_DENSITY）定视觉基调、
+> 映射真实设计系统、用 AI Tells 与预检清单验收。
+
+#### 蒸馏内容
+- **`.tianxuan/skills/taste-skill/SKILL.md`**（运行时源，gitignore）：原 87KB
+  SKILL.md 忠实保留核心章节（0-14 + Appendices），frontmatter 转为 tianxuan
+  子代理格式：`name: taste-skill`、`runas: subagent`、`allowed-tools:
+  read_file, ls, grep, bash`，新增 Subagent mode 自包含任务说明与 MIT 版权声明
+- **`internal/skill/bundled/taste-skill/SKILL.md`**（构建产物，随二进制分发，
+  新环境 EnsureBundled 自动提取）
+
+#### 接线
+- **自动注册**：boot 遍历 `runas: subagent` 技能，`taste_skill` 成为独立工具，
+  原生 tool-calling 直接可见；技能索引自动排除（不增加前缀 token）
+- **`boot.go` subagentSkillToolDescs**：注册 taste-skill 的模型可见
+  desc/compactDesc（中文描述三拨盘工作流）
+- **`skill/tools.go` design_router**：新增审美/反模板/landing/作品集/改版 →
+  taste-skill 路由分支，描述同步更新
+
+#### 测试
+- `TestTasteSkillBundledSubagent`：EnsureBundled 提取后技能可读、
+  RunAs=subagent、allowed-tools 完整、描述有效
+- `TestDesignRouter` 新增 3 个 taste-skill 路由 case
+- boot 工具注册测试新增 `taste_skill` 断言
+
+#### 验证
+- `go build ./...` EXIT 0；`go vet` 无警告；`go test ./internal/...` 全绿
+
 ### 🛡️ 修复 compact schema 系统性丢失 enum/minimum 约束（13 工具 18 处）
 
 > V10.146 只修了 edit_lines 的 minimum:1，但同类根因并未根治：compact schema

@@ -55,6 +55,9 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
   const [displayMode, setDisplayMode] = useState(() => {
     try { return localStorage.getItem("tianxuan.displayMode") || "standard"; } catch { return "standard"; }
   });
+  const [notifyPref, setNotifyPref] = useState(() => {
+    try { return localStorage.getItem("tianxuan.desktopNotifications") === "0" ? "0" : "1"; } catch { return "1"; }
+  });
   const [statusBarStyle, setStatusBarStyle] = useState(desk.statusBarStyle || "icon");
   const [statusBarItems, setStatusBarItems] = useState<string[]>(desk.statusBarItems?.length ? desk.statusBarItems : STATUS_BAR_ITEMS);
   const [statusBarExpanded, setStatusBarExpanded] = useState(false);
@@ -129,6 +132,13 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             ]}
             value={closeBehavior}
             onChange={(v) => { setCloseBehavior(v); void apply(() => app.SetDesktopCloseBehavior(v)); }}
+          />
+        </SettingsField>
+        <SettingsField label="任务完成系统通知" hint="长任务结束或需要批准时，在 Windows 通知中心提醒。">
+          <SegmentedButton
+            options={[{ value: "1", label: "开启" }, { value: "0", label: "关闭" }]}
+            value={notifyPref}
+            onChange={(v) => { setNotifyPref(v); try { localStorage.setItem("tianxuan.desktopNotifications", v); } catch {} }}
           />
         </SettingsField>
         <SettingsField label="显示模式" hint="对话区域的紧凑程度。">

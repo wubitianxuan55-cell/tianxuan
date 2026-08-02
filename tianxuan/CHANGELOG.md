@@ -41,6 +41,10 @@
 - **Appshots 蒸馏（截屏发给 AI）**：Composer 新增截屏按钮，GDI 截取主屏幕
   生成 PNG dataURL，复用粘贴图片附件管线（@path 引用）发送给 agent——
   Codex Appshots 的 Windows 版，UI/布局评审场景一键分享当前屏幕
+- **任务完成系统通知**：长任务结束 / 需要批准时弹 Windows 通知中心提醒
+  （Codex 长任务通知蒸馏）；设置 > 通用 > 外观与布局可关闭（localStorage
+  持久化）。Go 侧 `App.Notify` 基于 go-toast（AUMID 注册一次，非 Windows
+  平台大声报错）
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示

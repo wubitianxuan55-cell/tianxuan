@@ -108,6 +108,8 @@ export interface AppBindings {
   // CaptureScreen captures the primary screen as a PNG data URL (Codex Appshots
   // distillation); the frontend feeds it through SavePastedImage as an attachment.
   CaptureScreen(): Promise<string>;
+  // Notify shows a Windows toast notification (task-done / approval-needed alerts).
+  Notify(title: string, body: string): Promise<void>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

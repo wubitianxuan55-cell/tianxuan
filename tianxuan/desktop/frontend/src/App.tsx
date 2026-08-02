@@ -35,6 +35,7 @@ import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { downloadMarkdown, exportAsMarkdown } from "./lib/export";
+import { app } from "./lib/bridge";
 import type { SessionMeta } from "./lib/types";
 import { useTodoExtractor } from "./hooks/useTodoExtractor";
 import { useModeManager } from "./hooks/useModeManager";
@@ -277,6 +278,31 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
   }, [pickWorkspace, switchWorkspace, refreshSessions]);
 
   useEffect(() => { void refreshSessions(); }, [cwd, refreshSessions]);
+
+  // 桌面系统通知（Codex 长任务提醒蒸馏）：任务完成 / 需要批准时弹 Windows
+  // 通知；设置面板"任务完成系统通知"开关（localStorage）可关闭。
+  const notifyEnabled = useCallback(() => {
+    try { return localStorage.getItem("tianxuan.desktopNotifications") !== "0"; } catch { return true; }
+  }, []);
+  const prevRunningRef = useRef(state.running);
+  useEffect(() => {
+    const wasRunning = prevRunningRef.current;
+    prevRunningRef.current = state.running;
+    if (!notifyEnabled()) return;
+    if (wasRunning && !state.running) {
+      void app.Notify("tianxuan", t("notify.taskDone") ?? "任务已完成").catch(() => {});
+    }
+  }, [state.running, notifyEnabled, t]);
+  const prevApprovalIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = state.approval?.id ?? null;
+    const was = prevApprovalIdRef.current;
+    prevApprovalIdRef.current = id;
+    if (!notifyEnabled()) return;
+    if (id !== null && was !== id) {
+      void app.Notify("tianxuan", t("notify.needApproval") ?? "需要你的批准").catch(() => {});
+    }
+  }, [state.approval?.id, notifyEnabled, t]);
 
   // 全局快捷键
   useEffect(() => {

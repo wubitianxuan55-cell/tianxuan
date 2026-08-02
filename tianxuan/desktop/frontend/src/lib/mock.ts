@@ -321,6 +321,9 @@ export function makeMockApp(): AppBindings {
       // 1x1 透明 PNG data URL，dev mock 下占位。
       return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     },
+    async Notify(_title: string, _body: string) {
+      // dev mock 下不弹系统通知。
+    },
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;
       capServers.push({

@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	aead.dev/minisign v0.3.0
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
 	github.com/getlantern/systray v1.2.2
 	github.com/minio/selfupdate v0.6.0
 	github.com/wailsapp/wails/v2 v2.12.0
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect

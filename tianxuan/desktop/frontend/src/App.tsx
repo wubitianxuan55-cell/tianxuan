@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { CSSProperties } from "react";
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FolderGit2, FolderTree, GitBranch,
-  Globe, Settings as SettingsIcon, MessageSquare,
+  Globe, PanelRightClose, PanelRightOpen, Settings as SettingsIcon, MessageSquare,
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { useT } from "./lib/i18n";
@@ -165,6 +165,20 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
     startWorkspacePanelResize, resizeWorkspacePanelWithKeyboard,
     setSavedWorkspacePanelWidth,
   } = useWorkspacePanel(effectiveSidebarWidth, viewportWidth);
+  // 浏览器视图打开时自动折叠右侧面板让位，关闭时恢复原面板状态；
+  // 浏览器内手动展开面板不被自动折叠打断。
+  const prevBrowserOpenRef = useRef(false);
+  const prevPanelOpenRef = useRef(false);
+  useEffect(() => {
+    const wasBrowserOpen = prevBrowserOpenRef.current;
+    prevBrowserOpenRef.current = browserOpen;
+    if (browserOpen && !wasBrowserOpen) {
+      prevPanelOpenRef.current = workspacePanelOpen;
+      if (workspacePanelOpen) setWorkspacePanel(false);
+    } else if (!browserOpen && wasBrowserOpen && prevPanelOpenRef.current) {
+      setWorkspacePanel(true);
+    }
+  }, [browserOpen, workspacePanelOpen, setWorkspacePanel]);
   const { alive: bridgeAlive, onReconnect } = useBridgeWatch();
   // Edit a sent user message: load its text into the composer for rework. Each
   // click bumps the id so Composer's externalDraft effect re-fires.
@@ -405,6 +419,9 @@ onOpenSettings={() => setSettingsOpen(true)}
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              {!workspacePanelOpen && (
+                <ToolbarButton onClick={() => setWorkspacePanel(true)} title={t("workspace.expand") ?? "展开面板"}><PanelRightOpen size={13} /></ToolbarButton>
+              )}
               <ToolbarButton onClick={() => {
                 setPendingViewMode("changed");
                 if (workspacePanelOpen && rightTab === "files") {
@@ -540,6 +557,14 @@ onOpenSettings={() => setSettingsOpen(true)}
             >
               <BarChart3 size={13} />
               <span>统计</span>
+            </button>
+            <div className="flex-1" />
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 mr-1.5 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-[color,background] duration-[var(--dur-fast)] hover:text-fg hover:bg-bg-soft shrink-0"
+              onClick={() => setWorkspacePanel(false)}
+              title={t("workspace.collapse") ?? "折叠面板"}
+            >
+              <PanelRightClose size={13} />
             </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">

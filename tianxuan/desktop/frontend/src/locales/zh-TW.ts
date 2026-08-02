@@ -45,6 +45,8 @@ export const zhTW: Record<DictKey, string> = {
   // workspace panel
   "workspace.title": "工作區",
   "workspace.open": "開啟工作區面板",
+  "workspace.expand": "展開面板",
+  "workspace.collapse": "摺疊面板",
   "workspace.close": "關閉工作區面板",
   "workspace.minimize": "最小化工作區面板",
   "workspace.maximize": "最大化工作區面板",

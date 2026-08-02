@@ -46,6 +46,8 @@ export const zh: Record<DictKey, string> = {
   // 工作区面板
   "workspace.title": "工作区",
   "workspace.open": "打开工作区面板",
+  "workspace.expand": "展开面板",
+  "workspace.collapse": "折叠面板",
   "workspace.close": "关闭工作区面板",
   "workspace.minimize": "最小化工作区面板",
   "workspace.maximize": "最大化工作区面板",

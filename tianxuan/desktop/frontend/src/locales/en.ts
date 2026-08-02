@@ -45,6 +45,8 @@ export const en = {
   // workspace panel
   "workspace.title": "Workspace",
   "workspace.open": "Open workspace panel",
+  "workspace.expand": "Expand panel",
+  "workspace.collapse": "Collapse panel",
   "workspace.close": "Close workspace panel",
   "workspace.minimize": "Minimize workspace panel",
   "workspace.maximize": "Maximize workspace panel",

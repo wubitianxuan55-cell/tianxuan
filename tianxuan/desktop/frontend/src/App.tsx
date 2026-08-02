@@ -429,12 +429,13 @@ onOpenSettings={() => setSettingsOpen(true)}
             <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("topbar.startupError", { msg: state.meta.startupErr })}</div>
           )}
 
-          <UpdateBanner />
-          <NewSessionToast done={newSessionDone} />
-          {browserOpen ? (
-            <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} />
-          ) : (
+          <div className={browserOpen ? "flex flex-col flex-1 min-h-0" : "hidden"}>
+            <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} visible={browserOpen} />
+          </div>
+          {!browserOpen && (
             <>
+              <UpdateBanner />
+              <NewSessionToast done={newSessionDone} />
           <main className="main">
             <CompactContext.Provider value={compactMode}>
             {(state.meta?.ready === false && !state.meta?.startupErr) || switchingModel ? (

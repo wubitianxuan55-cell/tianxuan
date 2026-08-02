@@ -539,6 +539,10 @@ export const en = {
   "browser.openBrowser": "Browser (Ctrl+Shift+B)",
   "browser.openExternal": "Open in external browser",
   "browser.sendSelection": "Send to AI",
+  "browser.recent": "Recent",
+  "browser.shortcutNewTab": "New tab",
+  "browser.shortcutClose": "Close",
+  "browser.shortcutAddress": "Address bar",
 
   "modelSwitcher.searchPlaceholder": "Search models…",
   "modelSwitcher.noMatches": "No matching models",

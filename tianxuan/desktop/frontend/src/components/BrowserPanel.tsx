@@ -2,7 +2,7 @@
 // 多标签，每标签独立历史栈；首次访问域名弹权限确认（localStorage 白名单，确认后免问）。
 // 页面模式用 iframe 渲染（WebView2 完整渲染）；网站拒绝 iframe 嵌入或用户
 // 想读纯文本时切换文本模式——复用内核 web_fetch（SSRF 防护 + 去标签）。
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -44,14 +44,17 @@ import {
   isAllowedHost,
   type BrowserStorage,
 } from "../lib/browserPerm";
+import { getRecent, recordVisit, type RecentVisit } from "../lib/browserRecent";
 import { useT } from "../lib/i18n";
 
 export function BrowserPanel({
   onClose,
   onSendText,
+  visible,
 }: {
   onClose: () => void;
   onSendText?: (text: string) => void;
+  visible: boolean;
 }) {
   const t = useT();
   const storage: BrowserStorage | null = useMemo(
@@ -61,11 +64,18 @@ export function BrowserPanel({
   const [tabs, setTabs] = useState<BrowserTab[]>(() => [createBrowserTab()]);
   const [activeId, setActiveId] = useState<string>("");
   const [selection, setSelection] = useState("");
+  const [recent, setRecent] = useState<RecentVisit[]>(() => (storage ? getRecent(storage) : []));
+  const addressRef = useRef<HTMLInputElement>(null);
   const currentId = activeId !== "" ? activeId : tabs[0]?.id ?? "";
   const active = tabs.find((tab) => tab.id === currentId) ?? tabs[0];
   const current = active?.history.index !== undefined && active.history.index >= 0
     ? active.history.entries[active.history.index]
     : "";
+
+  // 导航/切换成功后记录"最近访问"（同域名去重并置顶）。
+  useEffect(() => {
+    if (current && storage) setRecent(recordVisit(storage, current));
+  }, [current, storage]);
 
   // 提交一次真实导航（纯函数）：入栈历史、清空待确认域名与文本缓存、触发展示加载。
   const commitNavigate = useCallback((tab: BrowserTab, url: string): BrowserTab => ({
@@ -165,6 +175,29 @@ export function BrowserPanel({
     setActiveId(r.activeId);
     setSelection("");
   }, [tabs, activeId, onClose]);
+
+  // 浏览器视图可见时的快捷键：Ctrl+T 新标签 / Ctrl+W 关闭 / Ctrl+L 聚焦地址栏。
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "t") {
+        e.preventDefault();
+        onNewTab();
+      } else if (k === "w") {
+        e.preventDefault();
+        onCloseTab(currentId);
+      } else if (k === "l") {
+        e.preventDefault();
+        addressRef.current?.focus();
+        addressRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, onNewTab, onCloseTab, currentId]);
 
   const switchTo = useCallback((id: string) => {
     const next = switchTab(tabs, id);
@@ -266,6 +299,7 @@ export function BrowserPanel({
           <div className="flex items-center gap-1.5 flex-1 min-w-0 border border-border-soft rounded-md bg-bg-soft px-2 py-1 focus-within:border-accent/40 transition-colors">
             <Globe size={12} className="text-fg-faint shrink-0" />
             <input
+              ref={addressRef}
               className="flex-1 min-w-0 border-0 bg-transparent text-fg text-xs outline-none placeholder:text-fg-faint font-mono"
               value={active?.input ?? ""}
               onChange={(e) => {
@@ -350,9 +384,38 @@ export function BrowserPanel({
             </div>
           </div>
         ) : empty ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-faint/50">
-            <Globe size={28} />
-            <div className="text-xs">{t("browser.emptyHint")}</div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
+            <div className="flex flex-col items-center gap-2 text-fg-faint/50">
+              <Globe size={30} />
+              <div className="text-xs">{t("browser.emptyHint")}</div>
+            </div>
+            {recent.length > 0 && (
+              <div className="w-full max-w-sm flex flex-col gap-2">
+                <div className="text-[10px] uppercase tracking-wider text-fg-faint">
+                  {t("browser.recent") ?? "最近访问"}
+                </div>
+                {recent.map((r) => (
+                  <button
+                    key={r.host}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-soft/60 bg-bg-soft/40 text-left cursor-pointer transition-colors duration-150 hover:border-accent/40 hover:text-fg"
+                    onClick={() => navigate(r.url)}
+                  >
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-accent/15 text-accent shrink-0">
+                      {hostInitial(r.url)}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-xs text-fg truncate">{r.host}</span>
+                      <span className="block text-[10px] text-fg-faint font-mono truncate">{r.url}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-4 text-[10px] text-fg-faint/70">
+              <span><kbd>Ctrl</kbd>+<kbd>T</kbd> {t("browser.shortcutNewTab") ?? "新标签"}</span>
+              <span><kbd>Ctrl</kbd>+<kbd>W</kbd> {t("browser.shortcutClose") ?? "关闭"}</span>
+              <span><kbd>Ctrl</kbd>+<kbd>L</kbd> {t("browser.shortcutAddress") ?? "地址栏"}</span>
+            </div>
           </div>
         ) : active.mode === "page" ? (
           <iframe

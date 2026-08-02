@@ -20,6 +20,12 @@
 - **外部浏览器一键打开**：导航栏 ExternalLink 按钮，当前页交给系统浏览器
   （桥接 `BrowserOpenURL`）
 - **标签域名徽标**：标签行显示域名首字母胶囊（空标签回退 Globe 图标）
+- **会话状态保留**：浏览器视图常驻挂载，切回聊天再打开不丢标签/历史栈
+  （display 切换，非卸载）
+- **浏览器快捷键**：Ctrl+T 新标签 / Ctrl+W 关闭当前标签 / Ctrl+L 聚焦地址栏
+  （仅视图可见时生效）
+- **新标签页起始页**：最近访问列表（localStorage 跨会话持久化，按域名去重
+  置顶、上限 8 条）+ 快捷键提示
 - **选中文本发送 AI**：文本模式选中文字浮层"发送给 AI 分析"，自动附来源
   URL 填入 Composer（iframe 跨域无法做元素级注释，此为实现 Codex 注释
   模式的现实蒸馏）
@@ -37,10 +43,11 @@
 - 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
   URL 规范化）+ `browserTabs.test.ts` 10 例（新建/切换/关闭邻居激活/
   不可变更新/标题/徽标首字母）+ `browserPerm.test.ts` 5 例（域名解析/
-  白名单读写/损坏数据兜底）
+  白名单读写/损坏数据兜底）+ `browserRecent.test.ts` 5 例（去重置顶/
+  上限裁剪/损坏数据兜底/清理）
 
 #### 验证
-- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 108/108；
+- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 113/113；
   `vite build` EXIT 0
 
 ### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光

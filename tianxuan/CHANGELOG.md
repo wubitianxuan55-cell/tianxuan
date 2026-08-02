@@ -53,6 +53,10 @@
   Esc 取消），评论按 workspace+文件路径持久化（localStorage 跨会话）；
   有评论的行显示计数徽标，弹窗底部评论列表支持删除与"发送给 AI"（自动附
   路径:行号，逐条处理）——Codex review 注释工作流闭环
+- **Visualizations 蒸馏（Mermaid 图表）**：Markdown 渲染支持 ```mermaid
+  代码块 → SVG 图表（流程图/时序图/架构图），agent 讲解复杂逻辑直接配图；
+  mermaid 按需懒加载（独立 chunk 149KB gzip，不拖首屏）、securityLevel
+  strict 防注入、深色主题适配科幻风
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示

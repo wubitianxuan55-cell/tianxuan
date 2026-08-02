@@ -6,6 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Check, Copy } from "lucide-react";
 import { CodeViewer } from "./CodeViewer";
+import { MermaidChart } from "./MermaidChart";
 import { openExternal } from "../lib/bridge";
 
 // KaTeX CSS 延迟注入：避免非数学对话的 ~23KB CSS 开销。
@@ -67,6 +68,9 @@ const components: Components = {
     const lang = match?.[1];
     const isBlock = match !== null || text.includes("\n");
     if (isBlock) {
+      if (lang === "mermaid") {
+        return <MermaidChart code={text} />;
+      }
       return (
         <div className="my-3 rounded-md border border-border-soft overflow-hidden">
           <CodeBlockHeader language={lang} text={text} />

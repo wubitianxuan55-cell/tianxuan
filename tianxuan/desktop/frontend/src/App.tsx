@@ -472,11 +472,6 @@ onOpenSettings={() => setSettingsOpen(true)}
             <div className="shrink-0 px-4 py-2 text-[12.5px] bg-del-bg text-err border-b border-border-soft">{t("topbar.startupError", { msg: state.meta.startupErr })}</div>
           )}
 
-          <div className={browserOpen ? "flex flex-col flex-1 min-h-0" : "hidden"}>
-            <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} visible={browserOpen} />
-          </div>
-          {!browserOpen && (
-            <>
               <UpdateBanner />
               <NewSessionToast done={newSessionDone} />
           <main className="main">
@@ -528,9 +523,15 @@ onOpenSettings={() => setSettingsOpen(true)}
             />
             </CompactContext.Provider>
           </footer>
-            </>
-          )}
         </section>
+
+        {/* 浏览器独立右分栏：对话与浏览器并存（可边聊边看），关闭即收起 */}
+        <div
+          className={browserOpen ? "flex flex-col min-w-0 shrink-0 border-l border-border-soft bg-bg" : "hidden"}
+          style={{ width: "clamp(360px, 38vw, 760px)" }}
+        >
+          <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} visible={browserOpen} />
+        </div>
 
         {workspacePanelOpen && !workspacePanelMaximized && (
           <button

@@ -411,6 +411,7 @@ export const zhTW: Record<DictKey, string> = {
   "msg.thinkingDone": "已完成",
   "msg.copy": "複製",
   "msg.copyAll": "複製全部",
+  "msg.edit": "編輯",
   "rewind.label": "回退 / 分支 / 摘要…",
   "rewind.both": "程式碼 + 對話",
   "rewind.conversation": "僅對話",

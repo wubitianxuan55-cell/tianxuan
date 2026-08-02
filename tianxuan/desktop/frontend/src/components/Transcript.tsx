@@ -266,11 +266,12 @@ function QuestionJumpBar({ questions, onJump }: { questions: QuestionAnchor[]; o
 // ── Transcript ──────────────────────────────────────────────────────────
 
 export function Transcript({
-  onPrompt, onRewind, running, onThreadEl, onScrollToTurnReady,
+  onPrompt, onRewind, onEditMessage, running, onThreadEl, onScrollToTurnReady,
   cwd, cwdName, sessions, onResumeSession, meta,
 }: {
   onPrompt: (text: string) => void;
   onRewind?: (turn: number, scope: string) => void;
+  onEditMessage?: (text: string) => void;
   running: boolean;
   onThreadEl?: (el: HTMLElement | null) => void;
   onScrollToTurnReady?: (fn: (turn: number) => void) => void;
@@ -470,7 +471,8 @@ export function Transcript({
               <UserMessage text={it.text} turn={tn}
                 open={tn != null && openTurn === tn}
                 onToggle={() => setOpenTurn((cur) => (cur === tn ? null : (tn ?? null)))}
-                onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }} />
+                onRewind={(turn, scope) => { onRewind?.(turn, scope); setOpenTurn(null); }}
+                onEdit={onEditMessage} />
             </div>
           );
         }

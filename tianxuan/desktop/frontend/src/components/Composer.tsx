@@ -38,14 +38,24 @@ function loadComposerHeight(): number | null {
 
 export function Composer({
   running, cwd, onSend, onCancel, permLevel, onSetPermLevel, onPickFolder, disabled,
+  externalDraft,
 }: {
   running: boolean; cwd?: string;
   onSend: (displayText: string, submitText?: string) => void;
   onCancel: () => string | undefined; permLevel?: string; onSetPermLevel?: (p: "ask" | "auto" | "yolo") => void;
   onPickFolder: (path?: string) => Promise<string>; disabled?: boolean;
+  externalDraft?: { text: string; id: number } | null;
 }) {
   const t = useT();
   const [text, setText] = useState("");
+  // Editing a sent message loads its text back into the composer: the App bumps
+  // externalDraft.id on each "edit" click, so this effect re-fires per edit.
+  useEffect(() => {
+    if (!externalDraft) return;
+    setText(externalDraft.text);
+    setHistoryIndex(-1);
+    taRef.current?.focus();
+  }, [externalDraft]);
   const debouncedText = useDebounce(text, 80);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pendingPaste, setPendingPaste] = useState(0);

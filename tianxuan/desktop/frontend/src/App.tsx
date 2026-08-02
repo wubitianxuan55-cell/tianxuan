@@ -141,6 +141,7 @@ export default function App() {
 const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
+  const [editDraft, setEditDraft] = useState<{ text: string; id: number } | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
   const [scrollToTurn, setScrollToTurn] = useState<((turn: number) => void) | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
@@ -163,6 +164,11 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
     setSavedWorkspacePanelWidth,
   } = useWorkspacePanel(effectiveSidebarWidth, viewportWidth);
   const { alive: bridgeAlive, onReconnect } = useBridgeWatch();
+  // Edit a sent user message: load its text into the composer for rework. Each
+  // click bumps the id so Composer's externalDraft effect re-fires.
+  const handleEditMessage = useCallback((text: string) => {
+    setEditDraft((prev) => ({ text, id: (prev?.id ?? 0) + 1 }));
+  }, []);
   useEffect(() => {
     onReconnect(() => { refreshMeta(); });
   }, [onReconnect, refreshMeta]);
@@ -426,7 +432,7 @@ onOpenSettings={() => setSettingsOpen(true)}
               <Skeleton />
             ) : (
               <>
-                <Transcript onPrompt={send} onRewind={rewind} running={state.running} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
+                <Transcript onPrompt={send} onRewind={rewind} onEditMessage={handleEditMessage} running={state.running} onScrollToTurnReady={setScrollToTurn} cwd={state.meta?.cwd} cwdName={cwdName} sessions={sidebarSessions} onResumeSession={handleResumeSession} meta={state.meta} />
                 {state.items.length > 1 && <JumpBar items={state.items} scrollToTurn={scrollToTurn ?? undefined} />}
               </>
             )}
@@ -453,6 +459,7 @@ onOpenSettings={() => setSettingsOpen(true)}
               onSetPermLevel={setPermLevel}
               onPickFolder={switchFolder}
               disabled={state.meta?.ready === false || state.approval != null}
+              externalDraft={editDraft}
             />
             </div>
             <StatusBar

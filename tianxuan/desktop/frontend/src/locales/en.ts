@@ -412,6 +412,7 @@ export const en = {
   "msg.thinkingDone": "done",
   "msg.copy": "Copy",
   "msg.copyAll": "Copy all",
+  "msg.edit": "Edit",
   "rewind.label": "Rewind / fork / summarize…",
   "rewind.both": "Code + conversation",
   "rewind.conversation": "Conversation only",

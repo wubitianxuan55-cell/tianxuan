@@ -600,6 +600,7 @@ onOpenSettings={() => setSettingsOpen(true)}
                 cwd={state.meta?.cwd}
                 onClose={() => { setWorkspacePanel(false); setPendingViewMode(null); }}
                 initialViewMode={pendingViewMode ?? undefined}
+                onSendReview={handleSend}
               />
             ) : rightTab === "runtime" ? (
               <RuntimePanel counts={toolCounts} />

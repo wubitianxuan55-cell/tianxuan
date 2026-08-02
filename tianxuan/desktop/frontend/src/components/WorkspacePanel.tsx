@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Columns2, FileText, Folder, PanelRightClose, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Columns2, FileText, Folder, MessageSquare, PanelRightClose, Search, Send, X } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { DirEntry, FilePreview, WorkspaceChangeView } from "../lib/types";
@@ -7,6 +7,13 @@ import { CodeViewer } from "./CodeViewer";
 import { UnifiedDiffView } from "./UnifiedDiffView";
 import { Markdown } from "./Markdown";
 import { Modal } from "./Modal";
+import {
+  addComment,
+  formatCommentsForAI,
+  loadPathComments,
+  removeComment,
+  type ReviewComment,
+} from "../lib/reviewComments";
 
 function entryPath(dir: string, entry: DirEntry): string {
   const prefix = dir === "" || dir.endsWith("/") ? dir : dir + "/";
@@ -67,11 +74,13 @@ export function WorkspacePanel({
   cwd,
   initialViewMode,
   onClose,
+  onSendReview,
 }: {
   open: boolean;
   cwd?: string;
   initialViewMode?: "files" | "changed";
   onClose: () => void;
+  onSendReview?: (text: string) => void;
 }) {
   const t = useT();
   const filterRef = useRef<HTMLInputElement>(null);
@@ -86,6 +95,26 @@ export function WorkspacePanel({
   const [modalPreview, setModalPreview] = useState<FilePreview | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalDiff, setModalDiff] = useState<string | null>(null);
+  const [modalComments, setModalComments] = useState<ReviewComment[]>([]);
+
+  // 打开文件时加载该路径的持久化评论（localStorage，跨会话保留）。
+  useEffect(() => {
+    if (!modalPath || typeof localStorage === "undefined") {
+      setModalComments([]);
+      return;
+    }
+    setModalComments(loadPathComments(localStorage, cwd ?? "", modalPath));
+  }, [modalPath, cwd]);
+
+  const onAddComment = useCallback((line: number, text: string) => {
+    if (!modalPath || typeof localStorage === "undefined") return;
+    setModalComments(addComment(localStorage, cwd ?? "", modalPath, line, text));
+  }, [modalPath, cwd]);
+
+  const onRemoveComment = useCallback((id: string) => {
+    if (!modalPath || typeof localStorage === "undefined") return;
+    setModalComments(removeComment(localStorage, cwd ?? "", modalPath, id));
+  }, [modalPath, cwd]);
 
   const loadDir = useCallback(async (dir: string) => {
     const entries = await app.ListDir(dir).catch(() => []);
@@ -116,6 +145,7 @@ export function WorkspacePanel({
     setModalPath(null);
     setModalPreview(null);
     setModalDiff(null);
+    setModalComments([]);
     void loadDir("");
     if (viewMode === "changed" && workspaceChanges === null) {
       void loadWorkspaceChanges();
@@ -356,7 +386,7 @@ export function WorkspacePanel({
           </div>
           <div className="flex-1 min-h-0">
             {modalDiff ? (
-              <UnifiedDiffView diff={modalDiff} />
+              <UnifiedDiffView diff={modalDiff} comments={modalComments} onAddComment={onAddComment} />
             ) : (
               <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
                 {modalLoading ? (
@@ -378,6 +408,36 @@ export function WorkspacePanel({
               </div>
             )}
           </div>
+          {modalComments.length > 0 && (
+            <div className="shrink-0 max-h-[30%] overflow-y-auto border-t border-border-soft px-3 py-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={12} className="text-warn" />
+                <span className="text-[10.5px] font-medium text-fg-dim">{t("workspace.reviewComments", { n: modalComments.length })}</span>
+                {onSendReview && (
+                  <button
+                    className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md border-0 bg-accent text-accent-fg text-[10.5px] cursor-pointer transition-all duration-150 hover:brightness-110 active:scale-95"
+                    onClick={() => onSendReview(`${t("workspace.reviewPrompt") ?? "以下是评审评论，请逐条处理："}\n${formatCommentsForAI(modalComments)}`)}
+                  >
+                    <Send size={10} />
+                    {t("workspace.sendReview") ?? "发送给 AI"}
+                  </button>
+                )}
+              </div>
+              {modalComments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2 px-2 py-1 rounded-md bg-bg-soft/50">
+                  <span className="shrink-0 text-[10.5px] font-mono text-fg-faint tabular-nums">{c.line}</span>
+                  <span className="flex-1 min-w-0 text-[12px] text-fg-dim break-words">{c.text}</span>
+                  <button
+                    className="shrink-0 inline-flex items-center justify-center w-4 h-4 border-0 rounded bg-transparent text-fg-faint cursor-pointer hover:text-err hover:bg-bg-soft"
+                    title={t("workspace.removeComment") ?? "删除评论"}
+                    onClick={() => onRemoveComment(c.id)}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
     </>

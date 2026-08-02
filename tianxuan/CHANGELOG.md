@@ -49,6 +49,10 @@
   diff（新增绿 / 删除红 / hunk 深色分隔 + 双行号列），替代纯文件预览——
   Codex review pane 蒸馏。后端把会话 diff（executor PendingDiffs 的 unified
   diff）透传到前端，diffParser 纯函数解析（TDD 4 例）
+- **diff 行内评论**：diff 行 hover 显示评论按钮，行内输入保存（Enter 保存 /
+  Esc 取消），评论按 workspace+文件路径持久化（localStorage 跨会话）；
+  有评论的行显示计数徽标，弹窗底部评论列表支持删除与"发送给 AI"（自动附
+  路径:行号，逐条处理）——Codex review 注释工作流闭环
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
@@ -66,10 +70,11 @@
   不可变更新/标题/徽标首字母）+ `browserPerm.test.ts` 5 例（域名解析/
   白名单读写/损坏数据兜底）+ `browserRecent.test.ts` 5 例（去重置顶/
   上限裁剪/损坏数据兜底/清理）+ `browserHistory` 地址解析 6 例（搜索编码/
-  裸域/localhost/IP/兜底搜索）
+  裸域/localhost/IP/兜底搜索）+ `reviewComments.test.ts` 5 例（增删/按
+  workspace 隔离/空文本防御/AI 格式化）+ `diffParser.test.ts` 4 例
 
 #### 验证
-- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 119/119；
+- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 128/128；
   `vite build` EXIT 0
 
 ### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光

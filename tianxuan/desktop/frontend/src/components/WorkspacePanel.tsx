@@ -4,6 +4,7 @@ import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import type { DirEntry, FilePreview, WorkspaceChangeView } from "../lib/types";
 import { CodeViewer } from "./CodeViewer";
+import { UnifiedDiffView } from "./UnifiedDiffView";
 import { Markdown } from "./Markdown";
 import { Modal } from "./Modal";
 
@@ -84,6 +85,7 @@ export function WorkspacePanel({
   const [modalPath, setModalPath] = useState<string | null>(null);
   const [modalPreview, setModalPreview] = useState<FilePreview | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [modalDiff, setModalDiff] = useState<string | null>(null);
 
   const loadDir = useCallback(async (dir: string) => {
     const entries = await app.ListDir(dir).catch(() => []);
@@ -96,12 +98,13 @@ export function WorkspacePanel({
   }, []);
 
   // 打开文件 → 弹窗预览
-  const openFilePreview = useCallback((path: string) => {
+  const openFilePreview = useCallback((path: string, diff?: string) => {
     setFilter("");
     const dirs = parentPath(path);
     if (dirs) {
       setOpenDirs((prev) => new Set([...Array.from(prev), dirs]));
     }
+    setModalDiff(diff ?? null);
     setModalPath(path);
   }, []);
 
@@ -112,6 +115,7 @@ export function WorkspacePanel({
     setFilter("");
     setModalPath(null);
     setModalPreview(null);
+    setModalDiff(null);
     void loadDir("");
     if (viewMode === "changed" && workspaceChanges === null) {
       void loadWorkspaceChanges();
@@ -286,7 +290,7 @@ export function WorkspacePanel({
                     <button
                       className="w-full min-w-0 min-h-[38px] flex items-center gap-2 px-2 py-1.5 border-0 rounded-md bg-transparent text-fg-dim text-[12.5px] text-left cursor-pointer no-drag hover:bg-sidebar-hover hover:text-fg border-l-[3px] border-l-transparent"
                       key={ch.path}
-                      onClick={() => openFilePreview(ch.path)}
+                      onClick={() => openFilePreview(ch.path, ch.diff)}
                       title={ch.path}
                     >
                       <FileText size={14} className="shrink-0 text-fg-faint" />
@@ -334,7 +338,7 @@ export function WorkspacePanel({
 
       {/* ── 文件预览弹窗 ── */}
       {modalPath && (
-        <Modal onClose={() => setModalPath(null)} wide>
+        <Modal onClose={() => { setModalPath(null); setModalDiff(null); }} wide>
           <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-border-soft shrink-0">
             <FileText size={15} className="shrink-0 text-fg-faint" />
             <span className="font-medium text-[13px] truncate">{basename(modalPath)}</span>
@@ -344,29 +348,35 @@ export function WorkspacePanel({
             )}
             <button
               className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-faint cursor-pointer hover:text-fg hover:bg-bg-soft shrink-0"
-              onClick={() => setModalPath(null)}
+              onClick={() => { setModalPath(null); setModalDiff(null); }}
               title={t("workspace.close")}
             >
               <X size={15} />
             </button>
           </div>
-          <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
-            {modalLoading ? (
-              <div className="py-10 text-center text-fg-faint text-[13px]">{t("workspace.loading")}</div>
-            ) : modalPreview?.err ? (
-              <div className="py-6 text-err text-[13px]">{modalPreview.err}</div>
-            ) : modalPreview?.binary ? (
-              <div className="py-6 text-fg-faint text-[13px]">{t("workspace.binary")}</div>
-            ) : modalPreview ? (
-              <>
-                {modalPreview.truncated && <div className="mb-2.5 px-2 py-1.5 border border-border-soft rounded-md bg-bg-soft text-fg-dim text-xs">{t("workspace.truncated")}</div>}
-                {isModalMarkdown ? (
-                  <Markdown text={modalPreview.body} />
-                ) : (
-                  <CodeViewer value={modalPreview.body || " "} language={languageFor(modalPath)} />
-                )}
-              </>
-            ) : null}
+          <div className="flex-1 min-h-0">
+            {modalDiff ? (
+              <UnifiedDiffView diff={modalDiff} />
+            ) : (
+              <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
+                {modalLoading ? (
+                  <div className="py-10 text-center text-fg-faint text-[13px]">{t("workspace.loading")}</div>
+                ) : modalPreview?.err ? (
+                  <div className="py-6 text-err text-[13px]">{modalPreview.err}</div>
+                ) : modalPreview?.binary ? (
+                  <div className="py-6 text-fg-faint text-[13px]">{t("workspace.binary")}</div>
+                ) : modalPreview ? (
+                  <>
+                    {modalPreview.truncated && <div className="mb-2.5 px-2 py-1.5 border border-border-soft rounded-md bg-bg-soft text-fg-dim text-xs">{t("workspace.truncated")}</div>}
+                    {isModalMarkdown ? (
+                      <Markdown text={modalPreview.body} />
+                    ) : (
+                      <CodeViewer value={modalPreview.body || " "} language={languageFor(modalPath)} />
+                    )}
+                  </>
+                ) : null}
+              </div>
+            )}
           </div>
         </Modal>
       )}

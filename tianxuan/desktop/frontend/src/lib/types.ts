@@ -129,6 +129,7 @@ export interface WorkspaceChangeView {
   path: string;
   added: number;
   removed: number;
+  diff?: string; // unified diff（review pane 视图）；binary/无 diff 时省略
 }
 
 export interface WorkspaceView {

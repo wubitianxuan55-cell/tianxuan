@@ -45,6 +45,10 @@
   （Codex 长任务通知蒸馏）；设置 > 通用 > 外观与布局可关闭（localStorage
   持久化）。Go 侧 `App.Notify` 基于 go-toast（AUMID 注册一次，非 Windows
   平台大声报错）
+- **Code review 审查面板（diff 视图）**：变更 tab 打开文件默认显示 unified
+  diff（新增绿 / 删除红 / hunk 深色分隔 + 双行号列），替代纯文件预览——
+  Codex review pane 蒸馏。后端把会话 diff（executor PendingDiffs 的 unified
+  diff）透传到前端，diffParser 纯函数解析（TDD 4 例）
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示

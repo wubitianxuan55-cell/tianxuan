@@ -45,9 +45,10 @@ type FilePreview struct {
 
 // WorkspaceChangeView is a single file change recorded during a session.
 type WorkspaceChangeView struct {
-	Path   string `json:"path"`
-	Added  int    `json:"added"`
-	Removed int   `json:"removed"`
+	Path    string `json:"path"`
+	Added   int    `json:"added"`
+	Removed int    `json:"removed"`
+	Diff    string `json:"diff"` // unified diff（review pane 用）；Binary 文件为空
 }
 
 // atSkip are entries the "@" menu hides as noise.
@@ -367,7 +368,7 @@ func (a *App) WorkspaceChanges() []WorkspaceChangeView {
 	changes := ctrl.WorkspaceChanges()
 	out := make([]WorkspaceChangeView, len(changes))
 	for i, ch := range changes {
-		out[i] = WorkspaceChangeView{Path: ch.Path, Added: ch.Added, Removed: ch.Removed}
+		out[i] = WorkspaceChangeView{Path: ch.Path, Added: ch.Added, Removed: ch.Removed, Diff: ch.Diff}
 	}
 	return out
 }

@@ -536,6 +536,8 @@ export const zh: Record<DictKey, string> = {
   "browser.allow": "允许",
   "browser.deny": "拒绝",
   "browser.openBrowser": "浏览器 (Ctrl+Shift+B)",
+  "browser.openExternal": "在外部浏览器打开",
+  "browser.sendSelection": "发送给 AI 分析",
 
   "modelSwitcher.searchPlaceholder": "搜索模型…",
   "modelSwitcher.noMatches": "无匹配模型",

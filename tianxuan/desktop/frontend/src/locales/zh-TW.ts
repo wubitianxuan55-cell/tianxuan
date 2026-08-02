@@ -536,6 +536,8 @@ export const zhTW: Record<DictKey, string> = {
   "browser.allow": "允許",
   "browser.deny": "拒絕",
   "browser.openBrowser": "瀏覽器 (Ctrl+Shift+B)",
+  "browser.openExternal": "在外部瀏覽器開啟",
+  "browser.sendSelection": "傳送給 AI 分析",
 
   "modelSwitcher.searchPlaceholder": "搜尋模型…",
   "modelSwitcher.noMatches": "無相符模型",

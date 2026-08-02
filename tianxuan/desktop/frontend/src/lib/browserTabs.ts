@@ -52,6 +52,17 @@ export function tabTitle(tab: BrowserTab): string {
   }
 }
 
+// hostInitial 返回域名首字母大写（标签行徽标用）；空或不可解析返回空串。
+export function hostInitial(url: string): string {
+  try {
+    const host = new URL(url).hostname;
+    const c = host.charAt(0);
+    return c ? c.toUpperCase() : "";
+  } catch {
+    return "";
+  }
+}
+
 export function addTab(tabs: BrowserTab[], _activeId: string): { tabs: BrowserTab[]; activeId: string } {
   const tab = createBrowserTab();
   return { tabs: [...tabs, tab], activeId: tab.id };

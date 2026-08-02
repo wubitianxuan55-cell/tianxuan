@@ -17,6 +17,12 @@
 - **权限确认**：首次访问域名弹确认卡（仿 Codex allowed hosts），允许后
   写入 localStorage 白名单（tianxuan.browser.allowedHosts）免问，拒绝则
   不加载；确认前页面不渲染
+- **外部浏览器一键打开**：导航栏 ExternalLink 按钮，当前页交给系统浏览器
+  （桥接 `BrowserOpenURL`）
+- **标签域名徽标**：标签行显示域名首字母胶囊（空标签回退 Globe 图标）
+- **选中文本发送 AI**：文本模式选中文字浮层"发送给 AI 分析"，自动附来源
+  URL 填入 Composer（iframe 跨域无法做元素级注释，此为实现 Codex 注释
+  模式的现实蒸馏）
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
@@ -30,11 +36,11 @@
   （真实抓取 example.com）
 - 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
   URL 规范化）+ `browserTabs.test.ts` 10 例（新建/切换/关闭邻居激活/
-  不可变更新/标题）+ `browserPerm.test.ts` 5 例（域名解析/白名单读写/
-  损坏数据兜底）
+  不可变更新/标题/徽标首字母）+ `browserPerm.test.ts` 5 例（域名解析/
+  白名单读写/损坏数据兜底）
 
 #### 验证
-- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 106/106；
+- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 108/108；
   `vite build` EXIT 0
 
 ### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光

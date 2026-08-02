@@ -432,7 +432,7 @@ onOpenSettings={() => setSettingsOpen(true)}
           <UpdateBanner />
           <NewSessionToast done={newSessionDone} />
           {browserOpen ? (
-            <BrowserPanel onClose={() => setBrowserOpen(false)} />
+            <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} />
           ) : (
             <>
           <main className="main">

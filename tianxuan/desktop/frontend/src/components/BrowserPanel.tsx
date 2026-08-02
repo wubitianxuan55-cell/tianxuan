@@ -7,16 +7,18 @@ import {
   ArrowLeft,
   ArrowRight,
   Eye,
+  ExternalLink,
   FileText,
   Globe,
   Loader2,
   Plus,
   RefreshCw,
   Search,
+  Send,
   ShieldAlert,
   X,
 } from "lucide-react";
-import { app } from "../lib/bridge";
+import { app, openExternal } from "../lib/bridge";
 import {
   canGoBack,
   canGoForward,
@@ -28,6 +30,7 @@ import {
 import {
   addTab,
   createBrowserTab,
+  hostInitial,
   removeTab,
   switchTab,
   tabTitle,
@@ -43,7 +46,13 @@ import {
 } from "../lib/browserPerm";
 import { useT } from "../lib/i18n";
 
-export function BrowserPanel({ onClose }: { onClose: () => void }) {
+export function BrowserPanel({
+  onClose,
+  onSendText,
+}: {
+  onClose: () => void;
+  onSendText?: (text: string) => void;
+}) {
   const t = useT();
   const storage: BrowserStorage | null = useMemo(
     () => (typeof localStorage !== "undefined" ? localStorage : null),
@@ -51,6 +60,7 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
   );
   const [tabs, setTabs] = useState<BrowserTab[]>(() => [createBrowserTab()]);
   const [activeId, setActiveId] = useState<string>("");
+  const [selection, setSelection] = useState("");
   const currentId = activeId !== "" ? activeId : tabs[0]?.id ?? "";
   const active = tabs.find((tab) => tab.id === currentId) ?? tabs[0];
   const current = active?.history.index !== undefined && active.history.index >= 0
@@ -142,6 +152,7 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
     const r = addTab(tabs, activeId);
     setTabs(r.tabs);
     setActiveId(r.activeId);
+    setSelection("");
   }, [tabs, activeId]);
 
   const onCloseTab = useCallback((id: string) => {
@@ -152,7 +163,27 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
     }
     setTabs(r.tabs);
     setActiveId(r.activeId);
+    setSelection("");
   }, [tabs, activeId, onClose]);
+
+  const switchTo = useCallback((id: string) => {
+    const next = switchTab(tabs, id);
+    if (next) {
+      setActiveId(next);
+      setSelection("");
+    }
+  }, [tabs]);
+
+  const detectSelection = useCallback(() => {
+    const sel = window.getSelection()?.toString().trim() ?? "";
+    setSelection(sel);
+  }, []);
+
+  const sendSelection = useCallback(() => {
+    if (!selection || !onSendText) return;
+    onSendText(selection + (current ? `\n\n(来源: ${current})` : ""));
+    setSelection("");
+  }, [selection, onSendText, current]);
 
   const empty = !active || current === "";
 
@@ -170,9 +201,15 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
                   ? "bg-bg border-border-soft text-fg"
                   : "bg-transparent border-transparent text-fg-faint hover:text-fg-dim"
               }`}
-              onClick={() => setActiveId(switchTab(tabs, tab.id))}
+              onClick={() => switchTo(tab.id)}
             >
-              <Globe size={11} className={isActive ? "text-accent shrink-0" : "shrink-0"} />
+              {tabTitle(tab) ? (
+                <span className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] font-bold shrink-0 ${isActive ? "bg-accent/20 text-accent" : "bg-bg-soft text-fg-faint"}`}>
+                  {hostInitial(tab.history.entries[tab.history.index] ?? "")}
+                </span>
+              ) : (
+                <Globe size={11} className={isActive ? "text-accent shrink-0" : "shrink-0"} />
+              )}
               <span className="truncate font-mono">
                 {tabTitle(tab) || (t("browser.untitledTab") ?? "新标签页")}
               </span>
@@ -256,6 +293,14 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
         >
           <RefreshCw size={13} />
         </button>
+        <button
+          className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-colors duration-150 hover:bg-bg-soft hover:text-fg disabled:opacity-35 disabled:cursor-default"
+          onClick={() => openExternal(current)}
+          disabled={empty}
+          title={t("browser.openExternal") ?? "在外部浏览器打开"}
+        >
+          <ExternalLink size={13} />
+        </button>
         <div className="flex items-center border border-border-soft rounded-md overflow-hidden shrink-0">
           <button
             className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] border-0 cursor-pointer transition-colors duration-150 ${active?.mode === "page" ? "bg-accent/12 text-accent" : "bg-transparent text-fg-faint hover:text-fg"}`}
@@ -330,8 +375,21 @@ export function BrowserPanel({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <pre className="h-full overflow-auto p-3 text-[11.5px] leading-relaxed text-fg-dim font-mono whitespace-pre-wrap break-words">
-            {active.textContent}
+            <span onMouseUp={detectSelection} onKeyUp={detectSelection}>
+              {active.textContent}
+            </span>
           </pre>
+        )}
+
+        {active?.mode === "text" && selection !== "" && onSendText && (
+          <button
+            className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border-0 bg-accent text-accent-fg text-[11px] cursor-pointer shadow-[var(--ds-shadow-dropdown)] transition-all duration-150 hover:brightness-110 active:scale-95"
+            onClick={sendSelection}
+            title={t("browser.sendSelection") ?? "发送给 AI 分析"}
+          >
+            <Send size={11} />
+            {t("browser.sendSelection") ?? "发送给 AI 分析"}
+          </button>
         )}
 
         {active?.mode === "page" && active.iframeLoading && !active.pendingHost && (

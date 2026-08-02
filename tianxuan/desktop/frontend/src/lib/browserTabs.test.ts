@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addTab,
   createBrowserTab,
+  hostInitial,
   removeTab,
   switchTab,
   tabTitle,
@@ -95,5 +96,16 @@ describe("browserTabs", () => {
       history: pushHistory(createBrowserHistory(), "https://docs.example.com/page"),
     };
     expect(tabTitle(loaded)).toBe("docs.example.com");
+  });
+
+  it("hostInitial returns the uppercased first letter of the hostname", () => {
+    expect(hostInitial("https://example.com/path")).toBe("E");
+    expect(hostInitial("http://localhost:3000")).toBe("L");
+    expect(hostInitial("https://docs.example.com")).toBe("D");
+  });
+
+  it("hostInitial returns empty for blank or unparsable input", () => {
+    expect(hostInitial("")).toBe("");
+    expect(hostInitial("not a url")).toBe("");
   });
 });

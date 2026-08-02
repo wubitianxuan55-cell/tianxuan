@@ -537,6 +537,8 @@ export const en = {
   "browser.allow": "Allow",
   "browser.deny": "Deny",
   "browser.openBrowser": "Browser (Ctrl+Shift+B)",
+  "browser.openExternal": "Open in external browser",
+  "browser.sendSelection": "Send to AI",
 
   "modelSwitcher.searchPlaceholder": "Search models…",
   "modelSwitcher.noMatches": "No matching models",

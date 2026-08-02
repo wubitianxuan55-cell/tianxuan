@@ -11,6 +11,7 @@
 // 缓存安全: 纯前端 mock，不触及 Go 内核。
 
 import type {
+  BuiltinToolView,
   MCPServerInput,
   MemorySuggestion,
   Meta,
@@ -104,6 +105,18 @@ export function makeMockApp(): AppBindings {
     { name: "explore", description: "Investigate the codebase in an isolated subagent", scope: "builtin", runAs: "subagent" },
     { name: "review", description: "Review the staged diff", scope: "project", runAs: "inline" },
     { name: "init", description: "Scaffold a REASONIX.md for this repo", scope: "builtin", runAs: "inline" },
+  ];
+  const mockBuiltinTools: BuiltinToolView[] = [
+    { name: "read_file", description: "读取文件内容(可选行范围/分页)", fullDescription: "Read a file, optionally paged.", readOnly: true },
+    { name: "edit_file", description: "精确替换文件字符串", fullDescription: "Replace a unique substring in a file.", readOnly: false },
+    { name: "bash", description: "执行shell命令", fullDescription: "Run a shell command.", readOnly: false },
+    { name: "git_status", description: "显示工作区状态", fullDescription: "Show the working tree status.", readOnly: true },
+    { name: "web_search", description: "搜索公开网页", fullDescription: "Search public web pages.", readOnly: true },
+    { name: "todo_write", description: "更新任务清单", fullDescription: "Replace the todo list.", readOnly: true },
+    { name: "task", description: "派发子代理执行聚焦子任务", fullDescription: "Spawn a subagent.", readOnly: true },
+    { name: "run_skill", description: "调用Skills索引中的playbook", fullDescription: "Invoke a skill playbook.", readOnly: true },
+    { name: "remember", description: "保存持久事实到项目记忆", fullDescription: "Save a fact.", readOnly: false },
+    { name: "code_index", description: "轻量符号索引", fullDescription: "Index and search symbols.", readOnly: true },
   ];
   const mockSwitchWorkspace = async (path: string) => {
     cwd = path || "~";
@@ -297,6 +310,9 @@ export function makeMockApp(): AppBindings {
     },
     async Capabilities() {
       return { servers: capServers.map((s) => ({ ...s })), skills: capSkills.map((s) => ({ ...s })) };
+    },
+    async Tools() {
+      return mockBuiltinTools.map((t) => ({ ...t }));
     },
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;

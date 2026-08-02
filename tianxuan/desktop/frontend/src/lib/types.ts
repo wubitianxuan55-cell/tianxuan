@@ -213,6 +213,12 @@ export interface SkillView {
   scope: string;
   runAs: string;
 }
+export interface BuiltinToolView {
+  name: string;
+  description: string;
+  fullDescription: string;
+  readOnly: boolean;
+}
 export interface CapabilitiesView {
   servers: ServerView[];
   skills: SkillView[];

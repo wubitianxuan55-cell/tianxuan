@@ -7,6 +7,7 @@
 
 import type {
   BalanceInfo,
+  BuiltinToolView,
   WorkspaceChangeView,
   CapabilitiesView,
   CheckpointMeta,
@@ -98,6 +99,9 @@ export interface AppBindings {
   // Add connects + persists a server; Remove disconnects + drops it from config;
   // Retry reconnects a configured server that failed (config untouched).
   Capabilities(): Promise<CapabilitiesView>;
+  // Tools lists every built-in kernel tool (name, display description,
+  // full description, read-only flag) for the right-drawer 工具 tab.
+  Tools(): Promise<BuiltinToolView[]>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

@@ -1,133 +1,113 @@
-import { useMemo, useRef, useState } from "react";
-import { Cpu, ChevronDown, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Copy, Cpu, RefreshCw, Search } from "lucide-react";
+import { app } from "../lib/bridge";
+import type { BuiltinToolView } from "../lib/types";
+import { useToast } from "./Toast";
 import { useGSAPCollapse } from "../lib/useGSAPCollapse";
+import {
+  filterCatalog,
+  groupByCategory,
+  highlightParts,
+  sortCatalog,
+  type CatalogGroup,
+  type CatalogTool,
+} from "../lib/toolCatalog";
 
 type Counts = Record<string, number>;
 
-/** Compact descriptions mirroring Go's compactDesc map + skill tools */
-const TOOL_DESC: Record<string, string> = {
-  // 文件
-  read_file: "读取文件内容(可选行范围/分页)",
-  write_file: "写入/覆盖文件(自动建父目录)",
-  edit_file: "精确替换文件字符串(须全局唯一)",
-  multi_edit: "原子化批量编辑(单文件N步依次执行)",
-  edit_lines: "按行号替换文件连续行(起止行号定位)",
-  delete_range: "删除文件连续行(起止锚点定位)",
-  delete_symbol: "删除Go符号(函数/类型/接口等,AST解析)",
-  glob: "通配符匹配文件名(支持**递归)",
-  grep: "正则搜索文件内容(返回path:行:文本,限200条)",
-  ls: "列目录条目(子目录带/)",
-  notebook_edit: "编辑Jupyter Notebook单元格(.ipynb)",
-  // 命令
-  bash: "执行shell命令(合并stdout+stderr,限2分钟)",
-  bash_output: "读取后台任务的增量输出(不阻塞)",
-  wait: "阻塞等待后台任务结束(可设超时)",
-  kill_shell: "终止后台任务(SIGTERM→SIGKILL)",
-  // 版本
-  git_status: "显示工作区状态(分支/暂存/未暂存/未跟踪/冲突)",
-  git_diff: "显示行级别变更(--staged可选,path可限文件)",
-  git_log: "显示提交历史(支持count/path/author过滤)",
-  git_commit: "提交暂存变更(可stage_all/amend/自动生成消息)",
-  git_worktree: "管理git工作树(添加/删除/列出)",
-  // 网络
-  web_fetch: "抓取URL纯文本(去标签,SSRF安全)",
-  web_search: "搜索公开网页(通过DuckDuckGo)",
-  // 任务/规划
-  todo_write: "更新任务清单(全量替换,最多一个进行中)",
-  complete_step: "完成计划步骤(附验证证据,空证据拒绝)",
-  ask: "向用户提供多选项问题",
-  // 子代理
-  task: "派发子代理执行聚焦子任务",
-  // 技能
-  run_skill: "调用Skills索引中的playbook",
-  parallel_skills: "并行派发多个子代理技能",
-  install_skill: "编写并保存新技能",
-  // 记忆
-  remember: "保存持久事实到项目记忆",
-  forget: "通过名称删除已保存记忆",
-  memory_search: "按关键词搜索已保存记忆",
-};
-
-interface Section {
-  title: string;
-  items: string[];
+/** Highlight renders text with case-insensitive query matches marked. */
+function Highlight({ text, query, className }: { text: string; query: string; className?: string }) {
+  const parts = highlightParts(text, query);
+  return (
+    <span className={className}>
+      {parts.map((p, i) =>
+        p.hit ? (
+          <mark key={i} className="bg-accent/25 text-accent rounded-[2px] px-px">
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </span>
+  );
 }
 
-const SECTIONS: Section[] = [
-  {
-    title: "文件",
-    items: ["read_file", "write_file", "edit_file", "edit_lines", "multi_edit", "delete_range", "delete_symbol", "glob", "grep", "ls", "notebook_edit"],
-  },
-  {
-    title: "命令",
-    items: ["bash", "bash_output", "wait", "kill_shell"],
-  },
-  {
-    title: "版本",
-    items: ["git_status", "git_diff", "git_log", "git_commit", "git_worktree"],
-  },
-  {
-    title: "网络",
-    items: ["web_fetch", "web_search"],
-  },
-  {
-    title: "任务",
-    items: ["todo_write", "complete_step", "ask"],
-  },
-  {
-    title: "子代理",
-    items: ["task"],
-  },
-  {
-    title: "技能",
-    items: ["run_skill", "parallel_skills", "install_skill"],
-  },
-  {
-    title: "记忆",
-    items: ["remember", "forget", "memory_search"],
-  },
-];
-
-function ToolCard({ name, count }: { name: string; count: number }) {
+function CatalogCard({
+  tool,
+  count,
+  query,
+  onCopy,
+}: {
+  tool: CatalogTool;
+  count: number;
+  query: string;
+  onCopy: (name: string) => void;
+}) {
   const active = count > 0;
-  const desc = TOOL_DESC[name];
   return (
-    <div
-      className={`flex items-start gap-1.5 px-2 py-1.5 rounded-md border border-border-soft bg-bg cursor-default ${
-        active ? "border-accent-soft bg-sidebar-active" : ""
+    <button
+      type="button"
+      title={tool.fullDescription || tool.description || tool.name}
+      onClick={() => onCopy(tool.name)}
+      className={`group flex items-start gap-1.5 w-full px-2 py-1.5 rounded-md border border-border-soft bg-bg cursor-pointer text-left transition-colors ${
+        active ? "border-accent-soft bg-sidebar-active" : "hover:border-accent-soft hover:bg-sidebar-active"
       }`}
-      title={desc ?? name}
     >
       <span className={`w-1.5 h-1.5 mt-[5px] rounded-full shrink-0 ${active ? "bg-accent" : "bg-border-soft"}`} />
       <span className="flex-1 min-w-0 flex flex-col gap-0.5 leading-[1.25]">
-        <span className={`font-mono text-[10.5px] truncate ${active ? "text-accent font-semibold" : "text-fg-dim"}`}>
-          {name}
+        <span className="flex items-center gap-1 min-w-0">
+          <Highlight
+            text={tool.name}
+            query={query}
+            className={`font-mono text-[10.5px] truncate ${active ? "text-accent font-semibold" : "text-fg-dim"}`}
+          />
+          {tool.readOnly && (
+            <span
+              className="shrink-0 text-[9px] px-1 py-px rounded bg-border-soft/60 text-fg-faint"
+              title="只读工具（无副作用）"
+            >
+              RO
+            </span>
+          )}
         </span>
-        {desc && <span className="text-[10px] text-fg-faint leading-[1.3] line-clamp-1">{desc}</span>}
+        {tool.description && (
+          <Highlight
+            text={tool.description}
+            query={query}
+            className="text-[10px] text-fg-faint leading-[1.3] line-clamp-1"
+          />
+        )}
       </span>
       <span className={`shrink-0 font-mono text-[11px] font-semibold mt-px ${active ? "text-accent" : "text-fg-faint"}`}>
         {count}
       </span>
-    </div>
+      <Copy
+        size={10}
+        className="shrink-0 self-center text-fg-faint opacity-0 group-hover:opacity-100 transition-opacity"
+      />
+    </button>
   );
 }
 
-function ToolGroup({
-  title,
-  items,
+function CatalogGroup({
+  group,
   counts,
+  query,
   defaultOpen,
+  onCopy,
 }: {
-  title: string;
-  items: string[];
+  group: CatalogGroup;
   counts: Counts;
+  query: string;
   defaultOpen: boolean;
+  onCopy: (name: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const ref = useRef<HTMLDivElement>(null);
   useGSAPCollapse(ref, open, { duration: 0.18 });
 
-  const activeCount = items.filter((n) => (counts[n] ?? 0) > 0).length;
+  const activeCount = group.tools.filter((t) => (counts[t.name] ?? 0) > 0).length;
 
   return (
     <div className="px-1.5 py-0.5">
@@ -139,15 +119,14 @@ function ToolGroup({
           size={10}
           className={`text-fg-faint transition-transform duration-150 ${open ? "rotate-0" : "-rotate-90"}`}
         />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.5px] text-fg-faint">{title}</span>
-        {activeCount > 0 && (
-          <span className="ml-auto text-[9px] font-mono text-accent">{activeCount}</span>
-        )}
+        <span className="text-[10px] font-semibold uppercase tracking-[0.5px] text-fg-faint">{group.label}</span>
+        <span className="text-[9px] font-mono text-fg-faint/50">{group.tools.length}</span>
+        {activeCount > 0 && <span className="ml-auto text-[9px] font-mono text-accent">{activeCount}</span>}
       </button>
       <div ref={ref} style={{ overflow: "hidden" }}>
         <div className="flex flex-col gap-0.5 pt-0.5 pb-1">
-          {items.map((name) => (
-            <ToolCard key={name} name={name} count={counts[name] ?? 0} />
+          {group.tools.map((t) => (
+            <CatalogCard key={t.name} tool={t} count={counts[t.name] ?? 0} query={query} onCopy={onCopy} />
           ))}
         </div>
       </div>
@@ -155,33 +134,58 @@ function ToolGroup({
   );
 }
 
-/** RuntimePanel — 右边栏"工具"标签页，按类别分组+搜索+紧凑描述 */
+/** RuntimePanel — right drawer 工具 tab: data-driven catalog with search
+ *  highlighting, used-first ordering, an "only used" filter, read-only badges
+ *  and one-click copy. Tool data comes from the kernel (App.Tools), so the
+ *  list never drifts from the real tool set. */
 export function RuntimePanel({ counts }: { counts: Counts }) {
+  const toast = useToast();
+  const [tools, setTools] = useState<BuiltinToolView[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
+  const [onlyUsed, setOnlyUsed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const totalTools = SECTIONS.reduce((sum, s) => sum + s.items.length, 0);
-  const activeTotal = useMemo(
-    () => SECTIONS.reduce((sum, s) => sum + s.items.filter((n) => (counts[n] ?? 0) > 0).length, 0),
-    [counts],
+  const load = useCallback(() => {
+    setLoadState("loading");
+    app
+      .Tools()
+      .then((v) => {
+        setTools(v);
+        setLoadState("ready");
+      })
+      .catch(() => setLoadState("error"));
+  }, []);
+  useEffect(load, [load]);
+
+  const catalog: CatalogTool[] = useMemo(
+    () =>
+      tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        fullDescription: t.fullDescription,
+        readOnly: t.readOnly,
+      })),
+    [tools],
   );
 
-  const filteredSections = useMemo(() => {
-    if (!query.trim()) return SECTIONS;
-    const q = query.toLowerCase();
-    return SECTIONS
-      .map((sec) => ({
-        ...sec,
-        items: sec.items.filter(
-          (name) =>
-            name.toLowerCase().includes(q) ||
-            (TOOL_DESC[name] ?? "").toLowerCase().includes(q),
-        ),
-      }))
-      .filter((sec) => sec.items.length > 0);
-  }, [query]);
+  const filtered = useMemo(() => {
+    const sorted = sortCatalog(catalog, counts);
+    return filterCatalog(sorted, query, onlyUsed, counts);
+  }, [catalog, query, onlyUsed, counts]);
 
-  const hasResults = filteredSections.length > 0;
+  const groups = useMemo(() => groupByCategory(filtered), [filtered]);
+  const activeTotal = useMemo(() => catalog.filter((t) => (counts[t.name] ?? 0) > 0).length, [catalog, counts]);
+
+  const copyName = useCallback(
+    (name: string) => {
+      navigator.clipboard?.writeText(name).then(
+        () => toast.show(`已复制 ${name}`, "info"),
+        () => {},
+      );
+    },
+    [toast],
+  );
 
   return (
     <div className="flex flex-col overflow-hidden text-xs h-full">
@@ -190,42 +194,72 @@ export function RuntimePanel({ counts }: { counts: Counts }) {
         <Cpu size={12} />
         <span>工具</span>
         <span className="ml-auto text-[10px] font-mono text-fg-faint/50">
-          {activeTotal > 0 ? `${activeTotal}/${totalTools}` : totalTools}
+          {activeTotal > 0 ? `${activeTotal}/${catalog.length}` : catalog.length}
         </span>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-1.5 mx-2 my-1.5 px-2 h-7 border border-border rounded-md bg-bg text-fg-faint shrink-0">
-        <Search size={12} />
-        <input
-          ref={inputRef}
-          className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[11.5px] placeholder:text-fg-faint"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索工具…"
-        />
-        {query && (
-          <button
-            className="border-0 bg-transparent text-fg-faint cursor-pointer p-0 leading-none hover:text-fg"
-            onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-          >
-            ✕
-          </button>
-        )}
+      {/* Search + only-used filter */}
+      <div className="flex items-center gap-1.5 mx-2 my-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 flex-1 px-2 h-7 border border-border rounded-md bg-bg text-fg-faint">
+          <Search size={12} />
+          <input
+            ref={inputRef}
+            className="flex-1 min-w-0 border-0 outline-none bg-transparent text-fg text-[11.5px] placeholder:text-fg-faint"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索工具…"
+          />
+          {query && (
+            <button
+              className="border-0 bg-transparent text-fg-faint cursor-pointer p-0 leading-none hover:text-fg"
+              onClick={() => {
+                setQuery("");
+                inputRef.current?.focus();
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <button
+          className={`h-7 px-2 rounded-md border text-[10.5px] font-medium cursor-pointer transition-colors ${
+            onlyUsed
+              ? "border-accent bg-accent/10 text-accent"
+              : "border-border text-fg-faint hover:text-fg hover:border-border-strong"
+          }`}
+          onClick={() => setOnlyUsed((v) => !v)}
+          title="只显示本次会话用过的工具"
+        >
+          仅已用
+        </button>
       </div>
 
-      {/* Tool list */}
+      {/* Catalog list */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-2">
-        {!hasResults ? (
-          <div className="empty-state">无匹配工具</div>
+        {loadState === "loading" ? (
+          <div className="empty-state">加载中…</div>
+        ) : loadState === "error" ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-6 text-fg-faint">
+            <span>工具列表加载失败</span>
+            <button
+              className="flex items-center gap-1 px-2.5 h-7 rounded-md border border-border text-fg-dim cursor-pointer hover:text-fg hover:border-border-strong transition-colors"
+              onClick={load}
+            >
+              <RefreshCw size={11} />
+              重试
+            </button>
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="empty-state">{query || onlyUsed ? "无匹配工具" : "暂无工具"}</div>
         ) : (
-          filteredSections.map((sec) => (
-            <ToolGroup
-              key={sec.title}
-              title={sec.title}
-              items={sec.items}
+          groups.map((g, i) => (
+            <CatalogGroup
+              key={g.category}
+              group={g}
               counts={counts}
-              defaultOpen={sec.title === "文件" || filteredSections.length <= 3}
+              query={query}
+              defaultOpen={i < 2 || groups.length <= 3}
+              onCopy={copyName}
             />
           ))
         )}

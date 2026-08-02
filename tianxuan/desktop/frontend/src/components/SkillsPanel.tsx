@@ -61,7 +61,7 @@ function SkillCard({
             className={`font-mono text-[10.5px] truncate ${active ? "text-accent font-semibold" : "text-fg-dim"}`}
           />
           {isSubagent && (
-            <span className="shrink-0 text-[9px] px-1 py-px rounded bg-accent-soft text-accent font-medium">🤖</span>
+            <span className="shrink-0 text-[9px] px-1 py-px rounded bg-accent-soft text-accent font-medium">🤖 子代理</span>
           )}
         </span>
         <Highlight
@@ -248,7 +248,7 @@ export function SkillsPanel({ counts }: { counts: Record<string, number> }) {
               skills={g.skills}
               counts={counts}
               query={query}
-              defaultOpen={g.scope === "builtin" || grouped.length === 1}
+              defaultOpen={g.scope === "builtin" || g.skills.some((sk) => sk.runAs === "subagent") || grouped.length === 1}
               onCopy={copyName}
             />
           ))

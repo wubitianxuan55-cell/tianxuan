@@ -518,6 +518,16 @@ export const zhTW: Record<DictKey, string> = {
   "memory.filterPlaceholder": "篩選…",
   "memory.archivedHint": "已從活躍記憶中移除，仍可查閱。",
 
+  "browser.placeholder": "輸入網址…",
+  "browser.go": "開啟",
+  "browser.back": "上一頁",
+  "browser.forward": "下一頁",
+  "browser.refresh": "重新整理",
+  "browser.pageMode": "頁面",
+  "browser.textMode": "文字",
+  "browser.emptyHint": "在上方輸入網址開始瀏覽",
+  "browser.loading": "載入中…",
+
   "modelSwitcher.searchPlaceholder": "搜尋模型…",
   "modelSwitcher.noMatches": "無相符模型",
   "settings.providerLabel.deepseek": "DeepSeek",

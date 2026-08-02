@@ -1,5 +1,32 @@
 ## [10.148.0] — 2026-08-02
 
+### 🌐 集成应用内浏览器（右侧面板"浏览器"tab，像 Codex 一样查看网页）
+
+> 需求：给 tianxuan 集成浏览器，可直接查看阅览网页。调研 Wails v2 生态后
+> 采用"iframe 渲染 + 文本模式兜底"方案：WebView2 完整渲染网页，X-Frame-
+> Options/CSP 拒绝嵌入的站点自动可切文本模式（复用内核 web_fetch 的 SSRF
+> 防护与去标签逻辑），保证任何站点都能查看。
+
+#### 功能
+- **右侧面板新增"浏览器"tab**：地址栏（URL 规范化自动补 https://）、
+  前进/后退（自维护历史栈，前进分支裁剪语义与浏览器一致）、刷新、
+  页面/文本双模式切换
+- **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
+- **文本模式**：内核抓取返回干净可读文本（等宽字体展示），受限网站兜底
+- **Go 侧**：`App.BrowserFetchText` 绑定（desktop/browser.go），复用
+  web_fetch 工具：空 URL / 非 http(s) 协议大声拒绝，SSRF 边界一致
+- **i18n**：en/zh/zh-TW 浏览器文案
+
+#### 测试（TDD RED→GREEN）
+- Go：`TestBrowserFetchTextRequiresURL` / `RejectsNonHTTP` / `Network`
+  （真实抓取 example.com）
+- 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
+  URL 规范化）
+
+#### 验证
+- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 91/91；
+  `vite build` EXIT 0
+
 ### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光
 
 - **代码块终端窗口质感**（Markdown.tsx）：头部加三色圆点（终端惯例，

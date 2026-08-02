@@ -518,6 +518,16 @@ export const zh: Record<DictKey, string> = {
   "memory.filterPlaceholder": "筛选…",
   "memory.archivedHint": "已从活跃记忆中移除，但保留可查阅。",
 
+  "browser.placeholder": "输入网址…",
+  "browser.go": "打开",
+  "browser.back": "后退",
+  "browser.forward": "前进",
+  "browser.refresh": "刷新",
+  "browser.pageMode": "页面",
+  "browser.textMode": "文本",
+  "browser.emptyHint": "在上方输入网址开始浏览",
+  "browser.loading": "加载中…",
+
   "modelSwitcher.searchPlaceholder": "搜索模型…",
   "modelSwitcher.noMatches": "无匹配模型",
   "settings.providerLabel.deepseek": "DeepSeek",

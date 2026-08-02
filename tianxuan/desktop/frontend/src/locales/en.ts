@@ -519,6 +519,16 @@ export const en = {
   "memory.filterPlaceholder": "Filter…",
   "memory.archivedHint": "Removed from active memory, but kept for reference.",
 
+  "browser.placeholder": "Enter a URL…",
+  "browser.go": "Open",
+  "browser.back": "Back",
+  "browser.forward": "Forward",
+  "browser.refresh": "Refresh",
+  "browser.pageMode": "Page",
+  "browser.textMode": "Text",
+  "browser.emptyHint": "Enter a URL above to browse",
+  "browser.loading": "Loading…",
+
   "modelSwitcher.searchPlaceholder": "Search models…",
   "modelSwitcher.noMatches": "No matching models",
   "settings.providerLabel.deepseek": "DeepSeek",

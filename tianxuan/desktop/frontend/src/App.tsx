@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { CSSProperties } from "react";
 import {
   BarChart3, SquarePen, Brain, Blocks, ChevronDown, Cpu, FolderGit2, FolderTree, GitBranch,
-  Settings as SettingsIcon, MessageSquare,
+  Globe, Settings as SettingsIcon, MessageSquare,
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { useT } from "./lib/i18n";
@@ -26,6 +26,7 @@ const HistoryPanel = lazy(() => import("./components/HistoryPanel").then(m => ({
 const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
 const SchedulePanel = lazy(() => import("./components/SchedulePanel").then(m => ({ default: m.SchedulePanel })));
 import { RuntimePanel } from "./components/RuntimePanel";
+import { BrowserPanel } from "./components/BrowserPanel";
 import { StartupSplash, shouldShowStartupSplash } from "./components/StartupSplash";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { SkillsPanel } from "./components/SkillsPanel";
@@ -139,7 +140,7 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
 const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "browser">("stats");
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [editDraft, setEditDraft] = useState<{ text: string; id: number } | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
@@ -523,6 +524,13 @@ onOpenSettings={() => setSettingsOpen(true)}
               <span>技能</span>
             </button>
             <button
+              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "browser" ? "text-accent border-accent" : ""}`}
+              onClick={() => setRightTab("browser")}
+            >
+              <Globe size={13} />
+              <span>浏览器</span>
+            </button>
+            <button
               className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("stats")}
             >
@@ -542,6 +550,8 @@ onOpenSettings={() => setSettingsOpen(true)}
               <RuntimePanel counts={toolCounts} />
             ) : rightTab === "skills" ? (
               <SkillsPanel counts={skillCounts} />
+            ) : rightTab === "browser" ? (
+              <BrowserPanel />
             ) : null}
             {rightTab === "stats" && (
               <StatsPanel

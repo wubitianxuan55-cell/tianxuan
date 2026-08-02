@@ -102,6 +102,9 @@ export interface AppBindings {
   // Tools lists every built-in kernel tool (name, display description,
   // full description, read-only flag) for the right-drawer 工具 tab.
   Tools(): Promise<BuiltinToolView[]>;
+  // BrowserFetchText powers the browser panel's text mode: fetch a URL and
+  // return cleaned readable text (kernel web_fetch, SSRF-guarded).
+  BrowserFetchText(url: string): Promise<string>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

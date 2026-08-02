@@ -314,6 +314,9 @@ export function makeMockApp(): AppBindings {
     async Tools() {
       return mockBuiltinTools.map((t) => ({ ...t }));
     },
+    async BrowserFetchText(url: string) {
+      return `[mock] ${url}\n\nThis is the mock text-mode response for the browser panel. In the real app the kernel fetches the URL and returns cleaned readable text.`;
+    },
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;
       capServers.push({

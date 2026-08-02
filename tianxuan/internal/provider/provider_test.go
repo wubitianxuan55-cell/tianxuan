@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 )
 
 // --- SanitizeToolPairing ---
@@ -145,6 +146,85 @@ func TestPricingCostZeroTokens(t *testing.T) {
 	u := &Usage{}
 	if got := p.Cost(u); got != 0 {
 		t.Errorf("zero tokens Cost = %f, want 0", got)
+	}
+}
+
+// --- DeepSeek peak-hour billing (峰谷计价) ---
+
+// bjHourUTC returns a time whose Beijing (UTC+8) wall clock is the given hour
+// on 2026-08-02. Peak windows are Beijing 09:00–12:00 and 14:00–18:00.
+func bjHourUTC(h int) time.Time {
+	return time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC).Add(time.Duration(h-8) * time.Hour)
+}
+
+func TestIsDeepSeekPeak(t *testing.T) {
+	for _, h := range []int{9, 10, 11, 14, 15, 16, 17} {
+		if !IsDeepSeekPeak(bjHourUTC(h)) {
+			t.Errorf("Beijing %02d:00 should be peak", h)
+		}
+	}
+	for _, h := range []int{0, 8, 12, 13, 18, 23} {
+		if IsDeepSeekPeak(bjHourUTC(h)) {
+			t.Errorf("Beijing %02d:00 should be off-peak", h)
+		}
+	}
+}
+
+func TestIsDeepSeekPeakBoundaries(t *testing.T) {
+	bj := time.FixedZone("Beijing", 8*3600)
+	cases := []struct {
+		wall string
+		peak bool
+	}{
+		{"08:59", false},
+		{"09:00", true},
+		{"11:59", true},
+		{"12:00", false},
+		{"13:59", false},
+		{"14:00", true},
+		{"17:59", true},
+		{"18:00", false},
+	}
+	for _, c := range cases {
+		at, err := time.ParseInLocation("2006-01-02 15:04", "2026-08-02 "+c.wall, bj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := IsDeepSeekPeak(at); got != c.peak {
+			t.Errorf("IsDeepSeekPeak(%s) = %v, want %v", c.wall, got, c.peak)
+		}
+	}
+}
+
+func TestPricingCostAtPeakDoubles(t *testing.T) {
+	p := &Pricing{CacheHit: 0.02, Input: 1, Output: 2, PeakMultiplier: 2}
+	u := &Usage{CacheHitTokens: 1_000_000, CacheMissTokens: 1_000_000, CompletionTokens: 1_000_000}
+	base := 0.02 + 1 + 2
+	if got := p.CostAt(u, bjHourUTC(10)); got != base*2 {
+		t.Errorf("peak CostAt = %f, want %f", got, base*2)
+	}
+	if got := p.CostAt(u, bjHourUTC(20)); got != base {
+		t.Errorf("off-peak CostAt = %f, want %f", got, base)
+	}
+}
+
+func TestPricingCostAtNoPeakConfig(t *testing.T) {
+	// PeakMultiplier unset (zero) keeps flat pricing in every window.
+	p := &Pricing{CacheHit: 0.02, Input: 1, Output: 2}
+	u := &Usage{CacheHitTokens: 1_000_000, CompletionTokens: 1_000_000}
+	base := 0.02 + 2
+	if got := p.CostAt(u, bjHourUTC(10)); got != base {
+		t.Errorf("no-peak-config CostAt during peak = %f, want %f", got, base)
+	}
+}
+
+func TestPricingCostAtNil(t *testing.T) {
+	var p *Pricing
+	if got := p.CostAt(&Usage{PromptTokens: 100}, time.Now()); got != 0 {
+		t.Errorf("nil Pricing.CostAt = %f, want 0", got)
+	}
+	if got := (&Pricing{Input: 2.0}).CostAt(nil, time.Now()); got != 0 {
+		t.Errorf("nil Usage.CostAt = %f, want 0", got)
 	}
 }
 

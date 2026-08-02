@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,6 +30,310 @@ type InstalledHook func(name, path string, scope Scope)
 type runSkillTool struct {
 	store  *Store
 	runner SubagentRunner
+}
+
+// subagentSkillTool exposes one runAs=subagent skill as its own model-visible
+// tool (explore / research / review / security_review). A dedicated entry lets
+// DeepSeek-style native tool calling see the capability directly, instead of
+// requiring the model to recall the skill name and route through run_skill.
+// Execution reuses the same isolated read-only subagent runner as run_skill.
+type subagentSkillTool struct {
+	store       *Store
+	runner      SubagentRunner
+	name        string // skill identifier (may contain hyphens, e.g. security-review)
+	desc        string
+	compactDesc string
+}
+
+// NewSubagentSkillTool builds a dedicated tool for one built-in subagent skill.
+// name is the skill identifier and tool name (e.g. "explore"); desc is the
+// full model-facing description; compactDesc is the token-light variant.
+func NewSubagentSkillTool(store *Store, runner SubagentRunner, name, desc, compactDesc string) tool.Tool {
+	return &subagentSkillTool{store: store, runner: runner, name: name, desc: desc, compactDesc: compactDesc}
+}
+
+// Name returns the model-visible tool name: the skill identifier with hyphens
+// normalised to underscores (security-review → security_review), matching the
+// built-in tool naming convention.
+func (t *subagentSkillTool) Name() string {
+	return strings.ReplaceAll(t.name, "-", "_")
+}
+
+func (t *subagentSkillTool) Description() string { return t.desc }
+
+func (*subagentSkillTool) Schema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string","description":"The concrete investigation/review question. The sub-agent runs in an isolated read-only context and sees only this text, so it must be self-contained."}},"required":["task"]}`)
+}
+
+// ReadOnly is true: dedicated subagent skills are read-only investigations
+// (their sub-agent toolset is filtered to read-only tools), so parallel
+// dispatch may batch them safely.
+func (*subagentSkillTool) ReadOnly() bool { return true }
+
+func (t *subagentSkillTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+	var p struct {
+		Task string `json:"task"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if strings.TrimSpace(p.Task) == "" {
+		return "", fmt.Errorf("%s requires a 'task' argument", t.name)
+	}
+	sk, ok := t.store.Read(t.name)
+	if !ok {
+		// The tool name may differ from the skill identifier only in
+		// underscore/hyphen spelling (security_review vs security-review).
+		if alt := strings.ReplaceAll(t.name, "_", "-"); alt != t.name {
+			sk, ok = t.store.Read(alt)
+		}
+	}
+	if !ok {
+		return "", fmt.Errorf("unknown skill %q", t.name)
+	}
+	if sk.RunAs != RunSubagent {
+		return "", fmt.Errorf("skill %q is not runAs=subagent", t.name)
+	}
+	if t.runner == nil {
+		return "", fmt.Errorf("%s: no subagent runner configured in this session", t.name)
+	}
+	return t.runner(ctx, sk, p.Task)
+}
+
+func (t *subagentSkillTool) CompactDescription() string { return t.compactDesc }
+
+func (*subagentSkillTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string"}},"required":["task"]}`)
+}
+
+// --- ui_styling (script-backed styling tool) ---
+
+type uiStylingTool struct {
+	store *Store
+}
+
+// NewUiStylingTool builds the ui-styling script tool: it locates the
+// ui-styling skill's scripts and references inside the skill store and runs /
+// returns them on demand, so the model does not need to remember the script
+// paths or invoke bash itself.
+func NewUiStylingTool(store *Store) tool.Tool {
+	return &uiStylingTool{store: store}
+}
+
+func (*uiStylingTool) Name() string { return "ui_styling" }
+
+func (*uiStylingTool) Description() string {
+	return "Generate Tailwind config or fetch shadcn/ui styling guidance from the ui-styling skill. 生成 Tailwind 配置或读取 shadcn/ui 组件指南。action=config 时 args 直接传给 tailwind_config_gen.py（如 \"--colors brand:blue --fonts display:Inter\"）；action=guide 时 args 为关键词（如 \"dialog\"、\"dark mode\"），返回匹配的指南片段。"
+}
+
+func (*uiStylingTool) Schema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["config","guide"],"description":"config: run tailwind_config_gen.py with args; guide: fetch a reference guide by keyword."},"args":{"type":"string"}},"required":["action"]}`)
+}
+
+// ReadOnly is false: the config action runs a Python script that may write
+// files, so the parallel-dispatch path must not batch it with other calls.
+func (*uiStylingTool) ReadOnly() bool { return false }
+
+func (t *uiStylingTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+	var p struct {
+		Action string `json:"action"`
+		Args   string `json:"args"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	sk, ok := t.store.Read("ui-styling")
+	if !ok {
+		return "", fmt.Errorf("ui-styling skill not found")
+	}
+	dir := filepath.Dir(sk.Path)
+	switch p.Action {
+	case "config":
+		script := filepath.Join(dir, "scripts", "tailwind_config_gen.py")
+		if _, err := os.Stat(script); err != nil {
+			return "", fmt.Errorf("tailwind_config_gen.py not found at %s", script)
+		}
+		return runPythonScript(script, p.Args)
+	case "guide":
+		return uiStylingGuide(dir, p.Args)
+	default:
+		return "", fmt.Errorf("ui_styling action must be \"config\" or \"guide\"")
+	}
+}
+
+func (*uiStylingTool) CompactDescription() string {
+	return "生成 Tailwind 配置或读取 shadcn/ui 样式指南（action: config|guide）"
+}
+
+func (*uiStylingTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"action":{"type":"string"},"args":{"type":"string"}},"required":["action"]}`)
+}
+
+func runPythonScript(script, args string) (string, error) {
+	py, err := exec.LookPath("python")
+	if err != nil {
+		if py3, err3 := exec.LookPath("python3"); err3 == nil {
+			py = py3
+		} else {
+			return "", fmt.Errorf("python not found: %w", err)
+		}
+	}
+	argv := []string{script}
+	if strings.TrimSpace(args) != "" {
+		argv = append(argv, strings.Fields(args)...)
+	}
+	cmd := exec.Command(py, argv...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("python %s: %w", script, err)
+	}
+	return string(out), nil
+}
+
+func uiStylingGuide(dir, keyword string) (string, error) {
+	refDir := filepath.Join(dir, "references")
+	entries, err := os.ReadDir(refDir)
+	if err != nil {
+		return "", fmt.Errorf("read ui-styling references: %w", err)
+	}
+	var names, mdFiles []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".md") {
+			names = append(names, e.Name())
+			mdFiles = append(mdFiles, filepath.Join(refDir, e.Name()))
+		}
+	}
+	if kw := strings.ToLower(strings.TrimSpace(keyword)); kw != "" {
+		// Filename match first: whole guide is the answer.
+		for _, n := range names {
+			if strings.Contains(strings.ToLower(n), kw) {
+				return truncateGuide(readGuideFile(filepath.Join(refDir, n))), nil
+			}
+		}
+		// Content match: return the matching lines with context.
+		for _, path := range mdFiles {
+			b, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			lines := strings.Split(string(b), "\n")
+			for i, ln := range lines {
+				if strings.Contains(strings.ToLower(ln), kw) {
+					start := i - 2
+					if start < 0 {
+						start = 0
+					}
+					end := i + 6
+					if end > len(lines) {
+						end = len(lines)
+					}
+					return fmt.Sprintf("file: %s\n%s", filepath.Base(path), strings.Join(lines[start:end], "\n")), nil
+				}
+			}
+		}
+	}
+	return "Available ui-styling references:\n- " + strings.Join(names, "\n- ") +
+		"\n\nMatch a keyword to read one; otherwise use read_skill for the full SKILL.md.", nil
+}
+
+func readGuideFile(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func truncateGuide(text string) string {
+	if len(text) > 6000 {
+		return text[:6000] + "\n...[truncated]"
+	}
+	return text
+}
+
+// --- design_router ---
+
+type designRouterTool struct {
+	store *Store
+}
+
+// NewDesignRouterTool builds the design routing tool: it classifies a design
+// task and returns the sub-agent skill (plus a rewritten task) the model
+// should dispatch, or the design-internal script to use for logo/icon work.
+func NewDesignRouterTool(store *Store) tool.Tool {
+	return &designRouterTool{store: store}
+}
+
+func (*designRouterTool) Name() string { return "design_router" }
+
+func (*designRouterTool) Description() string {
+	return "Route a design task to the right sub-agent skill. 快速判断设计任务类型并返回应派发的子代理技能与任务描述：banner/横幅→banner-design；演示/幻灯片→slides；品牌→brand；token/组件规范→design-system；logo/图标→design 脚本；UI/配色/字体/UX→ui-ux-pro-max；样式实现→ui_styling 工具。"
+}
+
+func (*designRouterTool) Schema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string","description":"The design task description to route."}},"required":["task"]}`)
+}
+
+func (*designRouterTool) ReadOnly() bool { return true }
+
+func (t *designRouterTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+	var p struct {
+		Task string `json:"task"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if strings.TrimSpace(p.Task) == "" {
+		return "", fmt.Errorf("design_router requires a 'task' argument")
+	}
+	return routeDesignTask(t.store, p.Task), nil
+}
+
+func (*designRouterTool) CompactDescription() string {
+	return "路由设计任务到对应子代理技能（banner/slides/brand/design-system/ui-ux-pro-max/ui_styling）"
+}
+
+func (*designRouterTool) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"task":{"type":"string"}},"required":["task"]}`)
+}
+
+func hasAny(lower string, kws ...string) bool {
+	for _, k := range kws {
+		if strings.Contains(lower, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func routeDesignTask(store *Store, task string) string {
+	lower := strings.ToLower(task)
+	type route struct {
+		subagent string
+		hint     string
+	}
+	routeJSON := func(r route) string {
+		b, _ := json.Marshal(map[string]string{"subagent": r.subagent, "task": task, "hint": r.hint})
+		return string(b)
+	}
+	switch {
+	case hasAny(lower, "banner", "横幅", "封面图", "广告图", "社媒图", "social media"):
+		return routeJSON(route{"banner-design", "派发 banner-design 子代理产出首稿;完成后按需迭代风格"})
+	case hasAny(lower, "slide", "presentation", "演示", "幻灯片", "ppt", "宣讲", "deck"):
+		return routeJSON(route{"slides", "派发 slides 子代理生成自包含 HTML 演示文件"})
+	case hasAny(lower, "brand", "品牌", "商标", "slogan", "口号", "品牌一致性"):
+		return routeJSON(route{"brand", "派发 brand 子代理生成品牌指南/一致性审查"})
+	case hasAny(lower, "token", "design token", "组件规范", "设计令牌", "design system"):
+		return routeJSON(route{"design-system", "派发 design-system 子代理产出 token/组件规格"})
+	case hasAny(lower, "logo", "标志", "icon", "图标", "favicon"):
+		return `{"subagent":"design","task":"` + task + `","hint":"design 技能内含 logo/icon 生成脚本(.tianxuan/skills/design/scripts/logo|icon),按 SKILL.md 的脚本调用方式执行"}`
+	case hasAny(lower, "tailwind", "shadcn", "样式实现", "css"):
+		return routeJSON(route{"ui_styling", "调用 ui_styling 工具(action=config|guide)生成配置或读取组件指南"})
+	case hasAny(lower, "ui", "界面", "页面", "配色", "色板", "字体", "typography", "ux", "组件", "响应式"):
+		return routeJSON(route{"ui-ux-pro-max", "派发 ui-ux-pro-max 检索子代理,返回综合设计推荐包"})
+	default:
+		return routeJSON(route{"explore", "先用 explore 子代理调查现状,再结合设计技能决策"})
+	}
 }
 
 // NewRunSkillTool builds the general skill-invocation tool. runner may be nil
@@ -57,7 +364,9 @@ func (*runSkillTool) Schema() json.RawMessage {
 }`)
 }
 
-func (*runSkillTool) CompactDescription() string { return "Invoke a skill by name. Subagent skills spawn isolated loop; inline skills fold body as tool result." }
+func (*runSkillTool) CompactDescription() string {
+	return "Invoke a skill by name. Subagent skills spawn isolated loop; inline skills fold body as tool result."
+}
 func (*runSkillTool) CompactSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"},"arguments":{"type":"string"}},"required":["name"]}`)
 }
@@ -179,7 +488,9 @@ func (*installSkillTool) Schema() json.RawMessage {
 }`)
 }
 
-func (*installSkillTool) CompactDescription() string { return "Create a new skill from name + description + markdown body. Saves to project or global skills directory." }
+func (*installSkillTool) CompactDescription() string {
+	return "Create a new skill from name + description + markdown body. Saves to project or global skills directory."
+}
 func (*installSkillTool) CompactSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"body":{"type":"string"},"scope":{"type":"string","enum":["project","global"]},"runAs":{"type":"string","enum":["inline","subagent","pipeline"]}},"required":["name","description","body"]}`)
 }
@@ -367,7 +678,9 @@ func (*parallelSkillsTool) Schema() json.RawMessage {
 }`)
 }
 
-func (*parallelSkillsTool) CompactDescription() string { return "Run multiple skills in parallel or DAG order, collect results." }
+func (*parallelSkillsTool) CompactDescription() string {
+	return "Run multiple skills in parallel or DAG order, collect results."
+}
 func (*parallelSkillsTool) CompactSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"tasks":{"type":"array","items":{"type":"object","properties":{"skill":{"type":"string"},"arguments":{"type":"string"},"id":{"type":"string"},"depends_on":{"type":"array","items":{"type":"string"}}},"required":["skill","arguments"]}}},"required":["tasks"]}`)
 }

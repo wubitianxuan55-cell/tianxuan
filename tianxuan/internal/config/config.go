@@ -14,8 +14,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"tianxuan/internal/provider"
 	"tianxuan/internal/netclient"
+	"tianxuan/internal/provider"
 )
 
 // Config is Tianxuan's runtime configuration.
@@ -37,7 +37,6 @@ type Config struct {
 	Network      NetworkConfig     `toml:"network"`
 	Desktop      DesktopConfig     `toml:"desktop"`
 }
-
 
 // DesktopConfig holds desktop-UI-only preferences persisted to the user config
 // so they survive across sessions. These do NOT affect the CLI or headless mode.
@@ -120,14 +119,14 @@ func (c *SearchConfig) SearchTimeout() time.Duration {
 // Proxy takes precedence.
 type NetworkConfig struct {
 	ProxyMode string             `toml:"proxy_mode"` // auto | env | custom | off
-	ProxyURL  string             `toml:"proxy_url"`   // http://host:port or socks5://host:port
-	NoProxy   string             `toml:"no_proxy"`    // comma-separated host suffixes excluded from proxying
-	Proxy     NetworkProxyConfig `toml:"proxy"`       // structured alternative to ProxyURL
+	ProxyURL  string             `toml:"proxy_url"`  // http://host:port or socks5://host:port
+	NoProxy   string             `toml:"no_proxy"`   // comma-separated host suffixes excluded from proxying
+	Proxy     NetworkProxyConfig `toml:"proxy"`      // structured alternative to ProxyURL
 }
 
 // NetworkProxyConfig is the structured form of proxy configuration.
 type NetworkProxyConfig struct {
-	Type     string `toml:"type"`     // http | https | socks5 | socks5h
+	Type     string `toml:"type"` // http | https | socks5 | socks5h
 	Server   string `toml:"server"`
 	Port     int    `toml:"port"`
 	Username string `toml:"username"`
@@ -315,8 +314,8 @@ type AgentConfig struct {
 	// adapt, with no plan-approval round-trip — so this field is not wired.
 	AutoPlan string `toml:"auto_plan"`
 	// AutoPlanClassifier is likewise reserved (no auto-plan gate is active).
-	AutoPlanClassifier string `toml:"auto_plan_classifier"`
-	MemoryCompilerEnabled bool `toml:"memory_compiler_enabled"`
+	AutoPlanClassifier    string `toml:"auto_plan_classifier"`
+	MemoryCompilerEnabled bool   `toml:"memory_compiler_enabled"`
 	// MaxSubagentDepth caps recursion depth for runAs=subagent skills. 0
 	// (default) means unlimited; the harness stops at-depth agents from spawning
 	// further sub-agents when the counter hits this limit.
@@ -371,6 +370,7 @@ func (a AgentConfig) SubagentTemp() float64 {
 	}
 	return a.Temperature
 }
+
 // PlannerEffortVal returns the effective reasoning effort for Hermes.
 // Falls back to Effort when PlannerEffort is empty.
 func (a AgentConfig) PlannerEffortVal() string {
@@ -407,7 +407,7 @@ type ProviderEntry struct {
 	// models with different rates. The TOML key "prices" maps model names to
 	// their Pricing. ModelList() includes these keys and ResolveModel picks
 	// the matching Price when resolving "provider/model".
-	Prices   map[string]*provider.Pricing `toml:"prices"`
+	Prices map[string]*provider.Pricing `toml:"prices"`
 	// Thinking / Effort are provider-kind-specific knobs forwarded to the provider
 	// via Config.Extra. The anthropic provider reads Thinking="adaptive" to enable
 	// extended thinking and Effort ("low".."max") to tune depth. The
@@ -492,11 +492,11 @@ type ToolsConfig struct {
 	// Compact enables V6.0 P8 reduced toolset (hides redundant tools from model view).
 	// Hidden tools remain callable by name but don't appear in the schema list,
 	// reducing model cognitive load from ~41 to ~25 visible tools.
-	Compact             bool   `toml:"compact"`
-	BashTimeoutSeconds  *int   `toml:"bash_timeout_seconds"`
-	MCPCallTimeoutSeconds *int `toml:"mcp_call_timeout_seconds"`
-	Shell               string `toml:"shell"`
-	SearchEngine        string `toml:"search_engine"`
+	Compact               bool   `toml:"compact"`
+	BashTimeoutSeconds    *int   `toml:"bash_timeout_seconds"`
+	MCPCallTimeoutSeconds *int   `toml:"mcp_call_timeout_seconds"`
+	Shell                 string `toml:"shell"`
+	SearchEngine          string `toml:"search_engine"`
 }
 
 // PermissionsConfig declares the per-call permission policy (see
@@ -617,9 +617,11 @@ func Default() *Config {
 		Codegraph: CodegraphConfig{Enabled: true, AutoInstall: true},
 		// LSP tools on by default, but dormant until a language server is on PATH;
 		// a missing server yields an install hint rather than an error.
-		LSP: LSPConfig{Enabled: true},
+		LSP:    LSPConfig{Enabled: true},
 		Notify: NotifyConfig{Enabled: true, MinDuration: 5},
-		Tools: ToolsConfig{Enabled: []string{
+		// Compact 默认开启：隐藏冗余工具（V6.0 P8），把模型可见工具控制在
+		// 核心集合，降低 DeepSeek 的注意力稀释和 schema token 成本。
+		Tools: ToolsConfig{Compact: true, Enabled: []string{
 			"read_file", "write_file", "edit_file", "edit_lines", "move_file",
 			"ls", "grep", "bash",
 			"web_fetch", "web_search",
@@ -628,8 +630,10 @@ func Default() *Config {
 			"git_status", "git_diff", "git_commit", "git_log", "git_worktree",
 		}},
 		Providers: []ProviderEntry{
-			{Name: "deepseek-flash", Kind: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-v4-flash", APIKeyEnv: "DEEPSEEK_API_KEY", BalanceURL: "https://api.deepseek.com/user/balance", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.02, Input: 1, Output: 2, Currency: "¥"}},
-			{Name: "deepseek-pro", Kind: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-v4-pro", APIKeyEnv: "DEEPSEEK_API_KEY", BalanceURL: "https://api.deepseek.com/user/balance", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.025, Input: 3, Output: 6, Currency: "¥"}},
+			// DeepSeek 自 V4 正式版起实行峰谷计价：北京时间每日 9:00-12:00、14:00-18:00
+			// 高峰时段所有计费项价格翻倍（PeakMultiplier=2），其余时段保持平时价。
+			{Name: "deepseek-flash", Kind: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-v4-flash", APIKeyEnv: "DEEPSEEK_API_KEY", BalanceURL: "https://api.deepseek.com/user/balance", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.02, Input: 1, Output: 2, Currency: "¥", PeakMultiplier: 2}},
+			{Name: "deepseek-pro", Kind: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-v4-pro", APIKeyEnv: "DEEPSEEK_API_KEY", BalanceURL: "https://api.deepseek.com/user/balance", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.025, Input: 3, Output: 6, Currency: "¥", PeakMultiplier: 2}},
 			{Name: "mimo-pro", Kind: "openai", BaseURL: "https://token-plan-cn.xiaomimimo.com/v1", Model: "mimo-v2.5-pro", APIKeyEnv: "MIMO_API_KEY", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.025, Input: 3, Output: 6, Currency: "¥"}},
 			{Name: "mimo-flash", Kind: "openai", BaseURL: "https://token-plan-cn.xiaomimimo.com/v1", Model: "mimo-v2.5", APIKeyEnv: "MIMO_API_KEY", ContextWindow: 1_000_000, Price: &provider.Pricing{CacheHit: 0.02, Input: 1, Output: 2, Currency: "¥"}},
 		},

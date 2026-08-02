@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"tianxuan/internal/memory"
+	"tianxuan/internal/provider"
 	"tianxuan/internal/tool/builtin"
 )
 
@@ -153,6 +154,34 @@ func (c *Controller) Memory() *memory.Set {
 	return c.mem
 }
 
+// ToolNames returns the model-visible tool names in the executor's registry
+// (hidden tools excluded), for tests and UI introspection. Nil when the
+// registry is not wired.
+func (c *Controller) ToolNames() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.reg == nil {
+		return nil
+	}
+	schemas := c.reg.Schemas()
+	out := make([]string, 0, len(schemas))
+	for _, s := range schemas {
+		out = append(out, s.Name)
+	}
+	return out
+}
+
+// ToolSchemas returns the model-visible tool schemas (compact form when the
+// tool implements CompactDescriptor), for diagnostics and UI introspection.
+func (c *Controller) ToolSchemas() []provider.ToolSchema {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.reg == nil {
+		return nil
+	}
+	return c.reg.Schemas()
+}
+
 // refreshMemoryLocked re-discovers memory from disk so a later Memory() reflects
 // a just-applied write, and updates the search index so memory_search finds the
 // change immediately. Caller holds c.mu.
@@ -238,6 +267,24 @@ func (c *Controller) autoExtract() {
 	}
 	if n > 0 {
 		c.notice(fmt.Sprintf("已从本轮会话提取 %d 条记忆候选，待确认后落盘", n))
+	}
+}
+
+// autoCondense distills a backlog of pending candidates (more than 30 staged
+// and unconfirmed) into one consolidated candidate after each turn, so the
+// pending list cannot pile up unboundedly. Failures surface loudly and never
+// fail the turn.
+func (c *Controller) autoCondense() {
+	if c.mem == nil {
+		return
+	}
+	n, err := memory.CondensePending(c.mem.Store, time.Now())
+	if err != nil {
+		slog.Warn("controller: auto-condense", "err", err)
+		return
+	}
+	if n > 0 {
+		c.notice("待确认记忆已超过 30 条，已提炼为 1 条，待确认后落盘")
 	}
 }
 

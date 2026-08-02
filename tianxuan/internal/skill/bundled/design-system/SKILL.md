@@ -6,11 +6,19 @@ license: MIT
 metadata:
   author: claudekit
   version: "1.0.0"
+runas: subagent
+allowed-tools: read_file, write_file, ls, grep, bash
+
 ---
 
 # Design System
 
 Token architecture, component specifications, systematic design, slide generation.
+
+## Subagent mode
+
+When invoked as a subagent, you receive a self-contained token/component task. Produce the token spec or component spec as a file (write_file), following the three-layer architecture below, and return the file path plus the key decisions. Never dump the full spec inline.
+
 
 ## When to Use
 

@@ -1,11 +1,19 @@
 ---
 name: ui-ux-pro-max
 description: "UI/UX design intelligence for web and mobile. Searchable local database with 84 styles, 192 color palettes, 74 font pairings, 192 product types, 98 UX guidelines, 104 icon entries, 16 GSAP motion presets, and 25 chart types across 22 stacks (React, Next.js, Vue, Nuxt, Svelte, Astro, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui, Jetpack Compose, Angular, Laravel, JavaFX, WPF, WinUI, Avalonia, Uno Platform, UWP, Three.js, and HTML/CSS). Use when designing, building, or reviewing UI: pages, components, color schemes, typography, layout, accessibility, animation, or data visualization."
+runas: subagent
+allowed-tools: read_file, ls, grep, bash
+
 ---
 
 # UI/UX Pro Max - Design Intelligence
 
 Searchable database of UI/UX design rules with priority-based recommendations: 84 styles, 192 color palettes, 74 font pairings, 192 product types with reasoning rules, 98 UX guidelines, 104 icon entries, 16 GSAP motion presets, and 25 chart types across 22 technology stacks.
+
+## Subagent mode
+
+When invoked as a subagent, you receive ONE self-contained design-research task. Run the search script by full path (`python .tianxuan/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system`) and iterate across style/color/typography/motion domains as needed. Return ONE distilled recommendation package: style, palette (hex), typography, motion, and anti-patterns, each tied to the source row it came from. Do not dump raw CSV. If a search returns 0 results, say which query returned nothing instead of presenting it as data.
+
 
 ## When to Apply
 

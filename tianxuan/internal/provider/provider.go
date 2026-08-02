@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"tianxuan/internal/nilutil"
 )
@@ -243,21 +244,46 @@ type Usage struct {
 
 // Pricing is a provider's per-1M-token rates, used to estimate spend. Currency
 // is just a display symbol (default "楼"). toml tags let config decode it.
+// PeakMultiplier enables DeepSeek's peak-hour billing: when > 1, every rate is
+// scaled by it during the Beijing peak windows (09:00–12:00 and 14:00–18:00).
+// Zero (the default) keeps flat pricing for providers without peak billing.
 type Pricing struct {
-	CacheHit float64 `toml:"cache_hit"` // per 1M cached prompt tokens
-	Input    float64 `toml:"input"`     // per 1M uncached prompt tokens
-	Output   float64 `toml:"output"`    // per 1M completion tokens
-	Currency string  `toml:"currency"`
+	CacheHit       float64 `toml:"cache_hit"`       // per 1M cached prompt tokens
+	Input          float64 `toml:"input"`           // per 1M uncached prompt tokens
+	Output         float64 `toml:"output"`          // per 1M completion tokens
+	Currency       string  `toml:"currency"`        // display symbol
+	PeakMultiplier float64 `toml:"peak_multiplier"` // > 1 enables DeepSeek peak-hour billing
 }
 
-// Cost estimates the spend for a usage record.
-func (p *Pricing) Cost(u *Usage) float64 {
+// IsDeepSeekPeak reports whether at falls in DeepSeek's peak billing window:
+// Beijing time 09:00–12:00 and 14:00–18:00 (half-open intervals). Beijing is
+// UTC+8 with no DST, so the hour is derived from UTC directly and never
+// depends on host tzdata.
+func IsDeepSeekPeak(at time.Time) bool {
+	h := (at.UTC().Hour() + 8) % 24
+	return (h >= 9 && h < 12) || (h >= 14 && h < 18)
+}
+
+// CostAt estimates the spend for a usage record billed at time at. When
+// PeakMultiplier > 1 and at falls in a DeepSeek peak window, all rates are
+// scaled by PeakMultiplier.
+func (p *Pricing) CostAt(u *Usage, at time.Time) float64 {
 	if p == nil || u == nil {
 		return 0
 	}
+	mult := 1.0
+	if p.PeakMultiplier > 1 && IsDeepSeekPeak(at) {
+		mult = p.PeakMultiplier
+	}
 	return (float64(u.CacheHitTokens)*p.CacheHit +
 		float64(u.CacheMissTokens)*p.Input +
-		float64(u.CompletionTokens)*p.Output) / 1e6
+		float64(u.CompletionTokens)*p.Output) * mult / 1e6
+}
+
+// Cost estimates the spend for a usage record, using the current time so
+// DeepSeek's peak multiplier applies when the call lands in a peak window.
+func (p *Pricing) Cost(u *Usage) float64 {
+	return p.CostAt(u, time.Now())
 }
 
 // Symbol returns the currency display symbol, defaulting to "楼".

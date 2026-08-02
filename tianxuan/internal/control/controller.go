@@ -380,6 +380,8 @@ func (c *Controller) runTurnWithRaw(ctx context.Context, input, raw string) erro
 	}
 	// 每轮对话后自动提取记忆候选（仅暂存 pending，用户确认后才落盘）
 	c.autoExtract()
+	// 待确认候选超过 30 条时提炼为 1 条，避免 pending 无限堆积
+	c.autoCondense()
 	// 每轮对话后检查 Dream 调度门控，通过则整合跨会话知识为候选
 	c.autoDream()
 	return nil

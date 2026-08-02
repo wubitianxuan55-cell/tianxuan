@@ -40,6 +40,10 @@ type SkillSuggestion struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
+	// DescriptionZh is the Chinese explanation shown beside the candidate in
+	// the memory panel; the generated skill file keeps the English description
+	// for trigger matching.
+	DescriptionZh string   `json:"descriptionZh"`
 	Scope       string   `json:"scope"`
 	Body        string   `json:"body"`
 	Reason      string   `json:"reason"`
@@ -69,6 +73,7 @@ type suggestionSession struct {
 type workflowCategory struct {
 	Name        string
 	Description string
+	DescriptionZh string
 	Reason      string
 	Keywords    []string
 	Steps       []string
@@ -308,6 +313,7 @@ func suggestSkills(workspaceRoot string, existing []skill.Skill, sessions []sugg
 			ID:          "skill-" + cat.Name,
 			Name:        cat.Name,
 			Description: cat.Description,
+			DescriptionZh: cat.DescriptionZh,
 			Scope:       scope,
 			Body:        skillCandidateBody(cat, evidence),
 			Reason:      cat.Reason,
@@ -470,6 +476,7 @@ func workflowCategories() []workflowCategory {
 		{
 			Name:        "tianxuan-code-review",
 			Description: "Review code changes, run tests, verify build, and prepare commits with Conventional Commits format.",
+			DescriptionZh: "审查代码变更、运行测试、验证构建,并按 Conventional Commits 规范准备提交。",
 			Reason:      "recent history repeatedly touched code review, testing, commits, or CI verification",
 			Keywords:    []string{"review", "test", "commit", "pr", "pull request", "build", "ci", "评审", "测试", "提交"},
 			Steps: []string{
@@ -483,6 +490,7 @@ func workflowCategories() []workflowCategory {
 		{
 			Name:        "tianxuan-refactor",
 			Description: "Safely refactor code: understand dependencies, rename symbols, verify no regressions.",
+			DescriptionZh: "安全地重构代码:先理清依赖关系,再重命名符号,最后验证无回归。",
 			Reason:      "recent history repeatedly discussed refactoring, renaming, or restructuring code",
 			Keywords:    []string{"refactor", "rename", "restructure", "extract", "重组", "重命名", "重构", "提取"},
 			Steps: []string{
@@ -495,6 +503,7 @@ func workflowCategories() []workflowCategory {
 		{
 			Name:        "tianxuan-bug-fix",
 			Description: "Diagnose and fix a reported bug: reproduce, isolate, fix, verify, and document.",
+			DescriptionZh: "诊断并修复缺陷:先复现,再隔离根因,修复后验证并补充回归测试。",
 			Reason:      "recent history repeatedly discussed debugging, fixing bugs, or investigating errors",
 			Keywords:    []string{"bug", "fix", "debug", "error", "crash", "broken", "修复", "错误", "崩溃", "调试"},
 			Steps: []string{

@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"tianxuan/internal/provider"
 )
 
 func TestExtractMemoryStatementEmpty(t *testing.T) {
@@ -164,5 +166,33 @@ func TestSuggestionTitle(t *testing.T) {
 	title := suggestionTitle("请记住用户偏好使用 tabs 缩进", "Default")
 	if title == "Default" {
 		t.Errorf("suggestionTitle should derive title from statement, got: %q", title)
+	}
+}
+
+// TestWorkflowCategoriesCarryChineseDescription verifies every skill suggestion
+// category ships a Chinese description for the memory panel.
+func TestWorkflowCategoriesCarryChineseDescription(t *testing.T) {
+	for _, cat := range workflowCategories() {
+		if strings.TrimSpace(cat.DescriptionZh) == "" {
+			t.Errorf("workflow category %q must carry a Chinese description", cat.Name)
+		}
+	}
+}
+
+// TestSuggestSkillsFillsChineseDescription verifies suggested skill candidates
+// expose the category's Chinese description to the panel.
+func TestSuggestSkillsFillsChineseDescription(t *testing.T) {
+	sessions := []suggestionSession{
+		{ID: "s1", Messages: []provider.Message{{Role: provider.RoleUser, Content: "请 review 代码并跑测试"}}},
+		{ID: "s2", Messages: []provider.Message{{Role: provider.RoleUser, Content: "帮我 review 这个 commit"}}},
+	}
+	out := suggestSkills("", nil, sessions)
+	if len(out) == 0 {
+		t.Fatal("suggestSkills should return at least one candidate")
+	}
+	for _, s := range out {
+		if strings.TrimSpace(s.DescriptionZh) == "" {
+			t.Errorf("skill suggestion %q missing Chinese description", s.Name)
+		}
 	}
 }

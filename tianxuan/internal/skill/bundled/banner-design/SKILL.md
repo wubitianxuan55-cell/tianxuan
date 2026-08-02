@@ -6,11 +6,19 @@ license: MIT
 metadata:
   author: claudekit
   version: "1.0.0"
+runas: subagent
+allowed-tools: read_file, write_file, ls, grep, bash
+
 ---
 
 # Banner Design - Multi-Format Creative Banner System
 
 Design banners across social, ads, web, and print formats. Generates multiple art direction options per request with AI-powered visual elements. This skill handles banner design only. Does NOT handle video editing, full website design, or print production.
+
+## Subagent mode
+
+When invoked as a subagent, you receive a banner request (platform/style/dimensions). Produce ONE set of ready-to-review banner drafts: follow the workflow below, write any generated files, and return the file paths plus a short art-direction summary for each option. Never dump the full banner content inline.
+
 
 ## When to Activate
 

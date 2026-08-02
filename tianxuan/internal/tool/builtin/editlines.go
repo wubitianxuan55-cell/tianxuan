@@ -112,7 +112,9 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 
 	// Rejoin with the file's original line ending, preserving trailing newline.
 	result := strings.Join(out, fileLE)
-	if hasTrailingNL && len(out) > 0 && out[len(out)-1] != "" {
+	// `out` 以空字符串结尾表示一个真实的空行（如 "a\n\n" 的第 2 行），
+	// Join 只会在元素之间插入分隔符，此时仍需追加换行，否则末尾空行会被吞掉。
+	if hasTrailingNL && len(out) > 0 {
 		result += fileLE
 	}
 

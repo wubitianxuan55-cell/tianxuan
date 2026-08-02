@@ -242,6 +242,68 @@ func TestEditLinesAppendAtEnd(t *testing.T) {
 	}
 }
 
+// TestEditLinesPreserveTrailingEmptyLine 复现"吞行"bug：文件末尾存在空行
+// （以两个换行结尾）时，编辑中间行会把末尾空行吞掉。
+// 根因：重建尾部时用 `out` 最后一个元素是否为 "" 判断"是否已有尾随换行"，
+// 但 `out` 以 "" 结尾表示的是"文件末尾是空行"，join 后仅产生一个换行，
+// 缺少该空行所需的第二个换行。
+func TestEditLinesPreserveTrailingEmptyLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "trailing_empty_lf.txt")
+	// 3 行：第 3 行为空行
+	orig := "line one\nline two\n\n"
+	if err := os.WriteFile(path, []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	el := editLines{roots: []string{dir}}
+	if _, err := el.Execute(t.Context(), argsJSON(t, map[string]any{
+		"path":        path,
+		"start_line":  2,
+		"end_line":    2,
+		"new_content": "line TWO",
+	})); err != nil {
+		t.Fatalf("edit_lines: %v", err)
+	}
+
+	got := readTestFile(t, path)
+	want := "line one\nline TWO\n\n" // 末尾空行必须保留
+	if got != want {
+		t.Errorf("trailing empty line swallowed:\n  got: %q\n want: %q", got, want)
+	}
+}
+
+// TestEditLinesPreserveTrailingEmptyLineCRLF CRLF 变体：同样的空行吞没问题，
+// 且不得产生 \r 泄漏。
+func TestEditLinesPreserveTrailingEmptyLineCRLF(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "trailing_empty_crlf.txt")
+	// 3 行：第 3 行为空行
+	orig := "line one\r\nline two\r\n\r\n"
+	if err := os.WriteFile(path, []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	el := editLines{roots: []string{dir}}
+	if _, err := el.Execute(t.Context(), argsJSON(t, map[string]any{
+		"path":        path,
+		"start_line":  2,
+		"end_line":    2,
+		"new_content": "line TWO",
+	})); err != nil {
+		t.Fatalf("edit_lines: %v", err)
+	}
+
+	got := readTestFile(t, path)
+	want := "line one\r\nline TWO\r\n\r\n"
+	if got != want {
+		t.Errorf("trailing empty line swallowed (CRLF):\n  got: %q\n want: %q", got, want)
+	}
+	if strings.Contains(got, "\r\r") {
+		t.Errorf("CR leaked (found \\r\\r): %q", got)
+	}
+}
+
 func readTestFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)

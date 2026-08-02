@@ -5,11 +5,19 @@ argument-hint: "[update|review|create] [args]"
 metadata:
   author: claudekit
   version: "1.0.0"
+runas: subagent
+allowed-tools: read_file, write_file, ls, grep, bash
+
 ---
 
 # Brand
 
 Brand identity, voice, messaging, asset management, and consistency frameworks.
+
+## Subagent mode
+
+When invoked as a subagent, you receive a self-contained brand task (create guidelines, review consistency, update assets). Apply the frameworks below, use scripts/ where relevant, write output files, and return file paths plus a concise summary. For consistency reviews, return findings with file references.
+
 
 ## When to Use
 

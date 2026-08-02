@@ -5,11 +5,19 @@ argument-hint: "[topic] [slide-count]"
 metadata:
   author: claudekit
   version: "1.0.0"
+runas: subagent
+allowed-tools: read_file, write_file, ls, grep
+
 ---
 
 # Slides
 
 Strategic HTML presentation design with data visualization.
+
+## Subagent mode
+
+When invoked as a subagent, you receive a presentation request (topic + slide count). Produce ONE complete self-contained HTML file using the templates in references/ (Chart.js + design tokens + responsive layout), write it with write_file, and return the file path plus a short design summary. Never return the HTML inline.
+
 
 ## When to Use
 

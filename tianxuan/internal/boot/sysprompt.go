@@ -54,7 +54,18 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 
 	skillStore := skill.New(skill.Options{ProjectRoot: cwd, CustomPaths: cfg.SkillCustomPaths(), Stderr: stderrPath})
 	skills := skillStore.List()
-	sysPrompt = skill.ApplyIndex(sysPrompt, skills)
+	// 已注册为独立工具的子代理技能（explore/research/review/security-review 及
+	// 用户技能 runas: subagent）不再进入索引——工具 schema 已包含名称、描述与
+	// 用法，索引重复列出只会增加前缀 token。inline 技能保留（模型仍需通过
+	// 索引 + run_skill 发现它们）。
+	var indexed []skill.Skill
+	for _, sk := range skills {
+		if sk.RunAs == skill.RunSubagent {
+			continue
+		}
+		indexed = append(indexed, sk)
+	}
+	sysPrompt = skill.ApplyIndex(sysPrompt, indexed)
 
 	builtin.WireReadSkillResolver(func(name string) (string, error) {
 		sk, ok := skillStore.Read(name)

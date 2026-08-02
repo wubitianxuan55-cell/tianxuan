@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   priceFor, calcCost, fmtTokens, fmtCost, fmtElapsed,
+  isDeepSeekPeak, peakMultiplierAt,
   hitRateColor, hitRate, aggSteps, colFromUsage,
   filterSteps, hitPct, withHitRate, mergeCols,
 } from "./stats";
@@ -37,6 +38,44 @@ describe("calcCost", () => {
     expect(calcCost(1_000_000, 1.0)).toBeCloseTo(1.0, 4);
     expect(calcCost(500_000, 2.0)).toBeCloseTo(1.0, 4);
     expect(calcCost(0, 10)).toBe(0);
+  });
+});
+
+describe("isDeepSeekPeak", () => {
+  // Beijing = UTC+8: Beijing 09:00 == UTC 01:00, 18:00 == UTC 10:00.
+  const utc = (h: number) => new Date(Date.UTC(2026, 7, 2, h, 0));
+
+  it("flags Beijing 09:00-12:00 and 14:00-18:00", () => {
+    expect(isDeepSeekPeak(utc(1))).toBe(true);  // Beijing 09:00
+    expect(isDeepSeekPeak(utc(3))).toBe(true);  // Beijing 11:00
+    expect(isDeepSeekPeak(utc(6))).toBe(true);  // Beijing 14:00
+    expect(isDeepSeekPeak(utc(9))).toBe(true);  // Beijing 17:00
+  });
+
+  it("flags off-peak hours", () => {
+    expect(isDeepSeekPeak(utc(0))).toBe(false);  // Beijing 08:00
+    expect(isDeepSeekPeak(utc(4))).toBe(false);  // Beijing 12:00
+    expect(isDeepSeekPeak(utc(10))).toBe(false); // Beijing 18:00
+    expect(isDeepSeekPeak(utc(13))).toBe(false); // Beijing 21:00
+  });
+});
+
+describe("peakMultiplierAt", () => {
+  const flash = priceFor("deepseek-v4-flash");
+  const offPeak = new Date(Date.UTC(2026, 7, 2, 4, 0)); // Beijing 12:00
+  const peak = new Date(Date.UTC(2026, 7, 2, 3, 0));    // Beijing 11:00
+
+  it("doubles during DeepSeek peak hours", () => {
+    expect(peakMultiplierAt(flash, peak)).toBe(2);
+  });
+
+  it("stays flat off-peak", () => {
+    expect(peakMultiplierAt(flash, offPeak)).toBe(1);
+  });
+
+  it("stays flat for models without peak billing", () => {
+    const flat = { cacheHit: 0.02, input: 1, output: 2, label: "Flat" };
+    expect(peakMultiplierAt(flat, peak)).toBe(1);
   });
 });
 

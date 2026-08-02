@@ -1,3 +1,50 @@
+## [10.147.0] — 2026-08-02
+
+### 🧬 技能系统重构 — 子代理化 + 工具化 + 压缩
+
+> 大量实测证明 DeepSeek 不爱调用技能（run_skill 间接路径），本次把技能转为第一等
+> 工具/子代理，并压缩模型可见工具集，降低注意力稀释与 schema token 成本。
+
+- **探索类技能独立工具**：explore / research / review / security_review 注册为独立
+  工具（名字即触发词，原生 tool-calling 直接可见），不再要求模型先想起技能名再走
+  run_skill
+- **技能蒸馏转子代理**：ui-ux-pro-max（设计检索）/ slides / banner-design / brand /
+  design-system 5 个技能声明 `runas: subagent` + `allowed-tools` + Subagent mode 自包含
+  任务说明；bundled 分发源同步，新环境自动获得 subagent 版
+- **ui_styling 工具**：封装 tailwind_config_gen 脚本执行 + references 指南关键词
+  内容检索（文件名优先，全文匹配返回上下文片段）
+- **design_router 工具**：设计任务路由到对应子代理（banner/slides/brand/
+  design-system/ui-ux-pro-max/ui_styling/explore），返回结构化派发建议
+- **技能索引去重**：已注册为独立工具的子代理技能不再进入系统提示 # Skills 索引
+  （工具 schema 已含名称+描述），索引 12+ 条 → 7 行，省 ~150 tokens/请求
+- **工具压缩默认开启**：Compact 默认 true，父级隐藏 codegraph 深度工具（6 个）、
+  lsp_rename/lsp_completion、install_skill；可见工具 55 → 46，schema tokens
+  4,345 → 3,590（-17%）；隐藏工具在 explore 子代理内仍全部可用
+
+### 🔧 修复 edit_lines 吞行
+
+- 文件末尾存在空行（如 "a\nb\n\n"）时编辑中间行，末尾空行被吞——重建条件把
+  "空行"误判为"已有尾随换行"。修复 + 2 个回归测试（LF/CRLF 变体）
+
+### 💰 DeepSeek 峰谷计价
+
+- V4 正式版高峰时段（北京时间 9:00-12:00、14:00-18:00）所有计费项价格翻倍；
+  Pricing 新增 PeakMultiplier（TOML `peak_multiplier`），统计面板 costUsd、
+  预算门控、CLI 状态行全链路按调用时刻生效；mimo 等未配置 provider 行为不变
+
+### 🧠 记忆系统增强
+
+- 待确认记忆超过 30 条自动提炼为 1 条（CondensePending，聚合后原候选移除）
+- 记忆面板建议项（pending + suggestions）点击展开详情（body + evidence + scope）；
+  技能候选项新增中文说明（descriptionZh）
+
+### 验证
+
+- `go test` 全绿（boot/skill/control/agent/tool/cache/config/desktop），vet 干净，
+  `tsc --noEmit` 0 错误，vitest 66/66，主模块与 desktop 构建 EXIT 0
+
+---
+
 ## [10.146.0] — 2026-08-01
 
 ### 🔧 修复 edit_lines 报 "start_line must be >= 1" — compact schema 丢失 minimum 约束

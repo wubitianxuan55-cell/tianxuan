@@ -81,6 +81,7 @@ export function MemoryPanelContent() {
   const [suggestions, setSuggestions] = useState<MemorySuggestionsView | null>(null);
   const [suggestionBusy, setSuggestionBusy] = useState(false);
   const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<string>>(new Set());
+  const [expandedSuggestion, setExpandedSuggestion] = useState<string | null>(null);
   const [autoSuggestions, setAutoSuggestions] = useState(readAutoPref);
   const autoReq = useRef(false);
 
@@ -282,6 +283,23 @@ export function MemoryPanelContent() {
     if (last < text.length) out.push(text.slice(last));
     return out;
   }, [factNames, jumpTo, t]);
+
+  const toggleSuggestion = useCallback((key: string) => {
+    setExpandedSuggestion((prev) => (prev === key ? null : key));
+  }, []);
+
+  const renderSuggestionDetail = useCallback((s: { body?: string; evidence?: string[] }) => (
+    <div className="mem-suggestion__detail">
+      {s.body && <div className="mem-fact__body">{renderWithLinks(s.body)}</div>}
+      {s.evidence && s.evidence.length > 0 && (
+        <div className="mem-suggestion__evidence">
+          {s.evidence.map((ev, i) => (
+            <div key={i} className="mem-suggestion__ev">{ev}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  ), [renderWithLinks]);
 
   // ── loading / error ──
   if (loading) {
@@ -506,23 +524,32 @@ export function MemoryPanelContent() {
             {hasPending && (
               <>
                 <div className="mem-section__title mt-1">{t("memory.pendingCandidates")}</div>
-                {pending.map((s) => (
-                  <div className="mem-suggestion" key={s.id || s.name}>
-                    <div className="mem-suggestion__info">
-                      <span className="mem-suggestion__title">{s.title || s.name}</span>
-                      <span className="mem-suggestion__desc">{s.description}</span>
-                      <span className="mem-suggestion__reason">{s.reason}</span>
-                    </div>
-                    <div className="mem-suggestion__actions">
-                      <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
-                        <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
+                {pending.map((s) => {
+                  const skey = s.id || s.name;
+                  const isOpen = expandedSuggestion === skey;
+                  return (
+                    <div className="mem-suggestion" key={skey}>
+                      <button
+                        type="button"
+                        className={`mem-suggestion__info${isOpen ? " mem-suggestion__info--open" : ""}`}
+                        onClick={() => toggleSuggestion(skey)}
+                      >
+                        <span className="mem-suggestion__title">{s.title || s.name}</span>
+                        <span className="mem-suggestion__desc">{s.description}</span>
+                        <span className="mem-suggestion__reason">{s.reason}</span>
                       </button>
-                      <button className="btn btn--small btn--ghost" onClick={() => void rejectPendingMemory(s.name)} disabled={busy} type="button">
-                        {t("memory.reject")}
-                      </button>
+                      <div className="mem-suggestion__actions">
+                        <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
+                          <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
+                        </button>
+                        <button className="btn btn--small btn--ghost" onClick={() => void rejectPendingMemory(s.name)} disabled={busy} type="button">
+                          {t("memory.reject")}
+                        </button>
+                      </div>
+                      {isOpen && renderSuggestionDetail(s)}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
@@ -663,45 +690,71 @@ export function MemoryPanelContent() {
                 {suggestions.memories.length > 0 && (
                   <>
                     <div className="mem-section__title mt-2">{t("memory.memoryCandidates")}</div>
-                    {suggestions.memories.map((s) => (
-                      <div className="mem-suggestion" key={s.id || s.name}>
-                        <div className="mem-suggestion__info">
-                          <span className="mem-suggestion__title">{s.title || s.name}</span>
-                          <span className="mem-suggestion__desc">{s.description}</span>
-                          <span className="mem-suggestion__reason">{s.reason}</span>
+                    {suggestions.memories.map((s) => {
+                      const skey = s.id || s.name;
+                      const isOpen = expandedSuggestion === skey;
+                      return (
+                        <div className="mem-suggestion" key={skey}>
+                          <button
+                            type="button"
+                            className={`mem-suggestion__info${isOpen ? " mem-suggestion__info--open" : ""}`}
+                            onClick={() => toggleSuggestion(skey)}
+                          >
+                            <span className="mem-suggestion__title">{s.title || s.name}</span>
+                            <span className="mem-suggestion__desc">{s.description}</span>
+                            <span className="mem-suggestion__reason">{s.reason}</span>
+                          </button>
+                          {acceptedSuggestions.has(skey) ? (
+                            <span className="mem-saved-badge">{t("memory.savedBadge")}</span>
+                          ) : (
+                            <div className="mem-suggestion__actions">
+                              <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
+                                <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
+                              </button>
+                            </div>
+                          )}
+                          {isOpen && renderSuggestionDetail(s)}
                         </div>
-                        {acceptedSuggestions.has(s.id || s.name) ? (
-                          <span className="mem-saved-badge">{t("memory.savedBadge")}</span>
-                        ) : (
-                          <div className="mem-suggestion__actions">
-                            <button className="btn btn--small" onClick={() => void acceptMemorySuggestion(s)} disabled={busy} type="button">
-                              <Check size={13} className="mem-btn-icon" />{t("memory.accept")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </>
                 )}
                 {suggestions.skills.length > 0 && (
                   <>
                     <div className="mem-section__title mt-3">{t("memory.skillCandidates")}</div>
-                    {suggestions.skills.map((s) => (
-                      <div className="mem-suggestion" key={s.id || s.name}>
-                        <div className="mem-suggestion__info">
-                          <span className="mem-suggestion__title">{s.name}</span>
-                          <span className="mem-suggestion__desc">{s.description}</span>
-                          <span className="mem-suggestion__reason">{s.reason}</span>
-                        </div>
-                        {acceptedSuggestions.has(s.id || s.name) ? (
-                          <span className="mem-saved-badge">{t("memory.createdBadge")}</span>
-                        ) : (
-                          <button className="btn btn--small" onClick={() => void acceptSkillSuggestion(s)} disabled={busy} type="button">
-                            <Plus size={13} className="mem-btn-icon" />{t("memory.create")}
+                    {suggestions.skills.map((s) => {
+                      const skey = s.id || s.name;
+                      const isOpen = expandedSuggestion === skey;
+                      return (
+                        <div className="mem-suggestion" key={skey}>
+                          <button
+                            type="button"
+                            className={`mem-suggestion__info${isOpen ? " mem-suggestion__info--open" : ""}`}
+                            onClick={() => toggleSuggestion(skey)}
+                          >
+                            <span className="mem-suggestion__title">{s.name}</span>
+                            {s.descriptionZh && <span className="mem-suggestion__zh">{s.descriptionZh}</span>}
+                            <span className="mem-suggestion__desc">{s.description}</span>
+                            <span className="mem-suggestion__reason">{s.reason}</span>
                           </button>
-                        )}
-                      </div>
-                    ))}
+                          {acceptedSuggestions.has(skey) ? (
+                            <span className="mem-saved-badge">{t("memory.createdBadge")}</span>
+                          ) : (
+                            <div className="mem-suggestion__actions">
+                              <button className="btn btn--small" onClick={() => void acceptSkillSuggestion(s)} disabled={busy} type="button">
+                                <Plus size={13} className="mem-btn-icon" />{t("memory.create")}
+                              </button>
+                            </div>
+                          )}
+                          {isOpen && (
+                            <>
+                              {s.scope && <div className="mem-suggestion__scope">{scopeLabel(s.scope, t)}</div>}
+                              {renderSuggestionDetail(s)}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </>
                 )}
                 {suggestions.generatedAt && (

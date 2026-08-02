@@ -543,6 +543,7 @@ export interface SkillSuggestion {
   id: string;
   name: string;
   description: string;
+  descriptionZh?: string;
   scope: string;
   body: string;
   reason: string;

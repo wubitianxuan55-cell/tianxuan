@@ -5,9 +5,18 @@ import type { WireUsage } from "./types";
 
 // ─── price table ───────────────────────────────────────────────
 
-export const MODEL_PRICES: Record<string, { cacheHit: number; input: number; output: number; label: string }> = {
-  "deepseek-v4-flash": { cacheHit: 0.0203, input: 1.015, output: 2.03, label: "V4 Flash" },
-  "deepseek-v4-pro":   { cacheHit: 0.0263, input: 3.154, output: 6.308, label: "V4 Pro" },
+export interface ModelPrice {
+  cacheHit: number;
+  input: number;
+  output: number;
+  label: string;
+  // DeepSeek 峰谷计价：高峰时段（北京时间 9:00-12:00、14:00-18:00）价格翻倍。
+  peakMultiplier?: number;
+}
+
+export const MODEL_PRICES: Record<string, ModelPrice> = {
+  "deepseek-v4-flash": { cacheHit: 0.0203, input: 1.015, output: 2.03, label: "V4 Flash", peakMultiplier: 2 },
+  "deepseek-v4-pro":   { cacheHit: 0.0263, input: 3.154, output: 6.308, label: "V4 Pro", peakMultiplier: 2 },
 };
 const DEFAULT_PRICE = MODEL_PRICES["deepseek-v4-flash"];
 
@@ -21,6 +30,18 @@ export function priceFor(label?: string) {
 
 export function calcCost(tokens: number, pricePerM: number): number {
   return (tokens / 1_000_000) * pricePerM;
+}
+
+/** DeepSeek peak billing window: Beijing time 09:00-12:00 and 14:00-18:00 (half-open). */
+export function isDeepSeekPeak(d: Date): boolean {
+  const bjHour = (d.getUTCHours() + 8) % 24;
+  return (bjHour >= 9 && bjHour < 12) || (bjHour >= 14 && bjHour < 18);
+}
+
+/** Rate multiplier for a model at a given time: peakMultiplier during DeepSeek peak hours, else 1. */
+export function peakMultiplierAt(p: ModelPrice, d: Date): number {
+  if (p.peakMultiplier && p.peakMultiplier > 1 && isDeepSeekPeak(d)) return p.peakMultiplier;
+  return 1;
 }
 
 // ─── formatting ─────────────────────────────────────────────────

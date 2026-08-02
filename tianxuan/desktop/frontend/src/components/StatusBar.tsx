@@ -4,7 +4,7 @@ import { Tooltip } from "./Tooltip";
 import { useI18n } from "../lib/i18n";
 import { useCompact } from "../hooks/useCompact";
 import type { BalanceInfo, JobView, WireUsage } from "../lib/types";
-import { priceFor, calcCost, fmtTokens, fmtCost } from "../lib/stats";
+import { priceFor, calcCost, fmtTokens, fmtCost, peakMultiplierAt } from "../lib/stats";
 
 
 // ─── Jobs popover ─────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export const StatusBar = memo(function StatusBar({
   const sessionCompl = usage?.completionTokens ?? 0;
   const totalPromptTokens = sessionHit + sessionMiss;
   const sessionCost = totalPromptTokens > 0
-    ? calcCost(sessionHit, p.cacheHit) + calcCost(sessionMiss, p.input) + calcCost(sessionCompl, p.output)
+    ? (calcCost(sessionHit, p.cacheHit) + calcCost(sessionMiss, p.input) + calcCost(sessionCompl, p.output)) * peakMultiplierAt(p, new Date())
     : 0;
 
   // ── 缓存率 ──

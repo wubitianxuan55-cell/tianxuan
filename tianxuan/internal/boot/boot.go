@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"sync"
 	"tianxuan/internal/agent"
 	"tianxuan/internal/archive"
 	"tianxuan/internal/cache"
@@ -27,13 +28,12 @@ import (
 	"tianxuan/internal/event"
 	"tianxuan/internal/hook"
 	"tianxuan/internal/jobs"
-	"tianxuan/internal/lsp"
 	"tianxuan/internal/learning"
+	"tianxuan/internal/lsp"
 	"tianxuan/internal/memory"
 	"tianxuan/internal/permission"
 	"tianxuan/internal/plugin"
 	"tianxuan/internal/provider"
-	"sync"
 	"tianxuan/internal/sandbox"
 	"tianxuan/internal/skill"
 	"tianxuan/internal/tool"
@@ -68,7 +68,7 @@ type Options struct {
 // to release them.
 var (
 	sandboxWarnOnce sync.Once
-	bashWarnOnce   sync.Once
+	bashWarnOnce    sync.Once
 )
 
 func Build(ctx context.Context, opts Options) (*control.Controller, error) {
@@ -107,7 +107,9 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	jm := jobs.NewManager(sink)
 
 	execProv, err := NewProvider(entry)
-if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
+	if cfg.Agent.Effort != "" {
+		entry.Effort = cfg.Agent.Effort
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -150,10 +152,14 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	reg := tool.NewRegistry()
 	bashSpec := sandbox.Spec{Mode: cfg.BashMode(), WriteRoots: cfg.WriteRoots(), Network: cfg.Sandbox.Network}
 	if bashSpec.Mode == "enforce" && !sandbox.Available() {
-		sandboxWarnOnce.Do(func() { fmt.Fprintln(stderr, "warning: bash sandbox requested but unavailable on this platform; running bash unconfined") })
+		sandboxWarnOnce.Do(func() {
+			fmt.Fprintln(stderr, "warning: bash sandbox requested but unavailable on this platform; running bash unconfined")
+		})
 	}
 	if sandbox.ResolveShell().Kind == sandbox.ShellPowerShell {
-		bashWarnOnce.Do(func() { fmt.Fprintln(stderr, "warning: bash not found on PATH; the shell tool will run commands under Windows PowerShell. Install Git for Windows or WSL to use bash.") })
+		bashWarnOnce.Do(func() {
+			fmt.Fprintln(stderr, "warning: bash not found on PATH; the shell tool will run commands under Windows PowerShell. Install Git for Windows or WSL to use bash.")
+		})
 	}
 	addBuiltins(reg, cfg.Tools.Enabled, cfg.WriteRoots(), bashSpec, stderr)
 	builtin.ResolveRgPath() // V10.29: enable ripgrep delegation when rg is on PATH
@@ -213,7 +219,9 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	// calls mean the parent's prefix cache is unaffected.
 	if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
 		if subEntry, ok := cfg.ResolveModel(subRef); ok {
-			if e := cfg.Agent.SubagentEffortVal(); e != "" { subEntry.Effort = e }
+			if e := cfg.Agent.SubagentEffortVal(); e != "" {
+				subEntry.Effort = e
+			}
 			if subProv, err := NewProvider(subEntry); err == nil {
 				taskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
 			}
@@ -268,23 +276,39 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		sysPrompt := childCompiler.SystemPrompt()
 
 		return agent.RunSubAgent(sctx, prov, subReg, sysPrompt, sk.Body+"\n\n"+task, agent.Options{
-		MaxSteps:      steps,
-		Temperature:   cfg.Agent.Temperature,
-		Pricing:       price,
-		Gate:          headlessGate,
-		ContextWindow: ctxWin,
-		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
-		RuntimePrompt: runtimeCtx.SystemPrompt(),
-		// V5.30: 根据技能名查找子代理模板 — 同类子代理共享前缀缓存
-		TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
-		// V10.36: 对齐父代理工具集以保证缓存命中
-		ActiveSchemas:  reg.Schemas(),
-	}, agent.NestedSink(sctx, event.Discard), nil)
+			MaxSteps:      steps,
+			Temperature:   cfg.Agent.Temperature,
+			Pricing:       price,
+			Gate:          headlessGate,
+			ContextWindow: ctxWin,
+			Compaction:    agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
+			RuntimePrompt: runtimeCtx.SystemPrompt(),
+			// V5.30: 根据技能名查找子代理模板 — 同类子代理共享前缀缓存
+			TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
+			// V10.36: 对齐父代理工具集以保证缓存命中
+			ActiveSchemas: reg.Schemas(),
+		}, agent.NestedSink(sctx, event.Discard), nil)
 	}
 	reg.Add(skill.NewRunSkillTool(skillStore, skillRunner))
 	reg.Add(skill.NewParallelSkillsTool(skillStore, skillRunner))
 	reg.Add(skill.NewInstallSkillTool(skillStore, nil))
-		// V5.30: 注册内置子代理模板，同类子代理共享 L4 前缀缓存
+	reg.Add(skill.NewUiStylingTool(skillStore))
+	reg.Add(skill.NewDesignRouterTool(skillStore))
+	// V10.x: 所有 runAs=subagent 技能注册为独立工具——内置 explore/research/
+	// review/security-review 以及用户技能通过 frontmatter 声明 runas: subagent
+	// （如 ui-ux-pro-max/slides/banner-design/brand/design-system）。DeepSeek
+	// 原生 tool-calling 直接看到专用入口，无需先想起技能名再走 run_skill。
+	for _, sk := range skillStore.List() {
+		if sk.RunAs != skill.RunSubagent {
+			continue
+		}
+		desc, compact := sk.Description, "在隔离子代理中执行 "+sk.Name+" 技能，返回精炼结果"
+		if d, ok := subagentSkillToolDescsBySkill[sk.Name]; ok {
+			desc, compact = d.desc, d.compactDesc
+		}
+		reg.Add(skill.NewSubagentSkillTool(skillStore, skillRunner, sk.Name, desc, compact))
+	}
+	// V5.30: 注册内置子代理模板，同类子代理共享 L4 前缀缓存
 	for _, st := range cache.BuiltinSpawnTemplates() {
 		cache.RegisterSpawnTemplate(st)
 	}
@@ -324,17 +348,17 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		offloadDir = filepath.Join(cwd, offloadDir)
 	}
 	executor := agent.New(execProv, reg, execSess, agent.Options{
-		MaxSteps:      maxSteps,
-		Temperature:   cfg.Agent.Temperature,
-		Pricing:       entry.Price,
-		Gate:          headlessGate,
-		Hooks:         hookRunner,
-		Jobs:          jm,
-		ContextWindow: entry.ContextWindow,
-		Compaction: agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
-		Dispatcher:    toolDispatcher,
-		StrictEvidence: strictEvidence,
-		OffloadDir:          offloadDir,
+		MaxSteps:              maxSteps,
+		Temperature:           cfg.Agent.Temperature,
+		Pricing:               entry.Price,
+		Gate:                  headlessGate,
+		Hooks:                 hookRunner,
+		Jobs:                  jm,
+		ContextWindow:         entry.ContextWindow,
+		Compaction:            agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
+		Dispatcher:            toolDispatcher,
+		StrictEvidence:        strictEvidence,
+		OffloadDir:            offloadDir,
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 	}, sink)
 	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
@@ -425,7 +449,9 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	var runner agent.Runner = executor
 	if pm := cfg.Agent.PlannerModel; pm != "" {
 		if pe, ok := cfg.ResolveModel(pm); ok {
-		if e := cfg.Agent.PlannerEffortVal(); e != "" { pe.Effort = e }
+			if e := cfg.Agent.PlannerEffortVal(); e != "" {
+				pe.Effort = e
+			}
 			// If the planner model has no pricing configured, fall back to
 			// the executor's pricing so cost statistics show real values.
 			if pe.Price == nil && entry.Price != nil {
@@ -462,7 +488,9 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			plannerTaskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
 			if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
 				if subEntry, ok := cfg.ResolveModel(subRef); ok {
-					if e := cfg.Agent.SubagentEffortVal(); e != "" { subEntry.Effort = e }
+					if e := cfg.Agent.SubagentEffortVal(); e != "" {
+						subEntry.Effort = e
+					}
 					if subProv, err := NewProvider(subEntry); err == nil {
 						plannerTaskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
 					}
@@ -503,13 +531,17 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 			}
 			readOnlyReg.Add(skill.NewRunSkillTool(skillStore, plannerSkillRunner))
 			readOnlyReg.Add(skill.NewParallelSkillsTool(skillStore, plannerSkillRunner))
+			// 规划者同样获得独立的只读子代理技能工具（探索/调研/审查）。
+			for _, sd := range subagentSkillToolDescs {
+				readOnlyReg.Add(skill.NewSubagentSkillTool(skillStore, plannerSkillRunner, sd.name, sd.desc, sd.compactDesc))
+			}
 
 			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxStepsVal(), pe.ContextWindow, config.ArchiveDir(), cwd)
-		// V10.89: emit warning if planner context window differs from provider default.
-		if pe.ContextWindow < entry.ContextWindow {
-			sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-				Text: fmt.Sprintf("规划者上下文窗口 (%d) < 模型默认 (%d)；超限计划可能被截断", pe.ContextWindow, entry.ContextWindow)})
-		}
+			// V10.89: emit warning if planner context window differs from provider default.
+			if pe.ContextWindow < entry.ContextWindow {
+				sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+					Text: fmt.Sprintf("规划者上下文窗口 (%d) < 模型默认 (%d)；超限计划可能被截断", pe.ContextWindow, entry.ContextWindow)})
+			}
 			label = entry.Name + " + planner " + pe.Name
 		} else {
 			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
@@ -541,13 +573,13 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 	compiler.IdentityLayer().SaveHash(cacheDir) // best-effort
 
 	ctrlOpts := control.Options{
-		Runner:            runner,
-		Executor:          executor,
-		Sink:              sink,
-		Policy:            policy,
-		Label:             label,
-		SystemPrompt:      sysPrompt,
-		SessionDir:        orDefault(opts.SessionDir, config.SessionDir()),
+		Runner:        runner,
+		Executor:      executor,
+		Sink:          sink,
+		Policy:        policy,
+		Label:         label,
+		SystemPrompt:  sysPrompt,
+		SessionDir:    orDefault(opts.SessionDir, config.SessionDir()),
 		Host:          pluginHost,
 		Commands:      cmds,
 		Skills:        skills,
@@ -559,8 +591,8 @@ if cfg.Agent.Effort != "" { entry.Effort = cfg.Agent.Effort }
 		Jobs:          jm,
 		Registry:      reg,
 		PluginCtx:     ctx,
-		CtxMgr:           ctxMgr,
-		WorkspaceRoot:    cwd,
+		CtxMgr:        ctxMgr,
+		WorkspaceRoot: cwd,
 	}
 	return control.New(ctrlOpts), nil
 }
@@ -748,7 +780,7 @@ type taskCompilerAdapter struct {
 }
 
 func (a *taskCompilerAdapter) Fork() interface{ SystemPrompt() string } { return a.c.Fork() }
-func (a *taskCompilerAdapter) SystemPrompt() string                      { return a.c.SystemPrompt() }
+func (a *taskCompilerAdapter) SystemPrompt() string                     { return a.c.SystemPrompt() }
 
 func orDefault(val, def string) string {
 	if val != "" {
@@ -786,6 +818,47 @@ func lookupSubagentTemplatePrefix(skillName string) string {
 	return tmpl.Prefix
 }
 
+// subagentSkillToolDescs holds the model-facing descriptions for the built-in
+// subagent skill tools (ordered). They are first-class tools so DeepSeek's
+// native tool calling sees a dedicated entry instead of routing through
+// run_skill. Keys match the built-in skill identifiers (security-review uses
+// the hyphen form; the model-visible tool name is normalised to underscores).
+var subagentSkillToolDescs = []struct {
+	name        string
+	desc        string
+	compactDesc string
+}{
+	{
+		name:        "explore",
+		desc:        "Explore the codebase in an isolated read-only sub-agent. 在隔离的只读子代理中深入调查代码库：架构、调用链、符号定义、影响面、跨文件综合问题；返回带 file:line 引用的精炼结论。适合宽泛调查、多处调用、理解系统结构——不要在主线上下文里反复 grep/read_file 堆砌探索。",
+		compactDesc: "在隔离只读子代理中调查代码库（架构/调用链/影响面），返回带引用的精炼结论",
+	},
+	{
+		name:        "research",
+		desc:        "Research a question combining web + code in an isolated read-only sub-agent. 在隔离的只读子代理中结合网页资料与本地代码调研（web_search/web_fetch + 代码检索），返回带代码与 URL 引用的综合结论。适合“某库是否支持 X”、外部方案对比、版本兼容等调研。",
+		compactDesc: "在隔离只读子代理中结合网页与代码调研问题，返回带引用的综合结论",
+	},
+	{
+		name:        "review",
+		desc:        "Review the current branch diff in an isolated read-only sub-agent. 在隔离的只读子代理中审查当前分支改动：正确性、安全、缺失测试、隐藏行为变化；按 file:line 给出问题与严重度，返回审查结论。只读，不提交不改文件。",
+		compactDesc: "在隔离只读子代理中审查当前分支 diff，按严重度返回问题清单",
+	},
+	{
+		name:        "security-review",
+		desc:        "Security-focused review of the current branch diff in an isolated read-only sub-agent. 在隔离的只读子代理中做安全专项审查：注入、越权、密钥泄露、反序列化、路径穿越、加密误用；按严重度标注并给出 file:line。只读，不提交不改文件。",
+		compactDesc: "在隔离只读子代理中做安全专项审查，按严重度返回风险清单",
+	},
+}
+
+// subagentSkillToolDescsBySkill indexes the custom descriptions by skill name.
+var subagentSkillToolDescsBySkill = func() map[string]struct{ desc, compactDesc string } {
+	m := map[string]struct{ desc, compactDesc string }{}
+	for _, d := range subagentSkillToolDescs {
+		m[d.name] = struct{ desc, compactDesc string }{d.desc, d.compactDesc}
+	}
+	return m
+}()
+
 // applyCompactToolset hides redundant tools from the model's tool schema list
 // while keeping them callable by name. V6.0 P8: reduces visible tool count
 // from ~41 to ~25, lowering model cognitive load.
@@ -800,11 +873,33 @@ func applyCompactToolset(reg *tool.Registry) {
 	// Background job management: merge kill_shell + wait into bash/bgjobs
 	reg.HideUnlessOnly([]string{"kill_shell", "wait"}, []string{"bash", "bash_output"})
 
-	// Specialized sub-agents: merge into task with kind parameter
-	reg.HideUnlessOnly([]string{"explore", "research", "review", "security_review"}, []string{"task"})
-
 	// Notebook editing: rarely used, hide unless explicitly enabled
 	reg.HideUnlessOnly([]string{"notebook_edit"}, []string{"edit_file", "write_file"})
+
+	// CodeGraph deep-analysis tools: the parent only needs the high-signal
+	// query tools; trace/explore/impact/callers/callees/status stay available
+	// inside explore sub-agents (FilterRegistry copies tools without hiding
+	// markers), so hiding them here only trims the parent's schema tokens.
+	reg.HideUnlessOnly([]string{
+		"mcp__codegraph__codegraph_trace",
+		"mcp__codegraph__codegraph_explore",
+		"mcp__codegraph__codegraph_impact",
+		"mcp__codegraph__codegraph_callers",
+		"mcp__codegraph__codegraph_callees",
+		"mcp__codegraph__codegraph_status",
+	}, []string{
+		"mcp__codegraph__codegraph_context",
+		"mcp__codegraph__codegraph_search",
+		"mcp__codegraph__codegraph_node",
+	})
+
+	// Skill authoring is a user/CLI action, not a per-turn model capability;
+	// run_skill covers invocation.
+	reg.HideUnlessOnly([]string{"install_skill"}, []string{"run_skill"})
+
+	// LSP rename/completion are lower-frequency mutations; the read-side
+	// tools (definition/references/hover/diagnostics) cover investigation.
+	reg.HideUnlessOnly([]string{"lsp_rename", "lsp_completion"}, []string{"lsp_definition", "lsp_references", "lsp_diagnostics"})
 
 	// File listing: glob is redundant with ls (which supports patterns)
 	reg.HideUnlessOnly([]string{"glob"}, []string{"ls"})

@@ -1,4 +1,4 @@
-﻿package boot
+package boot
 
 import (
 	"context"
@@ -74,6 +74,8 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 func TestBuildDiscoversSkills(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("APPDATA", dir)
+	t.Setenv("USERPROFILE", dir) // isolate the global skills dir too
+	t.Setenv("HOME", dir)
 	t.Chdir(dir)
 	writeFile(t, dir, "tianxuan.toml", `
 default_model = "test-model"
@@ -116,8 +118,67 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 	if !strings.Contains(sys, "# Skills") {
 		t.Fatalf("skills index missing from system prompt:\n%s", sys)
 	}
-	if !strings.Contains(sys, "projskill") || !strings.Contains(sys, "explore") {
-		t.Fatalf("skill names missing from index:\n%s", sys)
+	if !strings.Contains(sys, "projskill") {
+		t.Fatalf("inline skill missing from index:\n%s", sys)
+	}
+	// Subagent skills are registered as dedicated tools (their schemas carry
+	// name + description), so they must not be duplicated in the index.
+	if i := strings.Index(sys, "# Skills"); i >= 0 {
+		block := sys[i:]
+		if strings.Contains(block, "- explore") || strings.Contains(block, "- banner-design") || strings.Contains(block, "- ui-ux-pro-max") {
+			t.Fatalf("subagent skill should not be listed in the index (it is a dedicated tool):\n%s", block)
+		}
+	} else {
+		t.Fatalf("subagent skill should not be listed in the index (it is a dedicated tool):\n%s", sys)
+	}
+}
+
+// TestBuildRegistersSubagentSkillTools verifies every runAs=subagent skill is
+// registered as a first-class, model-visible tool — the built-ins
+// (explore/research/review/security_review) plus a user skill that opts in via
+// frontmatter (banner-design) — rather than being hidden behind run_skill.
+func TestBuildRegistersSubagentSkillTools(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
+	t.Setenv("USERPROFILE", dir) // isolate the global skills dir too
+	t.Setenv("HOME", dir)
+	t.Chdir(dir)
+	writeFile(t, dir, "tianxuan.toml", `
+default_model = "test-model"
+
+[codegraph]
+enabled = false
+
+[agent]
+system_prompt = "BASE"
+
+[[providers]]
+name = "test-model"
+kind = "openai"
+base_url = "https://example.invalid"
+model = "x"
+api_key_env = "TIANXUAN_TEST_KEY_UNSET"
+`)
+	writeFile(t, dir, ".tianxuan/skills/banner-design/SKILL.md", "---\nname: banner-design\ndescription: Banner design\nrunas: subagent\nallowed-tools: read_file, write_file\n---\nbody")
+
+	ctrl, err := Build(context.Background(), Options{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	defer ctrl.Close()
+
+	names := ctrl.ToolNames()
+	for _, want := range []string{"explore", "research", "review", "security_review", "banner_design", "ui_styling", "design_router", "run_skill", "task"} {
+		found := false
+		for _, n := range names {
+			if n == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("tool %q not visible in executor registry; got %v", want, names)
+		}
 	}
 }
 
@@ -293,5 +354,3 @@ func writeFile(t *testing.T, dir, name, body string) {
 		t.Fatal(err)
 	}
 }
-
-

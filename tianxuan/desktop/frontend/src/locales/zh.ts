@@ -154,6 +154,7 @@ export const zh: Record<DictKey, string> = {
   "composer.queueSend": "排队发送",
   "composer.queueTitle": "排队发送 ({n})",
   "composer.steer": "纠偏（立即注入当前任务）",
+  "composer.captureScreen": "截屏发给 AI",
   "composer.cancelQueued": "取消排队",
   "composer.modeExplore": "探索",
   "composer.modeDevelop": "开发",

@@ -152,6 +152,7 @@ export const zhTW: Record<DictKey, string> = {
   "composer.queueSend": "排隊發送",
   "composer.queueTitle": "排隊發送 ({n})",
   "composer.steer": "糾偏（立即注入當前任務）",
+  "composer.captureScreen": "截圖傳給 AI",
   "composer.cancelQueued": "取消排隊",
   "composer.modeExplore": "探索",
   "composer.modeDevelop": "開發",

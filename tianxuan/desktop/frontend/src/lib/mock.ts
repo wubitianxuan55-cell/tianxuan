@@ -317,6 +317,10 @@ export function makeMockApp(): AppBindings {
     async BrowserFetchText(url: string) {
       return `[mock] ${url}\n\nThis is the mock text-mode response for the browser panel. In the real app the kernel fetches the URL and returns cleaned readable text.`;
     },
+    async CaptureScreen() {
+      // 1x1 透明 PNG data URL，dev mock 下占位。
+      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    },
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;
       capServers.push({

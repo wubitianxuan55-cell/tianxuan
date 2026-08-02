@@ -105,6 +105,9 @@ export interface AppBindings {
   // BrowserFetchText powers the browser panel's text mode: fetch a URL and
   // return cleaned readable text (kernel web_fetch, SSRF-guarded).
   BrowserFetchText(url: string): Promise<string>;
+  // CaptureScreen captures the primary screen as a PNG data URL (Codex Appshots
+  // distillation); the frontend feeds it through SavePastedImage as an attachment.
+  CaptureScreen(): Promise<string>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

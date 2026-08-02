@@ -153,6 +153,7 @@ export const en = {
   "composer.queueSend": "Queue send",
   "composer.queueTitle": "Queue send ({n})",
   "composer.steer": "Steer (inject into current task now)",
+  "composer.captureScreen": "Capture screen for AI",
   "composer.cancelQueued": "Remove from queue",
   "composer.modeExplore": "Explore",
   "composer.modeDevelop": "Develop",

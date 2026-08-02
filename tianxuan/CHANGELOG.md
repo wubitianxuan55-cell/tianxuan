@@ -38,6 +38,9 @@
 - **右侧面板折叠**：面板 tab 行右侧折叠按钮；打开浏览器视图自动折叠面板
   让位、关闭时恢复原状态（浏览器内手动展开不被自动折叠打断）；面板折叠
   时顶栏显示展开按钮
+- **Appshots 蒸馏（截屏发给 AI）**：Composer 新增截屏按钮，GDI 截取主屏幕
+  生成 PNG dataURL，复用粘贴图片附件管线（@path 引用）发送给 agent——
+  Codex Appshots 的 Windows 版，UI/布局评审场景一键分享当前屏幕
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
@@ -48,7 +51,8 @@
 
 #### 测试（TDD RED→GREEN）
 - Go：`TestBrowserFetchTextRequiresURL` / `RejectsNonHTTP` / `Network`
-  （真实抓取 example.com）
+  （真实抓取 example.com）+ `TestPNGDataURL`（dataURL 前缀/PNG 可解码/
+  尺寸一致）
 - 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
   URL 规范化）+ `browserTabs.test.ts` 10 例（新建/切换/关闭邻居激活/
   不可变更新/标题/徽标首字母）+ `browserPerm.test.ts` 5 例（域名解析/

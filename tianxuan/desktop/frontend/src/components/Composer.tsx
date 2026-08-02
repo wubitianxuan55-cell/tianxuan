@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X, Zap } from "lucide-react";
+import { ArrowUp, Camera, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X, Zap } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
@@ -213,6 +213,21 @@ export function Composer({
         const previewUrl = await app.AttachmentDataURL(path);
         setAttachments((prev) => [...prev, { path, previewUrl }]);
       } catch {} finally { setPendingPaste((n) => Math.max(0, n - 1)); }
+    }
+  };
+
+  // Appshots 蒸馏：一键截屏当前屏幕，走与粘贴图片相同的附件管线（@path 引用发送）。
+  const captureScreen = async () => {
+    setPendingPaste((n) => n + 1);
+    try {
+      const dataUrl = await app.CaptureScreen();
+      const path = await app.SavePastedImage(dataUrl);
+      const previewUrl = await app.AttachmentDataURL(path);
+      setAttachments((prev) => [...prev, { path, previewUrl }]);
+    } catch {
+      // 截图失败（如无桌面会话）保持静默，与粘贴失败行为一致。
+    } finally {
+      setPendingPaste((n) => Math.max(0, n - 1));
     }
   };
 
@@ -480,6 +495,14 @@ export function Composer({
             placeholder={placeholderText}
             rows={1} disabled={disabled}
           />
+          <button
+            className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-150 bg-bg-elev-2 text-fg-dim hover:bg-accent hover:text-accent-fg active:scale-95 focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none"
+            onClick={() => void captureScreen()}
+            disabled={disabled}
+            title={t("composer.captureScreen") ?? "截屏发给 AI"}
+          >
+            <Camera size={14} />
+          </button>
           {running && (
             <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-0 rounded-md cursor-pointer shrink-0 transition-all duration-150 bg-bg-elev-2 text-err hover:bg-err hover:text-white active:scale-95 focus-visible:ring-1 focus-visible:ring-err/40 focus-visible:outline-none" onClick={handleCancel} title={t("composer.stop")}>
               <Square size={14} fill="currentColor" />

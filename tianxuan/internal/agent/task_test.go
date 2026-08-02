@@ -2,13 +2,81 @@ package agent
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"tianxuan/internal/event"
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"
 )
+
+// loopingProvider keeps requesting a tool call so an uncapped sub-agent never
+// finishes — the regression fixture for the default max_steps cap.
+type loopingProvider struct {
+	name  string
+	calls int32
+}
+
+func (l *loopingProvider) Name() string { return l.name }
+
+func (l *loopingProvider) Stream(_ context.Context, _ provider.Request) (<-chan provider.Chunk, error) {
+	n := atomic.AddInt32(&l.calls, 1)
+	ch := make(chan provider.Chunk, 1)
+	if n <= 40 {
+		ch <- provider.Chunk{Type: provider.ChunkToolCall, ToolCall: &provider.ToolCall{
+			ID: fmt.Sprintf("call-%d", n), Name: "bash", Arguments: `{"command":"echo hi"}`,
+		}}
+	} else {
+		ch <- provider.Chunk{Type: provider.ChunkText, Text: "finally done"}
+	}
+	close(ch)
+	return ch, nil
+}
+
+// TestTaskDefaultMaxStepsCapsRunawayLoop verifies a sub-agent that keeps
+// requesting tools is capped at DefaultSubagentMaxSteps instead of running
+// forever: an unlimited sub-agent (V10.53: 0 = unlimited) blocks the parent
+// task tool indefinitely.
+func TestTaskDefaultMaxStepsCapsRunawayLoop(t *testing.T) {
+	sub := &loopingProvider{name: "loop"}
+	parentReg := tool.NewRegistry()
+	parentReg.Add(fakeTool{name: "bash", readOnly: false})
+	task := NewTaskTool(sub, nil, parentReg, 20, 0, 0.0, "", "sys", nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err := task.Execute(ctx, []byte(`{"prompt":"keep looping"}`))
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("sub-agent hung until the test timeout instead of hitting the default cap")
+	}
+	if got := atomic.LoadInt32(&sub.calls); got > DefaultSubagentMaxSteps+2 {
+		t.Errorf("sub-agent ran %d rounds, want capped near %d", got, DefaultSubagentMaxSteps)
+	}
+}
+
+// TestParallelTasksDefaultMaxStepsCapsLoop mirrors the task cap for the
+// parallel_tasks tool: each sub-task gets the same default step ceiling on top
+// of its 120s timeout, so a looping sub-task cannot spin until the deadline.
+func TestParallelTasksDefaultMaxStepsCapsLoop(t *testing.T) {
+	sub := &loopingProvider{name: "loop"}
+	parentReg := tool.NewRegistry()
+	parentReg.Add(fakeTool{name: "bash", readOnly: false})
+	pt := NewParallelTasksTool(sub, nil, parentReg, 0, 0, 0.0, "", "sys", nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err := pt.Execute(ctx, []byte(`{"tasks":[{"prompt":"loop"}]}`))
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("parallel sub-task hung until the test timeout instead of hitting the default cap")
+	}
+	if got := atomic.LoadInt32(&sub.calls); got > DefaultSubagentMaxSteps+2 {
+		t.Errorf("parallel sub-task ran %d rounds, want capped near %d", got, DefaultSubagentMaxSteps)
+	}
+}
 
 // TestTaskToolReturnsSubAgentFinalAnswer runs a task against a mock provider
 // that emits a single text turn, and verifies the tool returns exactly that

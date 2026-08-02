@@ -147,6 +147,10 @@ func (t *ParallelTasksTool) Execute(ctx context.Context, args json.RawMessage) (
 
 			// V10.53: 子代理步数默认不限（0 = unlimited），仅当调用方显式指定 max_steps 时才设限。
 
+			if maxSteps <= 0 {
+				// 与 TaskTool 一致：0 = 默认上限，120s 超时之上再加步数兜底。
+				maxSteps = DefaultSubagentMaxSteps
+			}
 			subReg := FilterRegistry(t.parentReg, tools, SubagentMetaTools()...)
 			sysPrompt := t.sysPrompt
 			if t.compiler != nil {

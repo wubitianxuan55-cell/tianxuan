@@ -268,6 +268,9 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			if steps /= 2; steps < 5 {
 				steps = 5
 			}
+		} else {
+			// 与 TaskTool 一致：0 = 默认上限，防止子代理技能无限循环堵塞主代理。
+			steps = agent.DefaultSubagentMaxSteps
 		}
 		// V5.25: 构建与父代理一致的 [L1][L2] 双 system 消息结构。
 		// L1 来自 Fork 后的 compiler，L2 通过 opts.RuntimePrompt 注入。
@@ -514,6 +517,8 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 					if steps /= 2; steps < 5 {
 						steps = 5
 					}
+				} else {
+					steps = agent.DefaultSubagentMaxSteps
 				}
 				childCompiler := compiler.Fork()
 				sysPrompt := childCompiler.SystemPrompt()

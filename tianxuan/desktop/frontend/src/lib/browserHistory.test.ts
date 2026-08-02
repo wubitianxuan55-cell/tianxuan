@@ -7,6 +7,8 @@ import {
   goForward,
   normalizeUrl,
   pushHistory,
+  resolveAddress,
+  searchUrl,
 } from "./browserHistory";
 
 describe("browserHistory", () => {
@@ -81,5 +83,40 @@ describe("normalizeUrl", () => {
   it("returns empty for blank input", () => {
     expect(normalizeUrl("")).toBe("");
     expect(normalizeUrl("   ")).toBe("");
+  });
+});
+
+describe("searchUrl", () => {
+  it("encodes the query into the search engine URL", () => {
+    expect(searchUrl("hello world")).toBe("https://www.bing.com/search?q=hello%20world");
+    expect(searchUrl("golang 并发")).toBe("https://www.bing.com/search?q=golang%20%E5%B9%B6%E5%8F%91");
+  });
+
+  it("returns empty for blank input", () => {
+    expect(searchUrl("   ")).toBe("");
+  });
+});
+
+describe("resolveAddress", () => {
+  it("keeps full URLs and protocol-relative URLs", () => {
+    expect(resolveAddress("https://example.com/a?q=1")).toBe("https://example.com/a?q=1");
+    expect(resolveAddress("http://localhost:3000/x")).toBe("http://localhost:3000/x");
+    expect(resolveAddress("//example.com")).toBe("https://example.com");
+  });
+
+  it("resolves bare domains, paths, localhost and IPs to https URLs", () => {
+    expect(resolveAddress("example.com")).toBe("https://example.com");
+    expect(resolveAddress("docs.example.com/page")).toBe("https://docs.example.com/page");
+    expect(resolveAddress("localhost:3000")).toBe("https://localhost:3000");
+    expect(resolveAddress("192.168.1.10:8080")).toBe("https://192.168.1.10:8080");
+  });
+
+  it("falls back to a search for anything else", () => {
+    expect(resolveAddress("hello world")).toBe("https://www.bing.com/search?q=hello%20world");
+    expect(resolveAddress("openai")).toBe("https://www.bing.com/search?q=openai");
+  });
+
+  it("returns empty for blank input", () => {
+    expect(resolveAddress("   ")).toBe("");
   });
 });

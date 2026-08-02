@@ -538,6 +538,8 @@ export const zh: Record<DictKey, string> = {
   "browser.openBrowser": "浏览器 (Ctrl+Shift+B)",
   "browser.openExternal": "在外部浏览器打开",
   "browser.sendSelection": "发送给 AI 分析",
+  "browser.analyzePage": "AI 分析此页",
+  "browser.slowHint": "加载较慢——可切换文本模式或在外部浏览器打开",
   "browser.recent": "最近访问",
   "browser.shortcutNewTab": "新标签",
   "browser.shortcutClose": "关闭",

@@ -49,3 +49,23 @@ export function normalizeUrl(input: string): string {
   if (raw.startsWith("//")) return "https:" + raw;
   return "https://" + raw;
 }
+
+// searchUrl 把查询词编码进默认搜索引擎地址（地址栏兜底）。
+export function searchUrl(input: string, engine = "https://www.bing.com/search?q="): string {
+  const q = input.trim();
+  if (q === "") return "";
+  return engine + encodeURIComponent(q);
+}
+
+// resolveAddress 是地址栏智能解析：完整 URL 直接打开；裸域名/localhost/IP/
+// 带路径的域名补 https:// 打开；其余（含空格、单单词等）走搜索引擎查询。
+export function resolveAddress(input: string): string {
+  const raw = input.trim();
+  if (raw === "") return "";
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw) || raw.startsWith("//")) return normalizeUrl(raw);
+  const bareDomain = /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#].*)?$/.test(raw);
+  const localhost = /^localhost(:\d+)?([/?#].*)?$/i.test(raw);
+  const ipv4 = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?([/?#].*)?$/.test(raw);
+  if (bareDomain || localhost || ipv4) return normalizeUrl(raw);
+  return searchUrl(raw);
+}

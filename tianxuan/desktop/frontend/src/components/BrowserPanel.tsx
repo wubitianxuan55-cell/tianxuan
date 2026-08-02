@@ -24,8 +24,8 @@ import {
   canGoForward,
   goBack,
   goForward,
-  normalizeUrl,
   pushHistory,
+  resolveAddress,
 } from "../lib/browserHistory";
 import {
   addTab,
@@ -65,6 +65,7 @@ export function BrowserPanel({
   const [activeId, setActiveId] = useState<string>("");
   const [selection, setSelection] = useState("");
   const [recent, setRecent] = useState<RecentVisit[]>(() => (storage ? getRecent(storage) : []));
+  const [slowLoad, setSlowLoad] = useState(false);
   const addressRef = useRef<HTMLInputElement>(null);
   const currentId = activeId !== "" ? activeId : tabs[0]?.id ?? "";
   const active = tabs.find((tab) => tab.id === currentId) ?? tabs[0];
@@ -76,6 +77,17 @@ export function BrowserPanel({
   useEffect(() => {
     if (current && storage) setRecent(recordVisit(storage, current));
   }, [current, storage]);
+
+  // 页面模式加载超过 8 秒未完成时给出提示（可切文本模式或外部打开）。
+  useEffect(() => {
+    const loading = active?.mode === "page" && active.iframeLoading && current !== "";
+    if (!loading) {
+      setSlowLoad(false);
+      return;
+    }
+    const id = setTimeout(() => setSlowLoad(true), 8000);
+    return () => clearTimeout(id);
+  }, [active?.mode, active?.iframeLoading, current]);
 
   // 提交一次真实导航（纯函数）：入栈历史、清空待确认域名与文本缓存、触发展示加载。
   const commitNavigate = useCallback((tab: BrowserTab, url: string): BrowserTab => ({
@@ -90,7 +102,7 @@ export function BrowserPanel({
 
   // 导航入口：先过权限确认（首次访问域名），通过才真正加载。
   const navigate = useCallback((raw: string, targetId = currentId) => {
-    const url = normalizeUrl(raw);
+    const url = resolveAddress(raw);
     if (!url) return;
     const host = hostOf(url);
     if (!host) return;
@@ -217,6 +229,11 @@ export function BrowserPanel({
     onSendText(selection + (current ? `\n\n(来源: ${current})` : ""));
     setSelection("");
   }, [selection, onSendText, current]);
+
+  const analyzePage = useCallback(() => {
+    if (!active || !onSendText || !active.textContent) return;
+    onSendText(active.textContent + (current ? `\n\n(来源: ${current})` : ""));
+  }, [active, current, onSendText]);
 
   const empty = !active || current === "";
 
@@ -444,15 +461,33 @@ export function BrowserPanel({
           </pre>
         )}
 
-        {active?.mode === "text" && selection !== "" && onSendText && (
-          <button
-            className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border-0 bg-accent text-accent-fg text-[11px] cursor-pointer shadow-[var(--ds-shadow-dropdown)] transition-all duration-150 hover:brightness-110 active:scale-95"
-            onClick={sendSelection}
-            title={t("browser.sendSelection") ?? "发送给 AI 分析"}
-          >
-            <Send size={11} />
-            {t("browser.sendSelection") ?? "发送给 AI 分析"}
-          </button>
+        {active?.mode === "text" && onSendText && (
+          selection !== "" ? (
+            <button
+              className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border-0 bg-accent text-accent-fg text-[11px] cursor-pointer shadow-[var(--ds-shadow-dropdown)] transition-all duration-150 hover:brightness-110 active:scale-95"
+              onClick={sendSelection}
+              title={t("browser.sendSelection") ?? "发送给 AI 分析"}
+            >
+              <Send size={11} />
+              {t("browser.sendSelection") ?? "发送给 AI 分析"}
+            </button>
+          ) : active.textContent ? (
+            <button
+              className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border-0 bg-accent text-accent-fg text-[11px] cursor-pointer shadow-[var(--ds-shadow-dropdown)] transition-all duration-150 hover:brightness-110 active:scale-95"
+              onClick={analyzePage}
+              title={t("browser.analyzePage") ?? "AI 分析此页"}
+            >
+              <Send size={11} />
+              {t("browser.analyzePage") ?? "AI 分析此页"}
+            </button>
+          ) : null
+        )}
+
+        {slowLoad && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-soft bg-bg-elev text-fg-dim text-[10.5px] shadow-[var(--ds-shadow-dropdown)] whitespace-nowrap">
+            <Loader2 size={11} className="animate-spin text-accent" />
+            <span>{t("browser.slowHint") ?? "加载较慢——可切换文本模式或在外部浏览器打开"}</span>
+          </div>
         )}
 
         {active?.mode === "page" && active.iframeLoading && !active.pendingHost && (

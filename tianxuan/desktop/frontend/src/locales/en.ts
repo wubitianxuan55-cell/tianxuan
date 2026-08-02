@@ -539,6 +539,8 @@ export const en = {
   "browser.openBrowser": "Browser (Ctrl+Shift+B)",
   "browser.openExternal": "Open in external browser",
   "browser.sendSelection": "Send to AI",
+  "browser.analyzePage": "Analyze page with AI",
+  "browser.slowHint": "Loading slowly - switch to text mode or open externally",
   "browser.recent": "Recent",
   "browser.shortcutNewTab": "New tab",
   "browser.shortcutClose": "Close",

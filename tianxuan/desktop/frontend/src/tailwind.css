@@ -65,7 +65,7 @@
   /* ── scrollbar ── */
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: var(--border);
-  --color-scrollbar-thumb-hover: #444956;
+  --color-scrollbar-thumb-hover: #4B6478;
 
   /* ── fonts ── */
   --font-mono: var(--mono);
@@ -269,8 +269,8 @@
 }
 
 @keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--pulse-color, 229, 192, 123), 0.4); }
-  50%      { box-shadow: 0 0 0 3px rgba(var(--pulse-color, 229, 192, 123), 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--pulse-color, 34, 211, 238), 0.4); }
+  50%      { box-shadow: 0 0 0 3px rgba(var(--pulse-color, 34, 211, 238), 0); }
 }
 
 /* reasoning shimmer */

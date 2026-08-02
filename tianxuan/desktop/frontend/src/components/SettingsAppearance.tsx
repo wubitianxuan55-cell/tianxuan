@@ -6,7 +6,7 @@ import { app } from "../lib/bridge";
 import { applyColorScheme, applyThemeMode, getColorScheme, getThemeMode, type ColorScheme, type ThemeMode } from "../lib/theme";
 
 const SCHEME_META: Record<ColorScheme, { accent: string; bg: string; keyword: string; str: string; num: string; info: string; label: string }> = {
-  default: { accent: "#22C55E", bg: "#020617", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#38BDF8", label: "默认" },
+  default: { accent: "#22D3EE", bg: "#05070E", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#22D3EE", label: "默认" },
   warm:    { accent: "#F59E0B", bg: "#1E1814", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#2DD4BF", label: "暖色" },
   ice:     { accent: "#38BDF8", bg: "#050510", keyword: "#A78BFA", str: "#22C55E", num: "#FB923C", info: "#38BDF8", label: "冰蓝" },
   forest:  { accent: "#4ADE80", bg: "#0A120C", keyword: "#C084FC", str: "#4ADE80", num: "#FB923C", info: "#2DD4BF", label: "森林" },

@@ -1,5 +1,30 @@
 ## [10.148.0] — 2026-08-02
 
+### 🚀 UI 升级：默认主题改为未来科幻风（深空黑 + 电光青）
+
+> 使用 taste-skill + ui-ux-pro-max 双技能完成设计（Design Read：dark-tech
+> developer tool for technical users, sci-fi HUD language）。市场调研同类
+> AI 编程工具（Cursor/Devin/Windsurf 系）确认：深色控制台 + 单一冷色强调 +
+> 克制光效是当前主流方向，避免 AI 默认的紫色渐变 slop。
+
+#### 配色（styles.css default scheme 升级，明暗双态）
+- 暗色：深空黑蓝基底（#05070E → #171D2E 层级），强调色绿 → 电光青 #22D3EE，
+  边框/文本冷调化，语法高亮保持可读（紫色仅限代码关键字）
+- 浅色：冷白基底 + 青色强调 #0891B2（cyan-700，WCAG AA 达标）
+- 语义色保持：ok 绿 / warn 琥珀 / err 红 与强调色分离
+
+#### 质感细节（克制、单一强调色）
+- 顶栏：accent 细发光底线（HUD 分隔感，跟随各主题 accent）
+- 状态脉冲默认色：暖金 → 电光青（--pulse-color 默认值）
+- 滚动条 hover：冷灰青
+- 设置页主题预览卡同步新色值
+
+#### 验证
+- `tsc --noEmit` 0 错误；vitest 83/83；`vite build` EXIT 0
+- 无 backdrop-filter（遵守多平台性能约束）；无 web 字体引入；无 em-dash
+
+### 🎨 蒸馏 taste-skill 为前端审美子代理技能
+
 ### 🎨 蒸馏 taste-skill 为前端审美子代理技能
 
 > 用户要求将 Leonxlnx/taste-skill（MIT）蒸馏进 tianxuan。该技能是 Claude 生态

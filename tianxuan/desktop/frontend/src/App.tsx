@@ -392,7 +392,7 @@ onOpenSettings={() => setSettingsOpen(true)}
         />
 
         <section className="chat-pane">
-          <header className="flex flex-shrink-0 items-center gap-3 px-4 border-b border-border-soft select-none drag-region transition-all duration-200" style={{background: "var(--ds-gradient-topbar)", boxShadow: "var(--ds-shadow-topbar)"}}>
+          <header className="flex flex-shrink-0 items-center gap-3 px-4 border-b border-accent/15 select-none drag-region transition-all duration-200" style={{background: "var(--ds-gradient-topbar)", boxShadow: "var(--ds-shadow-topbar), inset 0 -1px 0 color-mix(in srgb, var(--accent) 12%, transparent)"}}>
             <div className="flex items-center gap-2 min-w-0">
               <ModelSwitcher label={state.meta?.label ?? t("status.connecting")} onPick={switchModel} />
             </div>

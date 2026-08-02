@@ -36,7 +36,6 @@ import type {
   UpdateProgress,
   WireEvent,
   WorkspaceView,
-  WorktreeView,
   HookConfigView,
   HooksSettingsView,
   PluginEntryView,
@@ -111,11 +110,6 @@ export interface AppBindings {
   CaptureScreen(): Promise<string>;
   // Notify shows a Windows toast notification (task-done / approval-needed alerts).
   Notify(title: string, body: string): Promise<void>;
-  // Worktree management (Codex local-environment worktree isolation): list,
-  // create (git worktree add -b), and remove (--force, optional branch delete).
-  Worktrees(): Promise<WorktreeView[]>;
-  AddWorktree(path: string, branch: string, base: string): Promise<void>;
-  RemoveWorktree(path: string, branch: string): Promise<void>;
   // OpenBrowserWindow opens the URL in a dedicated WebView2 browser window with
   // its own profile (cookies/login isolated from the app), unlike the iframe
   // panel which shares the app session.

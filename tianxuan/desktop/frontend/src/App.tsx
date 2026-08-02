@@ -34,7 +34,6 @@ import { StatsPanel, useStatsPersistence } from "./components/StatsPanel";
 import { Skeleton } from "./components/Skeleton";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WorkspacePanel } from "./components/WorkspacePanel";
-import { WorktreesPanel } from "./components/WorktreesPanel";
 import { downloadMarkdown, exportAsMarkdown } from "./lib/export";
 import { app } from "./lib/bridge";
 import type { SessionMeta } from "./lib/types";
@@ -142,7 +141,7 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
 const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "worktrees" | "stats">("stats");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
   const [browserOpen, setBrowserOpen] = useState(false);
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [editDraft, setEditDraft] = useState<{ text: string; id: number } | null>(null);
@@ -579,13 +578,6 @@ onOpenSettings={() => setSettingsOpen(true)}
               <span>技能</span>
             </button>
             <button
-              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "worktrees" ? "text-accent border-accent" : ""}`}
-              onClick={() => setRightTab("worktrees")}
-            >
-              <GitBranch size={13} />
-              <span>工作树</span>
-            </button>
-            <button
               className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("stats")}
             >
@@ -614,8 +606,6 @@ onOpenSettings={() => setSettingsOpen(true)}
               <RuntimePanel counts={toolCounts} />
             ) : rightTab === "skills" ? (
               <SkillsPanel counts={skillCounts} />
-            ) : rightTab === "worktrees" ? (
-              <WorktreesPanel onActivate={switchFolder} />
             ) : null}
             {rightTab === "stats" && (
               <StatsPanel

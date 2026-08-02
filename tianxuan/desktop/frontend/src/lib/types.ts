@@ -138,12 +138,6 @@ export interface WorkspaceView {
   current: boolean;
 }
 
-export interface WorktreeView {
-  path: string;
-  branch: string; // 当前分支名；detached 时为空
-  detached: boolean;
-  current: boolean; // agent 当前所在 worktree
-}
 
 export interface ContextInfo {
   used: number;

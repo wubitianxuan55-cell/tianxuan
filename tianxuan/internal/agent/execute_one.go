@@ -36,6 +36,20 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 	}
 
+	// V10.148: Auto Failure Guard — host-side failure escalation. Denied
+	// calls are blocked before any execution; the block message is fed back
+	// as the tool result so the model sees why and switches approach.
+	if a.failureGuard != nil {
+		if d := a.failureGuard.Check(call.Name, json.RawMessage(call.Arguments), !t.ReadOnly()); d != GuardAllow {
+			msg := autoGuardBlockMessage(d)
+			return toolOutcome{
+				output:  msg,
+				blocked: true,
+				errMsg:  msg,
+			}
+		}
+	}
+
 	// Plan-mode gate: refuse non-read-only tools while planning.
 	// Ported from DeepSeek-Reasonix planmode.Policy.
 	if a.planModeGate.Load() {
@@ -272,7 +286,14 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 		env := tool.WrapError(tool.CodeExecError, firstLine(err.Error()), map[string]any{"tool": call.Name, "detail": detail})
 		body, truncMsg := truncateToolOutput(env)
-		return toolOutcome{output: body, errMsg: firstLine(err.Error()), recoverable: recoverable, truncated: truncMsg != "", truncMsg: truncMsg}
+		return toolOutcome{
+			output:       body,
+			errMsg:       firstLine(err.Error()),
+			recoverable:  recoverable,
+			truncated:    truncMsg != "",
+			truncMsg:     truncMsg,
+			guardOutcome: a.guardObserve(call, !t.ReadOnly(), true),
+		}
 	}
 	// V10.13: 记录成功签名用于循环检测
 	a.recordRepeatSuccess(call, t)
@@ -320,7 +341,22 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	result = SmartCompress(call.Name, result)
 	env := tool.WrapResult(tool.CodeOK, map[string]any{"tool": call.Name, "result": result})
 	body, truncMsg := truncateToolOutput(env)
-	return toolOutcome{output: body, truncated: truncMsg != "", truncMsg: truncMsg}
+	return toolOutcome{
+		output:       body,
+		truncated:    truncMsg != "",
+		truncMsg:     truncMsg,
+		guardOutcome: a.guardObserve(call, !t.ReadOnly(), isErrorResult(body)),
+	}
+}
+
+// guardObserve records one executed tool call into the Auto Failure Guard.
+// Blocked calls never reach here (they return before execution), so only
+// genuine execution failures accumulate — matching Reasonix QualifyingFailure.
+func (a *AgentRunner) guardObserve(call provider.ToolCall, mutates, failed bool) GuardOutcome {
+	if a.failureGuard == nil {
+		return GuardNone
+	}
+	return a.failureGuard.Observe(call.Name, json.RawMessage(call.Arguments), mutates, failed)
 }
 
 // isBackgroundTaskCall reports whether a `task` call set run_in_background.

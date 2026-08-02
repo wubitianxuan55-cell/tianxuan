@@ -83,6 +83,13 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	if a.evidence != nil {
 		a.evidence.Reset()
 	}
+	// V10.148: reset Auto Failure Guard for this turn — escalation state is
+	// per-turn, so a fresh user turn starts with a fresh
+	// operation/episode budget instead of carrying a previous turn's stops.
+	if a.failureGuard != nil {
+		a.failureGuard.Reset()
+	}
+	a.lastGuardOutcomes = nil
 	a.sink.Emit(event.Event{Kind: event.TurnStarted})
 	// wrap user input with transient language preference blocks
 	// (Design adopted from DeepSeek-Reasonix-V1.12)
@@ -129,8 +136,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.repeatMu.Lock()
 	a.repeatSuccessCounts = nil // 每轮重置成功循环计数
 	a.repeatMu.Unlock()
-	a.toolFeedbackCount = 0     // V10.89: 每轮重置工具反馈计数
-	a.investigationNudgeCount = 0 // V10.139: 每轮重置调查膨胀引导计数
+	a.toolFeedbackCount = 0 // V10.89: 每轮重置工具反馈计数
 	// V10.101: 每轮重置 stop gate 计数器——这些门的「最多 3 次」是 per-turn
 	// 上限，不是整个会话累计（否则第二个用户 turn 后就全部永久失效）。
 	a.taskGateReentry = 0
@@ -499,22 +505,29 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 
 		// V10.89: 工具失败的结构化反馈 — 2+ errors 时注入归纳性消息，
 		// 帮助 LLM 理解失败模式（参考 Aider reflected_message）。
+		// V10.148: Auto Failure Guard — host-side failure escalation signals.
+		// Inject after all tool-result messages are appended so guidance lands
+		// in deterministic order at the end of this batch (parallel tool calls
+		// cannot inject directly without reordering session messages).
+		if a.lastGuardOutcomes != nil {
+			for i, call := range calls {
+				switch a.lastGuardOutcomes[i] {
+				case GuardOperationStopped:
+					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+						Text: "auto guard: operation stopped after repeated failures: " + call.Name})
+					a.session.Add(provider.Message{Role: provider.RoleUser, Content: autoGuardOperationStoppedMsg})
+				case GuardEpisodeStopped:
+					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
+						Text: "auto guard: turn mutation budget exhausted; mutations paused"})
+					a.session.Add(provider.Message{Role: provider.RoleUser, Content: autoGuardEpisodeStoppedMsg})
+				}
+			}
+			a.lastGuardOutcomes = nil
+		}
+
 		if a.maybeInjectToolFeedback(calls, results) {
 			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
 				Text: "部分工具执行失败，已注入错误分析反馈"})
-		}
-		// V10.136: Adaptive 宿主信号——当前 todo 步骤跨轮持续失败时注入
-		// "诊断根因→调整 todo→换方案"引导（与 maybeInjectToolFeedback 的
-		// 单轮多失败互补：本检测跨轮累计同一步骤的失败）。
-		if !a.plannerMode && a.maybeNudgeStuckTodoStep(calls, results) {
-			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-				Text: "当前 todo 步骤持续失败，已注入 Adaptive 换方案引导"})
-		}
-		// V10.139: 子代理并行优先——单轮纯调查膨胀时注入"改用 explore 子代理"
-		// 引导，避免调查中间信息永久堆积在主上下文。
-		if a.maybeNudgeInvestigation(calls) {
-			a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelInfo,
-				Text: "检测到大量调查调用，已注入子代理优先引导"})
 		}
 
 		// bg start-kill cycle — detect repeated background job start→kill

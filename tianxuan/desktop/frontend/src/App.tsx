@@ -44,11 +44,13 @@ import { useBridgeWatch } from "./hooks/useBridgeWatch";
 import { useToolStats } from "./hooks/useToolStats";
 import { useSidebar } from "./hooks/useSidebar";
 import { useWorkspacePanel } from "./hooks/useWorkspacePanel";
+import { useBrowserPanel } from "./hooks/useBrowserPanel";
 import { CHAT_MIN_WIDTH, WORKSPACE_PANEL_MIN_WIDTH,
   SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH,
   WORKSPACE_PANEL_DEFAULT_WIDTH, WORKSPACE_PANEL_MAX_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_DEFAULT_WIDTH,
   WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH,
+  BROWSER_PANEL_MIN_WIDTH, BROWSER_PANEL_MAX_WIDTH,
 } from "./hooks/useLayoutSizes";
 import type { SettingsTab } from "./components/SettingsShared";
 import CompactContext from "./hooks/useCompact";
@@ -166,6 +168,10 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
     startWorkspacePanelResize, resizeWorkspacePanelWithKeyboard,
     setSavedWorkspacePanelWidth,
   } = useWorkspacePanel(effectiveSidebarWidth, viewportWidth);
+  const {
+    effectiveBrowserPanelWidth, browserPanelResizing,
+    startBrowserPanelResize, resizeBrowserPanelWithKeyboard, resetBrowserPanelWidth,
+  } = useBrowserPanel(effectiveSidebarWidth, viewportWidth);
   // 浏览器视图打开时自动折叠右侧面板让位，关闭时恢复原面板状态；
   // 浏览器内手动展开面板不被自动折叠打断。
   const prevBrowserOpenRef = useRef(false);
@@ -376,9 +382,10 @@ if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(
     () =>
       ({
         "--sidebar-expanded-width": `${sidebarWidth}px`,
-        "--workspace-width": `${effectiveWorkspacePanelWidth}px`,
+        // 浏览器分栏打开时第三列让位给浏览器，宽度走浏览器自己的 state。
+        "--workspace-width": `${browserOpen ? effectiveBrowserPanelWidth : effectiveWorkspacePanelWidth}px`,
       }) as CSSProperties,
-    [effectiveWorkspacePanelWidth, sidebarWidth],
+    [browserOpen, effectiveBrowserPanelWidth, effectiveWorkspacePanelWidth, sidebarWidth],
   );
   const activePhase = useMemo(() => {
     for (let i = state.items.length - 1; i >= 0; i--) {
@@ -403,6 +410,7 @@ if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(
           sidebarResizing ? "layout--resizing layout--sidebar-resizing" : "",
           workspacePanelOpen ? "layout--workspace-open" : "",
           workspacePanelResizing ? "layout--resizing layout--workspace-resizing" : "",
+          browserPanelResizing ? "layout--resizing layout--workspace-resizing" : "",
           workspacePanelOpen && workspacePanelMaximized ? "layout--workspace-maximized" : "",
         ]
           .filter(Boolean)
@@ -526,9 +534,24 @@ onOpenSettings={() => setSettingsOpen(true)}
         </section>
 
         {/* 浏览器独立右分栏：对话与浏览器并存（可边聊边看），关闭即收起 */}
+        {browserOpen && (
+          <button
+            className="workspace-panel-resizer"
+            type="button"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("browser.resizePanel") ?? "调整浏览器宽度"}
+            aria-valuemin={BROWSER_PANEL_MIN_WIDTH}
+            aria-valuemax={BROWSER_PANEL_MAX_WIDTH}
+            aria-valuenow={effectiveBrowserPanelWidth}
+            onPointerDown={startBrowserPanelResize}
+            onKeyDown={resizeBrowserPanelWithKeyboard}
+            onDoubleClick={resetBrowserPanelWidth}
+            title={t("browser.resizePanel") ?? "调整浏览器宽度"}
+          />
+        )}
         <div
           className={browserOpen ? "flex flex-col min-w-0 shrink-0 border-l border-border-soft bg-bg" : "hidden"}
-          style={{ width: "clamp(360px, 38vw, 760px)" }}
         >
           <BrowserPanel onClose={() => setBrowserOpen(false)} onSendText={handleSend} visible={browserOpen} />
         </div>

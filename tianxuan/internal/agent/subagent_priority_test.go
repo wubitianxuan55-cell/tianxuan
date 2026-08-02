@@ -10,7 +10,7 @@ import (
 // 铺开批量 read_file/grep。
 func TestHephaestusSystemPrompt_SubagentPriority(t *testing.T) {
 	p := HephaestusSystemPrompt
-	for _, kw := range []string{"explore", "隔离上下文", "批量 read_file"} {
+	for _, kw := range []string{"explore", "isolated", "don't batch"} {
 		if !strings.Contains(p, kw) {
 			t.Errorf("HephaestusSystemPrompt missing subagent-priority keyword %q", kw)
 		}
@@ -19,7 +19,7 @@ func TestHephaestusSystemPrompt_SubagentPriority(t *testing.T) {
 
 func TestHermesPrompt_SubagentPriority(t *testing.T) {
 	p := HermesPrompt
-	for _, kw := range []string{"并行", "parallel", "explore", "子代理"} {
+	for _, kw := range []string{"parallel", "explore", "research"} {
 		if !strings.Contains(p, kw) {
 			t.Errorf("HermesPrompt missing subagent-priority keyword %q", kw)
 		}

@@ -258,6 +258,12 @@ func (e *httpStatusError) Error() string {
 	return fmt.Sprintf("%s: status %d: %s", e.name, e.code, e.body)
 }
 
+// HTTPStatus implements provider.HTTPStatusCoder so the failover chain can
+// classify transport failures by status code.
+func (e *httpStatusError) HTTPStatus() int {
+	return e.code
+}
+
 func normalizeReasoningProtocol(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "deepseek", "openai", "none":

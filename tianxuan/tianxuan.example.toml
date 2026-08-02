@@ -32,6 +32,9 @@ kind        = "openai"
 base_url    = "https://api.deepseek.com"
 models      = ["deepseek-v4-flash", "deepseek-v4-pro"]
 default     = "deepseek-v4-flash"   # optional; defaults to the first of `models`
+# fallbacks  = ["deepseek-v4-flash"]  # optional: model fallback chain (same key).
+#   Primary 限流/过载/断网时按序回退，turn-local（只当前回合生效，下回合回到主
+#   模型，保持前缀缓存稳定）。蒸馏自 OpenClaw model-failover。
 api_key_env = "DEEPSEEK_API_KEY"
 context_window = 1000000
 price       = { cache_hit = 0.02, input = 1, output = 2, currency = "¥" }   # per 1M tokens
@@ -74,7 +77,17 @@ thinking       = "adaptive"
 effort         = "high"
 
 [tools]
-enabled = []   # empty = all built-in tools
+enabled = []   # empty = all built-in tools. The shipped default is a compact
+                # core whitelist (18 tools) — see config.Default().
+# compact = true  # hides redundant tools (glob/delete_range/multi_edit/...)
+                  # from the model-visible schema; they stay callable. Decided
+                  # once at boot, never mid-session, so the request prefix is
+                  # cache-stable. Set false to expose the full toolset.
+
+# Foreground bash timeout in seconds (host-injected; the model cannot set it).
+# Omitted = 120s default; 0 = no tool-local cap (only cancellation stops the
+# command). Long-running servers/watchers should use run_in_background instead.
+# bash_timeout_seconds = 120
 
 # CodeGraph code intelligence (symbol/call-graph search via tree-sitter + SQLite),
 # a built-in MCP server giving the agent codegraph_* search / context / explore /

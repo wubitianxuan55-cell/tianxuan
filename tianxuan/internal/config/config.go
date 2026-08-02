@@ -393,12 +393,16 @@ func (a AgentConfig) SubagentEffortVal() string {
 // token budget; the harness compacts older history as a turn's prompt approaches
 // it (see agent compaction). 0 disables compaction for the instance.
 type ProviderEntry struct {
-	Name          string            `toml:"name"`
-	Kind          string            `toml:"kind"`
-	BaseURL       string            `toml:"base_url"`
-	Model         string            `toml:"model"`   // a single model (back-compat)
-	Models        []string          `toml:"models"`  // a vendor's model list (one base_url/key, many models)
-	Default       string            `toml:"default"` // default model when Models is set (else Models[0])
+	Name    string   `toml:"name"`
+	Kind    string   `toml:"kind"`
+	BaseURL string   `toml:"base_url"`
+	Model   string   `toml:"model"`   // a single model (back-compat)
+	Models  []string `toml:"models"`  // a vendor's model list (one base_url/key, many models)
+	Default string   `toml:"default"` // default model when Models is set (else Models[0])
+	// Fallbacks 是备用模型名（同一 provider/同一 key，不同 model）。主模型
+	// 限流/过载/断网时按序回退（turn-local：只当前回合生效，下回合回到主模型，
+	// 保持前缀缓存稳定）。蒸馏自 OpenClaw model-failover。
+	Fallbacks     []string          `toml:"fallbacks"`
 	APIKeyEnv     string            `toml:"api_key_env"`
 	BalanceURL    string            `toml:"balance_url"` // optional; a provider-specific wallet-balance endpoint (DeepSeek: https://api.deepseek.com/user/balance). Empty = no balance readout.
 	ContextWindow int               `toml:"context_window"`
@@ -497,6 +501,20 @@ type ToolsConfig struct {
 	MCPCallTimeoutSeconds *int   `toml:"mcp_call_timeout_seconds"`
 	Shell                 string `toml:"shell"`
 	SearchEngine          string `toml:"search_engine"`
+}
+
+// defaultBashTimeoutSeconds is the host-injected foreground bash timeout when
+// the config omits tools.bash_timeout_seconds (aligned with Reasonix).
+const defaultBashTimeoutSeconds = 120
+
+// BashTimeoutSeconds returns the foreground bash timeout in seconds. Omitted
+// or negative falls back to the 120s default; explicit 0 means no tool-local
+// cap (only parent-context cancellation stops the command).
+func (c *Config) BashTimeoutSeconds() int {
+	if c.Tools.BashTimeoutSeconds == nil || *c.Tools.BashTimeoutSeconds < 0 {
+		return defaultBashTimeoutSeconds
+	}
+	return *c.Tools.BashTimeoutSeconds
 }
 
 // PermissionsConfig declares the per-call permission policy (see
@@ -622,12 +640,12 @@ func Default() *Config {
 		// Compact 默认开启：隐藏冗余工具（V6.0 P8），把模型可见工具控制在
 		// 核心集合，降低 DeepSeek 的注意力稀释和 schema token 成本。
 		Tools: ToolsConfig{Compact: true, Enabled: []string{
-			"read_file", "write_file", "edit_file", "edit_lines", "move_file",
+			"read_file", "write_file", "edit_file", "edit_lines", "multi_edit",
 			"ls", "grep", "bash",
 			"web_fetch", "web_search",
 			"todo_write", "complete_step",
 			"memory_search",
-			"git_status", "git_diff", "git_commit", "git_log", "git_worktree",
+			"git_status", "git_diff", "git_commit", "git_log",
 		}},
 		Providers: []ProviderEntry{
 			// DeepSeek 自 V4 正式版起实行峰谷计价：北京时间每日 9:00-12:00、14:00-18:00

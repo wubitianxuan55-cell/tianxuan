@@ -23,7 +23,7 @@ type searchLargeOutput struct {
 }
 
 func (t *searchLargeOutput) Name() string        { return "search_large_output" }
-func (t *searchLargeOutput) Description() string { return "查询被卸载到磁盘的大型工具输出。支持 list(列出所有)/read(读取指定文件)/search(跨文件搜索)" }
+func (t *searchLargeOutput) Description() string { return "Query large tool outputs offloaded to disk. list shows all offloaded files; read returns one file’s content; search finds matching lines across files." }
 func (t *searchLargeOutput) ReadOnly() bool       { return true }
 func (t *searchLargeOutput) Kind() tool.ToolKind   { return tool.KindSearch }
 
@@ -33,16 +33,16 @@ func (t *searchLargeOutput) Schema() json.RawMessage {
   "properties": {
     "operation": {
       "type": "string",
-      "description": "操作类型",
+      "description": "Operation type",
       "enum": ["list", "read", "search"]
     },
     "name": {
       "type": "string",
-      "description": "文件名(read操作必需，从list结果中获取)"
+      "description": "File name (required for read; taken from the list result)"
     },
     "query": {
       "type": "string",
-      "description": "搜索关键词(search操作必需，大小写不敏感)"
+      "description": "Search keyword (required for search; case-insensitive)"
     }
   },
   "required": ["operation"]

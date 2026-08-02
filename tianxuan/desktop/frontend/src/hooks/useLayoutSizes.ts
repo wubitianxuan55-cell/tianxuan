@@ -17,6 +17,10 @@ export const WORKSPACE_FILE_TREE_PANEL_DEFAULT_WIDTH = 360;
 export const WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH = 320;
 export const WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH = 480;
 export const WORKSPACE_FILE_TREE_PANEL_MAX_RATIO = 0.32;
+export const BROWSER_PANEL_MIN_WIDTH = 360;
+export const BROWSER_PANEL_DEFAULT_WIDTH = 560;
+export const BROWSER_PANEL_MAX_WIDTH = 1080;
+export const BROWSER_PANEL_MAX_RATIO = 0.62;
 
 export function clampSidebarWidth(width: number): number {
   return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
@@ -48,6 +52,20 @@ export function clampWorkspaceFileTreePanelWidth(
     Math.min(WORKSPACE_FILE_TREE_PANEL_MAX_WIDTH, maxByRatio, maxByChat),
   );
   return Math.min(max, Math.max(WORKSPACE_FILE_TREE_PANEL_MIN_WIDTH, Math.round(width)));
+}
+
+export function clampBrowserPanelWidth(
+  width: number,
+  sidebarWidth = SIDEBAR_DEFAULT_WIDTH,
+  viewportWidth = 1440,
+): number {
+  const maxByRatio = Math.floor(viewportWidth * BROWSER_PANEL_MAX_RATIO);
+  const maxByChat = Math.floor(viewportWidth - sidebarWidth - CHAT_MIN_WIDTH);
+  const max = Math.max(
+    BROWSER_PANEL_MIN_WIDTH,
+    Math.min(BROWSER_PANEL_MAX_WIDTH, maxByRatio, maxByChat),
+  );
+  return Math.min(max, Math.max(BROWSER_PANEL_MIN_WIDTH, Math.round(width)));
 }
 
 export function loadSidebarCollapsed(): boolean {
@@ -94,4 +112,12 @@ export function loadWorkspaceFileTreePanelWidth(): number {
 
 export function saveWorkspaceFileTreePanelWidth(width: number): void {
   saveLayoutSize("workspaceFileTreePanelWidth", width);
+}
+
+export function loadBrowserPanelWidth(): number {
+  return loadLayoutSize("browserPanelWidth", BROWSER_PANEL_DEFAULT_WIDTH, clampBrowserPanelWidth);
+}
+
+export function saveBrowserPanelWidth(width: number): void {
+  saveLayoutSize("browserPanelWidth", width);
 }

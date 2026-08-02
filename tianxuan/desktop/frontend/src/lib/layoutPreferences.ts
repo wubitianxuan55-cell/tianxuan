@@ -2,6 +2,7 @@ export type LayoutSizeKey =
   | "sidebarWidth"
   | "workspacePanelWidth"
   | "workspaceFileTreePanelWidth"
+  | "browserPanelWidth"
   | "workspaceTreeWidth"
   | "composerHeight"
   | "drawerWidth"
@@ -17,6 +18,7 @@ const LEGACY_SIZE_KEYS: Record<LayoutSizeKey, string[]> = {
   sidebarWidth: ["tianxuan.sidebar.width"],
   workspacePanelWidth: ["tianxuan.workspacePanel.width"],
   workspaceFileTreePanelWidth: [],
+  browserPanelWidth: [],
   workspaceTreeWidth: ["tianxuan.workspaceTree.width"],
   composerHeight: ["tianxuan.composerHeight"],
   drawerWidth: ["tianxuan.drawer.width"],

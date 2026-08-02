@@ -8,16 +8,16 @@ import "encoding/json"
 // used by CompactDescriptor to slash per-turn prompt tokens by ~75%.
 var compactDesc = map[string]string{
 	"read_file":      "读取文件(可选行范围/分页)",
-	"edit_file":      "精确替换文件字符串(须全局唯一)",
+	"edit_file":      "精确替换字符串(replace_all可全部替换)",
 	"write_file":     "写入/覆盖文件(自动建父目录)",
 	"multi_edit":     "原子化批量编辑(单文件N步依次执行)",
 	"edit_lines":     "按行号替换文件连续行(起止行号定位)",
 	"delete_range":   "删除文件连续行(起止锚点定位)",
 	"delete_symbol":  "删除Go符号(函数/类型/接口等,AST解析)",
 	"glob":           "通配符匹配文件名(支持**递归)",
-	"grep":           "正则搜索文件内容(返回path:行:文本,支持sort_by=relevance)",
+	"grep":           "正则搜索文件内容(path:行:文本,支持glob过滤/context_lines)",
 	"ls":             "列目录条目(子目录带/)",
-	"bash":           "执行shell命令(5分超时,output_format=json得结构化输出)",
+	"bash":           "执行shell命令(宿主配置超时;timeout参数非法;长跑用run_in_background)",
 	"bash_output":    "读取后台任务增量输出",
 	"kill_shell":     "终止后台任务",
 	"wait":           "阻塞等待后台任务结束",
@@ -45,7 +45,7 @@ var compactSchema = map[string]json.RawMessage{
 	"read_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1},"line_numbers":{"type":"boolean"}},"required":["path"]}`),
 	"edit_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"}},"required":["path","old_string","new_string"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["path","old_string","new_string"]}`),
 	"write_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`),
 	"multi_edit": json.RawMessage(

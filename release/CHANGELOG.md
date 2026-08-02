@@ -1,4 +1,55 @@
+## V10.152.0 (2026-08-02) — 编程能力强化：向 Codex 工程效率看齐
+
+### 重构
+- 三套系统提示词按单/双模型分别精简：Solo 159→48 行、Hermes 417→90 行、Hephaestus 257→49 行，总固定开销 -79%
+- 回合循环减负：删 investigationNudge + todoStepStuckNudge；tool_feedback 仅硬模式（连续 3 轮全败才注入）
+- 工具面收敛：compact 默认生效（18 核心工具）；multi_edit 恢复可见；move_file/git_worktree 移出白名单
+- 计划仪式降级：单模型解除 complete_step 强制（finalReadinessCheck/taskGate 按模式分叉）
+- 测试先行规则确定化：改存量代码必须测试先行，修 bug 复现测试先行，新建豁免
+- bash 环境注入（项目 tools + 常见安装目录 PATH）+ cwd 引导；修 bug 实测 203s → 113s
+
+### 发布产物
+- `release/v10.152.0/tianxuan-desktop.exe` · 24,991,744 bytes (~23.8 MB)
+- SHA256: `8a3310ec2aa6e46d59b9fe5572dbef42613e6219e8261ff1baa6890c56ac830b`
+- 验证：`go test ./...` 全绿 · `go vet` 干净 · `wails build` EXIT 0
+
+---
+
 # Tianxuan 版本变更日志
+
+## V10.151.0 (2026-08-02) — 浏览器右侧分栏可拖拽调整宽度
+
+### 修复
+- 浏览器分栏宽度从写死 CSS 改为独立 state（useBrowserPanel），拖拽 resizer 调整
+- clamp：360 下限 / 1080 上限 / 62% 视口比例 / 对话区最小 200px 保护；宽度持久化
+- 键盘方向键/Home/End 调整、双击恢复默认；i18n 三语言补齐
+
+### 发布产物
+- `release/v10.151.0/tianxuan-desktop.exe` · 24,999,936 bytes (~23.8 MB)
+- SHA256: `1ac93074fb67e48d05326b59f0775573bc0b7c3039c77ed513167ad1e144ad53`
+- 验证：前端 135/135 · tsc 0 错误 · `wails build` EXIT 0
+
+---
+
+## V10.150.0 (2026-08-02) — 后端蒸馏（Auto Failure Guard + Model Failover）+ 桌面端发布
+
+### 🛡 宿主侧失败升级（Reasonix recovery 蒸馏）
+- 精确操作指纹（工具 + key 无序 JSON 参数 SHA-256）：同操作失败 3 次宿主停该操作，换参/换方案即新操作重新计数
+- 回合累计 6 次失败且无真实进展 → 宿主停变更/验证，只读诊断保持可用；成功变更清零回合预算
+- 只读失败不累计、blocked/权限拒绝不算失败（QualifyingFailure 语义）；纯宿主决策，不碰 L1-L4 前缀
+
+### 🧵 turn-local 模型回退链（OpenClaw model-failover 蒸馏）
+- 429/408/5xx/断网时按序切备用模型（同 key 不同 model），回退只当前回合生效，下回合回到 primary 保缓存
+- 整链纯过载时指数退避重试（MaxChainRetries）；全部耗尽返回 FallbackSummaryError 逐候选细节
+- 参数错误/auth（同 key）/取消/流中断不切候选；Chain 实现 provider.Provider 接口，agent 层零改动
+- 配置：`[[providers]] fallbacks = [...]`；无 fallback 零开销
+
+### 发布产物
+- `release/v10.150.0/tianxuan-desktop.exe` · 24,997,888 bytes (~23.8 MB)
+- SHA256: `c9e787b049a044a52c96b3b42a4d216a662ce29c1939267edfa50028e58b00e4`
+- 验证：`go test ./...` 全绿 · 前端 vitest 128/128 · `wails build` EXIT 0
+
+---
 
 ## V10.50.0 (2026-07-08) — Superpowers 蒸馏 + 双模型角色区分 + 完整准则体系
 

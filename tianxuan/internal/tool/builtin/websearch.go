@@ -42,15 +42,15 @@ type searchEngine interface {
 func (webSearch) Name() string { return "web_search" }
 
 func (webSearch) Description() string {
-	return "搜索公开网页（通过 SearXNG / Tavily / Brave Search）。返回结构化 JSON 数组，每项含 title/url/snippet/source 字段，支持引用追踪。当答案的正确性依赖于当前状态时使用——任何随时间变化的内容（事件、价格、发布版本、现实世界的状态）。先搜索再回答；常青问题不需要此工具。"
+	return "Search public web pages (SearXNG / Tavily / Brave Search) and return a structured JSON array with title/url/snippet/source per item, with citation tracking. Use when correctness depends on current state — anything that changes over time (events, prices, release versions, real-world state). Search first; evergreen questions don’t need this tool."
 }
 
 func (webSearch) Schema() json.RawMessage {
 	return json.RawMessage(`{
 "type":"object",
 "properties":{
-  "query":{"type":"string","description":"自然语言搜索词"},
-  "topK":{"type":"integer","description":"返回结果数（默认5，最多10）","minimum":1,"maximum":10}
+  "query":{"type":"string","description":"Natural-language search query"},
+  "topK":{"type":"integer","description":"Number of results (default 5, max 10)","minimum":1,"maximum":10}
 },
 "required":["query"]
 }`)

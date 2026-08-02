@@ -543,6 +543,7 @@ export const en = {
   "memory.archivedHint": "Removed from active memory, but kept for reference.",
 
   "browser.placeholder": "Enter a URL…",
+  "browser.resizePanel": "Resize browser panel",
   "browser.go": "Open",
   "browser.back": "Back",
   "browser.forward": "Forward",

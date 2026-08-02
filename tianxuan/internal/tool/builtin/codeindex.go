@@ -24,7 +24,7 @@ type codeIndex struct{ workDir string }
 func (codeIndex) Name() string { return "code_index" }
 
 func (codeIndex) Description() string {
-	return "轻量代码符号索引。outline 列出路径下所有符号；search 按名称/子串搜索符号定义。支持 Go AST 解析 + 多语言 regex 匹配。kind 可按 func/method/type/interface/struct/const/var 过滤。Prefer LSP tools (lsp_definition) for precise semantics."
+	return "Lightweight code symbol index. outline lists all symbols under path; search finds symbol definition candidates by name (Go AST + multi-language regex). kind filters by func/method/type/interface/struct/const/var. Prefer LSP tools (lsp_definition) for precise semantics."
 }
 
 func (codeIndex) Schema() json.RawMessage {

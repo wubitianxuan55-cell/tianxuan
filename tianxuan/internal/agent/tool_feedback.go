@@ -17,18 +17,15 @@ import (
 	"tianxuan/internal/tool"
 )
 
-// ToolFeedbackCap 连续工具反馈消息的最大注入轮数。
+// ToolFeedbackCap 全败连击注入 STOP 引导所需的最少轮数（V10.152：由
+// "最多注入 3 轮"语义改为"连续全败 3 轮才注入一次"——温和模式已删除，
+// 模型自己能读到 tool_result 的错误，只有全部失败且连续多轮时才需要
+// 宿主 STOP 引导；与 Auto Failure Guard 的回合级升级互补）。
 const ToolFeedbackCap = 3
 
-// toolFeedbackThreshold 触发反馈的最小失败工具数。
-const toolFeedbackThreshold = 2
-
-// maybeInjectToolFeedback 检查工具执行结果并在连续失败时注入结构化反馈。
-// 返回 true 表示注入了消息（调用方应发出 notice 事件）。
-//
-// 两层机制：
-//   - 温和模式（2+ 错误）: 注入分类错误分析 + 修正建议（参考 Aider reflected_message）
-//   - 强硬模式（全批次非 blocked 调用都失败 + 已连续 >=3 轮）: STOP and re-assess
+// maybeInjectToolFeedback 检查工具执行结果并在"全部调用连续失败"时注入
+// STOP 引导。返回 true 表示注入了消息（调用方应发出 notice 事件）。
+// 任何一轮包含成功即重置连击计数；全 blocked（权限门控）不累计。
 func (a *AgentRunner) maybeInjectToolFeedback(calls []provider.ToolCall, results []string) bool {
 	if a.plannerMode {
 		return false
@@ -42,32 +39,22 @@ func (a *AgentRunner) maybeInjectToolFeedback(calls []provider.ToolCall, results
 		return false
 	}
 
-	// Not enough failures → reset counter.
-	if errCount < toolFeedbackThreshold {
+	// Only a full-failure streak gets a host steer; any success resets it.
+	allFailed := errCount == len(results) && blockedCount < len(results)
+	if !allFailed {
 		a.toolFeedbackCount = 0
 		return false
 	}
 
 	a.toolFeedbackCount++
-	if a.toolFeedbackCount > ToolFeedbackCap {
+	if a.toolFeedbackCount < ToolFeedbackCap {
 		return false
 	}
+	a.toolFeedbackCount = 0 // 注入一次后重新累计，避免每轮重复打断
 
-	// All non-blocked calls failed → stuck, use firm steer at count 1 and 3.
-	allFailed := errCount == len(results) && blockedCount < len(results)
-
-	var msg string
-	if allFailed && a.toolFeedbackCount >= 3 {
-		msg = "[system] 你已连续多轮全部操作失败。停下来重新评估方案。\n" +
-			"先用 read_file/ls/glob 了解现状，或用 ask 工具向用户确认方向。\n" +
-			"不要继续当前做法。\n\n" + buildToolFeedbackMessage(errCount, len(results), details)
-	} else if allFailed && a.toolFeedbackCount == 1 {
-		msg = "[system] 本轮全部操作都失败了。尝试不同方法——先读取相关代码再动手，" +
-			"把任务拆成更小的步骤，或在不确定时用 ask 工具询问。\n\n" +
-			buildToolFeedbackMessage(errCount, len(results), details)
-	} else {
-		msg = buildToolFeedbackMessage(errCount, len(results), details)
-	}
+	msg := "[system] 你已经连续多轮全部操作失败。停下来重新评估方案。\n" +
+		"先用 read_file/ls/glob 了解现状，或用 ask 工具向用户确认方向。\n" +
+		"不要继续当前做法。\n\n" + buildToolFeedbackMessage(errCount, len(results), details)
 
 	a.session.Add(provider.Message{
 		Role:    provider.RoleUser,

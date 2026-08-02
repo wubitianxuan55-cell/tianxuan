@@ -290,17 +290,12 @@ func TestSoloSystemPrompt_ContainsEssentials(t *testing.T) {
 		"todo_write",
 		"complete_step",
 		"TDD",
-		"Design first",
 		"Surgical",
-		"Defensive",
-		"No placeholders",
-		// V10.89: SDD distillation
-		"Specs First",
-		"ADDED",
-		"MODIFIED",
-		"REMOVED",
-		"completeness",
-		"coherence",
+		"minimal",
+		"Verify",
+		"root cause",
+		"concise",
+		"run_skill",
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -402,6 +397,64 @@ func TestSoloPromptContainsTDD(t *testing.T) {
 	}
 	if !strings.Contains(SoloSystemPrompt, "complete_step") {
 		t.Fatal("SoloSystemPrompt must reference complete_step")
+	}
+}
+
+// TestSoloPromptTestFirstExistingCode locks the deterministic test-first rule
+// (V10.152): modifying existing code requires test-first, bug fixes require a
+// reproducing test, while new files and config/docs changes are exempt. The
+// rule must be scenario-based — DeepSeek systematically skips "when it fits"
+// discretion, but must not be forced into ceremony for green-field work.
+func TestSoloPromptTestFirstExistingCode(t *testing.T) {
+	p := SoloSystemPrompt
+	for _, kw := range []string{
+		"modify existing code",
+		"write or update the test",
+		"confirm it fails",
+		"reproducing test first",
+		"don't require test-first",
+	} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing test-first rule keyword %q", kw)
+		}
+	}
+}
+
+// TestHephaestusPromptTestFirstExistingCode locks the same deterministic rule
+// for the dual-model executor: it also modifies existing code and needs the
+// test-first guard, not free discretion.
+func TestHephaestusPromptTestFirstExistingCode(t *testing.T) {
+	p := HephaestusSystemPrompt
+	for _, kw := range []string{
+		"modify existing code",
+		"confirm it fails",
+		"reproducing test",
+	} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("HephaestusSystemPrompt missing test-first rule keyword %q", kw)
+		}
+	}
+}
+
+// TestSoloPromptWorkingDirectoryGuidance locks the cwd contract (V10.152):
+// the model must know that file/shell paths resolve against the project root
+// and must not prefix paths with the directory name — that mistake cost 3
+// probe rounds in the bug-fix benchmark.
+func TestSoloPromptWorkingDirectoryGuidance(t *testing.T) {
+	p := SoloSystemPrompt
+	for _, kw := range []string{"working directory (cwd)", "project root", "never prefix"} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("SoloSystemPrompt missing cwd-guidance keyword %q", kw)
+		}
+	}
+}
+
+func TestHephaestusPromptWorkingDirectoryGuidance(t *testing.T) {
+	p := HephaestusSystemPrompt
+	for _, kw := range []string{"working directory (cwd)", "project root", "never prefix"} {
+		if !strings.Contains(p, kw) {
+			t.Errorf("HephaestusSystemPrompt missing cwd-guidance keyword %q", kw)
+		}
 	}
 }
 

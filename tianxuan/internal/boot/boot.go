@@ -34,6 +34,7 @@ import (
 	"tianxuan/internal/permission"
 	"tianxuan/internal/plugin"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/provider/failover"
 	"tianxuan/internal/sandbox"
 	"tianxuan/internal/skill"
 	"tianxuan/internal/tool"
@@ -161,7 +162,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 			fmt.Fprintln(stderr, "warning: bash not found on PATH; the shell tool will run commands under Windows PowerShell. Install Git for Windows or WSL to use bash.")
 		})
 	}
-	addBuiltins(reg, cfg.Tools.Enabled, cfg.WriteRoots(), bashSpec, stderr)
+	addBuiltins(reg, cfg.Tools.Enabled, cfg.WriteRoots(), bashSpec, time.Duration(cfg.BashTimeoutSeconds())*time.Second, bashPathEnv(cwd), stderr)
 	builtin.ResolveRgPath() // V10.29: enable ripgrep delegation when rg is on PATH
 	// Always construct a host, even with no plugins configured, so the controller's
 	// host pointer is stable for the session and `/mcp add` can hot-add into it.
@@ -648,29 +649,72 @@ func subagentModelKeys(name string) []string {
 
 // NewProvider builds a provider.Provider from a configured entry. Exported so
 // custom assemblers (e.g. the ACP per-session factory) can reuse it without
-// going through the full Build.
+// going through the full Build. When the entry declares Fallbacks, the
+// returned provider is a turn-local failover chain (distilled from OpenClaw
+// model-failover): the primary model answers normally; on failover-worthy
+// errors (rate limit/overload/transport) the chain tries each fallback model,
+// and the next turn starts from the primary again to keep its prompt-cache
+// prefix stable.
 func NewProvider(e *config.ProviderEntry) (provider.Provider, error) {
-	return provider.New(e.Kind, provider.Config{
-		Name:    e.Name,
-		BaseURL: e.BaseURL,
-		Model:   e.Model,
-		APIKey:  e.APIKey(),
+	primary, err := buildProvider(e, e.Model)
+	if err != nil {
+		return nil, err
+	}
+	if len(e.Fallbacks) == 0 {
+		return primary, nil
+	}
+	var fallbacks []provider.Provider
+	for _, model := range e.Fallbacks {
+		if model == "" || model == e.Model {
+			continue
+		}
+		fb, err := buildProvider(e, model)
+		if err != nil {
+			return nil, fmt.Errorf("boot: fallback model %q: %w", model, err)
+		}
+		fallbacks = append(fallbacks, &namedProvider{Provider: fb, name: e.Name + "/" + model})
+	}
+	if len(fallbacks) == 0 {
+		return primary, nil
+	}
+	return failover.New(primary, fallbacks, failover.Options{}), nil
+}
+
+// buildProvider instantiates one model of a provider entry.
+func buildProvider(e *config.ProviderEntry, model string) (provider.Provider, error) {
+	entry := *e
+	return provider.New(entry.Kind, provider.Config{
+		Name:    entry.Name,
+		BaseURL: entry.BaseURL,
+		Model:   model,
+		APIKey:  entry.APIKey(),
 		// Pass the key's env var so auth failures can name where to fix it, plus
 		// provider-kind-specific knobs (the anthropic provider reads thinking/effort;
 		// the openai one ignores them).
 		Extra: map[string]any{
-			"api_key_env": e.APIKeyEnv,
-			"thinking":    e.Thinking,
-			"effort":      e.Effort,
+			"api_key_env": entry.APIKeyEnv,
+			"thinking":    entry.Thinking,
+			"effort":      entry.Effort,
 		},
 	})
 }
 
+// namedProvider overrides the display name of a wrapped provider so fallback
+// candidates surface as "instance/model" in switch notices and diagnostics.
+type namedProvider struct {
+	provider.Provider
+	name string
+}
+
+// Name returns the override label.
+func (p *namedProvider) Name() string { return p.name }
+
 // addBuiltins adds enabled built-in tools to reg. An empty list means all of
 // them. writeRoots confines the file-writing built-ins to the workspace: after
 // the (unconfined) defaults are added, each enabled writer is replaced by an
-// instance bound to writeRoots (preserving registry order).
-func addBuiltins(reg *tool.Registry, enabled, writeRoots []string, bashSpec sandbox.Spec, stderr io.Writer) {
+// instance bound to writeRoots (preserving registry order). bashTimeout is the
+// host-injected foreground cap (config tools.bash_timeout_seconds; 0 = no cap).
+func addBuiltins(reg *tool.Registry, enabled, writeRoots []string, bashSpec sandbox.Spec, bashTimeout time.Duration, bashEnv []string, stderr io.Writer) {
 	if len(enabled) == 0 {
 		for _, t := range tool.Builtins() {
 			reg.Add(t)
@@ -687,12 +731,48 @@ func addBuiltins(reg *tool.Registry, enabled, writeRoots []string, bashSpec sand
 	// Replace the unconfined defaults with confined instances (registry order is
 	// preserved on replace): file-writers bound to the workspace, bash to the OS
 	// sandbox. Only replace tools actually enabled/present.
-	confined := append(builtin.ConfineWriters(writeRoots), builtin.ConfineBash(bashSpec))
+	confined := append(builtin.ConfineWriters(writeRoots), builtin.ConfineBash(bashSpec,
+		builtin.WithBashTimeout(bashTimeout), builtin.WithBashEnv(bashEnv)))
 	for _, t := range confined {
 		if _, ok := reg.Get(t.Name()); ok {
 			reg.Add(t)
 		}
 	}
+}
+
+// bashPathEnv builds an augmented PATH for the bash tool: the project's
+// bundled tools (tools/go/bin, tools/node) plus common Windows install dirs
+// (Go, Node, Git). Without it the model wastes rounds probing for go/node
+// locations in every fresh session. Returns nil when nothing to inject (bash
+// then inherits the process environment unchanged).
+func bashPathEnv(cwd string) []string {
+	var dirs []string
+	add := func(p string) {
+		if p == "" {
+			return
+		}
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			dirs = append(dirs, p)
+		}
+	}
+	for _, rel := range []string{"tools/go/bin", "tools/node"} {
+		add(filepath.Join(cwd, rel))
+	}
+	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"} {
+		root := os.Getenv(env)
+		if root == "" {
+			continue
+		}
+		for _, rel := range []string{"Go/bin", "nodejs", "Git/cmd", "Git/usr/bin"} {
+			add(filepath.Join(root, rel))
+		}
+	}
+	if len(dirs) == 0 {
+		return nil
+	}
+	cur := os.Getenv("PATH")
+	merged := append(append([]string{}, dirs...), cur)
+	return []string{"PATH=" + strings.Join(merged, string(os.PathListSeparator))}
 }
 
 // PluginSpecs maps configured plugin entries to plugin.Spec, expanding ${VAR}
@@ -876,9 +956,6 @@ func applyCompactToolset(reg *tool.Registry) {
 	// File deletion: merge delete_range + delete_symbol into edit_file
 	// edit_file already supports delete via mode parameter
 	reg.HideUnlessOnly([]string{"delete_range", "delete_symbol"}, []string{"edit_file"})
-
-	// Batch editing: multi_edit is redundant with multiple edit_file calls
-	reg.HideUnlessOnly([]string{"multi_edit"}, []string{"edit_file"})
 
 	// Background job management: merge kill_shell + wait into bash/bgjobs
 	reg.HideUnlessOnly([]string{"kill_shell", "wait"}, []string{"bash", "bash_output"})

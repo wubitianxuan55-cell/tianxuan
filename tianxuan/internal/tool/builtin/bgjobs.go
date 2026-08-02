@@ -187,11 +187,22 @@ func (waitJob) CompactSchema() json.RawMessage   { return compactSchema["wait"] 
 func (waitJob) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
 		JobIDs         []string `json:"job_ids"`
+		JobID          string   `json:"job_id"` // legacy alias for a single id
 		TimeoutSeconds int      `json:"timeout_seconds"`
+		TimeoutMs      int      `json:"timeout_ms"` // legacy alias, converted to seconds
 	}
 	if len(args) > 0 {
 		if err := json.Unmarshal(args, &p); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
+		}
+	}
+	if len(p.JobIDs) == 0 && p.JobID != "" {
+		p.JobIDs = []string{p.JobID}
+	}
+	if p.TimeoutSeconds <= 0 && p.TimeoutMs > 0 {
+		p.TimeoutSeconds = p.TimeoutMs / 1000
+		if p.TimeoutSeconds < 1 {
+			p.TimeoutSeconds = 1
 		}
 	}
 	jm, ok := jobs.FromContext(ctx)

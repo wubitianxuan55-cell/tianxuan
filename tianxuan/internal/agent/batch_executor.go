@@ -148,6 +148,13 @@ drain:
 	// 的因果链，提前阻止注定失败的操作或注入一致性警告。
 	a.postBatchCoherenceCheck(calls, results)
 	a.applyStormBreaker(calls, outcomes, results)
+	// V10.148: collect Auto Failure Guard escalation signals in call order so
+	// the serial run loop injects guidance deterministically (parallel calls
+	// cannot inject into the session themselves without reordering messages).
+	a.lastGuardOutcomes = make([]GuardOutcome, len(calls))
+	for i := range calls {
+		a.lastGuardOutcomes[i] = outcomes[i].guardOutcome
+	}
 	return results
 }
 
@@ -341,6 +348,10 @@ type toolOutcome struct {
 	truncated   bool
 	truncMsg    string
 	tailCall    *provider.ToolCall // delegate to another tool; nil = no delegation
+	// guardOutcome carries the Auto Failure Guard escalation signal so the
+	// serial run loop can inject guidance messages in deterministic order
+	// after the whole batch finished (V10.148).
+	guardOutcome GuardOutcome
 }
 
 // executeOne runs a single tool call. It is pure with respect to the event sink

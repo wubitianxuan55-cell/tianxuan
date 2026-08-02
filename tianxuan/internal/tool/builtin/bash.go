@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -20,8 +21,6 @@ import (
 	"tianxuan/internal/tool"
 )
 
-const bashTimeout = 120 * time.Second
-
 func init() { tool.RegisterBuiltin(bash{}) }
 
 // bash runs a shell command with a timeout to avoid hangs. sb, when it enforces,
@@ -30,10 +29,19 @@ func init() { tool.RegisterBuiltin(bash{}) }
 // interpreter (real bash, or PowerShell on a Windows host without bash); the
 // zero value resolves lazily. workDir, when non-empty, is the directory the
 // command runs in (cmd.Dir); empty uses the process cwd.
+// timeout is the host-injected foreground cap (aligned with Reasonix): >0 caps
+// the foreground command; <=0 means no tool-local cap, only parent-context
+// cancellation kills the process tree. It is never read from model arguments —
+// the model cannot change the timeout, and unknown timeout fields are rejected.
 type bash struct {
 	sb      sandbox.Spec
 	shell   sandbox.Shell
 	workDir string
+	timeout time.Duration
+	// env, when non-empty, is injected into every executed command's
+	// environment (e.g. an augmented PATH). It replaces the inherited PATH
+	// rather than appending to it — see commandEnv.
+	env []string
 }
 
 func (bash) Name() string { return "bash" }
@@ -44,13 +52,17 @@ func (b bash) Description() string {
 			"NOTE: bash is not available on this host — commands run under Windows PowerShell, " +
 			"so write PowerShell syntax (e.g. $null not /dev/null; ';' or separate calls, not '&&'; " +
 			"Get-ChildItem/Select-String, not ls/grep). " +
-			"Commands time out after 2 minutes. For long-running servers/tunnels/watchers, " +
+			"The foreground timeout is set by the host (default 120s) and cannot be changed via arguments: " +
+			"timeout/timeout_seconds/description/cwd are NOT valid fields and will be rejected. " +
+			"For long-running servers/tunnels/watchers, " +
 			"you MUST use run_in_background=true — otherwise the process will be killed."
 	}
 	return "Execute a shell command with a 2-minute timeout. " +
 		"For long-running servers, tunnels, watchers, or daemons, you MUST use run_in_background=true " +
 		"to avoid blocking. If you forget, the command will be killed after 2 minutes. " +
-		"Set output_format=json for structured {ok, exit_code, duration_ms, stdout, stderr}."
+		"Set output_format=json for structured {ok, exit_code, duration_ms, stdout, stderr}. " +
+		"The foreground timeout is set by the host (default 120s) and cannot be changed via arguments: " +
+		"timeout/timeout_seconds/description/cwd are NOT valid fields and will be rejected."
 }
 
 // resolved returns the bound shell, resolving lazily for the zero-value instance
@@ -81,8 +93,8 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		RunInBackground bool   `json:"run_in_background"`
 		OutputFormat    string `json:"output_format"`
 	}
-	if err := json.Unmarshal(args, &p); err != nil {
-		return "", fmt.Errorf("invalid args: %w", err)
+	if err := decodeStrictArgs(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w (valid fields: command, run_in_background, output_format)", err)
 	}
 	if p.Command == "" {
 		return "", fmt.Errorf("command is required")
@@ -122,6 +134,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			cmd := exec.CommandContext(jobCtx, argv[0], argv[1:]...)
 			hideBashWindow(cmd) // Windows: 防止弹出 cmd 黑框
 			cmd.Dir = workDir
+			cmd.Env = b.commandEnv()
 			cmd.Stdout = out
 			cmd.Stderr = out
 			if err := cmd.Start(); err != nil {
@@ -162,12 +175,17 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	}
 
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, bashTimeout)
-	defer cancel()
+	timeout := b.foregroundTimeout()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	hideBashWindow(cmd) // Windows: 防止弹出 cmd 黑框
 	cmd.Dir = b.workDir // "" lets exec use the process working directory
+	cmd.Env = b.commandEnv()
 
 	// V10.5: json 模式下分离 stdout/stderr；plain 模式保持合并
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -221,7 +239,10 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	if ctx.Err() != nil {
 		// 超时/取消：Wait 已提前返回，但 copy goroutine 可能仍在写输出 buffer
 		// （服务进程持有管道写端）——不读取 buffer，避免数据竞争。
-		return "", fmt.Errorf("command timed out (> %s); process tree kill in progress", bashTimeout)
+		if timeout <= 0 {
+			return "", fmt.Errorf("command cancelled: %w", ctx.Err())
+		}
+		return "", fmt.Errorf("command timed out (> %s); process tree kill in progress", timeout)
 	}
 
 	// JSON output mode: return structured result with separated stdout/stderr.
@@ -277,6 +298,42 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		return out, fmt.Errorf("command exited: %w", err)
 	}
 	return out, nil
+}
+
+// foregroundTimeout returns the tool-local foreground cap; <=0 means no cap
+// (the parent context remains the only cancellation source).
+func (b bash) foregroundTimeout() time.Duration {
+	return b.timeout
+}
+
+// commandEnv returns the environment for executed commands. nil (the zero
+// value) means "inherit the process environment" — the cheapest common path.
+// When env is configured, the inherited PATH entry is dropped and replaced by
+// the configured one (exactly one PATH wins), so an augmented PATH never
+// duplicates or leaks the original.
+func (b bash) commandEnv() []string {
+	if len(b.env) == 0 {
+		return nil
+	}
+	base := os.Environ()
+	out := make([]string, 0, len(base)+len(b.env))
+	for _, kv := range base {
+		k, _, ok := strings.Cut(kv, "=")
+		if ok && strings.EqualFold(k, "PATH") {
+			continue // drop inherited PATH; the injected entry replaces it
+		}
+		out = append(out, kv)
+	}
+	return append(out, b.env...)
+}
+
+// decodeStrictArgs decodes tool arguments with DisallowUnknownFields so a
+// model-supplied schema-unknown field (timeout, description, cwd, ...) fails
+// loudly instead of being silently dropped.
+func decodeStrictArgs(args json.RawMessage, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(args))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
 }
 
 // hasUnquotedSeq reports whether seq appears in s outside any single- or

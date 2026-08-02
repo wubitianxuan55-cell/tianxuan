@@ -144,8 +144,27 @@ func TestTaskGateFiresWithIncompleteTodos(t *testing.T) {
 	if !strings.Contains(last.Content, "step 2") || !strings.Contains(last.Content, "步骤3") {
 		t.Fatalf("nudge should list incomplete steps, got: %s", last.Content)
 	}
+	// Single-model default: complete_step is optional — the nudge points at
+	// updating todo_write state instead of the sign-off ceremony.
+	if !strings.Contains(last.Content, "todo_write") {
+		t.Fatal("single-model nudge should mention todo_write")
+	}
+}
+
+func TestTaskGateDualModelMentionsCompleteStep(t *testing.T) {
+	s := NewSession("")
+	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // dual-model
+	a := &AgentRunner{session: s, evidence: ledger}
+	a.setTodoState([]evidence.TodoItem{
+		{Content: "step 1", Status: "pending"},
+	})
+	if !a.taskGate() {
+		t.Fatal("taskGate should fire with incomplete todos")
+	}
+	last := s.Messages[len(s.Messages)-1]
 	if !strings.Contains(last.Content, "complete_step") {
-		t.Fatal("nudge should mention complete_step")
+		t.Fatalf("dual-model nudge should mention complete_step, got: %s", last.Content)
 	}
 }
 
@@ -225,6 +244,7 @@ func TestFinalReadinessCheck_NoBaseline(t *testing.T) {
 // gate now correctly blocks (V10.101: current todos are passed in, not nil).
 func TestFinalReadinessCheck_UnverifiedTodosBlocks(t *testing.T) {
 	ledger := evidence.NewLedger()
+	ledger.SetStrictVerification(true) // dual-model: Hermes depends on complete_step evidence
 	// Baseline: todo_write creates tasks as pending
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",
@@ -247,6 +267,29 @@ func TestFinalReadinessCheck_UnverifiedTodosBlocks(t *testing.T) {
 	}
 	if reason == "" {
 		t.Fatal("blocked should include a reason")
+	}
+}
+
+// TestFinalReadinessCheck_SingleModelSkipsCompleteStep locks the V10.152
+// contract: in single-model mode (strictVerify=false) complete_step is
+// optional — a todo_write "completed" is a sufficient host-observable state.
+// Forcing the sign-off ceremony adds rounds with no partner to receive it.
+func TestFinalReadinessCheck_SingleModelSkipsCompleteStep(t *testing.T) {
+	ledger := evidence.NewLedger() // default strictVerify=false (single-model)
+	ledger.Record(evidence.Receipt{
+		ToolName: "todo_write",
+		Success:  true,
+		Todos: []evidence.TodoItem{
+			{Content: "Step 1", Status: "pending", ActiveForm: "Step 1"},
+		},
+	})
+	a := &AgentRunner{evidence: ledger}
+	currentTodos := []evidence.TodoItem{
+		{Content: "Step 1", Status: "completed", ActiveForm: "Step 1"},
+	}
+	blocked, _ := a.finalReadinessCheck(currentTodos)
+	if blocked {
+		t.Fatal("single-model mode must not block on missing complete_step")
 	}
 }
 

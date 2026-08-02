@@ -542,6 +542,7 @@ export const zh: Record<DictKey, string> = {
   "memory.archivedHint": "已从活跃记忆中移除，但保留可查阅。",
 
   "browser.placeholder": "输入网址…",
+  "browser.resizePanel": "调整浏览器宽度",
   "browser.go": "打开",
   "browser.back": "后退",
   "browser.forward": "前进",

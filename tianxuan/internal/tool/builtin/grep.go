@@ -33,11 +33,11 @@ var grepRgPath string // resolved ripgrep path, set at boot
 func (grepTool) Name() string { return "grep" }
 
 func (grepTool) Description() string {
-	return "搜索正则表达式匹配的文件或目录。返回匹配行 path:line:text。支持 context_lines 显示匹配行上下文（前后各N行），highlight 高亮匹配部分（>>>match<<<），sort_by=relevance 按匹配密度排序。max_matches 最大 2000。"
+	return "Search files or directories for a regex, returning path:line:text matches. Supports context_lines (N lines around each match), highlight (>>>match<<<), sort_by=relevance (match density), and max_matches (default 500, max 2000)."
 }
 
 func (grepTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"正则表达式 (RE2 语法)"},"path":{"type":"string","description":"文件或目录 (默认 \".\")"},"max_matches":{"type":"integer","description":"最大匹配数 (默认 500, 最大 2000)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"排序方式: path (默认) 或 relevance (按匹配密度)"},"context_lines":{"type":"integer","description":"匹配行四周的上下文行数 (默认 0, 最大 5)"},"highlight":{"type":"boolean","description":"用 >>><<< 包裹匹配文本 (默认 true)"}},"required":["pattern"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Regular expression (RE2 syntax)"},"path":{"type":"string","description":"File or directory (default \".\")"},"max_matches":{"type":"integer","description":"Maximum matches (default 500, max 2000)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"Sort: path (default) or relevance (match density)"},"context_lines":{"type":"integer","description":"Context lines around each match (default 0, max 5)"},"highlight":{"type":"boolean","description":"Wrap matches with >>> and <<< (default true)"}},"required":["pattern"]}`)
 }
 
 func (grepTool) ReadOnly() bool { return true }
@@ -56,14 +56,35 @@ type grepMatch struct {
 	isContext bool
 }
 
+// stringOrList accepts either a single string or an array of strings — the
+// model emits glob/include in both shapes and both must be honored.
+type stringOrList []string
+
+func (s *stringOrList) UnmarshalJSON(b []byte) error {
+	var one string
+	if err := json.Unmarshal(b, &one); err == nil {
+		*s = []string{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return err
+	}
+	*s = many
+	return nil
+}
+
 func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	type pT struct {
-		Pattern      string `json:"pattern"`
-		Path         string `json:"path"`
-		MaxMatches   *int   `json:"max_matches,omitempty"`
-		SortBy       string `json:"sort_by"`
-		ContextLines *int   `json:"context_lines,omitempty"`
-		Highlight    *bool  `json:"highlight,omitempty"`
+		Pattern      string       `json:"pattern"`
+		Path         string       `json:"path"`
+		MaxMatches   *int         `json:"max_matches,omitempty"`
+		SortBy       string       `json:"sort_by"`
+		ContextLines *int         `json:"context_lines,omitempty"`
+		Highlight    *bool        `json:"highlight,omitempty"`
+		Glob         stringOrList `json:"glob"`    // legacy alias: filter searched files
+		Include      stringOrList `json:"include"` // legacy alias: same semantics as glob
+		Limit        *int         `json:"limit"`   // legacy alias: maps to max_matches
 	}
 	var p pT
 	if err := json.Unmarshal(args, &p); err != nil {
@@ -82,7 +103,13 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		if maxMatches > 2000 {
 			maxMatches = 2000
 		}
+	} else if p.Limit != nil && *p.Limit > 0 {
+		maxMatches = *p.Limit
+		if maxMatches > 2000 {
+			maxMatches = 2000
+		}
 	}
+	globs := append(append([]string{}, p.Glob...), p.Include...)
 
 	ctxLines := 0
 	if p.ContextLines != nil && *p.ContextLines > 0 {
@@ -101,7 +128,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	// V10.29: delegate to ripgrep when available — 10-100x faster, honors .gitignore.
 	if grepRgPath != "" && ctxLines == 0 && !highlight && p.SortBy != "relevance" {
-		return g.runRipgrep(ctx, p.Pattern, p.Path, maxMatches)
+		return g.runRipgrep(ctx, p.Pattern, p.Path, maxMatches, globs)
 	}
 
 	re, err := regexp.Compile(p.Pattern)
@@ -247,13 +274,24 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 				walker.enter(path)
 				return nil
 			}
+			if len(globs) > 0 {
+				rel, rerr := filepath.Rel(p.Path, path)
+				if rerr != nil {
+					return nil
+				}
+				if !matchesAnyGlob(rel, globs) {
+					return nil
+				}
+			}
 			if searchFile(path) == io.EOF {
 				return filepath.SkipAll
 			}
 			return nil
 		})
 	} else {
-		_ = searchFile(p.Path)
+		if len(globs) == 0 || matchesAnyGlob(filepath.Base(p.Path), globs) {
+			_ = searchFile(p.Path)
+		}
 	}
 
 	if len(out) == 0 {
@@ -295,6 +333,36 @@ func highlightMatch(re *regexp.Regexp, text string) string {
 	return text[:loc[0]] + ">>>" + text[loc[0]:loc[1]] + "<<<" + text[loc[1]:]
 }
 
+// grepGlobMatch reports whether relPath (relative to the search root) matches
+// a glob filter. Patterns without a path separator also match basenames, and
+// "**" is honored via matchGlobSuffix's recursive semantics.
+func grepGlobMatch(relPath, pattern string) bool {
+	rel := filepath.ToSlash(relPath)
+	pat := filepath.ToSlash(pattern)
+	if strings.Contains(pat, "**") {
+		return matchGlobSuffix(filepath.FromSlash(rel), filepath.FromSlash(pat))
+	}
+	if ok, _ := filepath.Match(pat, rel); ok {
+		return true
+	}
+	if !strings.Contains(pat, "/") {
+		if ok, _ := filepath.Match(pat, filepath.Base(rel)); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesAnyGlob reports whether relPath matches any glob filter.
+func matchesAnyGlob(relPath string, globs []string) bool {
+	for _, g := range globs {
+		if grepGlobMatch(relPath, g) {
+			return true
+		}
+	}
+	return false
+}
+
 // sortByRelevance sorts matches by match density per file (descending), then
 // within each file by line number. Context lines are sorted adjacent to their
 // originating match.
@@ -334,13 +402,16 @@ func ResolveRgPath() string {
 	return ""
 }
 
-func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, maxMatches int) (string, error) {
+func (g grepTool) runRipgrep(ctx context.Context, pattern, path string, maxMatches int, globs []string) (string, error) {
 	argv := []string{
 		grepRgPath,
 		"--no-heading", "--line-number", "--with-filename", "--color", "never",
 		"--regexp", pattern,
-		"--", path,
 	}
+	for _, gl := range globs {
+		argv = append(argv, "-g", gl)
+	}
+	argv = append(argv, "--", path)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	hideBashWindow(cmd)
 

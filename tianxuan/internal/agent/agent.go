@@ -415,16 +415,14 @@ type AgentRunner struct {
 	// events across turns.
 	autoSkillSeq atomic.Int64
 
-	// todoFailStep / todoFailCount track the current in_progress todo step's
-	// consecutive tool-failure rounds for the Adaptive Execution nudge
-	// (V10.136). todoFailStep holds the step being counted; changing steps or
-	// a success round resets the counter.
-	todoFailStep  string
-	todoFailCount int
-
-	// investigationNudgeCount counts subagent-priority nudges injected this
-	// turn (capped by InvestigationNudgeCap, reset at turn start).
-	investigationNudgeCount int
+	// failureGuard is the host-side failure-escalation state machine
+	// (V10.148, distilled from Reasonix internal/recovery). Reset at each
+	// Run; checked before mutation execution and observed after each result.
+	failureGuard *FailureGuard
+	// lastGuardOutcomes carries per-call escalation outcomes from the most
+	// recent executeBatch so the serial run loop can inject guidance messages
+	// in deterministic order (parallel tool calls cannot inject directly).
+	lastGuardOutcomes []GuardOutcome
 }
 
 // SetAutoSkillStore installs the skill store used for automatic skill
@@ -774,6 +772,8 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	// subdirectory). Only the executor (not planner) offloads — the planner
 	// runs with a read-only toolset and its own session.
 	r.SetOffload(opts.OffloadDir, opts.OffloadThresholdChars)
+	// V10.148: Auto Failure Guard — host-side failure escalation.
+	r.failureGuard = NewFailureGuard()
 	return r
 }
 
@@ -942,6 +942,13 @@ func (a *AgentRunner) steerQueueLen() int {
 // todos are actually detected — the old nil argument caused the check to be a no-op.
 func (a *AgentRunner) finalReadinessCheck(currentTodos []evidence.TodoItem) (blocked bool, reason string) {
 	if a.evidence == nil {
+		return false, ""
+	}
+	// Single-model mode (strictVerify=false): complete_step is optional — a
+	// todo_write "completed" is a sufficient host-observable state, and forcing
+	// a sign-off ceremony adds rounds with no partner to receive it. Dual-model
+	// mode keeps the check: Hermes depends on complete_step evidence to replan.
+	if !a.evidence.StrictVerification() {
 		return false, ""
 	}
 	// Check for unverified completed todos: the model marked a todo as

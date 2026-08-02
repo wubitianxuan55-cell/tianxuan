@@ -23,11 +23,11 @@ type editFile struct {
 func (editFile) Name() string { return "edit_file" }
 
 func (editFile) Description() string {
-	return "Replace an exact string in a file with another. old_string must occur exactly once; add surrounding context to disambiguate. Line endings are auto-adapted: if the file uses CRLF, your LF old_string/new_string are automatically converted. Use for targeted edits instead of rewriting the whole file."
+	return "Replace an exact string in a file with another. old_string must occur exactly once unless replace_all=true; add surrounding context to disambiguate. Line endings are auto-adapted: if the file uses CRLF, your LF old_string/new_string are automatically converted. Use for targeted edits instead of rewriting the whole file; for multiple edits to one file, use multi_edit (atomic, all-or-nothing)."
 }
 
 func (editFile) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace (must be unique in the file). Line endings auto-adapted."},"new_string":{"type":"string","description":"Replacement text (may be empty to delete). Line endings auto-adapted."}},"required":["path","old_string","new_string"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace. Without replace_all, must be unique in the file. Line endings auto-adapted."},"new_string":{"type":"string","description":"Replacement text (may be empty to delete). Line endings auto-adapted."},"replace_all":{"type":"boolean","description":"Replace every occurrence instead of requiring uniqueness."}},"required":["path","old_string","new_string"]}`)
 }
 
 func (editFile) ReadOnly() bool { return false }
@@ -73,6 +73,7 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		Path      string `json:"path"`
 		OldString string `json:"old_string"`
 		NewString string `json:"new_string"`
+		ReplaceAll bool  `json:"replace_all"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -93,11 +94,11 @@ func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("read %s: %w", p.Path, err)
 	}
 
-	result := applyOldStringEdit(content, p.OldString, p.NewString, false)
+	result := applyOldStringEdit(content, p.OldString, p.NewString, p.ReplaceAll)
 	switch {
 	case result.matches == 0:
 		return "", oldStringNotFoundError(p.Path, p.OldString, content)
-	case result.matches > 1:
+	case !p.ReplaceAll && result.matches > 1:
 		return "", oldStringNotUniqueError(p.Path, p.OldString, content, result.matches, false)
 	}
 

@@ -49,11 +49,17 @@ func (a *AgentRunner) taskGate() bool {
 		names = append(names, fmt.Sprintf("  - %s [%s]", name, t.Status))
 	}
 
+	// 单模型（strictVerify=false）不强制 complete_step 签收，更新 todo 状态即可；
+	// 双模型保留 complete_step 引导（Hermes 需要证据回报）。
+	signOff := "complete_step 标记每个步骤。"
+	if !a.evidence.StrictVerification() {
+		signOff = "将完成的步骤在 todo_write 中更新为 completed。"
+	}
 	a.session.Add(provider.Message{
 		Role: provider.RoleUser,
 		Content: fmt.Sprintf(
 			"[system] 以下任务尚未完成，请继续执行：\n%s\n\n"+
-				"完成后使用 complete_step 标记每个步骤。如果步骤确实已完成但状态未更新，请重新调用 complete_step 确认。",
+				"完成后使用 "+signOff,
 			strings.Join(names, "\n")),
 	})
 	return true

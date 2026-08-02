@@ -542,6 +542,7 @@ export const zhTW: Record<DictKey, string> = {
   "memory.archivedHint": "已從活躍記憶中移除，仍可查閱。",
 
   "browser.placeholder": "輸入網址…",
+  "browser.resizePanel": "調整瀏覽器寬度",
   "browser.go": "開啟",
   "browser.back": "上一頁",
   "browser.forward": "下一頁",

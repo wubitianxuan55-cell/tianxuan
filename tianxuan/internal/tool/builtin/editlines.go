@@ -42,6 +42,7 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 		StartLine  int    `json:"start_line"`
 		EndLine    int    `json:"end_line"`
 		NewContent string `json:"new_content"`
+		OldString  string `json:"old_string"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -89,6 +90,28 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 	}
 	if p.EndLine > totalLines {
 		p.EndLine = totalLines // clamp
+	}
+
+	// The model often passes old_string together with line numbers (a habit
+	// from text-anchor edit tools). It is NOT a locator here — line numbers
+	// win — so verify it against the actual range: a mismatch means the
+	// numbers are stale/wrong, and silently proceeding would replace (and
+	// swallow) the wrong lines. Fail loudly and leave the file untouched.
+	if p.OldString != "" {
+		old := strings.ReplaceAll(p.OldString, "\r\n", "\n")
+		old = strings.TrimSuffix(old, "\n")
+		rangeText := strings.Join(lines[p.StartLine-1:p.EndLine], "\n")
+		if old != rangeText {
+			preview := rangeText
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			return "", fmt.Errorf(
+				"old_string does not match lines %d-%d (actual range: %q); "+
+					"re-read the file with read_file and re-check start_line/end_line, "+
+					"or use edit_file for exact-string edits",
+				p.StartLine, p.EndLine, preview)
+		}
 	}
 
 	// Build the new file: lines before the range + new_content + lines after.

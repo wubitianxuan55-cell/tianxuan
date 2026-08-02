@@ -336,6 +336,15 @@ type AuthError struct {
 	Status    int    // the HTTP status (401 or 403)
 }
 
+// HTTPStatus implements HTTPStatusCoder so failover/telemetry can classify
+// auth failures without type-switching on the concrete error.
+func (e *AuthError) HTTPStatus() int {
+	if e == nil {
+		return 0
+	}
+	return e.Status
+}
+
 func (e *AuthError) Error() string {
 	key := "the API key"
 	if e.KeyEnv != "" {
@@ -411,4 +420,25 @@ func (e *StreamInterruptedError) Unwrap() error {
 func IsStreamInterrupted(err error) bool {
 	var interrupted *StreamInterruptedError
 	return errors.As(err, &interrupted)
+}
+
+// HTTPStatusCoder marks an error that carries an HTTP status code. Provider
+// implementations attach it to transport failures so shared layers (failover,
+// diagnostics) can classify errors without depending on concrete error types.
+type HTTPStatusCoder interface {
+	HTTPStatus() int
+}
+
+// HTTPStatus extracts the HTTP status code carried by err, or 0 when err is
+// nil, carries no code, or wraps nothing that does. Used by the failover chain
+// to decide whether a candidate failure is retryable/failover-worthy.
+func HTTPStatus(err error) int {
+	if err == nil {
+		return 0
+	}
+	var coder HTTPStatusCoder
+	if errors.As(err, &coder) {
+		return coder.HTTPStatus()
+	}
+	return 0
 }

@@ -63,12 +63,16 @@ func (readFile) CompactSchema() json.RawMessage   { return compactSchema["read_f
 func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
 		Path        string `json:"path"`
+		File        string `json:"file"` // legacy alias: the model often emits "file"
 		Offset      int    `json:"offset,omitempty"`
 		Limit       int    `json:"limit,omitempty"`
 		LineNumbers *bool  `json:"line_numbers,omitempty"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if p.Path == "" {
+		p.Path = p.File // honor the model's "file" alias instead of silently dropping it
 	}
 	if p.Path == "" {
 		return "", fmt.Errorf("path is required")
@@ -294,4 +298,3 @@ func tryMarkItDown(path string) (string, bool) {
 	}
 	return result, true
 }
-

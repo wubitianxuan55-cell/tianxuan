@@ -11,14 +11,13 @@ import (
 func TestSoloSystemPrompt_AdaptiveExecution(t *testing.T) {
 	p := SoloSystemPrompt
 	required := []string{
-		"Adaptive Execution",
-		"living document",            // todo 活文档
-		"not a contract",             // 计划非合同
-		"No plan-approval round-trip", // 无计划确认
-		"**Adapt**",                  // 执行中调整计划
-		"switch approach",            // 3 次同方案失败换方案
-		"diagnose the root cause",    // 根因诊断
-		"deliverable subset",         // 收敛策略
+		"Adaptive execution",
+		"living document",             // todo 活文档
+		"no plan-approval round-trip", // 无计划确认
+		"adapt",                       // 执行中调整计划
+		"switch approach",             // 3 次同方案失败换方案
+		"diagnose the root cause",     // 根因诊断
+		"deliverable subset",          // 收敛策略
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {
@@ -43,41 +42,17 @@ func TestSoloSystemPrompt_NoDualModelPlanContract(t *testing.T) {
 // 不是"交还 Hermes"（那是双模型执行者的语义）。
 func TestSoloSystemPrompt_ProgressGuard(t *testing.T) {
 	p := SoloSystemPrompt
-	for _, kw := range []string{"Progress guard", "连续 8 轮", "重新评估当前 todo", "连续 16 轮"} {
+	for _, kw := range []string{"no progress", "reassess"} {
 		if !strings.Contains(p, kw) {
 			t.Errorf("SoloSystemPrompt missing progress-guard keyword %q", kw)
 		}
 	}
-	if strings.Contains(p, "交还 Hermes") {
-		t.Error("Solo progress guard must converge itself, not hand back to Hermes")
-	}
 }
 
-// V10.139 契约：子代理并行优先——调查默认走子代理，只有决策/实现/验证
-// 所需信息才进主上下文；批量调查中间信息由子代理隔离消化。
-func TestSoloSystemPrompt_SubagentDefaultInvestigation(t *testing.T) {
+// 单模型调查直接走主上下文（grep/read_file），不再教条式默认派发子代理。
+func TestSoloSystemPrompt_InvestigateDirectly(t *testing.T) {
 	p := SoloSystemPrompt
-	required := []string{
-		"default for investigation",
-		"隔离上下文",
-		"explore", "research",
-		"parallel_skills",
-		"file:line",
-	}
-	for _, kw := range required {
-		if !strings.Contains(p, kw) {
-			t.Errorf("SoloSystemPrompt missing subagent-priority keyword %q", kw)
-		}
-	}
-}
-
-// V10.140 契约：inline 技能（tdd/systematic-debugging 等）在任务匹配时必须
-// 主动 run_skill 获取完整 playbook——自动注入只覆盖关键词命中的高频场景。
-func TestSoloSystemPrompt_InlineSkillActiveInvocation(t *testing.T) {
-	p := SoloSystemPrompt
-	for _, kw := range []string{"主动调用", "run_skill", "systematic-debugging", "自动注入只覆盖"} {
-		if !strings.Contains(p, kw) {
-			t.Errorf("SoloSystemPrompt missing inline-skill invocation keyword %q", kw)
-		}
+	if strings.Contains(p, "default for investigation") {
+		t.Error("SoloSystemPrompt must not mandate sub-agent-first investigation")
 	}
 }

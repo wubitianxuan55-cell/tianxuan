@@ -1,3 +1,251 @@
+## [10.152.0] — 2026-08-02
+
+### 🔀 回合循环减负：删除过时 nudge，工具反馈改为仅硬模式
+
+> 与提示词重构同一方向：减少宿主对模型节奏的打断。
+
+#### 变更
+- **删除 investigationNudge**（V10.139 子代理优先引导）：新提示词已明确“调查直接用 grep/read_file”，
+  宿主在调查中途注入“改派子代理”只会打断节奏
+- **删除 todoStepStuckNudge**（V10.136 Adaptive 引导）：与 Auto Failure Guard（V10.148）
+  功能重叠，后者已覆盖“同一操作 3 次失败停止 + 回合 6 次无进展暂停”
+- **tool_feedback 改为仅硬模式**：删除温和模式（2+ 错误即注入），
+  只有“全部调用连续 3 轮失败”才注入一次 STOP 引导（模型自己能读到 tool_result 错误）
+
+#### 测试（TDD RED→GREEN）
+- 删除 investigation_nudge / todo_step_nudge 测试；重写 tool_feedback 测试
+  （非全败不注入、连续 3 轮全败注入、per-turn 连击重置）
+- 全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+### 🧰 每轮开销优化：compact 工具集默认生效验证与防回退锁定
+
+> 审计发现：Default() 中 tools.compact=true + 18 工具核心白名单早已生效
+> （用户 tianxuan.toml 无 [tools] 段，保留默认）；本次做确认与固化。
+
+#### 变更
+- **实测验证**：当前配置下只注册 18 个核心内置工具，
+  applyCompactToolset 再隐藏冗余（glob/delete_range/multi_edit/kill_shell/wait 等仍可调用）
+- **防回退锁定测试**：TestToolsCompactDefaultsEnabled（默认 compact=true
+  且白名单 ≤25）+ TestApplyCompactToolsetHidesRedundant（隐藏生效且仍可调用）
+- **文档化**：example.toml 补充 compact 参数说明（boot 一次决定、
+  session 内不变、缓存稳定）
+- **缓存安全结论**：compact 只走静态 Hide（boot 阶段），
+  不触及 SetActiveSchemas 动态路径；session 内工具列表字节不变，
+  4外前缀缓存完整命中
+
+#### 验证
+- 新增 2 例锁定测试；全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+### 📝 工具描述质量：统一英文 + 修复过时项
+
+> 模型每轮看到的工具描述与提示词必须语言一致——中英混杂会降低指令遵从度。
+
+#### 变更
+- **完整描述英文化**：code_index/grep/read_skill/web_search/search_large_output 的
+  Description 从中文改为英文（含这三个工具的 schema 参数描述）
+- **双语冗余修复**：ui_styling/design_router 的完整描述原为中英双语重复，
+  改为纯英文
+- **compact 描述过时项更新**：edit_file 的“须全局唯一”改为
+  “replace_all可全部替换”（与 schema 一致）；grep 补充 glob 过滤
+- **语言契约锁定测试**：全部内置工具完整 Description + Schema 必须
+  纯英文（TestBuiltinFullDescriptionsEnglish）；compact 中文描述保留为有意
+  设计（省 token，TestCompactDescriptionsStayChinese）
+
+#### 验证
+- 新增 2 例语言契约测试；全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+### 🧑‍💻 计划仪式降级：单模型解除 complete_step 强制
+
+> 提示词已崩紧（“简单任务直接做”），但宿主还在强制 complete_step 签收——
+> 内部矛盾。单模型没有接收方，完成仪式是纯开销。
+
+#### 变更
+- **finalReadinessCheck 单模型跳过**：strictVerify=false 时不再检查“todo 已
+  completed 但无 complete_step”， todo_write 的 completed 状态即为充分的宿主可观察证据
+- **taskGate 消息按模式分化**：单模型引导“将完成步骤在
+  todo_write 中更新为 completed”；双模型保留 complete_step 引导
+  （Hermes 依赖证据回报）
+- 双模型路径不受影响（strictEvidence=true 保持原契约）
+
+#### 测试（TDD RED→GREEN）
+- 新增 TestFinalReadinessCheck_SingleModelSkipsCompleteStep + TestTaskGateDualModelMentionsCompleteStep；
+  原有双模型测试显式 SetStrictVerification(true)
+- 全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+### 🎨 编辑工具收敛：恢复 multi_edit 可见（多 hunk 原子编辑）
+
+> multi_edit 是 Codex apply_patch 的多 hunk 等价物（单次批量编辑、全或无），
+> 但被 compact 隐藏且不在默认白名单——模型只能单次 edit_file，
+> 多编辑任务被拖慢。
+
+#### 变更
+- **multi_edit 恢复可见**：从 applyCompactToolset 隐藏清单移除 + 加入
+  Default 白名单（内置可见 18→19）
+- **edit_file 描述引导**：多个编辑点用 multi_edit（原子化 all-or-nothing）
+- 双模型/存在性不受影响；只是模型可见工具面多了一个高价值工具
+
+#### 测试
+- 更新 TestApplyCompactToolsetHidesRedundant：multi_edit 从 hidden 转为 keep
+- 全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+### ✂️ 剩余工具收敛：默认白名单 19→17
+
+> 基于历史调用频率审计：move_file（1 次）与 git_worktree（12 次）
+> 是超低频工具，模型完全可用 bash 替代（mv / git worktree）。
+
+#### 变更
+- 从默认白名单移除 move_file + git_worktree（仍可通过配置显式启用）
+- 保留高频 git 工具：git_status/git_diff/git_commit/git_log（核心工作流）
+- 内置可见：19 → 17，每轮 schema 开销进一步下降
+
+#### 测试
+- 白名单 ≤25 锁定测试保持通过；全量 go test ./... 通过；go build EXIT 0
+
+### 🎯 测试先行规则确定化：场景分叉代替自由裁量
+
+> 实测发现 DeepSeek 会系统性跳过 "TDD when it fits" 的自由裁量。
+> 改为场景分叉的确定性规则：修改存量代码必须测试先行，
+> 修 bug 必须复现测试先行，新建文件/配置变更豁免。
+
+#### 变更
+- **SoloSystemPrompt Verify 段**："TDD when it fits" → "修改存量代码时写/更新测试并确认其失败，
+  然后实现；修 bug 复现测试先行；新建文件/配置变更不需要测试先行"
+- **HephaestusSystemPrompt Verify 段**：同步加入同一规则（执行器也改存量代码）
+- 保留简单任务豁免（新建/文档）：不恢复仪式化指挥
+
+#### 测试（TDD RED→GREEN）
+- 新增 TestSoloPromptTestFirstExistingCode + TestHephaestusPromptTestFirstExistingCode
+- 全量 go test ./... 通过；go build EXIT 0
+
+### 🛠️ 实测驱动优化：bash 环境注入 + cwd 引导
+
+> 修 bug 实测暴露两个真实浪费：① 模型找不到 go
+> （每次探测路径，浪费 1-2 轮）；② 模型不知道 cwd，用错误相对路径导致找文件（浪费 2-3 轮）。
+
+#### 变更
+- **bash 环境注入（对齐 Reasonix login-shell PATH）**：ConfineBash 改 options
+  模式（WithBashTimeout/WithBashEnv）；boot 探测项目 tools/go/bin、tools/node 及
+  常见 Windows 安装目录（Program Files Go/nodejs/Git）注入 PATH，commandEnv 用注入
+  PATH 替换继承 PATH（唯一 PATH 生效）
+- **cwd 引导（Solo + Hephaestus）**：明确“工作目录即项目根，路径相对于它，
+  绝不要用目录名前缀路径”
+
+#### 测试（TDD）
+- 新增 TestBashCommandEnvInjectsPath/NilWhenUnset、TestBashPathEnvIncludesProjectTools/ExcludesMissing、
+  TestSoloPromptWorkingDirectoryGuidance/TestHephaestusPromptWorkingDirectoryGuidance
+- 全量 go test ./... 通过；go build EXIT 0
+
+#### 实测验证（修 bug 任务）
+- 修前：9 轮 / 203s（含 3 轮找文件 + 2 轮探测 go）
+- 修后（干净环境）：9 轮 / 113s（cwd 迷惑与 go 探测消除，剩余浪费来自基准目录历史残留）
+- 方法学训训：基准必须用全新目录 + 无 .tianxuan 残留，否则模型会调查历史浪费轮次
+
+### 🚀 编程能力强化：系统提示词重构（单模型/双模型分开）
+
+> 实测对比 Codex：相同模型下 tianxuan 速度与效果均差一大截。根因：系统提示词方法论堆砌 + 每轮固定 token 开销大 + 仪式化工具拉高轮数。按单模型/双模型设计差异分别重构三套提示词。
+
+#### 重构
+- **SoloSystemPrompt**（单模型）：159 行/2084 tokens → 48 行/629 tokens，
+  去掉强制 TDD 仪式与 SDD 规划契约，聚焦自适应执行/最小变更/验证
+- **HermesPrompt**（双模型·规划器）：417 行/5312 tokens → 90 行/974 tokens，
+  保留计划契约（<!--plan-->/Delta/File(s)/Constraint/Verify/Fix plan），
+  去掉 SDD 教条与自检清单
+- **HephaestusSystemPrompt**（双模型·执行器）：257 行/3276 tokens → 49 行/636 tokens，
+  保留执行契约（todo 同步、complete_step 证据、File(s) 锚点、失败升级）
+- 三套统一英文，总固定开销 -79%（~10.7k → ~2.2k tokens）
+
+#### 测试（TDD RED→GREEN）
+- 更新提示词契约锁定测试：adaptive_workflow、hermes_sdd、subagent_priority、scoped_verify
+- 全量 go test ./... 通过；go vet 干净；go build EXIT 0
+
+## [10.151.0] — 2026-08-02
+
+### 🖱 浏览器右侧分栏可拖拽调整宽度（修复宽度写死 CSS、无 resizer）
+
+> 问题：浏览器打开时占右侧分栏，宽度写死 `clamp(360px, 38vw, 760px)`，
+> 没有自己的拖拽把手（workspace 面板的 resizer 不服务浏览器分栏），用户
+> 无法拖动变宽。
+
+#### 修复
+- **useBrowserPanel hook**：浏览器分栏独立宽度 state + 拖拽调整（与
+  workspace 面板同模式）——pointer 拖拽、键盘（方向键/Home/End）、
+  双击恢复默认，宽度持久化到 localStorage
+- **clampBrowserPanelWidth**：360px 下限 / 1080px 上限 / 62% 视口比例 /
+  对话区最小 200px 保护（原 38vw≈560px 默认不变）
+- **接线**：浏览器打开时 `--workspace-width` 轨道跟随浏览器宽度，resizer
+  复用 workspace-panel-resizer 样式（拖拽高亮/光标/触摸）
+- **i18n**：en/zh/zh-TW 新增 `browser.resizePanel`
+
+#### 测试（TDD RED→GREEN）
+- `useLayoutSizes.test.ts` 7 例：默认不变、下限、上限、视口比例、对话区保护、
+  窄窗下限、取整
+- 前端全量 135/135 通过；`tsc --noEmit` 0 错误；`vite build` EXIT 0
+
+#### 验证
+- `pnpm test` 135/135 · `pnpm typecheck` 0 错误 · `pnpm run build` EXIT 0
+- `wails build -ldflags "-X main.version=v10.151.0"` EXIT 0（23s）
+
+## [10.150.0] — 2026-08-02
+
+### 🧵 Model Failover 蒸馏（OpenClaw model-failover 移植 — turn-local 模型回退链）
+
+> 需求：蒸馏 OpenClaw 的模型故障转移——primary 模型限流/过载/断网时不再
+> 整轮失败，而是按序尝试备用模型（同 provider 同 key 不同 model），只当前
+> 回合生效（turn-local），下回合回到 primary 保持前缀缓存稳定；纯过载时
+> 整链指数退避重试；全部耗尽返回带逐候选细节的摘要错误。
+
+#### 功能
+- **失败分类**：ShouldFailover 只对 failover-worthy 错误切候选（429/408/5xx
+  与网络瞬态）；参数错误（400/404/409）、鉴权失败（同 key 切了没用）、
+  调用方取消、流中断都立即传播，不烧备用候选
+- **候选链**：Chain 实现 provider.Provider 接口，agent 层零改动；主模型
+  正常应答，失败时按序试 fallback，切成功时触发 OnSwitch 通知
+  （前端 Notice：主模型 → 备用模型 + 失败原因）
+- **整链退避重试**：所有候选同轮全为纯过载时，按 MaxChainRetries 轮指数
+  退避重试（复用 provider.RateLimitBackoff），恢复后当前回合照常完成
+- **摘要错误**：全部耗尽返回 FallbackSummaryError，逐候选列出失败原因，
+  供 CLI 直接呈现
+- **配置**：`[[providers]] fallbacks = ["model-b"]`；空/重复 fallback 跳过，
+  无 fallback 时行为与原先完全一致（零开销）
+
+#### 测试（TDD RED→GREEN）
+- failover 包 11 例：primary 成功只用 primary、429 切 fallback + OnSwitch
+  一次、400 不切、全败摘要（顺序正确）、整链重试轮数、重试后恢复、取消
+  不切、auth 不切、ShouldFailover 分类 18 子例、通知携带原因、无 fallback 退化
+- boot 接线 3 例：有 fallbacks 构建 Chain、空/重复跳过、无 fallback 返回普通 provider
+
+#### 验证
+- `go test ./...` 全绿；`go vet` 干净；我改动的文件 gofmt 干净
+
+## [10.149.0] — 2026-08-02
+
+### 🛡 Auto Failure Guard 蒸馏（Reasonix internal/recovery 移植 — 宿主侧失败升级决策）
+
+> 需求：蒸馏 Reasonix Auto Guard 的失败升级决策，让 tianxuan agent 不再
+> 限于"注入 nudge 让模型自己改"，而是在宿主侧做硬决策：同一精确操作失败 3
+> 次后停止，回合累计 6 次失败且无真实进展后停回合变更/验证，只留只读诊断。
+> 只读失败不累计（blocked/权限拒绝不算失败），成功的变更/验证即清零回合
+> 预算——与 Reasonix rules.QualifyingFailure + budget 的语义对齐。
+
+#### 功能
+- **精确操作指纹**：OperationFingerprint（工具名 + key 无序 JSON 参数
+  SHA-256），模型以不同顺序重发同参不会被误判为新操作
+- **操作级升级**：同一指纹失败 3 次后宿主阻止该操作（blocked 结果
+  反馈给模型），换参数/改方案即视为新操作重新计数
+- **回合级升级**：回合内累计 6 次失败且无进展后，宿主停所有变更/验证
+  调用，只读诊断（read_file/ls/glob）保持可用
+- **回合预算重置**：成功的变更/验证 = 真实进展，清零回合失败数；
+  已停止的操作不解除
+- **缓存安全**：纯宿主决策，不碰 L1-L4 前缀；失败路径动态 user-tail
+  引导与现有 nudge 同模式，和存量 stop_gate/budget_gate 互补
+
+#### 测试（TDD RED→GREEN）
+- 纯状态机 8 例：指纹稳定/有别、操作停止、参数变化重新计数、只读失败不累计、回合停止、成功清零、已停操作不解除、reset
+- 接线集成 3 例（testutil.Mock 走真实 runDirect 主循环）：同操作 3 次失败后第 4 次被拒、回合停止后变更被拒只读放行、成功变更清除回合预算
+
+#### 验证
+- `go test ./...` 全绿；`go vet ./internal/agent/...` 干净；`go build ./...` EXIT 0
+
 ## [10.148.0] — 2026-08-02
 
 ### 🌐 集成应用内浏览器（仿 Codex 独立视图：Ctrl+Shift+B + 多标签 + 权限确认）

@@ -123,7 +123,7 @@ func NewUiStylingTool(store *Store) tool.Tool {
 func (*uiStylingTool) Name() string { return "ui_styling" }
 
 func (*uiStylingTool) Description() string {
-	return "Generate Tailwind config or fetch shadcn/ui styling guidance from the ui-styling skill. 生成 Tailwind 配置或读取 shadcn/ui 组件指南。action=config 时 args 直接传给 tailwind_config_gen.py（如 \"--colors brand:blue --fonts display:Inter\"）；action=guide 时 args 为关键词（如 \"dialog\"、\"dark mode\"），返回匹配的指南片段。"
+	return "Generate Tailwind config or fetch shadcn/ui styling guidance from the ui-styling skill. action=config passes args directly to tailwind_config_gen.py (e.g. \"--colors brand:blue --fonts display:Inter\"); action=guide takes a keyword (e.g. \"dialog\", \"dark mode\") and returns the matching guide excerpt."
 }
 
 func (*uiStylingTool) Schema() json.RawMessage {
@@ -267,7 +267,7 @@ func NewDesignRouterTool(store *Store) tool.Tool {
 func (*designRouterTool) Name() string { return "design_router" }
 
 func (*designRouterTool) Description() string {
-	return "Route a design task to the right sub-agent skill. 快速判断设计任务类型并返回应派发的子代理技能与任务描述：banner/横幅→banner-design；演示/幻灯片→slides；品牌→brand；token/组件规范→design-system；logo/图标→design 脚本；审美/反模板/landing/作品集/改版→taste-skill；UI/配色/字体/UX→ui-ux-pro-max；样式实现→ui_styling 工具。"
+	return "Route a design task to the right sub-agent skill: banner\u2192banner-design; slides/deck\u2192slides; brand\u2192brand; token/component specs\u2192design-system; logo/icon\u2192design; aesthetics/anti-template/landing/portfolio/redesign\u2192taste-skill; UI/color/typography/UX\u2192ui-ux-pro-max; implementation\u2192ui_styling."
 }
 
 func (*designRouterTool) Schema() json.RawMessage {

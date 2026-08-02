@@ -322,24 +322,14 @@ func TestCheckCoherence_EmptyFiles(t *testing.T) {
 func TestHermesPrompt_SDDKeywords(t *testing.T) {
 	p := HermesPrompt
 	required := []string{
-		// Proposal layer
-		"Proposal",
-		"why",
-		// Goal + constraint (replaces Delta marking)
 		"GOAL",
 		"Constraint",
 		"WHAT",
 		"HOW",
-		// Specs first
-		"openspec/specs",
-		"现有规范",
-		// Verify dimensions
+		"analysis",
 		"completeness",
 		"correctness",
 		"coherence",
-		// Enablers not gates
-		"Enablers",
-		"活文档",
 	}
 	var missing []string
 	for _, kw := range required {
@@ -364,10 +354,10 @@ func TestHermesPrompt_ContainsGoalFormat(t *testing.T) {
 }
 
 func TestHermesPrompt_ContainsProposalGuidance(t *testing.T) {
-	// 验证 prompt 引导 Hermes 在复杂任务时先写提案
+	// 验证 prompt 引导 Hermes 在计划前先写分析段（proposal）
 	p := HermesPrompt
-	if !strings.Contains(p, "先写简短提案") && !strings.Contains(p, "提案先行") {
-		t.Error("HermesPrompt missing proposal-first guidance")
+	if !strings.Contains(p, "analysis") {
+		t.Error("HermesPrompt missing proposal/analysis-first guidance")
 	}
 }
 

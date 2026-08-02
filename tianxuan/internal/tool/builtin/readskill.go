@@ -19,7 +19,7 @@ type readSkill struct {
 
 func (readSkill) Name() string        { return "read_skill" }
 func (readSkill) Description() string {
-	return "读取指定技能(skill)的完整内容(前置元数据+正文)。技能索引只列一行摘要，正文按需加载——执行 run_skill 前可用它预览技能玩法，或手动查看索引中提到的技能详情。"
+	return "Read the full body (frontmatter + content) of a skill by name. The skill index lists one-line summaries; load the body when you need the full playbook before running it (run_skill) or to inspect a mentioned skill."
 }
 func (readSkill) ReadOnly() bool      { return true }
 func (readSkill) Kind() tool.ToolKind  { return tool.KindRead }
@@ -28,7 +28,7 @@ func (readSkill) Schema() json.RawMessage {
 	return json.RawMessage(`{
   "type": "object",
   "properties": {
-    "name": {"type": "string", "description": "技能名称(如 'explore', 'tdd', 'review')"}
+    "name": {"type": "string", "description": "Skill name (e.g. 'explore', 'tdd', 'review')"}
   },
   "required": ["name"]
 }`)

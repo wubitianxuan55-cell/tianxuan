@@ -4,16 +4,39 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"tianxuan/internal/sandbox"
 	"tianxuan/internal/tool"
 )
 
+// BashOption configures the bash tool at composition time.
+type BashOption func(*bash)
+
+// WithBashTimeout sets the host-injected foreground cap; <=0 means no
+// tool-local cap (aligned with Reasonix — the model never controls the
+// timeout).
+func WithBashTimeout(d time.Duration) BashOption {
+	return func(b *bash) { b.timeout = d }
+}
+
+// WithBashEnv injects extra environment entries (e.g. an augmented PATH) into
+// every command the bash tool runs. A PATH entry here replaces the inherited
+// PATH, so the model never has to probe for go/node locations.
+func WithBashEnv(env []string) BashOption {
+	return func(b *bash) { b.env = env }
+}
+
 // ConfineBash returns the bash built-in bound to an OS-sandbox spec, overriding
 // the unconfined instance registered at init. When the spec enforces, bash runs
-// each command through the sandbox (see package sandbox).
-func ConfineBash(spec sandbox.Spec) tool.Tool {
-	return bash{sb: spec, shell: sandbox.ResolveShell()}
+// each command through the sandbox (see package sandbox). Options configure the
+// host-injected timeout and environment.
+func ConfineBash(spec sandbox.Spec, opts ...BashOption) tool.Tool {
+	b := bash{sb: spec, shell: sandbox.ResolveShell()}
+	for _, o := range opts {
+		o(&b)
+	}
+	return b
 }
 
 // ConfineWriters returns the file-writing built-ins (write_file, edit_file,

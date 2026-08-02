@@ -57,6 +57,11 @@
   代码块 → SVG 图表（流程图/时序图/架构图），agent 讲解复杂逻辑直接配图；
   mermaid 按需懒加载（独立 chunk 149KB gzip，不拖首屏）、securityLevel
   strict 防注入、深色主题适配科幻风
+- **Worktrees 桌面管理**：右侧面板新增"工作树"tab（Codex Local environments
+  的 worktree 隔离蒸馏）——列出当前仓库全部 worktree（分支/detached/当前
+  徽标）、创建（git worktree add -b，可指定基线）、一键切换（SwitchWorkspace
+  激活）、删除（--force + 可连带删分支，confirm 确认）。Go 侧 porcelain
+  解析纯函数 TDD 2 例
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
@@ -75,7 +80,8 @@
   白名单读写/损坏数据兜底）+ `browserRecent.test.ts` 5 例（去重置顶/
   上限裁剪/损坏数据兜底/清理）+ `browserHistory` 地址解析 6 例（搜索编码/
   裸域/localhost/IP/兜底搜索）+ `reviewComments.test.ts` 5 例（增删/按
-  workspace 隔离/空文本防御/AI 格式化）+ `diffParser.test.ts` 4 例
+  workspace 隔离/空文本防御/AI 格式化）+ `diffParser.test.ts` 4 例 +
+  `worktrees_test.go` 2 例（porcelain 解析/空与垃圾输入防御）
 
 #### 验证
 - `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 128/128；

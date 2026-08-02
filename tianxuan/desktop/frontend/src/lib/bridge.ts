@@ -36,6 +36,7 @@ import type {
   UpdateProgress,
   WireEvent,
   WorkspaceView,
+  WorktreeView,
   HookConfigView,
   HooksSettingsView,
   PluginEntryView,
@@ -110,6 +111,11 @@ export interface AppBindings {
   CaptureScreen(): Promise<string>;
   // Notify shows a Windows toast notification (task-done / approval-needed alerts).
   Notify(title: string, body: string): Promise<void>;
+  // Worktree management (Codex local-environment worktree isolation): list,
+  // create (git worktree add -b), and remove (--force, optional branch delete).
+  Worktrees(): Promise<WorktreeView[]>;
+  AddWorktree(path: string, branch: string, base: string): Promise<void>;
+  RemoveWorktree(path: string, branch: string): Promise<void>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

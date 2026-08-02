@@ -324,6 +324,14 @@ export function makeMockApp(): AppBindings {
     async Notify(_title: string, _body: string) {
       // dev mock 下不弹系统通知。
     },
+    async Worktrees() {
+      return [
+        { path: "C:/dev/example", branch: "main", detached: false, current: true },
+        { path: "C:/dev/example-wt/feat-x", branch: "feat-x", detached: false, current: false },
+      ];
+    },
+    async AddWorktree() {},
+    async RemoveWorktree() {},
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;
       capServers.push({

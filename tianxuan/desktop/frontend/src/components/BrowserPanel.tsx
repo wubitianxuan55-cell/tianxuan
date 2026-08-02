@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  AppWindow,
   Eye,
   ExternalLink,
   FileText,
@@ -351,6 +352,14 @@ export function BrowserPanel({
           title={t("browser.openExternal") ?? "在外部浏览器打开"}
         >
           <ExternalLink size={13} />
+        </button>
+        <button
+          className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-colors duration-150 hover:bg-accent/10 hover:text-accent disabled:opacity-35 disabled:cursor-default"
+          onClick={() => void app.OpenBrowserWindow(current).catch(() => {})}
+          disabled={empty}
+          title={t("browser.openWindow") ?? "在独立浏览器窗口打开（独立会话）"}
+        >
+          <AppWindow size={13} />
         </button>
         <div className="flex items-center border border-border-soft rounded-md overflow-hidden shrink-0">
           <button

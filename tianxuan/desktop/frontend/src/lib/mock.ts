@@ -332,6 +332,9 @@ export function makeMockApp(): AppBindings {
     },
     async AddWorktree() {},
     async RemoveWorktree() {},
+    async OpenBrowserWindow(_url: string) {
+      // dev mock 下不创建独立窗口。
+    },
     async AddMCPServer(input: MCPServerInput) {
       const tools = input.transport === "stdio" ? 3 : 5;
       capServers.push({

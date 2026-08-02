@@ -560,6 +560,7 @@ export const zhTW: Record<DictKey, string> = {
   "browser.deny": "拒絕",
   "browser.openBrowser": "瀏覽器 (Ctrl+Shift+B)",
   "browser.openExternal": "在外部瀏覽器開啟",
+  "browser.openWindow": "在獨立瀏覽器視窗開啟（獨立工作階段）",
   "browser.sendSelection": "傳送給 AI 分析",
   "browser.analyzePage": "AI 分析此頁",
   "browser.slowHint": "載入較慢——可切換文字模式或在外部瀏覽器開啟",

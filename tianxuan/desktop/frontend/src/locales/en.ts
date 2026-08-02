@@ -561,6 +561,7 @@ export const en = {
   "browser.deny": "Deny",
   "browser.openBrowser": "Browser (Ctrl+Shift+B)",
   "browser.openExternal": "Open in external browser",
+  "browser.openWindow": "Open in dedicated browser window (separate session)",
   "browser.sendSelection": "Send to AI",
   "browser.analyzePage": "Analyze page with AI",
   "browser.slowHint": "Loading slowly - switch to text mode or open externally",

@@ -62,6 +62,11 @@
   徽标）、创建（git worktree add -b，可指定基线）、一键切换（SwitchWorkspace
   激活）、删除（--force + 可连带删分支，confirm 确认）。Go 侧 porcelain
   解析纯函数 TDD 2 例
+- **独立 WebView2 浏览器窗口**：浏览器导航栏新增"独立窗口"按钮（AppWindow），
+  用 go-webview2 打开专用 WebView2 窗口——独立 user data folder（cookies/
+  登录与主应用隔离，Codex 独立 profile 蒸馏）、真实完整渲染（突破 iframe
+  的 X-Frame-Options/CSP 限制）、可登录、窗口复用（已开则仅导航）。Wails v2
+  同窗口内嵌第二面板需迁移 v3 WebviewPanel，此为当前架构下的落地形态
 - **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
   栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
@@ -73,7 +78,7 @@
 #### 测试（TDD RED→GREEN）
 - Go：`TestBrowserFetchTextRequiresURL` / `RejectsNonHTTP` / `Network`
   （真实抓取 example.com）+ `TestPNGDataURL`（dataURL 前缀/PNG 可解码/
-  尺寸一致）
+  尺寸一致）+ `TestOpenBrowserWindowRejectsInvalidURL`（空/非 http(s) 拒绝）
 - 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
   URL 规范化）+ `browserTabs.test.ts` 10 例（新建/切换/关闭邻居激活/
   不可变更新/标题/徽标首字母）+ `browserPerm.test.ts` 5 例（域名解析/

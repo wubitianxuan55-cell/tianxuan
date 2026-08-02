@@ -116,6 +116,10 @@ export interface AppBindings {
   Worktrees(): Promise<WorktreeView[]>;
   AddWorktree(path: string, branch: string, base: string): Promise<void>;
   RemoveWorktree(path: string, branch: string): Promise<void>;
+  // OpenBrowserWindow opens the URL in a dedicated WebView2 browser window with
+  // its own profile (cookies/login isolated from the app), unlike the iframe
+  // panel which shares the app session.
+  OpenBrowserWindow(url: string): Promise<void>;
   AddMCPServer(input: MCPServerInput): Promise<number>;
   RemoveMCPServer(name: string): Promise<void>;
   RetryMCPServer(name: string): Promise<void>;

@@ -25,6 +25,7 @@ mem.prof
 .tianxuan/
 .codegraph/
 .reasonix/
+.codex/
 
 # Local toolchains (Go/Node installs for the desktop build - never commit)
 /tools/

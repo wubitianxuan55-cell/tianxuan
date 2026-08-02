@@ -70,7 +70,7 @@ export DEEPSEEK_API_KEY=sk-...
 
 ## 版本
 
-当前 **V8.16.1** — 详见 [`tianxuan/CHANGELOG.md`](tianxuan/CHANGELOG.md)
+当前 **V10.147.0** — 详见 [`tianxuan/CHANGELOG.md`](tianxuan/CHANGELOG.md)
 
 ## 许可
 

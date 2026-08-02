@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Cross-compile reasonix for every target and package per-platform archives plus a
-# SHA256SUMS manifest into dist/. CodeGraph is NOT bundled — reasonix fetches it
+# Cross-compile tianxuan for every target and package per-platform archives plus a
+# SHA256SUMS manifest into dist/. CodeGraph is NOT bundled — tianxuan fetches it
 # into its per-version cache on first use (see internal/codegraph), which keeps
 # these archives small. Driven by the Release workflow on a v* tag; runnable
 # locally with VERSION set.
@@ -16,7 +16,7 @@ mkdir -p dist stage
 for t in $TARGETS; do
   os=${t%/*}
   arch=${t#*/}
-  name="reasonix-${os}-${arch}"
+  name="tianxuan-${os}-${arch}"
   stagedir="stage/${name}"
   ext=""
   [ "$os" = windows ] && ext=".exe"
@@ -24,7 +24,7 @@ for t in $TARGETS; do
   echo "==> build ${name}"
   mkdir -p "$stagedir"
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-    go build -ldflags "$LDFLAGS" -o "${stagedir}/reasonix${ext}" ./cmd/reasonix
+    go build -ldflags "$LDFLAGS" -o "${stagedir}/tianxuan${ext}" ./cmd/tianxuan
 
   echo "==> package ${name}"
   if [ "$os" = windows ]; then
@@ -35,5 +35,5 @@ for t in $TARGETS; do
 done
 
 echo "==> checksums"
-(cd dist && sha256sum reasonix-*.* >SHA256SUMS)
+(cd dist && sha256sum tianxuan-*.* >SHA256SUMS)
 ls -la dist

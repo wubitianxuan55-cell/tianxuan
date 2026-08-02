@@ -1,20 +1,21 @@
-# Contributing to Reasonix
+# Contributing to Tianxuan
 
-Thank you for your interest in contributing to Reasonix! This guide covers
+Thank you for your interest in contributing to Tianxuan! This guide covers
 everything you need to get started.
 
 ## Prerequisites
 
-- **Go 1.25+** — the project targets the latest stable Go release
+- **Go 1.25+** — the project targets Go 1.25 (`go.mod`)
 - **Git** — for version control
-- **Node.js** (optional) — only if you work on the desktop app (`desktop/`)
+- **Node.js + pnpm** (optional) — only if you work on the desktop app
+  (`desktop/frontend/`)
 
 ## Getting started
 
 ```bash
-git clone https://github.com/esengine/DeepSeek-Reasonix.git
-cd DeepSeek-Reasonix
-go build ./cmd/reasonix    # builds the CLI binary
+git clone git@github.com:wubitianxuan55-cell/tianxuan.git
+cd tianxuan
+go build ./cmd/tianxuan    # builds the CLI binary
 go test ./...              # runs the full test suite
 ```
 
@@ -22,59 +23,59 @@ go test ./...              # runs the full test suite
 
 | Directory | Purpose |
 |-----------|---------|
-| `cmd/reasonix` | CLI entry point |
+| `cmd/tianxuan` | CLI entry point |
 | `internal/agent` | Agent loop, session, coordinator |
-| `internal/cli` | TUI, subcommands, setup wizard |
+| `internal/cli` | TUI, subcommands |
 | `internal/control` | Transport-agnostic controller |
 | `internal/config` | TOML configuration loading |
 | `internal/tool/builtin` | Built-in tools (bash, read_file, …) |
 | `internal/provider` | Model-backend abstraction |
-| `internal/provider/openai` | OpenAI-compatible provider |
 | `internal/plugin` | MCP client (stdio + HTTP) |
+| `internal/cache` | L1–L4 prefix-cache layers |
+| `internal/context` | TCCA cache core |
 | `internal/event` | Typed event stream |
-| `internal/hook` | Shell hooks (PreToolUse, …) |
-| `internal/memory` | REASONIX.md hierarchy + auto-memory |
+| `internal/memory` | Persistent memory + extraction |
 | `internal/skill` | Skill discovery from Markdown |
 | `internal/sandbox` | OS-level sandboxing |
 | `internal/serve` | HTTP/SSE server frontend |
 | `internal/checkpoint` | Snapshot-based rewind |
 | `desktop/` | Wails-based desktop app (separate Go module) |
-| `docs/` | Engineering spec, migration guide |
-
-### Dependency direction
-
-```
-cli → {agent, plugin, config} → {tool, provider}
-```
-
-Built-in subpackages import their parent to self-register via `init()`.
-Parents never import children.
+| `docs/` | Engineering specs, migration guide |
 
 ## Development workflow
 
 ### Building
 
 ```bash
-make build          # go build ./...
-make test           # go test ./...
-make vet            # go vet ./...
-make fmt            # gofmt -w .
-make hooks          # install git hooks (pre-push: go vet)
-make cross          # cross-compile for all 6 targets
+go build ./...            # build all packages
+go build ./cmd/tianxuan   # build the CLI binary
 ```
 
 ### Running tests
 
 ```bash
-go test ./...                           # all tests
+go test ./...                           # all Go tests
 go test ./internal/agent/ -v            # verbose, one package
 go test ./internal/tool/builtin/ -run TestGrep  # one test
+cd desktop && go test ./...             # desktop Go module tests
+cd desktop/frontend && npx vitest run   # frontend tests
 ```
+
+### Verification levels
+
+Match verification to the change scope (see CHANGELOG v10.141.0):
+
+| Change scope | Verification |
+|--------------|--------------|
+| Go code | `go build` + affected package tests |
+| Frontend (`.ts/.tsx/.css`) | `tsc --noEmit` / frontend tests / build |
+| Docs/config | content review, no forced tests |
+| Cross-module refactor | full suite (`go test ./...`) |
 
 ### Code style
 
 - `gofmt` is enforced by CI — format before committing
-- Follow existing patterns: wrap errors with `fmt.Errorf("...: %w", err)`
+- Wrap errors with `fmt.Errorf("...: %w", err)`; never swallow errors silently
 - Library code never calls `os.Exit` or prints to stdout/stderr
 - Only `cli/` and `main/` decide exit codes and user-facing messages
 - Exported identifiers must have doc comments
@@ -84,11 +85,10 @@ go test ./internal/tool/builtin/ -run TestGrep  # one test
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat(glob): add ** recursive pattern support
-fix: replace silent error discards with structured logging
+feat(tool): add ** recursive pattern support
+fix(cache): keep compact schema constraints in sync
 test(event): add comprehensive unit tests for event package
-docs: add CONTRIBUTING.md
-ci: add golangci-lint and govulncheck
+docs: refresh README version to current release
 ```
 
 ## Adding a new built-in tool
@@ -96,7 +96,7 @@ ci: add golangci-lint and govulncheck
 1. Create `internal/tool/builtin/mytool.go`
 2. Implement the `tool.Tool` interface: `Name()`, `Description()`, `Schema()`, `ReadOnly()`, `Execute()`
 3. Register via `func init() { tool.RegisterBuiltin(myTool{}) }`
-4. Add tests in `internal/tool/builtin/builtin_test.go` or a separate `mytool_test.go`
+4. Add tests in `mytool_test.go` — write the failing test first (TDD)
 5. The tool is automatically available — `main` blank-imports `builtin`
 
 ## Adding a new model provider
@@ -108,30 +108,15 @@ ci: add golangci-lint and govulncheck
 3. Register via `func init() { provider.Register("mykind", New) }`
 4. The provider is available from config with `kind = "mykind"`
 
-## Adding i18n strings
-
-1. Add the field to `internal/i18n/i18n.go` (`Messages` struct)
-2. Add the value in `internal/i18n/messages_en.go` and `messages_zh.go`
-3. The `TestCatalogsComplete` test will fail if you miss a locale
-
 ## Submitting changes
 
-1. Fork the repository
-2. Create a feature branch from `main-v2`
-3. Make your changes with tests
-4. Ensure `go test ./...` passes
-5. Ensure `gofmt -l .` shows no changes
-6. Submit a pull request to `main-v2`
-
-## Reporting issues
-
-Open an issue on GitHub with:
-- Steps to reproduce
-- Expected vs actual behavior
-- Go version and OS
-- Relevant logs or error messages
+1. Create a feature branch from the current release branch
+2. Make your changes with tests (TDD: failing test → minimal implementation → green)
+3. Ensure the matching verification level passes (see above)
+4. Ensure `gofmt -l .` shows no changes
+5. Open a pull request
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
-same license as the project.
+same license as the project (MIT).

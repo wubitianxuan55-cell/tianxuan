@@ -1,30 +1,40 @@
 ## [10.148.0] — 2026-08-02
 
-### 🌐 集成应用内浏览器（右侧面板"浏览器"tab，像 Codex 一样查看网页）
+### 🌐 集成应用内浏览器（仿 Codex 独立视图：Ctrl+Shift+B + 多标签 + 权限确认）
 
-> 需求：给 tianxuan 集成浏览器，可直接查看阅览网页。调研 Wails v2 生态后
-> 采用"iframe 渲染 + 文本模式兜底"方案：WebView2 完整渲染网页，X-Frame-
-> Options/CSP 拒绝嵌入的站点自动可切文本模式（复用内核 web_fetch 的 SSRF
-> 防护与去标签逻辑），保证任何站点都能查看。
+> 需求：给 tianxuan 集成浏览器，可直接查看阅览网页。先调研 Codex 内置
+> 浏览器真实形态（官方文档：Ctrl+Shift+B 独立视图、多标签、首次访问域名
+> 权限确认、与 AI 共享页面），按此对齐改造。渲染方案为"iframe + 文本模式
+> 兜底"：WebView2 完整渲染网页，X-Frame-Options/CSP 拒绝嵌入的站点可切
+> 文本模式（复用内核 web_fetch 的 SSRF 防护与去标签逻辑），保证任何站点
+> 都能查看。
 
 #### 功能
-- **右侧面板新增"浏览器"tab**：地址栏（URL 规范化自动补 https://）、
-  前进/后退（自维护历史栈，前进分支裁剪语义与浏览器一致）、刷新、
-  页面/文本双模式切换
+- **独立浏览器视图**：顶栏 Globe 按钮 + Ctrl+Shift+B 快捷键打开，替换
+  聊天主区全高度展示（非侧边面板）；ESC 或工具栏 × 关闭返回聊天
+- **多标签**：标签行支持新建 / 切换 / 关闭（关闭当前标签激活右邻，空则
+  关视图），每标签独立历史栈与页面/文本模式状态
+- **权限确认**：首次访问域名弹确认卡（仿 Codex allowed hosts），允许后
+  写入 localStorage 白名单（tianxuan.browser.allowedHosts）免问，拒绝则
+  不加载；确认前页面不渲染
+- **导航**：地址栏（URL 规范化自动补 https://）、前进/后退（自维护历史
+  栈，前进分支裁剪语义与浏览器一致）、刷新、页面/文本双模式切换
 - **页面模式**：iframe 渲染（sandbox 放开脚本/表单/弹窗），加载指示
 - **文本模式**：内核抓取返回干净可读文本（等宽字体展示），受限网站兜底
 - **Go 侧**：`App.BrowserFetchText` 绑定（desktop/browser.go），复用
   web_fetch 工具：空 URL / 非 http(s) 协议大声拒绝，SSRF 边界一致
-- **i18n**：en/zh/zh-TW 浏览器文案
+- **i18n**：en/zh/zh-TW 浏览器文案（含权限确认/标签操作）
 
 #### 测试（TDD RED→GREEN）
 - Go：`TestBrowserFetchTextRequiresURL` / `RejectsNonHTTP` / `Network`
   （真实抓取 example.com）
 - 前端：`browserHistory.test.ts` 8 例（推入/去重/前进/后退/分支裁剪/
-  URL 规范化）
+  URL 规范化）+ `browserTabs.test.ts` 10 例（新建/切换/关闭邻居激活/
+  不可变更新/标题）+ `browserPerm.test.ts` 5 例（域名解析/白名单读写/
+  损坏数据兜底）
 
 #### 验证
-- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 91/91；
+- `go test ./...` desktop 全绿；`tsc --noEmit` 0 错误；vitest 106/106；
   `vite build` EXIT 0
 
 ### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光

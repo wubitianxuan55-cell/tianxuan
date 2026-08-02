@@ -140,7 +140,8 @@ export default function App() {
   const newSessionAndReset = useCallback(async () => { setStatsReset(n => n + 1); await startNewSession(); }, [startNewSession]);
   const [statsReset, setStatsReset] = useState(0);
 const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats" | "browser">("stats");
+  const [rightTab, setRightTab] = useState<"files" | "runtime" | "skills" | "stats">("stats");
+  const [browserOpen, setBrowserOpen] = useState(false);
   const [pendingViewMode, setPendingViewMode] = useState<"files" | "changed" | null>(null);
   const [editDraft, setEditDraft] = useState<{ text: string; id: number } | null>(null);
   const [compactMode, setCompactMode] = useState(() => { try { return localStorage.getItem("tianxuan.compactMode") === "1"; } catch { return false; } });
@@ -270,6 +271,7 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
       const mod = ke.ctrlKey || ke.metaKey, t = ke.target as HTMLElement;
       const inInput = t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable;
       if (ke.key === "Escape" && !inInput && !state.running) {
+if (browserOpen) { ke.preventDefault(); setBrowserOpen(false); return; }
 if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(null); return; }
         if (scheduleOpen) { ke.preventDefault(); setScheduleOpen(false); return; }
         if (histView !== null) { ke.preventDefault(); setHistView(null); return; }
@@ -283,11 +285,12 @@ if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(
       if (ke.key === "M" && ke.shiftKey) { ke.preventDefault(); void openMemory(); return; }
       if (ke.key === "H" && ke.shiftKey) { ke.preventDefault(); void openHistory(); return; }
       if (ke.key === "b") { ke.preventDefault(); toggleSidebar(); return; }
+      if (ke.key === "B" && ke.shiftKey) { ke.preventDefault(); setBrowserOpen((o) => !o); return; }
       if (ke.key === "j") { ke.preventDefault(); toggleWorkspacePanel(); return; }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [state.running, settingsOpen, histView, scheduleOpen, workspacePanelOpen]);
+  }, [state.running, settingsOpen, histView, scheduleOpen, workspacePanelOpen, browserOpen]);
 
   const { toolCounts, skillCounts } = useToolStats(state.items);
 
@@ -417,6 +420,7 @@ onOpenSettings={() => setSettingsOpen(true)}
               <ToolbarButton onClick={() => { const v = !compactMode; setCompactMode(v); try { localStorage.setItem("tianxuan.compactMode", v ? "1" : "0"); } catch {} }} title={compactMode ? "展开模式" : "紧凑模式"}>{compactMode ? "⊞" : "⊟"}</ToolbarButton>
               <ToolbarButton onClick={() => downloadMarkdown(exportAsMarkdown(state.items))} disabled={state.items.length===0}>导出</ToolbarButton>
               <ToolbarButton onClick={() => void newSessionAndReset()} disabled={state.running||state.items.length===0}>清空</ToolbarButton>
+              <ToolbarButton onClick={() => setBrowserOpen((o) => !o)} title={t("browser.openBrowser") ?? "浏览器 (Ctrl+Shift+B)"}><Globe size={13} /></ToolbarButton>
               <ThemeSwitcher scheme={colorScheme} mode={themeMode} onScheme={(s) => { applyColorScheme(s); setColorScheme(s); }} onMode={(m) => { applyThemeMode(m); setThemeMode(m); }} />
             </div>
           </header>
@@ -427,6 +431,10 @@ onOpenSettings={() => setSettingsOpen(true)}
 
           <UpdateBanner />
           <NewSessionToast done={newSessionDone} />
+          {browserOpen ? (
+            <BrowserPanel onClose={() => setBrowserOpen(false)} />
+          ) : (
+            <>
           <main className="main">
             <CompactContext.Provider value={compactMode}>
             {(state.meta?.ready === false && !state.meta?.startupErr) || switchingModel ? (
@@ -476,6 +484,8 @@ onOpenSettings={() => setSettingsOpen(true)}
             />
             </CompactContext.Provider>
           </footer>
+            </>
+          )}
         </section>
 
         {workspacePanelOpen && !workspacePanelMaximized && (
@@ -524,13 +534,6 @@ onOpenSettings={() => setSettingsOpen(true)}
               <span>技能</span>
             </button>
             <button
-              className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "browser" ? "text-accent border-accent" : ""}`}
-              onClick={() => setRightTab("browser")}
-            >
-              <Globe size={13} />
-              <span>浏览器</span>
-            </button>
-            <button
               className={`flex items-center gap-1 px-3 py-2 text-xs bg-transparent border-0 border-b-2 cursor-pointer transition-[color,border-color] duration-[var(--dur-base)] hover:text-fg text-fg-dim border-transparent ${rightTab === "stats" ? "text-accent border-accent" : ""}`}
               onClick={() => setRightTab("stats")}
             >
@@ -550,8 +553,6 @@ onOpenSettings={() => setSettingsOpen(true)}
               <RuntimePanel counts={toolCounts} />
             ) : rightTab === "skills" ? (
               <SkillsPanel counts={skillCounts} />
-            ) : rightTab === "browser" ? (
-              <BrowserPanel />
             ) : null}
             {rightTab === "stats" && (
               <StatsPanel

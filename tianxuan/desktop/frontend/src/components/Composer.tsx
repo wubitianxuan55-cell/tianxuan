@@ -456,6 +456,8 @@ export function Composer({
         style={{ ...(composerHeight !== null ? { height: "var(--composer-height)" } : {}), ...composerCardStyle }}
         ref={composerCardRef}
       >
+        {/* HUD 顶部高光线 */}
+        <div className="absolute top-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent pointer-events-none" aria-hidden />
         {/* 拖拽调整大小把手 */}
         <div
           className="absolute top-0 left-[14px] right-[14px] z-[5] h-2 cursor-ns-resize no-drag touch-none"

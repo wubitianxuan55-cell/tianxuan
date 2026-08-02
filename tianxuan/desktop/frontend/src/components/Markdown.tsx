@@ -35,10 +35,16 @@ function CodeBlockHeader({ language, text }: { language?: string; text: string }
     setTimeout(() => setCopied(false), 1500);
   }, [text]);
   return (
-    <div className="flex items-center justify-between px-3 py-1 bg-bg-soft/80 border-b border-border-soft/50 rounded-t-md text-[10px] select-none">
-      <span className="text-fg-faint/60 font-mono font-medium uppercase tracking-wider">
+    <div className="flex items-center gap-2 px-3 py-1 bg-bg-soft/80 border-b border-border-soft/50 rounded-t-md text-[10px] select-none">
+      <span className="flex items-center gap-1 shrink-0" aria-hidden>
+        <span className="w-[7px] h-[7px] rounded-full bg-err/70" />
+        <span className="w-[7px] h-[7px] rounded-full bg-warn/70" />
+        <span className="w-[7px] h-[7px] rounded-full bg-ok/70" />
+      </span>
+      <span className="text-accent/80 font-mono font-medium uppercase tracking-wider">
         {language || "text"}
       </span>
+      <div className="flex-1" />
       <button
         className="inline-flex items-center gap-1 px-1.5 py-0.5 border-0 rounded bg-transparent text-fg-faint/40 cursor-pointer hover:text-fg transition-colors"
         onClick={copy}

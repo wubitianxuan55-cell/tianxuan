@@ -1,5 +1,16 @@
 ## [10.148.0] — 2026-08-02
 
+### 🖥️ 科幻质感细节：终端代码块 + Composer HUD 上缘光
+
+- **代码块终端窗口质感**（Markdown.tsx）：头部加三色圆点（终端惯例，
+  err/warn/ok 降饱和）+ 语言标签青色化 + 右对齐复制按钮
+- **Composer HUD 上缘光**（Composer.tsx）：输入卡片顶部常驻青色渐变细线
+  （pointer-events-none，不干扰拖拽把手），聚焦时与 accent 光晕叠加
+- 运行状态行（Hermes 规划紫 / Hephaestus 执行青脉冲）沿用现有设计
+
+#### 验证
+- `tsc --noEmit` 0 错误；vitest 83/83；`vite build` EXIT 0
+
 ### 🚀 UI 升级：默认主题改为未来科幻风（深空黑 + 电光青）
 
 > 使用 taste-skill + ui-ux-pro-max 双技能完成设计（Design Read：dark-tech

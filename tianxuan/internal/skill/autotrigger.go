@@ -31,6 +31,7 @@ var autoTriggerRules = []AutoTriggerRule{
 	{SkillName: "requesting-code-review", Keywords: []string{"code review", "代码审查", "审查一下", "review 一下", "合并前审查"}},
 	{SkillName: "receiving-code-review", Keywords: []string{"审查意见", "审查反馈", "review 反馈", "review 意见", "按反馈修改"}},
 	{SkillName: "finish-development-branch", Keywords: []string{"收尾", "合并分支", "清理 worktree", "开发分支收尾"}},
+	{SkillName: "release", Keywords: []string{"发布", "打版", "打包发布", "出个新版本", "release 新版本"}},
 }
 
 // MatchSkill 返回输入匹配的第一个技能名；无匹配返回空串。

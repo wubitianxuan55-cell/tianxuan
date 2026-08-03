@@ -180,15 +180,17 @@ func TestEditLinesOldStringMismatchNoSwallow(t *testing.T) {
 func TestEditLinesOldStringMatchExecutes(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "x.go")
-	if err := os.WriteFile(f, []byte("func foo() {\n  body\n}\n"), 0o644); err != nil {
+	// The fixture must be a syntactically valid Go file: edit_lines now
+	// post-validates .go edits with gofmt -e and rolls back invalid files.
+	if err := os.WriteFile(f, []byte("package main\n\nfunc foo() {\n  body\n}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runTool(t, editLines{}, map[string]any{
-		"path": f, "start_line": 2, "end_line": 2,
+		"path": f, "start_line": 4, "end_line": 4,
 		"new_content": "  replaced", "old_string": "  body",
 	})
 	got, _ := os.ReadFile(f)
-	if want := "func foo() {\n  replaced\n}\n"; string(got) != want {
+	if want := "package main\n\nfunc foo() {\n  replaced\n}\n"; string(got) != want {
 		t.Fatalf("match edit = %q, want %q", got, want)
 	}
 }

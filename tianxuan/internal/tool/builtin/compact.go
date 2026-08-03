@@ -11,7 +11,7 @@ var compactDesc = map[string]string{
 	"edit_file":      "精确替换字符串(replace_all可全部替换)",
 	"write_file":     "写入/覆盖文件(自动建父目录)",
 	"multi_edit":     "原子化批量编辑(单文件N步依次执行)",
-	"edit_lines":     "按行号替换文件连续行(起止行号定位)",
+	"edit_lines":     "按行号替换连续行(起止行锚点校验,编辑后自动语法检查)",
 	"delete_range":   "删除文件连续行(起止锚点定位)",
 	"delete_symbol":  "删除Go符号(函数/类型/接口等,AST解析)",
 	"glob":           "通配符匹配文件名(支持**递归)",
@@ -51,7 +51,7 @@ var compactSchema = map[string]json.RawMessage{
 	"multi_edit": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"edits":{"type":"array","items":{"type":"object","properties":{"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["old_string","new_string"]}}},"required":["path","edits"]}`),
 	"edit_lines": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1},"new_content":{"type":"string"}},"required":["path","start_line","end_line","new_content"]}`),
+		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1},"new_content":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"validate":{"type":"boolean"}},"required":["path","start_line","end_line","new_content"]}`),
 	"delete_range": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"inclusive":{"type":"boolean"}},"required":["path","start_anchor","end_anchor"]}`),
 	"delete_symbol": json.RawMessage(

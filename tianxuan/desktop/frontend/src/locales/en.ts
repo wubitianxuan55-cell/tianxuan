@@ -567,9 +567,13 @@ export const en = {
   "browser.analyzePage": "Analyze page with AI",
   "browser.slowHint": "Loading slowly - switch to text mode or open externally",
   "browser.recent": "Recent",
+  "browser.bookmark": "Bookmark this page",
+  "browser.bookmarked": "Remove bookmark",
+  "browser.bookmarks": "Bookmarks",
   "browser.shortcutNewTab": "New tab",
   "browser.shortcutClose": "Close",
   "browser.shortcutAddress": "Address bar",
+  "browser.shortcutBookmark": "Bookmark this page",
 
   "modelSwitcher.searchPlaceholder": "Search models…",
   "modelSwitcher.noMatches": "No matching models",

@@ -566,9 +566,13 @@ export const zh: Record<DictKey, string> = {
   "browser.analyzePage": "AI 分析此页",
   "browser.slowHint": "加载较慢——可切换文本模式或在外部浏览器打开",
   "browser.recent": "最近访问",
+  "browser.bookmark": "收藏当前页",
+  "browser.bookmarked": "取消收藏",
+  "browser.bookmarks": "我的收藏",
   "browser.shortcutNewTab": "新标签",
   "browser.shortcutClose": "关闭",
   "browser.shortcutAddress": "地址栏",
+  "browser.shortcutBookmark": "收藏当前页",
 
   "modelSwitcher.searchPlaceholder": "搜索模型…",
   "modelSwitcher.noMatches": "无匹配模型",

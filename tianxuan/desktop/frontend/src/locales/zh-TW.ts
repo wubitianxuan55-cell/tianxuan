@@ -566,9 +566,13 @@ export const zhTW: Record<DictKey, string> = {
   "browser.analyzePage": "AI 分析此頁",
   "browser.slowHint": "載入較慢——可切換文字模式或在外部瀏覽器開啟",
   "browser.recent": "最近瀏覽",
+  "browser.bookmark": "收藏目前頁面",
+  "browser.bookmarked": "取消收藏",
+  "browser.bookmarks": "我的收藏",
   "browser.shortcutNewTab": "新分頁",
   "browser.shortcutClose": "關閉",
   "browser.shortcutAddress": "網址列",
+  "browser.shortcutBookmark": "收藏目前頁面",
 
   "modelSwitcher.searchPlaceholder": "搜尋模型…",
   "modelSwitcher.noMatches": "無相符模型",

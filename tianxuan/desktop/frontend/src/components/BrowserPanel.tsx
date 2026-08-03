@@ -17,6 +17,7 @@ import {
   Search,
   Send,
   ShieldAlert,
+  Star,
   X,
 } from "lucide-react";
 import { app, openExternal } from "../lib/bridge";
@@ -45,6 +46,13 @@ import {
   isAllowedHost,
   type BrowserStorage,
 } from "../lib/browserPerm";
+import {
+  addBookmark,
+  getBookmarks,
+  isBookmarked,
+  removeBookmark,
+  type Bookmark,
+} from "../lib/browserBookmarks";
 import { getRecent, recordVisit, type RecentVisit } from "../lib/browserRecent";
 import { useT } from "../lib/i18n";
 
@@ -66,6 +74,7 @@ export function BrowserPanel({
   const [activeId, setActiveId] = useState<string>("");
   const [selection, setSelection] = useState("");
   const [recent, setRecent] = useState<RecentVisit[]>(() => (storage ? getRecent(storage) : []));
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => (storage ? getBookmarks(storage) : []));
   const [slowLoad, setSlowLoad] = useState(false);
   const addressRef = useRef<HTMLInputElement>(null);
   const currentId = activeId !== "" ? activeId : tabs[0]?.id ?? "";
@@ -73,6 +82,7 @@ export function BrowserPanel({
   const current = active?.history.index !== undefined && active.history.index >= 0
     ? active.history.entries[active.history.index]
     : "";
+  const bookmarked = current !== "" ? bookmarks.some((b) => b.url === current) : false;
 
   // 导航/切换成功后记录"最近访问"（同域名去重并置顶）。
   useEffect(() => {
@@ -171,6 +181,16 @@ export function BrowserPanel({
     }
   }, [active, current, openText]);
 
+  // 收藏/取消收藏当前页（URL 级去重，跨会话持久化到 localStorage）。
+  const toggleBookmark = useCallback(() => {
+    if (!current || !storage) return;
+    setBookmarks(
+      isBookmarked(storage, current)
+        ? removeBookmark(storage, current)
+        : addBookmark(storage, current),
+    );
+  }, [current, storage]);
+
   const onNewTab = useCallback(() => {
     const r = addTab(tabs, activeId);
     setTabs(r.tabs);
@@ -206,11 +226,14 @@ export function BrowserPanel({
         e.preventDefault();
         addressRef.current?.focus();
         addressRef.current?.select();
+      } else if (k === "d") {
+        e.preventDefault();
+        toggleBookmark();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [visible, onNewTab, onCloseTab, currentId]);
+  }, [visible, onNewTab, onCloseTab, currentId, toggleBookmark]);
 
   const switchTo = useCallback((id: string) => {
     const next = switchTab(tabs, id);
@@ -354,6 +377,18 @@ export function BrowserPanel({
           <ExternalLink size={13} />
         </button>
         <button
+          className={`inline-flex items-center justify-center w-7 h-7 border-0 rounded-md cursor-pointer transition-colors duration-150 disabled:opacity-35 disabled:cursor-default ${
+            bookmarked
+              ? "bg-accent/15 text-accent"
+              : "bg-transparent text-fg-dim hover:bg-bg-soft hover:text-fg"
+          }`}
+          onClick={toggleBookmark}
+          disabled={empty}
+          title={bookmarked ? (t("browser.bookmarked") ?? "取消收藏") : (t("browser.bookmark") ?? "收藏当前页")}
+        >
+          <Star size={13} className={bookmarked ? "fill-current" : ""} />
+        </button>
+        <button
           className="inline-flex items-center justify-center w-7 h-7 border-0 rounded-md bg-transparent text-fg-dim cursor-pointer transition-colors duration-150 hover:bg-accent/10 hover:text-accent disabled:opacity-35 disabled:cursor-default"
           onClick={() => void app.OpenBrowserWindow(current).catch(() => {})}
           disabled={empty}
@@ -415,6 +450,38 @@ export function BrowserPanel({
               <Globe size={30} />
               <div className="text-xs">{t("browser.emptyHint")}</div>
             </div>
+            {bookmarks.length > 0 && (
+              <div className="w-full max-w-sm flex flex-col gap-2">
+                <div className="text-[10px] uppercase tracking-wider text-fg-faint">
+                  {t("browser.bookmarks") ?? "我的收藏"}
+                </div>
+                {bookmarks.map((b) => (
+                  <div
+                    key={b.url}
+                    className="group flex items-center gap-2.5 px-3 py-2 rounded-md border border-border-soft/60 bg-bg-soft/40 cursor-pointer transition-colors duration-150 hover:border-accent/40 hover:text-fg"
+                    onClick={() => navigate(b.url)}
+                  >
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-accent/15 text-accent shrink-0">
+                      {hostInitial(b.url)}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-xs text-fg truncate">{b.host}</span>
+                      <span className="block text-[10px] text-fg-faint font-mono truncate">{b.url}</span>
+                    </span>
+                    <button
+                      className="inline-flex items-center justify-center w-5 h-5 rounded border-0 cursor-pointer text-fg-faint opacity-0 group-hover:opacity-100 hover:bg-del-bg hover:text-err transition-opacity duration-150"
+                      title={t("browser.bookmarked") ?? "取消收藏"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBookmarks(removeBookmark(storage!, b.url));
+                      }}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             {recent.length > 0 && (
               <div className="w-full max-w-sm flex flex-col gap-2">
                 <div className="text-[10px] uppercase tracking-wider text-fg-faint">

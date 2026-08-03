@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -107,13 +109,9 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"conditional chaining, or issue the commands as separate calls")
 	}
 
-	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
-	argv, _ := sandbox.Command(b.sb, sh, p.Command)
-
-	// V10.127: 服务类命令防呆——前台启动服务器/监听进程会阻塞 turn 直到
-	// 120s 超时，且超时后服务进程可能仍持有输出管道写端，使 cmd.Wait()
-	// 永久阻塞（整个进程卡死、只能重启）。检测到服务类命令且未显式
-	// run_in_background 时自动转后台：立即返回 job id，kill_shell 可随时停。
+	// Service-command auto-background must be judged on the ORIGINAL command:
+	// adaptPowerShellCommand rewrites bare npm to npm.cmd, which would break
+	// the service markers below.
 	autoBackground := false
 	if !p.RunInBackground && isServiceCommand(p.Command) {
 		if _, ok := jobs.FromContext(ctx); ok {
@@ -121,6 +119,30 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			autoBackground = true
 		}
 	}
+
+	// P1 Windows/PowerShell adaptation: translate bash-isms the model habitually
+	// writes (heredocs, bare npm shims) and inject git's cmd dir when git is not
+	// on PATH. Bash shells skip this entirely - the model's POSIX syntax works
+	// as-is there.
+	if sh.Kind == sandbox.ShellPowerShell {
+		gitCmdDir := ""
+		if _, err := exec.LookPath("git"); err != nil {
+			gitCmdDir = findGitCmdDir()
+		}
+		adapted, aerr := adaptPowerShellCommand(p.Command, gitCmdDir)
+		if aerr != nil {
+			return "", aerr
+		}
+		p.Command = adapted
+	}
+
+	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
+	argv, _ := sandbox.Command(b.sb, sh, p.Command)
+
+	// V10.127: 服务类命令防呆——前台启动服务器/监听进程会阻塞 turn 直到
+	// 120s 超时，且超时后服务进程可能仍持有输出管道写端，使 cmd.Wait()
+	// 永久阻塞（整个进程卡死、只能重启）。检测到服务类命令且未显式
+	// run_in_background 时自动转后台：立即返回 job id，kill_shell 可随时停。
 
 	if p.RunInBackground {
 		jm, ok := jobs.FromContext(ctx)
@@ -445,4 +467,174 @@ func truncateStream(s string, maxBytes int) (string, bool) {
 		return s, false
 	}
 	return result, true
+}
+
+// ---- Windows/PowerShell command adaptation (P1) ----
+
+var (
+	heredocMarkerRE   = regexp.MustCompile(`<<-?['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?`)
+	heredocRedirectRE = regexp.MustCompile(`(>>|>)\s*("[^"]*"|'[^']*'|\S+)`)
+	cmdShimRE         = regexp.MustCompile(`(^|[;&|(){}\r\n]+\s*)\b(npm|npx|pnpm|pnpx|pn)(\s|$)`)
+	// stdinHeredocCmds 是可安全接收 stdin 管道 heredoc 的命令（python -、
+	// node -、npx tsx - 等）。白名单之外的命令无法可靠翻译，大声失败并提示。
+	stdinHeredocCmds = map[string]bool{
+		"python": true, "python3": true, "py": true,
+		"node": true, "tsx": true, "deno": true, "bun": true,
+		"ruby": true, "perl": true, "php": true,
+		"npx": true, "pnpm": true, "npm": true,
+	}
+)
+
+// adaptPowerShellCommand rewrites bash-isms that Windows PowerShell 5.1 cannot
+// parse, so the model's POSIX habits stop failing on a Windows host:
+//   - <<heredoc blocks become PowerShell here-strings: cat > file / >> file
+//     become [IO.File]::WriteAllText/AppendAllText; any other command (python -,
+//     node -, npx tsx -) gets the heredoc piped to its stdin.
+//   - bare npm/npx/pnpm/pnpx at command positions gain a .cmd suffix, forcing
+//     PowerShell past its .ps1-first lookup that hits the execution policy.
+//   - gitCmdDir, when non-empty, is prepended to $env:Path so git works even
+//     when it is not on PATH (PortableGit / per-user installs).
+func adaptPowerShellCommand(cmd, gitCmdDir string) (string, error) {
+	var err error
+	cmd, err = adaptHeredoc(cmd)
+	if err != nil {
+		return "", err
+	}
+	cmd = adaptCmdShims(cmd)
+	if gitCmdDir != "" {
+		cmd = "$env:Path='" + psSingleQuote(gitCmdDir) + ";' + $env:Path; " + cmd
+	}
+	return cmd, nil
+}
+
+// adaptHeredoc translates the first heredoc block in cmd, returning the adapted
+// command. Commands without a heredoc pass through unchanged.
+func adaptHeredoc(cmd string) (string, error) {
+	prefix, body, redirect, rest, ok := splitHeredoc(cmd)
+	if !ok {
+		return cmd, nil
+	}
+	psBody := "@'\n" + body + "\n'@"
+	name := heredocCommandName(prefix)
+	switch {
+	case name == "cat" && redirect != "":
+		method := "WriteAllText"
+		if strings.HasPrefix(redirect, ">>") {
+			method = "AppendAllText"
+		}
+		path := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(redirect, ">>"), ">"))
+		return fmt.Sprintf("[System.IO.File]::%s('%s', %s)%s", method, psSingleQuote(path), psBody, heredocTail(rest)), nil
+	case name == "cat":
+		return psBody + heredocTail(rest), nil
+	case name != "" && stdinHeredocCmds[name]:
+		return psBody + " | " + prefix + heredocTail(rest), nil
+	default:
+		return "", fmt.Errorf("cannot translate heredoc command %q to PowerShell; use write_file or a PowerShell here-string", prefix)
+	}
+}
+
+// splitHeredoc extracts the first <<marker heredoc block from cmd: the command
+// prefix before it, the body lines, any > / >> redirect on the opening line,
+// and the remainder after the closing marker.
+func splitHeredoc(cmd string) (prefix, body, redirect, rest string, ok bool) {
+	idx := strings.Index(cmd, "<<")
+	if idx < 0 {
+		return "", "", "", "", false
+	}
+	m := heredocMarkerRE.FindStringSubmatchIndex(cmd[idx:])
+	if m == nil {
+		return "", "", "", "", false
+	}
+	marker := cmd[idx+m[2] : idx+m[3]]
+	lineEnd := strings.IndexByte(cmd[idx:], '\n')
+	if lineEnd < 0 {
+		return "", "", "", "", false // unterminated heredoc
+	}
+	head := cmd[idx : idx+lineEnd]
+	if r := heredocRedirectRE.FindStringSubmatch(head); r != nil {
+		redirect = strings.TrimSpace(r[1] + " " + strings.Trim(r[2], `"'`))
+	}
+	bodyLines := []string{}
+	found := false
+	restLines := strings.Split(cmd[idx+lineEnd+1:], "\n")
+	for i, ln := range restLines {
+		if strings.TrimLeft(ln, "\t") == marker {
+			rest = strings.Join(restLines[i+1:], "\n")
+			found = true
+			break
+		}
+		bodyLines = append(bodyLines, ln)
+	}
+	if !found {
+		return "", "", "", "", false
+	}
+	return strings.TrimSpace(cmd[:idx]), strings.Join(bodyLines, "\n"), redirect, rest, true
+}
+
+// heredocCommandName extracts the bare command name (path and quotes stripped)
+// from a heredoc command prefix, e.g. "npx tsx -" → "npx".
+func heredocCommandName(prefix string) string {
+	prefix = strings.TrimSpace(prefix)
+	if i := strings.IndexAny(prefix, " \t"); i >= 0 {
+		prefix = prefix[:i]
+	}
+	prefix = strings.Trim(prefix, `"'`)
+	if i := strings.LastIndexAny(prefix, `/\`); i >= 0 {
+		prefix = prefix[i+1:]
+	}
+	return prefix
+}
+
+// heredocTail appends the post-heredoc remainder on its own line, or nothing.
+func heredocTail(rest string) string {
+	if rest == "" {
+		return ""
+	}
+	return "\n" + rest
+}
+
+// adaptCmdShims forces bare npm/npx/pnpm/pnpx/pn at command positions to their
+// .cmd shims. PowerShell 5.1 prefers the .ps1 sibling, whose execution the
+// default execution policy blocks; the .cmd suffix bypasses that lookup.
+func adaptCmdShims(cmd string) string {
+	return cmdShimRE.ReplaceAllString(cmd, "${1}${2}.cmd${3}")
+}
+
+// psSingleQuote escapes a string for a PowerShell single-quoted literal.
+func psSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
+
+// findGitCmdDir returns the cmd directory of the first git install found in the
+// usual Windows locations, or "" when git is already on PATH or nowhere found.
+// Callers only use it after LookPath("git") fails.
+func findGitCmdDir() string {
+	var roots []string
+	for _, env := range []string{"ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"} {
+		if v := os.Getenv(env); v != "" {
+			roots = append(roots, v)
+		}
+	}
+	if v := os.Getenv("LOCALAPPDATA"); v != "" {
+		roots = append(roots, filepath.Join(v, "Programs"))
+		roots = append(roots, filepath.Join(v, "Programs", "Git"))
+	}
+	var candidates []string
+	for _, r := range roots {
+		candidates = append(candidates,
+			filepath.Join(r, "Git", "cmd"),
+			filepath.Join(r, "PortableGit", "cmd"),
+		)
+	}
+	for _, d := range candidates {
+		if fileExistsPath(filepath.Join(d, "git.exe")) {
+			return d
+		}
+	}
+	return ""
+}
+
+func fileExistsPath(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }

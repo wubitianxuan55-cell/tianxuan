@@ -14,6 +14,15 @@ import (
 	"tianxuan/internal/tool/builtin"
 )
 
+// GitWorkflowHint 是 L1 系统提示中的静态工作流规则(缓存安全:纯静态文本,
+// 不注入实时 git 状态):多任务/长会话开始前主动检查分支并建议建功能分支,
+// 任务完成按逻辑单元拆分提交,避免变更堆积在受保护分支。
+const GitWorkflowHint = `## Git 工作流约定
+
+- 多任务或长会话开始前,先用 git_status 检查工作区:若当前分支不是功能分支(如 master/main)且有未提交变更,建议用 git_worktree 创建功能分支再动手,避免变更堆积无法按任务提交。
+- 任务完成时按逻辑单元拆分提交(git_diff 核对范围),不要一次堆积大量无关变更。
+- 若提交被分支保护拒绝,先把变更迁到功能分支(git_worktree),不要绕过保护。`
+
 // syspromptOut contains the artifacts produced by building the system prompt.
 type syspromptOut struct {
 	prompt     string
@@ -35,6 +44,7 @@ func buildSystemPrompt(cfg *config.Config, stderrPath io.Writer) (*syspromptOut,
 	if st, ok := outputstyle.Resolve(cfg.Agent.OutputStyle, outputstyle.Dirs()); ok {
 		sysPrompt = outputstyle.Apply(sysPrompt, st)
 	}
+	sysPrompt += "\n\n" + GitWorkflowHint
 	sysPrompt += "\n\n" + config.LanguagePolicy
 
 	mem := memory.Load(memory.Options{CWD: ".", UserDir: config.MemoryUserDir()})

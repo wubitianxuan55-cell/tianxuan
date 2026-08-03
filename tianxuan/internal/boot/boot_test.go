@@ -309,6 +309,41 @@ api_key_env = "TIANXUAN_TEST_KEY_UNSET"
 	}
 }
 
+// TestBuildGitWorkflowHintPresent: 多任务开始前提示检查分支/建功能分支的
+// 静态规则必须进入 L1 系统提示(缓存安全:静态文本,不注入实时 git 状态)。
+func TestBuildGitWorkflowHintPresent(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
+	t.Chdir(dir)
+	writeFile(t, dir, "tianxuan.toml", `
+default_model = "test-model"
+
+[codegraph]
+enabled = false
+
+[agent]
+system_prompt = "BASE"
+
+[[providers]]
+name = "test-model"
+kind = "openai"
+base_url = "https://example.invalid"
+model = "x"
+api_key_env = "TIANXUAN_TEST_KEY_UNSET"
+`)
+
+	ctrl, err := Build(context.Background(), Options{})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	defer ctrl.Close()
+
+	sys := systemMessage(ctrl.History())
+	if !strings.Contains(sys, GitWorkflowHint) {
+		t.Fatalf("git workflow hint missing from system prompt:\n%s", sys)
+	}
+}
+
 func systemMessage(msgs []provider.Message) string {
 	for _, m := range msgs {
 		if m.Role == provider.RoleSystem {
@@ -336,6 +371,10 @@ func stripBootBlocks(s string) string {
 	}
 	// Strip language policy (appended before memory, now at the tail)
 	s = strings.TrimSpace(strings.TrimSuffix(s, config.LanguagePolicy))
+	// Strip git workflow hint (appended right before the language policy)
+	if i := strings.Index(s, "\n\n## Git 工作流约定"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
 	return s
 }
 

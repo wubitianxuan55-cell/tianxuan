@@ -1,3 +1,19 @@
+## V10.153.0 (2026-08-03) — 编辑安全 + Windows 适配 + 发布流水线
+
+### 变更
+- edit_lines 内容锚点校验（start_anchor/end_anchor 不匹配即拒绝且不写文件）+ 编辑后自动语法检查回滚（.go→gofmt -e，.ts/.tsx→项目本地 tsc，失败/超时自动回滚）
+- bash PowerShell 适配层：heredoc 转 here-string、npm/npx/pnpm .cmd shim 绕开执行策略、git 不在 PATH 时自动注入常见安装目录
+- 内置 release 发布技能：版本号同步/打包/CHANGELOG/记忆一键化 + autotrigger 触发词
+- L1 注入 Git 工作流约定：多任务开始前提示 git_worktree 建功能分支，完成按逻辑单元拆分提交
+- bash 高危环境变量主动预警：数据库类命令执行前比对用户级 DATABASE_URL 与项目 .env
+
+### 发布产物
+- `release/v10.153.0/tianxuan-desktop.exe` · 25,020,928 bytes (~23.9 MB)
+- SHA256: `957ecce4a2357e63bd68a0e596a2fcf81e38e71476769c83265ba8b947c0924e`
+- 验证：`go test ./...` 全绿 · `go vet` 干净 · `wails build` EXIT 0
+
+---
+
 ## V10.152.0 (2026-08-02) — 编程能力强化：向 Codex 工程效率看齐
 
 ### 重构

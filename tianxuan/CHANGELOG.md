@@ -2849,3 +2849,53 @@
 - 新增 store_roots / extract / dream / strength / search / recall / refs /
   controller extract 测试；全仓 `go test ./...` 无 FAIL、go vet 通过、
   `tsc --noEmit` 0 错误、vitest 52 用例全过、desktop `wails build` 通过
+## [10.153.0] — 2026-08-03
+
+### 🛡️ 编辑安全：edit_lines 锚点校验 + 自动语法检查回滚
+
+> P0 最痛点：纯行号替换多次编辑后偏移，导致误删声明/字段覆盖/括号缺失。
+
+#### 变更
+- **内容锚点定位**：`start_anchor`/`end_anchor` 校验起止行实际内容，不匹配即拒绝且不写文件
+- **编辑后自动校验**：`validate`（默认 true）——`.go` 走 `gofmt -e`；`.ts/.tsx` 走项目本地 `tsc --noEmit --skipLibCheck`（限时 60s），失败/超时自动回滚
+- 换行符感知保持（CRLF/LF 归一化，锚点比对前归一化）
+
+#### 测试（TDD RED→GREEN）
+- 新增 13 例：锚点不匹配拒绝×2、匹配通过、CRLF 锚点、Go/TS 校验回滚与通过、validate=false 跳过
+- 全量 go test ./... 通过；go vet 干净
+
+### 🪟 Windows/PowerShell 工具适配
+
+> P1：heredoc 不支持、npx.ps1 被执行策略禁、git 不在 PATH，多次重试。
+
+#### 变更
+- heredoc 转 here-string：`cat > / >> file` → WriteAllText/AppendAllText；`python/node/tsx -` → stdin 管道
+- 裸 npm/npx/pnpm/pnpx 自动 `.cmd` 后缀，绕开 PowerShell `.ps1` 优先解析的执行策略拦截
+- git 不在 PATH 时自动注入常见安装目录（ProgramFiles/PortableGit）
+- 服务命令自动后台改为基于原始命令判定
+
+#### 测试（TDD RED→GREEN）
+- 新增 11 例（含真实 PowerShell e2e 写文件）
+
+### 🚀 发布流水线：内置 release 技能
+
+> P3：打包手写临时脚本、版本号手同步、changelog 手写。
+
+#### 变更
+- release 技能（项目级 + bundled 内置）：版本号 4 处同步、全量验证先行、打包、模板、提交核对清单
+- `scripts/package.ps1`：定位 exe → `release/vX.Y.Z/` + SHA256SUMS（内置排除清单）
+- autotrigger 注册"发布/打版/打包发布"触发词
+
+### 🌿 Git 工作流约定（L1 静态提示）
+
+> P4：master 禁提交导致 19+ 项变更堆积。
+
+- 多任务/长会话开始前提示 git_status 检查 + git_worktree 建功能分支
+- 完成按逻辑单元拆分提交；被保护分支拒绝时先迁功能分支
+
+### ⚠️ 高危环境变量主动预警
+
+> P5：DATABASE_URL 用户级变量复发连错库。
+
+- 数据库类命令（prisma/psql/mysql/migrate）执行前比对用户级 DATABASE_URL 与项目 .env
+- 不一致时 plain 输出前缀注入 env-warning、JSON 模式进 warning 字段；一致/无关命令零噪音

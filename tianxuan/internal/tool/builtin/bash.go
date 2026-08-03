@@ -109,6 +109,10 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"conditional chaining, or issue the commands as separate calls")
 	}
 
+	// P5: 高危环境变量主动预警。数据库类命令 + 用户级 DATABASE_URL 与项目
+	// .env 不一致时,在输出/JSON 中注入警告,不依赖记忆兜底。
+	envWarn := envWarningForCommand(p.Command, b.workDir)
+
 	// Service-command auto-background must be judged on the ORIGINAL command:
 	// adaptPowerShellCommand rewrites bare npm to npm.cmd, which would break
 	// the service markers below.
@@ -300,6 +304,9 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"stderr":      stderrStr,
 			"command":     p.Command,
 		}
+		if envWarn != "" {
+			result["warning"] = envWarn
+		}
 		if stdoutTrunc {
 			result["stdout_truncated"] = true
 		}
@@ -314,6 +321,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	out := stdoutBuf.String()
 	const plainMaxBytes = 48 * 1024
 	out, _ = truncateStream(out, plainMaxBytes)
+	out = prefixWarning(out, envWarn)
 
 	if err != nil {
 		// Non-zero exit: feed output and error back so the model can self-correct.
@@ -637,4 +645,74 @@ func findGitCmdDir() string {
 func fileExistsPath(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir()
+}
+
+// ---- P5: high-risk environment variable warning ----
+
+// sensitiveEnvCommandKeywords 是涉及数据库连接的命令关键词;命中才做预警,
+// 避免无关命令的噪音。
+var sensitiveEnvCommandKeywords = []string{
+	"prisma", "database_url", "psql", "mysql", "migrate", "db push",
+}
+
+// envWarningForCommand 检查数据库类命令是否会在用户级高危环境变量与项目
+// .env 不一致的情况下执行。返回预警文本;无风险返回空串。
+// 主动检查项:不依赖记忆兜底,每次执行前判定(纯函数,无副作用)。
+func envWarningForCommand(cmd, workDir string) string {
+	lower := strings.ToLower(cmd)
+	hit := false
+	for _, kw := range sensitiveEnvCommandKeywords {
+		if strings.Contains(lower, kw) {
+			hit = true
+			break
+		}
+	}
+	if !hit {
+		return ""
+	}
+	userVal := os.Getenv("DATABASE_URL")
+	if userVal == "" {
+		return ""
+	}
+	projVal := readDotEnvValue(workDir, "DATABASE_URL")
+	if projVal == "" || projVal == userVal {
+		return ""
+	}
+	return "[env-warning] 用户级 DATABASE_URL 与项目 .env 不一致(项目 .env: " + projVal +
+		") — 命令可能连错库;确认数据库目标后再执行"
+}
+
+// readDotEnvValue 从 workDir/.env(workDir 为空则用进程 cwd)读取 KEY=VALUE,
+// 支持双引号/单引号包裹。文件缺失或键不存在返回空串。
+func readDotEnvValue(workDir, key string) string {
+	dir := workDir
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	b, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if ok && strings.TrimSpace(k) == key {
+			return strings.Trim(strings.TrimSpace(v), `"'`)
+		}
+	}
+	return ""
+}
+
+// prefixWarning 把预警拼到命令输出最前,保证模型第一眼看到。
+func prefixWarning(out, warn string) string {
+	if warn == "" {
+		return out
+	}
+	if out == "" {
+		return warn
+	}
+	return warn + "\n" + out
 }

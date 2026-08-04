@@ -266,8 +266,7 @@ type AgentRunner struct {
 
 	// patternExtractor learns from recurring tool errors across sessions.
 	patternExtractor interface {
-		Extract(toolName, result string) *learning.Pattern
-		SaveStore() error
+		Observe(toolName, result string) *learning.Pattern
 	}
 
 	// jobs, when non-nil, is the session's background-job manager. executeOne
@@ -331,6 +330,9 @@ type AgentRunner struct {
 	// auditFunc, when non-nil, is called after each tool execution for
 	// audit trail logging (V3.2).
 	auditFunc func(tool string, taskKind string, readOnly bool, outcome string, errMsg string, outputLen int, durationMs int64)
+	// toolStats, when non-nil, aggregates per-tool failure modes across
+	// sessions (V10.154, distilled from codex ToolDispatchTrace).
+	toolStats *tool.Stats
 
 	// preOutcomes collects results of read-only tool calls that were pre-executed
 	// during stream() before the full batch. Keyed by tool call ID. executeBatch
@@ -521,8 +523,7 @@ func (a *AgentRunner) Sink() event.Sink { return a.sink }
 func (a *AgentRunner) SetSink(s event.Sink) { a.sink = s }
 
 func (a *AgentRunner) SetPatternExtractor(e interface {
-	Extract(toolName, result string) *learning.Pattern
-	SaveStore() error
+	Observe(toolName, result string) *learning.Pattern
 }) {
 	a.patternExtractor = e
 }
@@ -728,6 +729,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		dispatcher:    opts.Dispatcher,
 		ctxMgr:        opts.CtxMgr,
 		auditFunc:     opts.AuditFunc,
+		toolStats:     opts.ToolStats,
 		tc:            cache.New(-1), // V5.8: session �����棬mtime У�������
 		goal:          opts.Goal,     // V6.0 P7: �ỰĿ��
 		disableVerify: opts.DisableVerify,

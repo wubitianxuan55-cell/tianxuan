@@ -113,6 +113,16 @@ var errorClassifiers = []struct {
 		}
 		return "", ""
 	}},
+	// Universal classifier (Tool == "" matches every tool): the schema
+	// validator (V10.154, distilled from codex CLI) fails argument type /
+	// required / enum violations with CodeValidationError. The model must learn
+	// to re-read the schema embedded in the error message instead of guessing.
+	{Tool: "", MatchFn: func(r string) (string, string) {
+		if env, ok := tool.ParseEnvelope(r); ok && env.Code == tool.CodeValidationError {
+			return "validation_error", "the arguments did not match the tool schema; re-emit them exactly per the schema included in the error message"
+		}
+		return "", ""
+	}},
 	{Tool: "write_file", MatchFn: func(r string) (string, string) {
 		if strings.Contains(r, "outside") || strings.Contains(r, "confine") || strings.Contains(r, "permission") {
 			return "write_outside_workspace", "the file must be within the project workspace or a configured write root"
@@ -136,7 +146,7 @@ func (e *PatternExtractor) Extract(toolName, result string) *Pattern {
 	}
 
 	for _, cls := range errorClassifiers {
-		if cls.Tool != toolName {
+		if cls.Tool != "" && cls.Tool != toolName {
 			continue
 		}
 		kind, recovery := cls.MatchFn(result)
@@ -154,6 +164,35 @@ func (e *PatternExtractor) Extract(toolName, result string) *Pattern {
 		}
 	}
 	return nil
+}
+
+// Observe extracts a failure pattern from one tool result, merges it into the
+// on-disk store (count advances per occurrence), and persists. It returns the
+// merged pattern, or nil when the result was not a learnable failure.
+//
+// The previous pipeline called Extract() and then SaveStore() without ever
+// merging, so counts never advanced and ActivePatterns() stayed empty; this is
+// the single entry point that makes cross-session learning actually work.
+func (e *PatternExtractor) Observe(toolName, result string) *Pattern {
+	p := e.Extract(toolName, result)
+	if p == nil {
+		return nil
+	}
+	store, err := LoadStore(e.filesPath)
+	if err != nil {
+		return nil
+	}
+	MergePattern(store, p)
+	if err := SaveStore(e.filesPath, store); err != nil {
+		return nil
+	}
+	// Return the merged entry so callers/tests see the updated count.
+	for i := range store.Patterns {
+		if store.Patterns[i].Sig == p.Sig {
+			return &store.Patterns[i]
+		}
+	}
+	return p
 }
 
 // isErrorResult checks whether a tool result string indicates failure.

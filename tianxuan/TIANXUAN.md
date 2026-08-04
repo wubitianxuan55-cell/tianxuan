@@ -1,5 +1,41 @@
 # tianxuan project memory
 
+> V10.154.0 — Codex CLI 工具蒸馏 · 2026-08-04
+
+## V10.154.0 (2026-08-04)
+
+### Codex CLI 工具蒸馏（降低工具出错率）
+
+参照 openai/codex 开源版（main @ 6d4d944）蒸馏，详见 `docs/design/codex-tools-distillation.md`。
+
+#### 执行前 schema 校验（对齐 codex json_schema.rs）
+- `internal/tool/validate.go`：ValidateArgs 校验必填/类型/枚举，未知字段收集（不阻止），
+  别名映射满足必填并按规范字段校验，无效 schema 安全降级
+- `internal/agent/execute_one.go`：内建工具执行前校验，错误以 `validation_error` 大声
+  失败并附带完整 schema（模型下一轮按 schema 修正）
+- 别名清单 `builtinAliases`：read_file(file→path)、wait(job_id→job_ids, timeout_ms→timeout_seconds)、
+  edit_lines(old_string extra)
+
+#### compact schema 保留参数描述
+- `internal/tool/builtin/compact.go`：30 个工具 compactSchema 补精简英文描述
+  （默认值/范围/语义）
+- `internal/provider/schema_canonicalize.go`：新增 `CanonicalizeSchemaVerbose`（保留
+  description），`FilteredSchemas` compact 分支启用 —— 修复描述被规范化管线二次剥离
+
+#### 工具错误统计（codex ToolDispatchTrace 蒸馏）
+- `internal/tool/stats.go`：Stats（tool × error_kind × count/last_seen）+ ClassifyError
+  + JSON 原子落盘 `.tianxuan/tool-stats.json`
+- `internal/agent/batch_executor.go`：统一记录（排除权限门控 blocked）
+- `internal/boot/boot.go`：生产接线；`internal/cli/tools.go`：`tianxuan tools stats` 命令
+
+#### learning 链路修复
+- `internal/learning/patterns.go`：新增 `Observe`（提取+合并+持久化）—— 原
+  Extract+SaveStore 从不 merge，计数永不增长、系统提示注入形同虚设
+- validation_error 通配分类（Tool="" 兜底）
+
+#### 编辑错误反馈补齐
+- `delete_range.go` / `delete_symbol.go`：not found / not unique 错误补恢复 hint
+
 > V10.23.0 — 测试修复 + boot 拆分 + 前端测试 + 缓存安全工具 · 2026-07-04
 
 ## V10.23.0 (2026-07-04)

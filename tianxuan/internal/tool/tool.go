@@ -497,10 +497,12 @@ func (r *Registry) FilteredSchemas(names []string) []provider.ToolSchema {
 			desc = cd.CompactDescription()
 			schema := cd.CompactSchema()
 			// Compact schemas are context-dependent — canonicalize inline.
+			// Keep parameter descriptions: they are the model's only source of
+			// parameter semantics (V10.154, distilled from codex CLI).
 			out = append(out, provider.ToolSchema{
 				Name:        t.Name(),
 				Description: desc,
-				Parameters:  provider.CanonicalizeSchema(schema),
+				Parameters:  provider.CanonicalizeSchemaVerbose(schema),
 			})
 		} else {
 			// Standard schema — use pre-canonicalized cache from Add().

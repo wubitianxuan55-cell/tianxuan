@@ -46,9 +46,29 @@ func TestEditLinesCompactSchemaMinimum(t *testing.T) {
 		t.Fatal("edit_lines must implement CompactDescriptor")
 	}
 	schema := string(cd.CompactSchema())
-	for _, want := range []string{`"start_line":{"type":"integer","minimum":1}`, `"end_line":{"type":"integer","minimum":1}`} {
+	for _, want := range []string{`"start_line":{"type":"integer","minimum":1`, `"end_line":{"type":"integer","minimum":1`} {
 		if !strings.Contains(schema, want) {
 			t.Errorf("compact schema missing %s (full schema has it; model sees compact → 漏传/传 0 根因)\nfull: %s", want, schema)
+		}
+	}
+}
+
+// TestCompactSchemaKeepsDescriptions 防回归（V10.154）：compact schema 是模型
+// 唯一看到的参数定义，必须保留参数语义描述（默认值/约束），否则模型只能猜参数
+// 含义 —— 参数类工具错误的根因。蒸馏自 codex CLI 的 schema 设计。
+func TestCompactSchemaKeepsDescriptions(t *testing.T) {
+	for _, name := range []string{"edit_file", "read_file", "bash", "grep"} {
+		tl, ok := tool.LookupBuiltin(name)
+		if !ok {
+			t.Fatalf("builtin %q not found", name)
+		}
+		cd, ok := tl.(tool.CompactDescriptor)
+		if !ok {
+			t.Fatalf("%s must implement CompactDescriptor", name)
+		}
+		schema := string(cd.CompactSchema())
+		if !strings.Contains(schema, "description") {
+			t.Errorf("%s: compact schema has no parameter descriptions (model cannot infer parameter semantics)", name)
 		}
 	}
 }

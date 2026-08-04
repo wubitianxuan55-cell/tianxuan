@@ -9,8 +9,11 @@ import (
 // deeply nested schemas (multi_edit / complete_step have nested arrays).
 const compressSchemaMaxDepth = 5
 // compressSchema strips redundant fields from a JSON Schema to reduce prompt
-// token count.
-func compressSchema(v any, depth int) any {
+// token count. When stripDescriptions is true, description fields are removed
+// at every nesting level (they are redundant with the tool-level description);
+// the compact tool schema keeps them because the model has no other source of
+// parameter semantics (V10.154, distilled from codex CLI).
+func compressSchema(v any, depth int, stripDescriptions bool) any {
 	if depth > compressSchemaMaxDepth {
 		return v
 	}
@@ -20,7 +23,9 @@ func compressSchema(v any, depth int) any {
 	}
 	// Strip all description fields — they mirror the tool-level Description()
 	// and only inflate per-turn prompt tokens. Applies at every nesting level.
-	delete(obj, "description")
+	if stripDescriptions {
+		delete(obj, "description")
+	}
 	// Do NOT remove "type":"object" — DeepSeek API requires it.
 	// Remove "type":"string" from property values (safe: implied when omitted)
 	if prop, hasProps := obj["properties"]; hasProps {
@@ -33,13 +38,13 @@ func compressSchema(v any, depth int) any {
 					if len(pm) == 0 {
 						props[key] = struct{}{}
 					} else {
-						props[key] = compressSchema(pm, depth+1)
+						props[key] = compressSchema(pm, depth+1, stripDescriptions)
 					}
 				}
 			}
 		}
 		if items, hasItems := obj["items"]; hasItems {
-			obj["items"] = compressSchema(items, depth+1)
+			obj["items"] = compressSchema(items, depth+1, stripDescriptions)
 		}
 	}
 	// Remove empty "required":[]
@@ -55,6 +60,17 @@ func compressSchema(v any, depth int) any {
 // schema always produces the same byte representation, then compresses
 // redundant fields for minimum prompt token consumption.
 func CanonicalizeSchema(raw json.RawMessage) json.RawMessage {
+	return canonicalizeSchema(raw, true)
+}
+
+// CanonicalizeSchemaVerbose is like CanonicalizeSchema but preserves
+// description fields. Compact tool schemas use it so the model still sees
+// parameter semantics (defaults, units, constraints) instead of bare types.
+func CanonicalizeSchemaVerbose(raw json.RawMessage) json.RawMessage {
+	return canonicalizeSchema(raw, false)
+}
+
+func canonicalizeSchema(raw json.RawMessage, stripDescriptions bool) json.RawMessage {
 	if len(raw) == 0 {
 		return raw
 	}
@@ -62,7 +78,7 @@ func CanonicalizeSchema(raw json.RawMessage) json.RawMessage {
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return raw
 	}
-	canon := canonicalizeSchemaValue(v)
+	canon := canonicalizeSchemaValue(v, stripDescriptions)
 	b, err := json.Marshal(canon)
 	if err != nil {
 		return raw
@@ -75,12 +91,12 @@ var setLikeSchemaArrays = map[string]bool{
 	"dependentRequired": true,
 }
 
-func canonicalizeSchemaValue(v any) any {
-	v = compressSchema(v, 0)
+func canonicalizeSchemaValue(v any, stripDescriptions bool) any {
+	v = compressSchema(v, 0, stripDescriptions)
 	switch val := v.(type) {
 	case map[string]any:
 		for k, inner := range val {
-			val[k] = canonicalizeSchemaValue(inner)
+			val[k] = canonicalizeSchemaValue(inner, stripDescriptions)
 		}
 		for key := range val {
 			if setLikeSchemaArrays[key] {
@@ -105,7 +121,7 @@ func canonicalizeSchemaValue(v any) any {
 		return val
 	case []any:
 		for i, elem := range val {
-			val[i] = canonicalizeSchemaValue(elem)
+			val[i] = canonicalizeSchemaValue(elem, stripDescriptions)
 		}
 		return val
 	default:

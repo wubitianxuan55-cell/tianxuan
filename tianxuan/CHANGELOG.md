@@ -2899,3 +2899,36 @@
 
 - 数据库类命令（prisma/psql/mysql/migrate）执行前比对用户级 DATABASE_URL 与项目 .env
 - 不一致时 plain 输出前缀注入 env-warning、JSON 模式进 warning 字段；一致/无关命令零噪音
+## [10.154.0] — 2026-08-04
+
+### 🧬 Codex CLI 工具蒸馏：执行前校验 + 参数语义 + 错误闭环
+
+> 克隆 openai/codex 开源版（main @ 6d4d944）蒸馏其工具设计，直击"工具出错率高"
+> 根因：模型看不到参数语义（compact schema 剥光描述）+ 参数错误被静默容错
+> （模型永远学不会）+ 无错误度量。详见 docs/design/codex-tools-distillation.md。
+
+#### 变更
+- **执行前 schema 校验（对齐 codex json_schema.rs）**：新增 `internal/tool/validate.go`，
+  内建工具在 precheck 之前校验必填/类型/枚举，错误以 `validation_error` 大声失败并
+  附带完整 schema 提示（模型下一轮按 schema 修正）；别名（file→path、job_id→job_ids、
+  timeout_ms→timeout_seconds）继续兼容并满足必填检查；无效 schema 安全降级放行
+- **compact schema 保留参数描述（V10.154 根治参数盲猜）**：30 个内置工具 compactSchema
+  补齐精简英文描述（默认值/范围/语义）；新增 `CanonicalizeSchemaVerbose` 防止规范化
+  管线二次剥离 description（`FilteredSchemas` compact 分支启用）
+- **工具错误统计（codex ToolDispatchTrace 蒸馏）**：新增 `internal/tool/stats.go`
+  （tool × error_kind × count/last_seen，JSON 原子落盘 .tianxuan/tool-stats.json）；
+  executeBatch 统一记录（排除权限门控）；`tianxuan tools stats` 新命令查看
+- **修复 learning 学习链路 bug**：`Extract` 返回的 pattern 从未 merge（计数永不增长、
+  系统提示注入形同虚设）→ 新增 `Observe`（提取+合并+持久化）并接线 executeBatch
+- **validation_error 通配分类**：learning 识别校验器新错误类型，恢复提示引导模型
+  按错误内嵌 schema 重发参数
+- **编辑错误反馈补齐**：delete_range/delete_symbol 的 not found/not unique 错误补恢复
+  hint（re-read / code_index outline 验证），对齐 edit_file 反馈质量
+
+#### 测试（TDD RED→GREEN）
+- 新增 ValidateArgs 10 用例（必填/类型/枚举/别名/嵌套/null/畸形 JSON/无效 schema 降级）
+- 新增 Stats 7 用例（聚合/持久化/排序/空快照/ClassifyError 分类）
+- 新增接线 3 用例（validation_error 阻断、file 别名放行、stats 记录）
+- 新增 compact 描述保留 2 用例（FilteredSchemas 管线 + 防回归）
+- 新增 learning Observe/阈值/validation_error 3 用例（锁定 merge 修复）
+- 全量 go test ./... 通过，go vet 干净，go build EXIT 0

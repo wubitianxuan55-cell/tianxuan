@@ -43,63 +43,63 @@ var compactDesc = map[string]string{
 // descriptions/constraints), used by CompactDescriptor.
 var compactSchema = map[string]json.RawMessage{
 	"read_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1},"line_numbers":{"type":"boolean"}},"required":["path"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"offset":{"type":"integer","minimum":0,"description":"0-based line offset (default 0)"},"limit":{"type":"integer","minimum":1,"description":"Max lines to return (default 2000)"},"line_numbers":{"type":"boolean","description":"Prefix lines with 1-based numbers (default true)"}},"required":["path"]}`),
 	"edit_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["path","old_string","new_string"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace; must be unique unless replace_all"},"new_string":{"type":"string","description":"Replacement text (may be empty to delete)"},"replace_all":{"type":"boolean","description":"Replace every occurrence instead of requiring uniqueness"}},"required":["path","old_string","new_string"]}`),
 	"write_file": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path (parent dirs auto-created)"},"content":{"type":"string","description":"Full file content to write"}},"required":["path","content"]}`),
 	"multi_edit": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"edits":{"type":"array","items":{"type":"object","properties":{"old_string":{"type":"string"},"new_string":{"type":"string"},"replace_all":{"type":"boolean"}},"required":["old_string","new_string"]}}},"required":["path","edits"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"edits":{"type":"array","description":"Edits applied atomically in order","items":{"type":"object","properties":{"old_string":{"type":"string","description":"Exact text to replace"},"new_string":{"type":"string","description":"Replacement text"},"replace_all":{"type":"boolean","description":"Replace every occurrence"}},"required":["old_string","new_string"]}}},"required":["path","edits"]}`),
 	"edit_lines": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1},"new_content":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"validate":{"type":"boolean"}},"required":["path","start_line","end_line","new_content"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"start_line":{"type":"integer","minimum":1,"description":"1-based start line (inclusive)"},"end_line":{"type":"integer","minimum":1,"description":"1-based end line (inclusive)"},"new_content":{"type":"string","description":"Replacement text for the line range"},"start_anchor":{"type":"string","description":"Expected exact content of start_line; mismatch rejects edit"},"end_anchor":{"type":"string","description":"Expected exact content of end_line; mismatch rejects edit"},"validate":{"type":"boolean","description":"Post-edit syntax check with rollback (default true)"}},"required":["path","start_line","end_line","new_content"]}`),
 	"delete_range": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"start_anchor":{"type":"string"},"end_anchor":{"type":"string"},"inclusive":{"type":"boolean"}},"required":["path","start_anchor","end_anchor"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"start_anchor":{"type":"string","description":"Exact content of first line to delete"},"end_anchor":{"type":"string","description":"Exact content of last line to delete"},"inclusive":{"type":"boolean","description":"Whether end_anchor line is deleted too"}},"required":["path","start_anchor","end_anchor"]}`),
 	"delete_symbol": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string"},"parent":{"type":"string"}},"required":["path","name"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"name":{"type":"string","description":"Symbol name (function/type/interface)"},"kind":{"type":"string","description":"Optional symbol kind filter"},"parent":{"type":"string","description":"Optional enclosing symbol name"}},"required":["path","name"]}`),
 	"move_file": json.RawMessage(
-		`{"type":"object","properties":{"source_path":{"type":"string"},"destination_path":{"type":"string"}},"required":["source_path","destination_path"]}`),
+		`{"type":"object","properties":{"source_path":{"type":"string","description":"Current file path"},"destination_path":{"type":"string","description":"Target path (parent dirs auto-created)"}},"required":["source_path","destination_path"]}`),
 	"glob": json.RawMessage(
-		`{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]}`),
+		`{"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern (supports ** recursion)"}},"required":["pattern"]}`),
 	"grep": json.RawMessage(
-		`{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string"},"sort_by":{"type":"string","enum":["path","relevance"]}},"required":["pattern"]}`),
+		`{"type":"object","properties":{"pattern":{"type":"string","description":"Regex to search for"},"path":{"type":"string","description":"Directory or file to search (default: workspace)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"Result ordering"}},"required":["pattern"]}`),
 	"ls": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"}}}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: cwd)"}}}`),
 	"bash": json.RawMessage(
-		`{"type":"object","properties":{"command":{"type":"string"},"run_in_background":{"type":"boolean"},"output_format":{"type":"string","enum":["plain","json"]}},"required":["command"]}`),
+		`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached; returns job id; use for servers/watchers"},"output_format":{"type":"string","enum":["plain","json"],"description":"json returns {ok, exit_code, stdout, stderr}"}},"required":["command"]}`),
 	"bash_output": json.RawMessage(
-		`{"type":"object","properties":{"job_id":{"type":"string"},"filter":{"type":"string"}},"required":["job_id"]}`),
+		`{"type":"object","properties":{"job_id":{"type":"string","description":"Background job id (e.g. bash-1)"},"filter":{"type":"string","description":"Regex; only matching lines returned"}},"required":["job_id"]}`),
 	"kill_shell": json.RawMessage(
-		`{"type":"object","properties":{"job_id":{"type":"string"}},"required":["job_id"]}`),
+		`{"type":"object","properties":{"job_id":{"type":"string","description":"Background job id to terminate"}},"required":["job_id"]}`),
 	"wait": json.RawMessage(
-		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"}},"timeout_seconds":{"type":"integer","minimum":1}}}`),
+		`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"},"description":"Job ids to wait for; omit waits for all"},"timeout_seconds":{"type":"integer","minimum":1,"description":"Max seconds to block before returning progress"}}}`),
 	"web_fetch": json.RawMessage(
-		`{"type":"object","properties":{"url":{"type":"string"},"retries":{"type":"integer","minimum":0}},"required":["url"]}`),
+		`{"type":"object","properties":{"url":{"type":"string","description":"URL to fetch as plain text"},"retries":{"type":"integer","minimum":0,"description":"Retry count for transient failures (default 0)"}},"required":["url"]}`),
 	"web_search": json.RawMessage(
-		`{"type":"object","properties":{"query":{"type":"string"},"topK":{"type":"integer","minimum":1}},"required":["query"]}`),
+		`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"topK":{"type":"integer","minimum":1,"description":"Number of results (default 5)"}},"required":["query"]}`),
 	"todo_write": json.RawMessage(
-		`{"type":"object","properties":{"todos":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"},"level":{"type":"integer","enum":[0,1]}},"required":["content","status"]}}},"required":["todos"]}`),
+		`{"type":"object","properties":{"todos":{"type":"array","description":"Full todo list (replaces previous)","items":{"type":"object","properties":{"content":{"type":"string","description":"Task description"},"status":{"type":"string","enum":["pending","in_progress","completed"],"description":"Task state"},"activeForm":{"type":"string","description":"Active phrasing of an in_progress task"},"level":{"type":"integer","enum":[0,1],"description":"0=task, 1=subtask"}},"required":["content","status"]}}},"required":["todos"]}`),
 	"complete_step": json.RawMessage(
-		`{"type":"object","properties":{"step":{"type":"string"},"step_index":{"type":"integer","minimum":1},"result":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["verification","diff","files","manual"]},"summary":{"type":"string"},"command":{"type":"string"},"paths":{"type":"array","items":{"type":"string"}}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
+		`{"type":"object","properties":{"step":{"type":"string","description":"Step name being completed"},"step_index":{"type":"integer","minimum":1,"description":"1-based step number in the plan"},"result":{"type":"string","description":"What was done"},"evidence":{"type":"array","description":"Verifiable evidence (manual rejected)","items":{"type":"object","properties":{"kind":{"type":"string","enum":["verification","diff","files","manual"],"description":"Evidence type"},"summary":{"type":"string","description":"What the evidence shows"},"command":{"type":"string","description":"Verification command run"},"paths":{"type":"array","items":{"type":"string"},"description":"Changed file paths"}},"required":["kind","summary"]}}},"required":["step","result","evidence"]}`),
 	"notebook_edit": json.RawMessage(
-		`{"type":"object","properties":{"path":{"type":"string"},"cell_number":{"type":"integer"},"cell_id":{"type":"string"},"new_source":{"type":"string"},"cell_type":{"type":"string","enum":["code","markdown"]},"edit_mode":{"type":"string","enum":["replace","insert","delete"]}},"required":["path"]}`),
+		`{"type":"object","properties":{"path":{"type":"string","description":"Path to .ipynb file"},"cell_number":{"type":"integer","description":"0-based cell index"},"cell_id":{"type":"string","description":"Cell id (alternative to cell_number)"},"new_source":{"type":"string","description":"New cell source text"},"cell_type":{"type":"string","enum":["code","markdown"],"description":"Cell type to insert"},"edit_mode":{"type":"string","enum":["replace","insert","delete"],"description":"Edit operation"}},"required":["path"]}`),
 	"git_status": json.RawMessage(
 		`{"type":"object","properties":{},"required":[]}`),
 	"git_diff": json.RawMessage(
-		`{"type":"object","properties":{"staged":{"type":"boolean"},"path":{"type":"string"}}}`),
+		`{"type":"object","properties":{"staged":{"type":"boolean","description":"Show staged diff (default false)"},"path":{"type":"string","description":"Restrict diff to this path"}}}`),
 	"git_commit": json.RawMessage(
-		`{"type":"object","properties":{"message":{"type":"string"},"stage_all":{"type":"boolean"},"amend":{"type":"boolean"}}}`),
+		`{"type":"object","properties":{"message":{"type":"string","description":"Commit message"},"stage_all":{"type":"boolean","description":"Stage all changes first (default true)"},"amend":{"type":"boolean","description":"Amend the last commit"}}}`),
 	"git_log": json.RawMessage(
-		`{"type":"object","properties":{"count":{"type":"integer"},"path":{"type":"string"},"author":{"type":"string"}}}`),
+		`{"type":"object","properties":{"count":{"type":"integer","description":"Number of commits to show (default 10)"},"path":{"type":"string","description":"Restrict to commits touching this path"},"author":{"type":"string","description":"Filter by author"}}}`),
 	"git_worktree": json.RawMessage(
-		`{"type":"object","properties":{"action":{"type":"string","enum":["add","remove","list"]},"path":{"type":"string"},"branch":{"type":"string"},"base":{"type":"string"}},"required":["action"]}`),
+		`{"type":"object","properties":{"action":{"type":"string","enum":["add","remove","list"],"description":"Worktree operation"},"path":{"type":"string","description":"Worktree path"},"branch":{"type":"string","description":"Branch for the new worktree"},"base":{"type":"string","description":"Base ref for the new worktree"}},"required":["action"]}`),
 	"memory_search": json.RawMessage(
-		`{"type":"object","properties":{"query":{"type":"string"},"kind":{"type":"string","enum":["semantic","episodic","procedural"]}},"required":["query"]}`),
+		`{"type":"object","properties":{"query":{"type":"string","description":"Search keywords"},"kind":{"type":"string","enum":["semantic","episodic","procedural"],"description":"Memory kind filter"}},"required":["query"]}`),
 	"read_skill": json.RawMessage(
-		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`),
+		`{"type":"object","properties":{"name":{"type":"string","description":"Skill name to read in full"}},"required":["name"]}`),
 	"code_index": json.RawMessage(
-		`{"type":"object","properties":{"action":{"type":"string","enum":["outline","search"]},"path":{"type":"string"},"query":{"type":"string"},"kind":{"type":"string"},"limit":{"type":"integer","minimum":1}},"required":["action"]}`),
+		`{"type":"object","properties":{"action":{"type":"string","enum":["outline","search"],"description":"outline lists symbols; search finds by query"},"path":{"type":"string","description":"File or directory to index"},"query":{"type":"string","description":"Symbol query for search action"},"kind":{"type":"string","description":"Symbol kind filter"},"limit":{"type":"integer","minimum":1,"description":"Max results"}},"required":["action"]}`),
 	"search_large_output": json.RawMessage(
-		`{"type":"object","properties":{"operation":{"type":"string","enum":["list","read","search"]},"name":{"type":"string"},"query":{"type":"string"}},"required":["operation"]}`),
+		`{"type":"object","properties":{"operation":{"type":"string","enum":["list","read","search"],"description":"list/read/search offloaded tool outputs"},"name":{"type":"string","description":"Offloaded output name"},"query":{"type":"string","description":"Search text for search operation"}},"required":["operation"]}`),
 	"verify_gate": json.RawMessage(
-		`{"type":"object","properties":{"checks":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"command":{"type":"string"},"timeout":{"type":"integer","minimum":1}},"required":["name","command"]}}},"required":["checks"]}`),
+		`{"type":"object","properties":{"checks":{"type":"array","description":"Verification commands; all must pass","items":{"type":"object","properties":{"name":{"type":"string","description":"Check name"},"command":{"type":"string","description":"Shell command to verify"},"timeout":{"type":"integer","minimum":1,"description":"Timeout seconds"}},"required":["name","command"]}}},"required":["checks"]}`),
 }

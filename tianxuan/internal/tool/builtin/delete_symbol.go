@@ -164,7 +164,7 @@ func (d deleteSymbol) findSymbol(path, name, kind, parent string) (symbolMatch, 
 		}
 	}
 	if len(byName) == 0 {
-		return symbolMatch{}, nil, fmt.Errorf("symbol %q not found in %s", name, path)
+		return symbolMatch{}, nil, fmt.Errorf("symbol %q not found in %s; verify the name with code_index(action=outline) or grep before retrying", name, path)
 	}
 
 	filtered := byName
@@ -176,7 +176,7 @@ func (d deleteSymbol) findSymbol(path, name, kind, parent string) (symbolMatch, 
 			}
 		}
 		if len(byKind) == 0 {
-			return symbolMatch{}, nil, fmt.Errorf("symbol %q with kind %q not found", name, kind)
+			return symbolMatch{}, nil, fmt.Errorf("symbol %q with kind %q not found; check the actual kind with code_index(action=outline)", name, kind)
 		}
 		filtered = byKind
 	}
@@ -188,7 +188,7 @@ func (d deleteSymbol) findSymbol(path, name, kind, parent string) (symbolMatch, 
 			}
 		}
 		if len(byParent) == 0 {
-			return symbolMatch{}, nil, fmt.Errorf("symbol %q (kind=%q parent=%q) not found", name, kind, parent)
+			return symbolMatch{}, nil, fmt.Errorf("symbol %q (kind=%q parent=%q) not found; check the enclosing symbol name with code_index(action=outline)", name, kind, parent)
 		}
 		filtered = byParent
 	}

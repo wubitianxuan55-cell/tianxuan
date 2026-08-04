@@ -93,11 +93,26 @@ func (a *AgentRunner) executeBatch(ctx context.Context, calls []provider.ToolCal
 			results[i] = outcomes[i].output
 		}
 
-		// V7.4: learn from tool errors across sessions
-		if a.patternExtractor != nil {
-			if p := a.patternExtractor.Extract(calls[i].Name, results[i]); p != nil {
-				a.patternExtractor.SaveStore()
+		// V10.154: aggregate genuine tool failures (excluding permission/plan
+		// refusals) into the cross-session error stats. The outcome is the
+		// final one (tail-call chains count as their delegate's result).
+		if a.toolStats != nil && !outcomes[i].blocked && outcomes[i].errMsg != "" {
+			code := tool.CodeExecError
+			if env, ok := tool.ParseEnvelope(outcomes[i].output); ok && env.Code != "" {
+				code = env.Code
 			}
+			a.toolStats.Record(
+				calls[i].Name,
+				tool.ClassifyError(calls[i].Name, code, outcomes[i].errMsg),
+				outcomes[i].errMsg,
+			)
+		}
+
+		// V7.4/V10.154: learn from tool errors across sessions. Observe
+		// extracts + merges + persists (the old Extract+SaveStore pair never
+		// merged, so pattern counts never advanced).
+		if a.patternExtractor != nil {
+			a.patternExtractor.Observe(calls[i].Name, results[i])
 		}
 	}
 

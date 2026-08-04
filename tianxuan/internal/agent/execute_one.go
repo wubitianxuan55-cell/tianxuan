@@ -129,6 +129,29 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			}
 		}
 	}
+	// V10.154: codex-style schema validation for built-in tools. Missing
+	// required / type mismatch / enum violation fail loudly BEFORE execution
+	// (the model fixes the args next turn instead of getting a downstream
+	// "path is required" style secondary error); schema-unknown fields stay
+	// compatible (deliberate aliases) and are reported alongside real errors.
+	if _, isBuiltin := tool.LookupBuiltin(call.Name); isBuiltin {
+		unknown, verr := tool.ValidateArgs(t.Schema(), json.RawMessage(call.Arguments), builtinAliases(call.Name), builtinExtraFields(call.Name)...)
+		if verr != nil {
+			detail := verr.Error()
+			if len(unknown) > 0 {
+				detail += " (schema-unknown fields: " + strings.Join(unknown, ", ") + ")"
+			}
+			msg := tool.WrapError(tool.CodeValidationError, detail, map[string]any{
+				"tool":   call.Name,
+				"schema": string(t.Schema()),
+			})
+			return toolOutcome{
+				output:      msg,
+				errMsg:      detail,
+				recoverable: true,
+			}
+		}
+	}
 	// Phase 1 DSpark: 确定性预检查 — 在文件编辑工具实际执行前，
 	// 验证 old_string / anchor 是否存在于目标文件中。
 	// 预检查命中时返回诊断消息，阻止必然失败的操作，节省一整轮 API 调用。
@@ -357,6 +380,32 @@ func (a *AgentRunner) guardObserve(call provider.ToolCall, mutates, failed bool)
 		return GuardNone
 	}
 	return a.failureGuard.Observe(call.Name, json.RawMessage(call.Arguments), mutates, failed)
+}
+
+// builtinAliases maps deliberate aliases that built-in tools accept to their
+// canonical schema property (locked by args_alias_test.go). An alias satisfies
+// the canonical field's required check and is validated against its schema.
+func builtinAliases(name string) map[string]string {
+	switch name {
+	case "read_file":
+		return map[string]string{"file": "path"}
+	case "wait":
+		return map[string]string{"job_id": "job_ids", "timeout_ms": "timeout_seconds"}
+	default:
+		return nil
+	}
+}
+
+// builtinExtraFields lists schema-less tolerated fields for built-in tools
+// (e.g. edit_lines' old_string). They are exempt from the unknown-field report
+// but don't satisfy any required check.
+func builtinExtraFields(name string) []string {
+	switch name {
+	case "edit_lines":
+		return []string{"old_string"}
+	default:
+		return nil
+	}
 }
 
 // isBackgroundTaskCall reports whether a `task` call set run_in_background.

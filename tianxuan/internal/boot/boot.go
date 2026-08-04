@@ -351,6 +351,9 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	if offloadDir != "" && !filepath.IsAbs(offloadDir) {
 		offloadDir = filepath.Join(cwd, offloadDir)
 	}
+	// V10.154: cross-session per-tool error stats (distilled from codex CLI's
+	// ToolDispatchTrace) so the host can measure which tool/error dominates.
+	toolStats := tool.NewStats(tool.DefaultStatsPath(cwd))
 	executor := agent.New(execProv, reg, execSess, agent.Options{
 		MaxSteps:              maxSteps,
 		Temperature:           cfg.Agent.Temperature,
@@ -364,6 +367,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		StrictEvidence:        strictEvidence,
 		OffloadDir:            offloadDir,
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
+		ToolStats:             toolStats,
 	}, sink)
 	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
 	// 匹配技能的 playbook（tdd/systematic-debugging 等）。Hermes 规划者

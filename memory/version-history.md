@@ -7,6 +7,7 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.154.0 | 2026-08-04 | Codex CLI 工具蒸馏 — 执行前 schema 校验（validation_error+别名兼容）、compact 参数描述保留（CanonicalizeSchemaVerbose）、工具错误统计（tools stats）、learning 链路修复（Observe），SHA256 90a0b4b9… |
 | V10.153.0 | 2026-08-03 | P0-P5 工程改进 — edit_lines 锚点校验+自动语法回滚、PowerShell heredoc/npx.cmd 适配、release 发布技能、L1 Git 工作流提示、DATABASE_URL 预警（SHA256 957ecce4…） |
 | V10.152.0 | 2026-08-02 | 编程能力强化 — 提示词重构（总开销 -79%）+回合减负+工具收敛+测试先行规则；实测对比 Codex：从零实现 71s/¥0.02，修 bug 测试先行 100% 遵守；桌面端打包发布（SHA256 8a3310ec…） |
 

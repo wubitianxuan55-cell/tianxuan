@@ -113,17 +113,17 @@ func (d deleteRange) preview(args json.RawMessage) (diff.Change, error) {
 	lines := strings.Split(strings.ReplaceAll(original, "\r\n", "\n"), "\n")
 	startLine := findUniqueLine(lines, p.StartAnchor)
 	if startLine == -2 {
-		return diff.Change{}, fmt.Errorf("start_anchor is not unique in %s; add more surrounding context", p.Path)
+		return diff.Change{}, fmt.Errorf("start_anchor is not unique in %s; add more surrounding context (or use edit_file with a longer old_string)", p.Path)
 	}
 	if startLine == -1 {
-		return diff.Change{}, fmt.Errorf("start_anchor not found in %s", p.Path)
+		return diff.Change{}, fmt.Errorf("start_anchor not found in %s; re-read the file first and copy the exact line", p.Path)
 	}
 	endLine := findUniqueLine(lines, p.EndAnchor)
 	if endLine == -2 {
-		return diff.Change{}, fmt.Errorf("end_anchor is not unique in %s; add more surrounding context", p.Path)
+		return diff.Change{}, fmt.Errorf("end_anchor is not unique in %s; add more surrounding context (or use edit_file with a longer old_string)", p.Path)
 	}
 	if endLine == -1 {
-		return diff.Change{}, fmt.Errorf("end_anchor not found in %s", p.Path)
+		return diff.Change{}, fmt.Errorf("end_anchor not found in %s; re-read the file first and copy the exact line", p.Path)
 	}
 	if startLine > endLine {
 		return diff.Change{}, fmt.Errorf("start_anchor appears after end_anchor (lines %d and %d)", startLine+1, endLine+1)

@@ -4,6 +4,7 @@ import (
 	"tianxuan/internal/context"
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/provider"
+	"tianxuan/internal/tool"
 )
 
 // Options configures an AgentRunner.
@@ -35,6 +36,10 @@ type Options struct {
 	// AuditFunc, when non-nil, is called after every tool execution with a
 	// summary of the call. V3.2: foundational audit trail.
 	AuditFunc func(tool string, taskKind string, readOnly bool, outcome string, errMsg string, outputLen int, durationMs int64)
+	// ToolStats, when non-nil, aggregates per-tool failure modes (distilled
+	// from codex CLI's ToolDispatchTrace) and persists them for cross-session
+	// error-rate queries. V10.154.
+	ToolStats *tool.Stats
 
 	// ParamStorm enables parameter-level duplicate tool call detection (V5.13).
 	// nil disables; non-nil provides WindowSize/Threshold/ExemptTools.

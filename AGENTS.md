@@ -131,6 +131,7 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.154.0** (2026-08-04): Codex CLI 工具蒸馏 — 执行前 schema 校验（validation_error 大声失败+别名兼容）+ compact schema 保留参数描述（CanonicalizeSchemaVerbose）+ 工具错误统计（`tianxuan tools stats`）+ 修复 learning 链路 bug（Observe 合并计数）。详见 [codex-tools-distillation.md](docs/design/codex-tools-distillation.md) + CHANGELOG
 - **V10.147.0** (2026-08-02): 技能系统重构 — 探索类技能独立工具化 + 子代理化 + 工具压缩默认开启（可见 55→46，schema -17%）+ edit_lines 吞行修复 + DeepSeek 峰谷计价
 - **V10.95.0** (2026-07-24): 双模型架构 15 项逻辑修复 + 契约简化 + Hephaestus 上下文补齐
 - **V10.94.0** (2026-07-24): XAI 规划者独立架构 + 轻量子代理路径（已回退）

@@ -1,3 +1,24 @@
+## V10.154.0 (2026-08-04) — Codex CLI 工具蒸馏：降低工具出错率
+
+### 变更
+- 执行前 schema 校验（对齐 codex json_schema.rs）：内建工具必填/类型/枚举错误以
+  `validation_error` 大声失败并附带完整 schema 提示；别名（file→path、job_id→job_ids、
+  timeout_ms→timeout_seconds）兼容并满足必填
+- compact schema 保留参数描述：30 个工具补精简英文描述（默认值/范围/语义）；
+  `CanonicalizeSchemaVerbose` 修复描述被规范化管线二次剥离
+- 工具错误统计（codex ToolDispatchTrace 蒸馏）：`tianxuan tools stats` 查询
+  tool × error_kind × count，落盘 `.tianxuan/tool-stats.json`
+- 修复 learning 链路 bug：`Observe`（提取+合并+持久化）替代从未 merge 的
+  Extract+SaveStore，模式计数真正增长并注入系统提示
+- validation_error 通配分类 + delete_range/delete_symbol 错误反馈补齐
+
+### 发布产物
+- `release/v10.154.0/tianxuan-desktop.exe` · 25,054,720 bytes (~23.9 MB)
+- SHA256: `90a0b4b9ceb6fcbbb8115f3a445a640d68b99c0b4909f39ce71f10ad909ea218`
+- 验证：`go test ./...` 全绿 · `go vet` 干净 · `wails build` EXIT 0
+
+---
+
 ## V10.153.0 (2026-08-03) — 编辑安全 + Windows 适配 + 发布流水线
 
 ### 变更

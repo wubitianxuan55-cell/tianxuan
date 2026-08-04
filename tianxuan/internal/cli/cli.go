@@ -63,6 +63,8 @@ func Run(args []string, version string) int {
 		return mcpCommand(rest)
 	case "codegraph":
 		return codegraphCommand(rest)
+	case "tools":
+		return toolsCommand(rest)
 	case "update":
 		return updateCommand(rest, version)
 	case "doctor":

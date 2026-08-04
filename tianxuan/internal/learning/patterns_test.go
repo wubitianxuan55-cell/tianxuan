@@ -1,6 +1,7 @@
 package learning
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -75,6 +76,78 @@ func TestTruncate(t *testing.T) {
 		if got != tt.expect {
 			t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.n, got, tt.expect)
 		}
+	}
+}
+
+// TestObserveMergesAndPersists locks the learn-from-errors pipeline: each
+// observed failure must be merged into the on-disk store (count grows per
+// occurrence), different tools/kinds stay separate, and successes never create
+// patterns. This regresses the bug where Extract() returned a pattern that was
+// dropped before merge, so counts never advanced and the system-prompt guide
+// stayed empty forever.
+func TestObserveMergesAndPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "learned-patterns.toml")
+	e := NewExtractor(path)
+
+	errEdit := `{"ok":false,"success":false,"code":"exec_error","error":"old_string not found in a.go"}`
+	if p := e.Observe("edit_file", errEdit); p == nil || p.Count != 1 {
+		t.Fatalf("first observe = %+v, want count 1", p)
+	}
+	if p := e.Observe("edit_file", errEdit); p == nil || p.Count != 2 {
+		t.Fatalf("second observe = %+v, want count 2 (merge bug)", p)
+	}
+	if p := e.Observe("bash", `{"ok":false,"success":false,"code":"timeout","error":"timed out"}`); p == nil || p.Tool != "bash" {
+		t.Fatalf("bash observe = %+v, want a bash pattern", p)
+	}
+
+	store, err := LoadStore(path)
+	if err != nil {
+		t.Fatalf("LoadStore: %v", err)
+	}
+	if len(store.Patterns) != 2 {
+		t.Fatalf("store has %d patterns, want 2 (edit_file + bash)", len(store.Patterns))
+	}
+	if store.Patterns[0].Count != 2 {
+		t.Fatalf("edit_file count = %d, want 2", store.Patterns[0].Count)
+	}
+
+	if p := e.Observe("edit_file", `{"ok":true,"success":true,"code":"ok"}`); p != nil {
+		t.Fatalf("success should not create a pattern, got %+v", p)
+	}
+}
+
+// TestActivePatternsThreshold verifies the injection threshold: patterns below
+// the min-count are not surfaced into the system prompt.
+func TestActivePatternsThreshold(t *testing.T) {
+	store := &Store{Patterns: []Pattern{
+		{Tool: "edit_file", ErrorKind: "old_string_not_found", Count: 2},
+		{Tool: "bash", ErrorKind: "bash_timeout", Count: 5},
+	}}
+	active := ActivePatterns(store, 3)
+	if len(active) != 1 || active[0].Tool != "bash" {
+		t.Fatalf("active = %+v, want only bash (count 5 >= 3)", active)
+	}
+	guide := FormatGuide(active)
+	if !strings.Contains(guide, "bash") || strings.Contains(guide, "edit_file") {
+		t.Fatalf("guide should mention bash only, got: %s", guide)
+	}
+}
+
+// TestObserveValidationError verifies the universal classifier: schema
+// validation failures (V10.154 codex-style validator) are learnable for every
+// tool, with a recovery hint telling the model to re-read the embedded schema.
+func TestObserveValidationError(t *testing.T) {
+	e := NewExtractor(filepath.Join(t.TempDir(), "learned-patterns.toml"))
+	result := `{"ok":false,"success":false,"code":"validation_error","error":"field \"path\" must be a string, got float64","data":{"schema":"{\"type\":\"object\"}"}}`
+	p := e.Observe("edit_file", result)
+	if p == nil {
+		t.Fatal("validation_error not learned")
+	}
+	if p.ErrorKind != "validation_error" {
+		t.Fatalf("kind = %q, want validation_error", p.ErrorKind)
+	}
+	if !strings.Contains(p.RecoveryAction, "schema") {
+		t.Fatalf("recovery should mention the embedded schema, got: %s", p.RecoveryAction)
 	}
 }
 

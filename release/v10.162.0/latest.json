@@ -1,0 +1,14 @@
+{
+    "version":  "v10.162.0",
+    "notes":  "### 变更\n- 新增 `vision` 内置技能：无视觉模型（DeepSeek）通过 OpenCode Zen 视觉模型（mimo-v2.5-free）识图\n- `scripts/vision.ps1` 零依赖：图片 base64 → POST Zen chat/completions → 返回文字描述\n- 真实 API 实测通过：中文描述准确、UTF-8 输出正确、错误路径大声失败",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.162.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.162.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10755529,
+                                            "sha256":  "186e51979d2e4ef393bbf745bb2d15c489a98616930a710620cce27ac3828543"
+                                        }
+                  }
+}

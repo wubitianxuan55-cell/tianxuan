@@ -7,6 +7,7 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.175.0 | 2026-08-08 | Codex 蒸馏能力级提升 + 过程卡工作流 — write_stdin 交互式进程/token 预算提醒/hook 进程树/windows_shell_guidance/search_tool/precheck nearest line/每轮折叠大过程卡/输出简洁 |
 | V10.171.0 | 2026-08-08 | Codex 蒸馏 P2-7 收尾 — apply_patch 补丁编辑工具（行级模糊匹配/跨文件原子）+ tools trace-report 错误率表 + apply_patch 错误细分 |
 | V10.170.0 | 2026-08-08 | Codex 蒸馏 P2 + 技能并发修复 + bash 结构化头 — get_context_remaining / ToolDispatchTrace / 技能工具并行 / bash 失败结构化头 |
 | V10.169.0 | 2026-08-08 | bash 失败输出结构化头 — plain 模式失败附 Exit code / Wall time / Total output lines（对标 codex） |

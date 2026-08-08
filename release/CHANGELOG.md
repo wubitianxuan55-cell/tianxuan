@@ -1,3 +1,30 @@
+## V10.175.0 (2026-08-08) — Codex 蒸馏能力级提升 + 过程卡工作流
+
+### 变更
+- **write_stdin 交互式进程管理**（蒸馏 codex 核心能力）：bash 增加 interactive
+  参数（后台任务建 stdin 管道），新增 write_stdin 工具驱动 REPL/交互式 CLI/
+  调试器；单次调用写 stdin + 返回最新输出
+- **会话级 token 预算渐进提醒**（蒸馏 codex rollout_budget）：跨 turn 累计
+  token 用量，剩余跨过配置阈值注入渐进式 user 提醒，让模型提前规划收敛
+- **hook 超时递归杀进程树**（蒸馏 codex dd91642）：DefaultSpawner 改用
+  proc.StartTracked + KillTracked，超时回收整棵进程树（Windows Job Object）
+- **windows_shell_guidance**：bash PowerShell 描述注入三条安全规则
+  （防跨 shell 误删/递归删除前验证工作区/Start-Process 必须 Hidden）
+- **search_tool**：模型按关键词搜索工具目录（名字+描述），解决 MCP 工具
+  名长且多的猜名问题；tools 列表运行期零变更（缓存铁律安全）
+- **precheck nearest line**：编辑失败报错补最近行提示，对齐 Execute 路径诊断
+- **过程卡工作流**：每轮结束后整轮（提问+思考+工具+正文）折叠成大过程卡，
+  只留最新轮最终正文；生成中保持"文本↔过程卡"交替
+- **输出简洁**：SoloSystemPrompt 加强约束（报告 3-10 行，只写 changed/
+  verified/remains）
+
+### 发布产物
+- `release/v10.175.0/tianxuan-desktop.exe` · 25132032 bytes (~24 MB)
+- SHA256: `27bb36ee3bef1f7adfdc677790dea34859407463d871fbdf7826d217f9f1a554`
+- 验证：`go test ./...` 48 包全绿（仅 5 个预存 API 认证类失败）· `go vet` 干净 · `wails build` EXIT 0 · 前端 tsc 0 错误 + vitest 142 全绿
+
+---
+
 ## V10.171.0 (2026-08-08) — Codex 蒸馏 P2-7 收尾：apply_patch 补丁编辑 + tools trace-report
 
 ### 变更

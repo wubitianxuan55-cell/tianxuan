@@ -1,3 +1,27 @@
+## [10.171.0] — 2026-08-08
+
+### ✨ tools trace-report：从 JSONL trace 聚合每工具错误率
+
+> 蒸馏报告"先能度量，才能优化"闭环：V10.167 ToolDispatchTrace 落盘后，
+> 缺一个把 trace 变成可执行度量的视图。真实会话积累 tool-trace.jsonl 后，
+> 一条命令即可定位下一个优化目标。
+
+#### 变更
+- `SummarizeTrace`（internal/tool/trace.go）：流式读 JSONL，按工具聚合
+  calls/success/errors/blocked/error_rate/avg_ms/total_ms + top 3 错误文本
+  （按频次去重）；坏行跳过不中断；排序 errors 降序 → calls 降序 → 工具名
+- CLI 新增 `tianxuan tools trace-report`：输出每工具错误率表（含 top_error），
+  一眼定位错误率最高 / 错误次数最多的工具
+
+#### 验证（TDD）
+- trace_report_test.go 5 例：空文件 / 聚合计数与错误率 / top errors 频次排序 /
+  坏行跳过 / 排序 tie-break
+- cli tools_trace_report_test.go 2 例：表格输出（含 100.0% 与 0.0%）+
+  空状态友好提示
+- go build/vet 干净；internal 测试全绿（仅预存 API 认证类失败与本次无关）
+
+---
+
 ## [10.169.0] — 2026-08-08
 
 ### ✨ bash 失败输出结构化头（对标 codex format_exec_output_for_model）

@@ -23,9 +23,11 @@ func toolsCommand(args []string) int {
 			return toolStatsCommand()
 		case "trace":
 			return toolTraceCommand(args[1:])
+		case "trace-report":
+			return toolTraceReportCommand()
 		}
 	}
-	fmt.Fprintln(os.Stderr, "usage: tianxuan tools <stats|trace [-n N]>")
+	fmt.Fprintln(os.Stderr, "usage: tianxuan tools <stats|trace [-n N]|trace-report>")
 	return 2
 }
 
@@ -107,5 +109,32 @@ func toolTraceCommand(args []string) int {
 		fmt.Printf("%s %-18s %-7s %6dms %s\n",
 			strings.TrimPrefix(e.Ts, "T"), e.Tool, e.Outcome, e.DurationMs, args)
 	}
+	return 0
+}
+
+// toolTraceReportCommand aggregates the JSONL trace into a per-tool
+// error-rate table, ordered by error count descending — the host can see at a
+// glance which tool deserves the next optimization pass (V10.171).
+func toolTraceReportCommand() int {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tools trace-report: %v\n", err)
+		return 2
+	}
+	path := tool.DefaultTracePath(cwd)
+	stats, err := tool.SummarizeTrace(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("no tool dispatches recorded yet (trace file: " + path + ")")
+			return 0
+		}
+		fmt.Fprintf(os.Stderr, "tools trace-report: %v\n", err)
+		return 2
+	}
+	if len(stats) == 0 {
+		fmt.Println("no tool dispatches recorded yet (trace file: " + path + ")")
+		return 0
+	}
+	fmt.Print(tool.TraceReportTable(stats))
 	return 0
 }

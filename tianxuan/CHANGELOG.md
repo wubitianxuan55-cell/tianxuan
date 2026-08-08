@@ -1,3 +1,34 @@
+## [10.165.0] — 2026-08-08
+
+### 📸 AI 自主截图工具 `capture_screen`
+
+> 之前截图只能靠用户点相机按钮。现在模型自己就能截屏：你只需要说
+> "截个屏看看 / 看看我屏幕上的报错 / 帮我评审当前界面"，AI 会主动调用
+> `capture_screen` 截主屏，再通过 vision 技能识图回答。
+
+#### 变更
+- 新增内置工具 `internal/tool/builtin/screenshot.go`（+Windows GDI 实现
+  `screenshot_windows.go`、跨平台回退 `screenshot_other.go`）：
+  - 截取主屏幕 → PNG 保存到 `.tianxuan/attachments/screen-<时间戳>.png`
+  - 返回 `@` 相对路径（与粘贴/截图附件管线同一约定，@引用与 vision 技能
+    直接可用）
+  - 返回文本明确提示模型："invoke the vision skill (run_skill name=vision)"
+- 截图函数为包级变量（`captureScreenShot`），测试注入确定性假图
+- 默认全量工具集自动包含，CLI/桌面端均可用；无参工具（Schema 无字段）
+
+#### 测试（TDD RED→GREEN）
+- `TestCaptureScreenSavesAttachment`：注入假 PNG → 验证附件落盘、
+  `@.tianxuan/attachments/screen-` 路径、vision 技能指引
+- `TestCaptureScreenPropagatesCaptureError`：截图失败大声传播
+- `TestCaptureScreenRejectsBadArgs`：非法 JSON 参数大声失败
+- 真实 GDI 截屏验证：本机截得 869KB PNG
+- `go test ./internal/tool/... ./internal/control/...` 全绿；`go build ./...` 通过
+
+#### 权限
+- `capture_screen` 是写者工具（写附件文件），ask 权限下首次调用需用户确认
+  （截屏含屏幕内容，首次确认是安全惯例；确认时可选"记住"，之后自动放行；
+  或自行在 `[permissions] allow` 加入 `capture_screen`）
+
 ## [10.164.0] — 2026-08-08
 
 ### 📷 截图→识图闭环

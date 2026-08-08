@@ -1,3 +1,12 @@
+## V10.165.0 (2026-08-08) — AI 自主截图工具 capture_screen
+
+### 变更
+- 新增内置工具 `capture_screen`：模型可主动截取主屏幕，保存到 `.tianxuan/attachments/screen-*.png` 并返回 @路径，配合 vision 技能完成"截图→识图"自主闭环（如"看看我屏幕上的报错"）
+- Windows GDI 实现（复用桌面端 CaptureScreen 同款逻辑），非 Windows 大声报错
+- 工具返回明确指引模型调用 vision 技能；截图涉及隐私，ask 权限下首次调用需用户确认
+
+---
+
 ## V10.164.0 (2026-08-08) — 截图→识图闭环：附件提示指向 vision 技能
 
 ### 变更

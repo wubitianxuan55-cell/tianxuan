@@ -1,3 +1,37 @@
+## [10.172.0] — 2026-08-08
+
+### ✨ Codex 蒸馏续篇：windows_shell_guidance + search_tool
+
+> 蒸馏报告 P0/P1/P2 全部完成后，对照 codex 参考仓库继续挖差距：
+> Windows 桌面端 shell 安全指导（防误删/跨 shell 事故）+ 工具目录搜索
+> （MCP 工具名长且多时的按需发现）。
+
+#### bash PowerShell 描述注入 Windows 安全规则（蒸馏 codex windows_shell_guidance）
+- 对标 codex-rs/core/src/tools/handlers/shell_spec.rs:405-410，PowerShell 分支
+  描述注入三条规则：禁止跨 shell 组合破坏性文件命令（单 shell 端到端，
+  优先 Remove-Item / Move-Item + -LiteralPath）；递归删除/移动前验证解析后
+  绝对路径在工作区内；Start-Process 后台进程必须 -WindowStyle Hidden
+- 仅改完整 Description（PowerShell 分支），compact 描述与 bash 分支不变
+
+#### search_tool：工具目录搜索（蒸馏 codex tool_search，轻量版）
+- 模型按功能关键词搜索工具目录（名字+描述），返回匹配工具名与用途，
+  解决 MCP 工具名（mcp__<server>__<tool>）长且多时的猜名/失败调用问题
+- 简单大小写不敏感子串匹配（工具数十个无需 BM25），名字命中优先于描述
+  命中，limit 截断（默认 5 / 最大 10）；搜索源 = 模型可见工具
+- **前缀缓存铁律安全**：结果走普通 tool_result 进对话消息，tools schema
+  列表运行期零变更（与 V10.166 PlannerHost 同思路）
+- executeOne 注入 searchToolsProvider 闭包（对齐 get_context_remaining
+  注入模式）；ReadOnly + KindRead，plan mode 可用
+
+#### 验证（TDD）
+- bash_powershell_test.go 新增 1 例：描述含 Remove-Item / -LiteralPath /
+  workspace / recursive / WindowStyle Hidden（先红后绿）
+- search_tool_test.go 11 例全绿：名字/描述命中、大小写、limit、名字优先
+  排序、MCP 可搜、无命中空、空 query 报错、无注入报错、格式化、默认 limit
+- agent 包仅 3 个预存 API 401 失败；boot 测试绿；go build/vet 干净
+
+---
+
 ## [10.171.0] — 2026-08-08
 
 ### ✨ Codex 蒸馏 P2-7：apply_patch 补丁编辑工具 + tools trace-report

@@ -1,3 +1,22 @@
+## [10.164.0] — 2026-08-08
+
+### 📷 截图→识图闭环
+
+> 桌面端 Composer 的"截屏发给 AI"（相机按钮）和粘贴/拖拽图片早已存在：
+> 截图保存到 `.tianxuan/attachments/` 后以 `@路径` 引用发送。但附件管线给
+> 模型的提示写的是 "use an image/OCR/vision MCP tool"——tianxuan 没有
+> vision MCP，只有 vision 技能，模型不会主动关联，导致截图发了却"看不见"。
+
+#### 变更
+- `internal/control/refs.go`：`refImage` 提示文案改为
+  "invoke the vision skill (run_skill name=vision) with this path"，
+  让 DeepSeek 收到截图/图片附件时明确调用识图技能
+- `vision` 技能 description 增加触发条件：收到 `[image attachment]`
+  附件引用（`@.tianxuan/attachments/` 路径）时必须使用
+
+#### 测试
+- `go test ./internal/control/` 全绿（附件引用分类/渲染逻辑不受影响）
+
 ## [10.163.0] — 2026-08-08
 
 ### 🛠️ 修复更新安装时旧版本未关闭导致失败

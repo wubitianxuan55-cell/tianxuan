@@ -1,6 +1,6 @@
 ---
 name: vision
-description: 让无视觉能力的模型（如 DeepSeek）也能看图：把用户提供的图片发给 OpenCode Zen 视觉模型（默认 mimo-v2.5-free），返回文字描述。用户发送图片/截图、或询问"这张图里是什么/帮我看看这个截图/这个 UI 怎么样"时必须使用。
+description: 让无视觉能力的模型（如 DeepSeek）也能看图：把用户提供的图片发给 OpenCode Zen 视觉模型（默认 mimo-v2.5-free），返回文字描述。用户发送图片/截图、收到 [image attachment] 附件引用（@.tianxuan/attachments/ 路径）、或询问"这张图里是什么/帮我看看这个截图/这个 UI 怎么样"时必须使用。
 ---
 
 # Vision（识图技能）

@@ -135,7 +135,7 @@ func (c *Controller) ResolveRefs(ctx context.Context, line string) (block string
 			}
 			appendRefBlock(&b, tag, `path="`+r.path+`"`, text)
 		case refImage:
-			appendRefBlock(&b, "image", `path="`+r.path+`"`, "[image attachment available at @"+r.path+"; use an image/OCR/vision MCP tool if visual understanding is needed]")
+			appendRefBlock(&b, "image", `path="`+r.path+`"`, "[image attachment available at @"+r.path+"; image bytes are not inlined — invoke the vision skill (run_skill name=vision) with this path to see it]")
 		case refSession:
 			path := filepath.Join(c.sessionDir, r.raw+".jsonl")
 			text, err := sessionDigest(path, maxSessionRefBytes)

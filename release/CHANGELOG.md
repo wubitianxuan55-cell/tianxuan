@@ -1,3 +1,11 @@
+## V10.164.0 (2026-08-08) — 截图→识图闭环：附件提示指向 vision 技能
+
+### 变更
+- refs.go 图片附件提示改为明确指引 `run_skill vision`（原文案指向不存在的 "vision MCP tool"），截图/粘贴图片发送后模型会调用识图技能读图
+- vision 技能 description 增加触发条件：收到 `[image attachment]` 附件引用（`@.tianxuan/attachments/` 路径）时必须使用
+
+---
+
 ## V10.163.0 (2026-08-08) — 修复更新安装时旧版本未关闭导致失败
 
 ### 变更

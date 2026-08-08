@@ -39,4 +39,4 @@ description: V10.171.0 版本发布 — Codex 蒸馏 P2-7 收尾：apply_patch �
 - 评估 codex tool_search（BM25 动态工具发现，减少首屏认知负担）
 - 评估 apply_patch 与 edit_file/edit_lines 的错误率对比（trace 数据验证 freeform 假设）
 - 桌面端重启后用新版本验证 apply_patch 在实际会话中的调用质量
-- 继续 Codex 蒸馏：对照 codex 参考仓库（6d4d944 无新提交）自审工具失败模式
+- 继续 Codex 蒸馏：对照 codex 参考仓库（已更新至 3aae5d8，179 个新提交评估无紧急增量）自审工具失败模式

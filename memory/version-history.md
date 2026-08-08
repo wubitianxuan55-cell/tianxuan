@@ -7,6 +7,7 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.171.0 | 2026-08-08 | Codex 蒸馏 P2-7 收尾 — apply_patch 补丁编辑工具（行级模糊匹配/跨文件原子）+ tools trace-report 错误率表 + apply_patch 错误细分 |
 | V10.170.0 | 2026-08-08 | Codex 蒸馏 P2 + 技能并发修复 + bash 结构化头 — get_context_remaining / ToolDispatchTrace / 技能工具并行 / bash 失败结构化头 |
 | V10.169.0 | 2026-08-08 | bash 失败输出结构化头 — plain 模式失败附 Exit code / Wall time / Total output lines（对标 codex） |
 | V10.168.0 | 2026-08-08 | 修复技能工具不并发 — getConflictKey registry 感知，ro: 键并行 + 与写工具互斥（V10.124→147 回归） |

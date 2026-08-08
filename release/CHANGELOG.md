@@ -1,3 +1,24 @@
+## V10.171.0 (2026-08-08) — Codex 蒸馏 P2-7 收尾：apply_patch 补丁编辑 + tools trace-report
+
+### 变更
+- **apply_patch 工具**（蒸馏 codex freeform 编辑，P2-7）：patch 文本（*** Begin Patch
+  ... *** End Patch），支持 Add File / Delete File / Update File（@@ 锚点 + 上下文行 +
+  行级 -/+ 增删 + *** End of File 钉尾）
+- **行级模糊匹配**：忽略行首尾空白（对标 codex seek_sequence），告别 old_string
+  大小写/空白/CRLF 精确重现；无 @@ 锚点时删除块必须唯一，多处匹配大声报错
+- **跨文件原子**：全部 hunk 内存校验通过才写盘；CRLF 保持、权限保留、路径 confine
+- **tools trace-report**：从 JSONL trace 聚合每工具错误率表（calls/success/errors/
+  error_rate/avg_ms + top 3 错误），真实数据驱动下一轮优化决策
+- **apply_patch 错误细分**：ClassifyError 支持 patch_parse_error / block_not_unique /
+  block_not_found 分类，tools stats 与 trace-report 有细粒度视图
+
+### 发布产物
+- `release/v10.171.0/tianxuan-desktop.exe` · 25050624 bytes (~23.9 MB)
+- SHA256: `ab3fb76f0a20c914f8a768c2869ccc58719531319c4a8818afa9ad8c91840a57`
+- 验证：`go test ./...` 全绿（仅 5 个预存 API 认证类失败）· `go vet` 干净 · 打包 EXIT 0
+
+---
+
 ## V10.170.0 (2026-08-08) — Codex 蒸馏 P2 + 技能并发修复 + bash 结构化头
 
 ### 变更

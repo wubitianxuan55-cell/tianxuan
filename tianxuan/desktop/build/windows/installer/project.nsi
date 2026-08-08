@@ -1,4 +1,4 @@
-Unicode true
+﻿Unicode true
 
 ####
 ## Please note: Template replacements don't work in this file. They are provided with default defines like
@@ -52,6 +52,7 @@ VIAddVersionKey "ProductName"     "${INFO_PRODUCTNAME}"
 ManifestDPIAware true
 
 !include "MUI.nsh"
+!include "LogicLib.nsh"
 
 !define MUI_ICON "..\icon.ico"
 !define MUI_UNICON "..\icon.ico"
@@ -91,6 +92,27 @@ FunctionEnd
 
 Section
     !insertmacro wails.setShellContext
+
+    # The old process may still be running during an update/overwrite install:
+    # the in-app updater launches this installer and only then exits, or the
+    # user double-clicks the installer while the old build is open. wails.files
+    # below would fail to overwrite the locked exe. Terminate the old process
+    # and poll until it is gone (max ~10s).
+    # taskkill exit codes: 0 = found and terminated, 128 = no such process.
+    DetailPrint "Closing a running ${PRODUCT_EXECUTABLE} ..."
+    StrCpy $0 0
+    ${Do}
+        nsExec::ExecToStack 'cmd /c taskkill /F /IM "${PRODUCT_EXECUTABLE}" /T 2>nul'
+        Pop $1
+        ${If} $1 != 0
+            ${Break}
+        ${EndIf}
+        Sleep 500
+        IntOp $0 $0 + 1
+    ${LoopWhile} $0 < 20
+    # Brief pause after the process is gone so file handles are fully released
+    # before wails.files overwrites the executable below.
+    Sleep 500
 
     !insertmacro wails.webview2runtime
 

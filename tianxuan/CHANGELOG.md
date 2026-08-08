@@ -1,3 +1,28 @@
+## [10.163.0] — 2026-08-08
+
+### 🛠️ 修复更新安装时旧版本未关闭导致失败
+
+> 应用内更新器启动 NSIS 安装器后才退出旧进程，或用户直接双击安装包升级时
+> 旧版仍在运行——此时 `wails.files` 覆盖 `tianxuan-desktop.exe` 会被 Windows
+> 拒绝，安装失败（Wails 官方模板不处理运行中的进程）。
+
+#### 变更
+- `build/windows/installer/project.nsi`：Section 开头终止旧进程并轮询等待其
+  退出（`taskkill /F /IM tianxuan-desktop.exe /T`，最多 10 秒），确认句柄释放
+  后再覆盖 exe
+- 命令经 `cmd /c` 包裹执行重定向：`2>nul` 直接传给 `nsExec::ExecToStack`
+  会导致 taskkill 不执行（实测复现）；包一层 cmd 后正常
+- `project.nsi` 加 UTF-8 BOM：新增注释含中文后无 BOM 的 UTF-8 脚本会让
+  makensis 报 `Bad text encoding`（NSIS 按 ANSI/GBK 解析无 BOM 文件）
+
+#### 测试与验证（真实场景）
+- makensis 单独编译通过；`LogicLib`/`nsExec` 用法用最小安装器复现验证
+- 端到端：启动伪造 `tianxuan-desktop.exe`（PowerShell 副本）→ 运行带修复的
+  安装器 `/S` → 伪造进程被终止、真实安装目录 exe 覆盖成功（SHA-256 一致）、
+  安装器退出码 0
+- 对比实验确认根因：`2>nul` 重定向是 taskkill 未执行的直接原因（去掉后进程
+  可杀）
+
 ## [10.162.0] — 2026-08-08
 
 ### 👁️ 新增 vision 识图技能（OpenCode Zen 视觉模型）

@@ -274,44 +274,30 @@ func (c *Config) BashMode() string {
 	return "enforce"
 }
 
-// AgentConfig configures the harness loop. PlannerModel is optional: when set
-// to another provider's name it enables two-model collaboration, where the
-// planner handles low-frequency planning in its own session (kept separate so
-// each model's prompt prefix stays cache-stable). SubagentModel is the optional
+// AgentConfig configures the harness loop. SubagentModel is the optional
 // default for runAs=subagent skills; SubagentModels overrides it per skill name.
 type AgentConfig struct {
 	SystemPrompt     string            `toml:"system_prompt"`
 	SystemPromptFile string            `toml:"system_prompt_file"`
 	MaxSteps         int               `toml:"max_steps"` // tool-call rounds per turn; 0 = unlimited
 	Temperature      float64           `toml:"temperature"`
-	PlannerModel     string            `toml:"planner_model"`
 	SubagentModel    string            `toml:"subagent_model"`
 	SubagentModels   map[string]string `toml:"subagent_models"`
-	// PlannerTemperature overrides Temperature for the Hermes planner model.
-	// 0 means "use Temperature" (backward compatible). Negative means "use Temperature".
-	PlannerTemperature float64 `toml:"planner_temperature"`
 	// SubagentTemperature overrides Temperature for task-tool sub-agents.
 	// 0 means "use Temperature". Negative means "use Temperature".
 	SubagentTemperature float64 `toml:"subagent_temperature"`
-	// Effort overrides the reasoning effort for the executor (Hephaestus).
+	// Effort overrides the reasoning effort for the model.
 	// "" means provider default. For DeepSeek: "high" (default) or "max".
 	Effort string `toml:"effort"`
-	// PlannerEffort overrides Effort for the Hermes planner.
-	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
-	PlannerEffort string `toml:"planner_effort"`
 	// SubagentEffort overrides Effort for task-tool sub-agents.
 	// "" means "use Effort" (or provider default). For DeepSeek: "high" or "max".
 	SubagentEffort string `toml:"subagent_effort"`
-	// PlannerMaxSteps caps the planner model's tool-call rounds per planning
-	// turn. 0 (default) applies DefaultPlannerMaxSteps via PlannerMaxStepsVal —
-	// an unlimited read-only planner can investigate without bound.
-	PlannerMaxSteps int `toml:"planner_max_steps"`
 	// startup (a built-in like "explanatory"/"learning"/"concise", or a custom
 	// .tianxuan/output-styles/<name>.md). Empty = the unmodified prompt.
 	OutputStyle string `toml:"output_style"`
-	// AutoPlan is reserved for backward compatibility. Single-model mode uses
-	// the Adaptive Execution workflow (V10.135) — skeleton todo → execute →
-	// adapt, with no plan-approval round-trip — so this field is not wired.
+	// AutoPlan controls the single-model planning mode (V10.166):
+	// "off" (default) = direct adaptive execution; "ask" = complex tasks go
+	// through plan → confirm → execute via PlannerHost. Desktop has a toggle.
 	AutoPlan string `toml:"auto_plan"`
 	// AutoPlanClassifier is likewise reserved (no auto-plan gate is active).
 	AutoPlanClassifier    string `toml:"auto_plan_classifier"`
@@ -338,30 +324,6 @@ type AgentConfig struct {
 	OffloadThresholdChars int `toml:"offload_threshold_chars"`
 }
 
-// DefaultPlannerMaxSteps is the conservative tool-round cap applied when
-// planner_max_steps is unset. The planner is read-only, so an unbounded
-// investigation loop has no natural stop and only burns tokens.
-const DefaultPlannerMaxSteps = 12
-
-// PlannerMaxStepsVal returns the effective planner tool-round cap:
-// the configured value, or DefaultPlannerMaxSteps when unset (0).
-// Want effectively unlimited rounds? Set a large explicit value.
-func (a AgentConfig) PlannerMaxStepsVal() int {
-	if a.PlannerMaxSteps <= 0 {
-		return DefaultPlannerMaxSteps
-	}
-	return a.PlannerMaxSteps
-}
-
-// PlannerTemp returns the effective temperature for the Hermes planner.
-// Falls back to Temperature when PlannerTemperature is zero or negative.
-func (a AgentConfig) PlannerTemp() float64 {
-	if a.PlannerTemperature > 0 {
-		return a.PlannerTemperature
-	}
-	return a.Temperature
-}
-
 // SubagentTemp returns the effective temperature for task-tool sub-agents.
 // Falls back to Temperature when SubagentTemperature is zero or negative.
 func (a AgentConfig) SubagentTemp() float64 {
@@ -369,15 +331,6 @@ func (a AgentConfig) SubagentTemp() float64 {
 		return a.SubagentTemperature
 	}
 	return a.Temperature
-}
-
-// PlannerEffortVal returns the effective reasoning effort for Hermes.
-// Falls back to Effort when PlannerEffort is empty.
-func (a AgentConfig) PlannerEffortVal() string {
-	if a.PlannerEffort != "" {
-		return a.PlannerEffort
-	}
-	return a.Effort
 }
 
 // SubagentEffortVal returns the effective reasoning effort for sub-agents.
@@ -565,10 +518,10 @@ func (c *Config) AutoStartPlugins() []PluginEntry {
 
 // DefaultSystemPrompt is used when config provides none.
 // DefaultSystemPrompt is the shared L1 coding discipline — byte-stable prefix
-// injected into every agent (Hermes, Hephaestus, and single-model Solo) through
+// injected into every agent through
 // the compiler. It contains only rules that apply regardless of role; role-specific
 // identity, workflow strategy, and tool-selection policy live in each agent's
-// dedicated L2 prompt (HermesPrompt / HephaestusSystemPrompt / SoloSystemPrompt).
+// the dedicated L2 prompt (SoloSystemPrompt).
 const DefaultSystemPrompt = `## 编码铁律
 
 - 🔴 设计优先：编码前分析需求和代码，设计好再动手
@@ -611,8 +564,7 @@ func Default() *Config {
 			// the user cancels, or the provider errors. Context stays bounded by
 			// compaction, not by a round count. Set a positive agent.max_steps only
 			// if you want a hard guard against runaway.
-			MaxSteps:      0,
-			PlannerEffort: "max",
+			MaxSteps: 0,
 			// Context offloading on by default: tool outputs above the threshold
 			// are saved to <cwd>/.tianxuan/offload and replaced with compact
 			// references, keeping the context window lean. Set offload_dir = ""

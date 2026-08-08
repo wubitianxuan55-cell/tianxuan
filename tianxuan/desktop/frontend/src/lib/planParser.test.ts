@@ -11,7 +11,7 @@ const samplePlan = `
 - **Change**：实现 \`parsePlan(plan: string)\` 函数，从 Markdown 计划文本中提取结构化数据
 - **Depends on**：无
 - **Success**：\`npx vitest run --reporter=verbose\` 中新增的 \`planParser.test.ts\` 全部通过
-- **Risk recovery**：若正则不匹配真实 Hermes 输出格式，对照 \`hermes.go\` 中的步骤格式模板调整正则
+- **Risk recovery**：若正则不匹配真实计划输出格式，对照规划模式步骤格式模板调整正则
 
 步骤 2：重写 PlanCard 组件为结构化视图
 - **File(s)**：\`tianxuan/desktop/frontend/src/components/PlanCard.tsx\`
@@ -38,7 +38,7 @@ describe("parsePlan", () => {
     expect(step.change).toContain("parsePlan");
     expect(step.dependsOn).toBe("无");
     expect(step.success).toContain("npx vitest run");
-    expect(step.riskRecovery).toContain("hermes.go");
+    expect(step.riskRecovery).toContain("规划模式");
   });
 
   it("提取步骤 2 的信息", () => {

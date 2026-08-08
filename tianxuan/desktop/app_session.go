@@ -207,17 +207,6 @@ func (a *App) History() []HistoryMessage {
 			// raw user input.
 			raw := agent.StripTransientBlocks(m.Content)
 
-			// Handoff messages (Hermes→Hephaestus instructions) embed the
-			// original user task. Extract and display it instead of the
-			// full handoff prompt.
-			if strings.HasPrefix(strings.TrimSpace(raw), "# tianxuan hephaestus handoff") {
-				if task := extractOriginalTask(raw); task != "" {
-					raw = agent.StripTransientBlocks(task)
-				} else {
-					continue // defensive: malformed handoff, skip
-				}
-			}
-
 			// Compaction summaries are LLM-generated digests injected as
 			// user messages for cache-prefix stability. They are NOT user
 			// content — show a brief label instead of the English summary.
@@ -235,19 +224,4 @@ func (a *App) History() []HistoryMessage {
 		out = append(out, HistoryMessage{Role: string(m.Role), Content: content})
 	}
 	return out
-}
-
-// extractOriginalTask extracts the original user task from a Hermes→Hephaestus
-// handoff message. Returns empty string if the content is not a valid handoff.
-func extractOriginalTask(content string) string {
-	const header = "Original task:\n"
-	i := strings.Index(content, header)
-	if i < 0 {
-		return ""
-	}
-	rest := content[i+len(header):]
-	if j := strings.Index(rest, "\n\nHermes output:"); j >= 0 {
-		rest = rest[:j]
-	}
-	return strings.TrimSpace(rest)
 }

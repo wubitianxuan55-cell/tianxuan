@@ -9,9 +9,9 @@ import (
 //
 // DecidePlannerRoute applies deterministic precedence rules to decide whether
 // a turn needs the planner or can go executor-only. Pure text analysis —
-// no model calls, no I/O. Used only within Hermes to skip the planner for
-// simple tasks; never changes system prompts (executor always uses
-// HephaestusSystemPrompt).
+// no model calls, no I/O. Used by the planner host to decide whether a
+// turn needs planning; never changes system prompts.
+
 
 // PlannerRoute is the decision. Three-way semantics (O5):
 //   - executor_only:   skip the planner, execute directly

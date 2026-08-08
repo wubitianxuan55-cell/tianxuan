@@ -338,7 +338,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 			// ── Stop gates (solo mode) ───────────────────────────────────
 			// Triple gate: taskGate → goalGate → verifyGate.
 			// All three fire only in solo mode (!plannerMode); plannerMode
-			// (Hermes planner) skips them because Hermes handles task tracking
+			// (planning round) skips them because the planner host handles task tracking
 			// and verification via its own plan/confirm/verify loop.
 			// V10.87: taskGate and goalGate restored for solo (single-model) runs.
 			// Both check plannerMode internally, so no external guard needed.
@@ -482,7 +482,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 				if !isErr && step != "" {
 					a.advanceCanonicalTodo(step)
 				}
-				// V10.89: collect step results, dedup by step name — Hephaestus may
+				// V10.89: collect step results, dedup by step name — the model may
 				// call complete_step multiple times for the same step; keep only last.
 				// V10.101: record failed complete_step calls too (status="error"),
 				// so allStepsPassed can detect them and trigger correction loops.

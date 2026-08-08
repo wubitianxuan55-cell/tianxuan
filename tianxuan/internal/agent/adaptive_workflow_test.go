@@ -5,15 +5,16 @@ import (
 	"testing"
 )
 
-// V10.135 契约：单模型工作流是 Adaptive Execution——todo 是活文档而非
-// 合同、无计划确认往返、失败按级升级（重试→根因诊断→换方案→收敛）。
-// 与双模型（完整计划→确认→执行，执行者禁改计划）形成明确差异。
+// V10.135+ 契约：单模型工作流以 Adaptive Execution 为基础——todo 是活文档
+// 而非合同、失败按级升级（重试→根因诊断→换方案→收敛）。V10.166 起规划
+// 模式（PlannerHost）通过 plan-mode 指令（planmode.Marker）在同一 session
+// 引导规划确认，提示词为条件式：收到规划指令先规划等待确认，否则直接执行。
 func TestSoloSystemPrompt_AdaptiveExecution(t *testing.T) {
 	p := SoloSystemPrompt
 	required := []string{
 		"Adaptive execution",
 		"living document",             // todo 活文档
-		"no plan-approval round-trip", // 无计划确认
+		"plan-mode directive",         // 规划指令存在时先规划等待确认
 		"adapt",                       // 执行中调整计划
 		"switch approach",             // 3 次同方案失败换方案
 		"diagnose the root cause",     // 根因诊断
@@ -39,7 +40,7 @@ func TestSoloSystemPrompt_NoDualModelPlanContract(t *testing.T) {
 
 // V10.136 契约：单模型必须有进度保护——连续无进展轮次后重新评估 todo /
 // 收敛（ask 或缩小范围），不能无限循环。收敛对象是自己（Adaptive），
-// 不是"交还 Hermes"（那是双模型执行者的语义）。
+// 不是"交还规划者"（那是双模型执行者的语义）。
 func TestSoloSystemPrompt_ProgressGuard(t *testing.T) {
 	p := SoloSystemPrompt
 	for _, kw := range []string{"no progress", "reassess"} {

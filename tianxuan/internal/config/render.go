@@ -36,30 +36,17 @@ func RenderTOML(c *Config) string {
 	}
 	fmt.Fprintf(&b, "max_steps   = %d\n", c.Agent.MaxSteps)
 	fmt.Fprintf(&b, "temperature = %s\n", formatFloat(c.Agent.Temperature))
-	if c.Agent.PlannerTemperature > 0 {
-		fmt.Fprintf(&b, "planner_temperature = %s   # override for Hermes planner (0 = use temperature)\n", formatFloat(c.Agent.PlannerTemperature))
-	}
 	if c.Agent.SubagentTemperature > 0 {
 		fmt.Fprintf(&b, "subagent_temperature = %s   # override for task sub-agents (0 = use temperature)\n", formatFloat(c.Agent.SubagentTemperature))
 	}
 	if c.Agent.Effort != "" {
 		fmt.Fprintf(&b, "effort = %q   # executor reasoning: high | max (empty = off)\n", c.Agent.Effort)
 	}
-	if c.Agent.PlannerEffort != "" {
-		fmt.Fprintf(&b, "planner_effort = %q   # override for Hermes (empty = inherit effort)\n", c.Agent.PlannerEffort)
-	}
 	if c.Agent.SubagentEffort != "" {
 		fmt.Fprintf(&b, "subagent_effort = %q   # override for sub-agents (empty = inherit effort)\n", c.Agent.SubagentEffort)
 	}
-	if c.Agent.PlannerModel != "" {
-		fmt.Fprintf(&b, "planner_model = %q   # low-frequency planner (two-model collaboration)\n", c.Agent.PlannerModel)
-	} else {
-		b.WriteString("# planner_model = \"mimo\"   # optional: enable two-model collaboration\n")
-	}
-	if c.Agent.PlannerMaxSteps > 0 {
-		fmt.Fprintf(&b, "planner_max_steps = %d   # max planner tool-call rounds per turn\n", c.Agent.PlannerMaxSteps)
-	} else {
-		b.WriteString("# planner_max_steps = 12   # cap planner turns (0 = unlimited)\n")
+	if c.Agent.AutoPlan != "" && c.Agent.AutoPlan != "off" {
+		fmt.Fprintf(&b, "auto_plan = %q   # 单模型规划模式: off = 直接执行, ask = 复杂任务先规划确认\n", c.Agent.AutoPlan)
 	}
 	if c.Agent.SubagentModel != "" {
 		fmt.Fprintf(&b, "subagent_model = %q   # default model for runAs=subagent skills\n", c.Agent.SubagentModel)

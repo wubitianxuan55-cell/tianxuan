@@ -50,7 +50,7 @@ func (a *AgentRunner) taskGate() bool {
 	}
 
 	// 单模型（strictVerify=false）不强制 complete_step 签收，更新 todo 状态即可；
-	// 双模型保留 complete_step 引导（Hermes 需要证据回报）。
+	// 规划模式保留 complete_step 引导（修正循环需要证据回报）。
 	signOff := "complete_step 标记每个步骤。"
 	if !a.evidence.StrictVerification() {
 		signOff = "将完成的步骤在 todo_write 中更新为 completed。"

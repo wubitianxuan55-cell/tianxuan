@@ -20,22 +20,6 @@ func TestSetDefaultModel(t *testing.T) {
 	}
 }
 
-func TestSetPlannerModel(t *testing.T) {
-	c := Default()
-	if err := c.SetPlannerModel("deepseek-pro"); err != nil {
-		t.Fatalf("set planner: %v", err)
-	}
-	if c.Agent.PlannerModel != "deepseek-pro" {
-		t.Errorf("planner = %q", c.Agent.PlannerModel)
-	}
-	if err := c.SetPlannerModel(""); err != nil || c.Agent.PlannerModel != "" {
-		t.Errorf("clearing planner failed: err=%v planner=%q", err, c.Agent.PlannerModel)
-	}
-	if err := c.SetPlannerModel("ghost"); err == nil {
-		t.Error("expected error for unknown planner")
-	}
-}
-
 func TestUpsertProvider(t *testing.T) {
 	c := Default()
 	n := len(c.Providers)
@@ -75,18 +59,14 @@ func TestUpsertProvider(t *testing.T) {
 
 func TestRemoveProvider(t *testing.T) {
 	c := Default()
-	c.Agent.PlannerModel = "deepseek-pro"
 
 	// Cannot remove the default model.
 	if err := c.RemoveProvider(c.DefaultModel); err == nil {
 		t.Error("expected error removing the default model")
 	}
-	// Removing the planner provider clears planner_model.
+	// Removing a non-default provider succeeds.
 	if err := c.RemoveProvider("deepseek-pro"); err != nil {
-		t.Fatalf("remove planner provider: %v", err)
-	}
-	if c.Agent.PlannerModel != "" {
-		t.Errorf("planner should be cleared, got %q", c.Agent.PlannerModel)
+		t.Fatalf("remove provider: %v", err)
 	}
 	if _, ok := c.Provider("deepseek-pro"); ok {
 		t.Error("provider not actually removed")
@@ -196,9 +176,6 @@ func TestSaveToRoundTrips(t *testing.T) {
 	if err := c.SetDefaultModel("mimo-pro"); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SetPlannerModel("deepseek-pro"); err != nil {
-		t.Fatal(err)
-	}
 	if err := c.UpsertProvider(ProviderEntry{Name: "local", Kind: "openai", BaseURL: "http://localhost:1234/v1", Model: "llama"}); err != nil {
 		t.Fatal(err)
 	}
@@ -224,9 +201,6 @@ func TestSaveToRoundTrips(t *testing.T) {
 	}
 	if got.DefaultModel != "mimo-pro" {
 		t.Errorf("default_model = %q", got.DefaultModel)
-	}
-	if got.Agent.PlannerModel != "deepseek-pro" {
-		t.Errorf("planner_model = %q", got.Agent.PlannerModel)
 	}
 	if _, ok := got.Provider("local"); !ok {
 		t.Error("added provider 'local' missing after round-trip")

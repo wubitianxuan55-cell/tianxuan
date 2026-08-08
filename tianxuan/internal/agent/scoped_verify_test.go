@@ -24,12 +24,3 @@ func TestSoloSystemPrompt_ScopedVerification(t *testing.T) {
 		}
 	}
 }
-
-func TestHephaestusSystemPrompt_ScopedVerification(t *testing.T) {
-	p := HephaestusSystemPrompt
-	for _, kw := range []string{"matches the change", "affected package tests", "frontend", "full suite"} {
-		if !strings.Contains(p, kw) {
-			t.Errorf("HephaestusSystemPrompt missing scoped-verification keyword %q", kw)
-		}
-	}
-}

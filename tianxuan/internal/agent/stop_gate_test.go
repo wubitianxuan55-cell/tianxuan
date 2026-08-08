@@ -244,7 +244,7 @@ func TestFinalReadinessCheck_NoBaseline(t *testing.T) {
 // gate now correctly blocks (V10.101: current todos are passed in, not nil).
 func TestFinalReadinessCheck_UnverifiedTodosBlocks(t *testing.T) {
 	ledger := evidence.NewLedger()
-	ledger.SetStrictVerification(true) // dual-model: Hermes depends on complete_step evidence
+	ledger.SetStrictVerification(true) // plan mode: complete_step evidence drives the fix loop
 	// Baseline: todo_write creates tasks as pending
 	ledger.Record(evidence.Receipt{
 		ToolName: "todo_write",

@@ -501,9 +501,9 @@ func (c *Controller) EnableInteractiveApproval() {
 		c.executor.SetGate(permission.NewGate(c.policy, gateApprover{c}))
 		c.executor.SetAsker(c)
 	}
-	// V10.34: wire Hermes plan confirmation — planner asks user before executing.
-	if hermes, ok := c.runner.(*agent.Hermes); ok {
-		hermes.SetAsker(c)
+	// V10.166: 单模型规划模式确认——PlannerHost 在规划轮后询问用户。
+	if host, ok := c.runner.(*agent.PlannerHost); ok {
+		host.SetAsker(c)
 	}
 }
 
@@ -713,11 +713,6 @@ func (c *Controller) NewSession() error {
 		c.mu.Unlock()
 	}
 	c.executor.SetSession(agent.NewSession(c.systemPrompt))
-	// V10.87: also reset the planner session when using dual-model architecture,
-	// or the new session inherits stale project maps and execution feedback.
-	if h, ok := c.runner.(*agent.Hermes); ok {
-		h.ResetSession()
-	}
 	c.rebindCheckpoints(c.SessionPath())
 	// Reset V3.0 TCCA state so the new session starts clean.
 	if c.ctxMgr != nil {
@@ -758,13 +753,6 @@ func (c *Controller) Resume(s *agent.Session, path string) {
 
 	if c.executor != nil {
 		c.executor.SetSession(s)
-	}
-
-	// V10.108: reset Hermes planner session so the planner doesn't carry stale
-	// context from a previous session across a restore. The planner will
-	// re-acquire project context on the next turn via injectProjectMap.
-	if h, ok := c.runner.(*agent.Hermes); ok {
-		h.ResetSession()
 	}
 
 	// V10.108: sync FlowLayer with the loaded session so TCCA metrics and

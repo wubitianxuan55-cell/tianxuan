@@ -42,7 +42,6 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
   const { t, pref, setPref } = useI18n();
 
   const [depth, setDepth] = useState(s.agent.maxSubagentDepth);
-  const [plannerSteps, setPlannerSteps] = useState(s.agent.plannerMaxSteps || 0);
   const [reasoningLang, setReasoningLang] = useState(s.agent.reasoningLanguage || "auto");
   const [autoPlan, setAutoPlan] = useState(s.agent.autoPlan || "off");
   const [outputStyle, setOutputStyle] = useState(s.agent.outputStyle || "");
@@ -289,7 +288,7 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
       <SettingsSection title={
         <span className="flex items-center gap-1.5"><Bot size={14} className="text-accent" />智能体</span>
       }>
-        <SettingsField label="自动规划" hint="多步任务自动启用规划模式。off=手动 / ask=询问 / on=自动。">
+        <SettingsField label="规划模式" hint="off=直接执行（默认）；ask=复杂任务先规划、确认后执行。">
           <SegmentedButton
             options={[
               { value: "off", label: "关闭" },
@@ -298,22 +297,6 @@ export function SettingsGeneral({ s, busy: _busy, apply }: SectionProps) {
             ]}
             value={autoPlan}
             onChange={(v) => { setAutoPlan(v); void apply(() => app.SetAutoPlan(v)); }}
-          />
-        </SettingsField>
-        <SettingsField label="规划器最大步数" hint="规划阶段工具调用轮数上限。0 = 不限。">
-          <SegmentedButton
-            options={[
-              { value: "6", label: "6" },
-              { value: "12", label: "12" },
-              { value: "25", label: "25" },
-              { value: "0", label: "∞" },
-            ]}
-            value={String(plannerSteps)}
-            onChange={(v) => {
-              const n = Number(v);
-              setPlannerSteps(n);
-              void apply(() => app.SetPlannerMaxSteps(n));
-            }}
           />
         </SettingsField>
         <SettingsField label="递归深度限制" hint="限制子代理嵌套层数。0 = 不限。">

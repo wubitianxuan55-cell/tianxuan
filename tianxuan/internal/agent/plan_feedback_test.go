@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// ── SDD 蒸馏测试 — OpenSpec 方法论映射到 Hermes ──────────────────────────
+// ── SDD 蒸馏测试 — OpenSpec 方法论映射到单模型执行反馈 ──────────────────
 //
-// 这些测试验证 Hermes 的规划者是否遵循 Spec-Driven Development (SDD)
-// 方法论。每个测试对应 OpenSpec 的一个核心概念：
+// 这些测试验证执行反馈是否遵循 Spec-Driven Development (SDD) 方法论。
+// 每个测试对应 OpenSpec 的一个核心概念：
 //
 //   Delta Specs  — parseStepDeltas (ADDED/MODIFIED/REMOVED)
 //   Proposal     — hasProposal (why+what 在 plan 之前)
 //   Coherence    — checkCoherence (执行结果 vs 计划)
-//   Specs First  — HermesPrompt 关键词验证
+//   Specs First  — 计划格式验证
 //   Verify 三维  — formatExecutionFeedback 完整性检查
 
 // ── 1. Delta Specs：步骤变更类型标记 ────────────────────────────────────
@@ -177,7 +177,7 @@ func TestHasProposal_ProposalAsWhy(t *testing.T) {
 }
 
 func TestHasProposal_AnalysisNotProposal(t *testing.T) {
-	// Hermes 的分析/调查叙述不是 proposal
+	// 单纯的分析/调查叙述不是 proposal
 	plan := `我检查了 internal/auth/ 目录，发现 JWT 验证逻辑分散在 3 个文件中。
 建议合并到单一模块。README 也需要更新。
 
@@ -317,51 +317,7 @@ func TestCheckCoherence_EmptyFiles(t *testing.T) {
 	}
 }
 
-// ── 4. Prompt 关键词验证 — SDD 方法论已注入 ──────────────────────────
-
-func TestHermesPrompt_SDDKeywords(t *testing.T) {
-	p := HermesPrompt
-	required := []string{
-		"GOAL",
-		"Constraint",
-		"WHAT",
-		"HOW",
-		"analysis",
-		"completeness",
-		"correctness",
-		"coherence",
-	}
-	var missing []string
-	for _, kw := range required {
-		if !strings.Contains(p, kw) {
-			missing = append(missing, kw)
-		}
-	}
-	if len(missing) > 0 {
-		// TDD: deliberately failing — 这些关键词尚未注入 HermesPrompt
-		t.Errorf("HermesPrompt 缺少 SDD 关键词（待注入）: %v", missing)
-	}
-}
-
-func TestHermesPrompt_ContainsGoalFormat(t *testing.T) {
-	// 验证步骤格式中包含 Goal + Constraint 字段说明
-	if !strings.Contains(HermesPrompt, "**Constraint**") {
-		t.Error("HermesPrompt missing Constraint field in step format")
-	}
-	if !strings.Contains(HermesPrompt, "GOAL") {
-		t.Error("HermesPrompt missing GOAL explanation")
-	}
-}
-
-func TestHermesPrompt_ContainsProposalGuidance(t *testing.T) {
-	// 验证 prompt 引导 Hermes 在计划前先写分析段（proposal）
-	p := HermesPrompt
-	if !strings.Contains(p, "analysis") {
-		t.Error("HermesPrompt missing proposal/analysis-first guidance")
-	}
-}
-
-// ── 5. formatExecutionFeedback 增强 — OpenSpec 风格汇报 ──────────────
+// ── 4. formatExecutionFeedback 增强 — OpenSpec 风格汇报 ──────────────
 
 func TestFormatExecutionFeedback_ContainsDeltaSummary(t *testing.T) {
 	r := &TurnResult{

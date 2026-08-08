@@ -1,3 +1,55 @@
+## [10.166.0] — 2026-08-08
+
+### 🔄 架构回退：删除双模型（Hermes），重回单模型规划模式
+
+> 经大量验证，双模型架构（Hermes 规划者 + Hephaestus 执行者，两个独立
+> session / 两套 L1 前缀）效果不达预期。本版本整体删除，原"规划 → 确认 →
+> 执行 → 自动修正"工作流由**单模型规划模式（PlannerHost）**承接：同一
+> 模型、同一 session、同一工具列表，复杂任务先只读规划、确认后执行。
+
+#### 核心设计（`internal/agent/planner_host.go`）
+- `PlannerHost` 包装唯一 `AgentRunner`：`DecidePlannerRoute` 三值路由 →
+  `RoutePlanAndExec` 且规划模式开启时进入两阶段
+  - 规划轮：注入 `planmode.Marker` + `SetPlanMode(true)`（运行时只读门控，
+    工具 schema 全程不变 —— 遵守前缀缓存铁律，避免 V8.0.2 filteredSchemas
+    事故重演）+ 临时 `plannerMode=true` 跳过三闸门
+  - 确认：headless / 简单计划（≤3 步、无新文件、Verify 可执行）自动确认；
+    交互模式弹确认卡（提交执行 / 仅聊天 / 按用户意见修改计划 / 取消）
+  - 执行轮：同一 session 继续（计划文本就在上下文中，无 handoff 交接）
+  - 自动修正循环：失败步骤 → `buildFixPrompt`（round 2 定向 / round 3 反思）
+    → 同一模型生成修正计划并立即执行（≤3 轮）
+- 规划模式开关：`agent.auto_plan`（`off` 默认 = 直接执行；`ask` = 复杂任务
+  先规划确认），桌面端 Composer 底部新增"规划"按钮热切换
+- 默认关闭，行为与之前单模型 Adaptive Execution（Codex 方式）一致
+
+#### 删除（双模型专属）
+- `internal/agent/hermes.go`、`hermes_confirm.go`、`hermes_compact_test.go`、
+  `workflow_test.go`（编排逻辑迁移/改写）
+- `HermesPrompt` / `HephaestusSystemPrompt` / `hephaestusHandoffMarker` /
+  `formatHandoff` / `HandoffTask` / `feedResultToPlanner` / `injectProjectMap`
+- `agent.planner_model` / `planner_temperature` / `planner_effort` /
+  `planner_max_steps` 配置及桌面设置 UI（模型卡、规划器步数）
+- 前端 Hermes/Hephaestus 双标签（RunStatus 改为单阶段"规划/执行"）、
+  planner 用量标签、ProcessCard 双模型流程文案
+- `memory.PlannerBlock` 死代码（双模型规划者专用记忆过滤）
+
+#### 保留复用
+- `planmode.Policy` 只读安全门 + `Marker`、`DecidePlannerRoute` 分类器、
+  `planparse.go` 计划解析、`shouldAutoConfirm` / `displayPlan` /
+  `resolveConfirmChoice`、`buildVerifyTriad` / `checkCoherence` /
+  `checkStepCoverage`（SDD 反馈）
+
+#### 验证
+- 新增 `planner_host_test.go` 9 个契约测试（直接执行 / 规划→执行 / 直接回答
+  / 简单任务 / `!` 快速路径 / headless 自动确认 / 修订循环 / 取消 / 修正循环）
+- `go build ./...`、`go vet ./...`、`go test ./internal/...` 全绿
+  （`internal/cli` 的 `TestModelRefsSkipsUnconfigured` 为预存失败：zen
+  provider 测试未清 `OPENCODE_API_KEY`，与本版本无关）
+- 桌面端 `go build` / `go vet` 通过；前端 `tsc --noEmit` 通过、142 个
+  vitest 测试全部通过
+
+---
+
 ## [10.165.0] — 2026-08-08
 
 ### 📸 AI 自主截图工具 `capture_screen`

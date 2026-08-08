@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUp, Camera, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X, Zap } from "lucide-react";
+import { ArrowUp, Brain, Camera, Check, ChevronDown, FolderGit2, FolderPlus, Search, Square, X, Zap } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { clearLayoutSize, loadOptionalLayoutSize, saveLayoutSize } from "../lib/layoutPreferences";
@@ -38,13 +38,15 @@ function loadComposerHeight(): number | null {
 
 export function Composer({
   running, cwd, onSend, onCancel, permLevel, onSetPermLevel, onPickFolder, disabled,
-  externalDraft,
+  externalDraft, autoPlan, onToggleAutoPlan,
 }: {
   running: boolean; cwd?: string;
   onSend: (displayText: string, submitText?: string) => void;
   onCancel: () => string | undefined; permLevel?: string; onSetPermLevel?: (p: "ask" | "auto" | "yolo") => void;
   onPickFolder: (path?: string) => Promise<string>; disabled?: boolean;
   externalDraft?: { text: string; id: number } | null;
+  autoPlan?: string;
+  onToggleAutoPlan?: () => void;
 }) {
   const t = useT();
   const [text, setText] = useState("");
@@ -572,7 +574,25 @@ export function Composer({
             })}
           </div>
 
-{/* 快捷提示 */}
+          {/* V10.166: 单模型规划模式开关（默认关闭 = 直接执行） */}
+          {onToggleAutoPlan && (
+            <button type="button"
+              className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-md bg-transparent text-xs cursor-pointer transition-all duration-150 active:scale-[0.97] focus-visible:ring-1 focus-visible:ring-accent/40 focus-visible:outline-none ${
+                autoPlan && autoPlan !== "off"
+                  ? "text-purple-400 bg-purple-400/10 border-purple-400/25 shadow-[0_0_0_1px_var(--purple-400)]"
+                  : "text-fg-dim border-border-soft hover:text-fg hover:bg-bg-soft hover:border-fg-faint"
+              }`}
+              onClick={() => onToggleAutoPlan()}
+              title={autoPlan && autoPlan !== "off"
+                ? "规划模式已开启：复杂任务先规划、确认后执行"
+                : "规划模式已关闭：直接执行（默认）"}
+            >
+              <Brain size={11} />
+              {autoPlan && autoPlan !== "off" ? "规划中" : "规划"}
+            </button>
+          )}
+
+          {/* 快捷提示 */}
           <span className="ml-auto text-fg-faint/40 text-[10px] select-none hidden sm:inline-flex items-center gap-2">
             <span>/ 命令</span>
             <span>@ 文件</span>

@@ -1,3 +1,17 @@
+## V10.166.0 (2026-08-08) — 删除双模型架构，重回单模型规划模式
+
+### 变更
+- 删除双模型架构（Hermes 规划者 + Hephaestus 执行者，两个独立 session / 两套 L1 前缀）
+- 新增单模型规划模式 `PlannerHost`：同一模型、同一 session、同一工具列表，
+  复杂任务先只读规划（planmode.Marker + 运行时只读门）→ 确认 → 执行 →
+  自动修正（≤3 轮）；规划/执行阶段工具 schema 全程不变，遵守前缀缓存铁律
+- 规划模式开关 `agent.auto_plan`（默认 off = 直接执行；ask = 复杂任务先规划确认），
+  桌面端 Composer 底部新增"规划"按钮热切换
+- 删除 `planner_model` / `planner_temperature` / `planner_effort` /
+  `planner_max_steps` 配置与设置 UI；前端运行状态行改为单阶段"规划/执行"
+
+---
+
 ## V10.165.0 (2026-08-08) — AI 自主截图工具 capture_screen
 
 ### 变更

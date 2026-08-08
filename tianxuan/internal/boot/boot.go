@@ -1,7 +1,7 @@
 // Package boot assembles a ready-to-drive control.Controller from configuration:
 // it loads config, resolves the model(s), builds the tool registry (built-ins +
 // plugins), wires the permission gate, and constructs the executor — optionally
-// wrapping it in a two-model Hermes. It is the one place that turns "what the
+// wrapping it in the single-model PlannerHost. It is the one place that turns "what the
 // user configured" into "a Controller a frontend can drive", so every frontend —
 // the terminal TUI, the HTTP/SSE server, the desktop webview — shares the exact
 // same assembly instead of each re-deriving it. Frontends pass only a sink and a
@@ -64,7 +64,7 @@ type Options struct {
 }
 
 // Build loads config, resolves the model(s), and returns a Controller wrapping a
-// single Agent, or a two-model Hermes when agent.planner_model is set. The
+// single Agent, or a PlannerHost when agent.auto_plan is set. The
 // returned controller owns plugin subprocesses; call Close (via Controller.Close)
 // to release them.
 var (
@@ -336,16 +336,9 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		applyCompactToolset(reg)
 	}
 
-	// V10.55: single-model mode uses a unified prompt that covers both
-	// planning and execution. Dual-model mode keeps HephaestusSystemPrompt,
-	// which relies on Hermes for planning.
-	execPrompt := agent.HephaestusSystemPrompt
-	strictEvidence := false
-	if cfg.Agent.PlannerModel == "" {
-		execPrompt = agent.SoloSystemPrompt
-	} else {
-		strictEvidence = true // dual-model: verify evidence against turn ledger
-	}
+	// V10.166: 单模型统一提示词——默认自适应执行，规划模式（PlannerHost）
+	// 通过 planmode.Marker 在同一 session 内引导规划阶段，提示词全程不变。
+	execPrompt := agent.SoloSystemPrompt
 	execSess := agent.NewSession(compiler.WithInstructions(execPrompt))
 	offloadDir := cfg.Agent.OffloadDir
 	if offloadDir != "" && !filepath.IsAbs(offloadDir) {
@@ -364,13 +357,13 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		ContextWindow:         entry.ContextWindow,
 		Compaction:            agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
 		Dispatcher:            toolDispatcher,
-		StrictEvidence:        strictEvidence,
+		StrictEvidence:        false,
 		OffloadDir:            offloadDir,
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 		ToolStats:             toolStats,
 	}, sink)
 	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
-	// 匹配技能的 playbook（tdd/systematic-debugging 等）。Hermes 规划者
+	// 匹配技能的 playbook（tdd/systematic-debugging 等）。规划轮
 	// 走 plannerMode 不注入；subagent 技能已工具化，也不注入正文。
 	executor.SetAutoSkillStore(skillStore)
 
@@ -451,111 +444,12 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// underlying model name (e.g. both "deepseek-chat").
 	label := entry.Name
 
-	// V10.30: two-model collaboration — when planner_model names a provider
-	// different from the executor, wrap the executor in a Hermes with its
-	// own planner session for cache stability.
+	// V10.166: 单模型规划模式——auto_plan 非 off 时用 PlannerHost 包装
+	// executor：同一模型在同一 session 内先规划（只读门控）再执行。
 	var runner agent.Runner = executor
-	if pm := cfg.Agent.PlannerModel; pm != "" {
-		if pe, ok := cfg.ResolveModel(pm); ok {
-			if e := cfg.Agent.PlannerEffortVal(); e != "" {
-				pe.Effort = e
-			}
-			// If the planner model has no pricing configured, fall back to
-			// the executor's pricing so cost statistics show real values.
-			if pe.Price == nil && entry.Price != nil {
-				pe.Price = entry.Price
-			}
-			plannerProv, err := NewProvider(pe)
-			if err != nil {
-				return nil, fmt.Errorf("planner %q: %w", pm, err)
-			}
-			plannerSess := agent.NewSession(compiler.WithInstructions(agent.HermesPrompt + "\n\n# Project context\n\n" + mem.PlannerBlock()))
-			// V10.32: build a read-only tool subset for the planner so it can
-			// investigate code before proposing a plan (read_file, grep, glob,
-			// web_search, web_fetch, lsp_*, code_index, memory_search,
-			// read_skill, git_status/git_diff/git_log, and MCP read-only tools).
-			readOnlyReg := newReadOnlyRegistry(reg)
-
-			// V10.89: subagent registry is read-only — bash is too dangerous
-			// for subagents. They use task tool for code execution.
-			subagentReg := newReadOnlyRegistry(reg)
-
-			// 显式添加 ask 工具到规划者只读工具集中。
-			// ask 工具 ReadOnly=true 理论上会被 newReadOnlyRegistry 自动包含，
-			// 但显式添加可确保它不受过滤逻辑变化的影响。
-			if askTool, ok := reg.Get("ask"); ok {
-				readOnlyReg.Add(askTool)
-			}
-
-			// V10.42: 为规划者注入只读子代理工具（task/explore/research/
-			// review/security_review）。每个子代理工具的 parentReg =
-			// readOnlyReg，确保子代理也只拿到只读工具 — headlessGate 无害。
-			plannerTaskTool := agent.NewTaskTool(plannerProv, pe.Price, subagentReg, maxSteps,
-				pe.ContextWindow, cfg.Agent.SubagentTemp(), config.ArchiveDir(), "", headlessGate)
-			plannerTaskTool.SetCompiler(&taskCompilerAdapter{c: compiler})
-			plannerTaskTool.SetRuntimePrompt(runtimeCtx.SystemPrompt())
-			if subRef := strings.TrimSpace(cfg.Agent.SubagentModel); subRef != "" {
-				if subEntry, ok := cfg.ResolveModel(subRef); ok {
-					if e := cfg.Agent.SubagentEffortVal(); e != "" {
-						subEntry.Effort = e
-					}
-					if subProv, err := NewProvider(subEntry); err == nil {
-						plannerTaskTool.SetSubagentProvider(subProv, subEntry.Price, subEntry.ContextWindow)
-					}
-				}
-			}
-			readOnlyReg.Add(plannerTaskTool)
-
-			// 只读 skillRunner — 源 registry 为 readOnlyReg，子代理工具集被限定为只读
-			plannerSkillRunner := func(sctx context.Context, sk skill.Skill, task string) (string, error) {
-				prov, price, ctxWin := plannerProv, pe.Price, pe.ContextWindow
-				if modelRef := subagentModelRef(cfg, sk); modelRef != "" {
-					if me, ok := cfg.ResolveModel(modelRef); ok {
-						if p, err := NewProvider(me); err == nil {
-							prov, price, ctxWin = p, me.Price, me.ContextWindow
-						}
-					}
-				}
-				subReg := agent.FilterRegistry(subagentReg, sk.AllowedTools, agent.SubagentMetaTools()...)
-				steps := maxSteps
-				if steps > 0 {
-					if steps /= 2; steps < 5 {
-						steps = 5
-					}
-				} else {
-					steps = agent.DefaultSubagentMaxSteps
-				}
-				childCompiler := compiler.Fork()
-				sysPrompt := childCompiler.SystemPrompt()
-				return agent.RunSubAgent(sctx, prov, subReg, sysPrompt, sk.Body+"\n\n"+task, agent.Options{
-					MaxSteps:       steps,
-					Temperature:    cfg.Agent.PlannerTemp(),
-					Pricing:        price,
-					Gate:           headlessGate,
-					ContextWindow:  ctxWin,
-					Compaction:     agent.CompactionConfig{ArchiveDir: config.ArchiveDir()},
-					RuntimePrompt:  runtimeCtx.SystemPrompt(),
-					TemplatePrefix: lookupSubagentTemplatePrefix(sk.Name),
-					ActiveSchemas:  readOnlyReg.Schemas(),
-				}, agent.NestedSink(sctx, event.Discard), nil)
-			}
-			readOnlyReg.Add(skill.NewRunSkillTool(skillStore, plannerSkillRunner))
-			readOnlyReg.Add(skill.NewParallelSkillsTool(skillStore, plannerSkillRunner))
-			// 规划者同样获得独立的只读子代理技能工具（探索/调研/审查）。
-			for _, sd := range subagentSkillToolDescs {
-				readOnlyReg.Add(skill.NewSubagentSkillTool(skillStore, plannerSkillRunner, sd.name, sd.desc, sd.compactDesc))
-			}
-
-			runner = agent.NewHermes(plannerProv, plannerSess, pe.Price, executor, cfg.Agent.PlannerTemp(), sink, readOnlyReg, cfg.Agent.PlannerMaxStepsVal(), pe.ContextWindow, config.ArchiveDir(), cwd)
-			// V10.89: emit warning if planner context window differs from provider default.
-			if pe.ContextWindow < entry.ContextWindow {
-				sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn,
-					Text: fmt.Sprintf("规划者上下文窗口 (%d) < 模型默认 (%d)；超限计划可能被截断", pe.ContextWindow, entry.ContextWindow)})
-			}
-			label = entry.Name + " + planner " + pe.Name
-		} else {
-			return nil, fmt.Errorf("planner_model %q is not a configured provider", pm)
-		}
+	if cfg.Agent.AutoPlan != "" && cfg.Agent.AutoPlan != "off" {
+		runner = agent.NewPlannerHost(executor, cfg.Agent.AutoPlan, sink)
+		label = entry.Name + " · 规划模式"
 	}
 
 	skillLayer := cache.NewSkillLayer()

@@ -1,13 +1,13 @@
-﻿package agent
+package agent
 
 import (
 	"fmt"
 	"strings"
 )
 
-// ── SDD 蒸馏实现 — OpenSpec 方法论映射到 Hermes ──────────────────────
+// ── SDD 蒸馏实现 — OpenSpec 方法论映射到单模型执行反馈 ────────────────
 //
-// 以下函数将 OpenSpec 的 SDD 核心概念蒸馏到 Hermes 规划者中：
+// 以下函数将 OpenSpec 的 SDD 核心概念蒸馏到执行反馈中：
 //   Delta Specs  — parseStepDeltas, countDeltas
 //   Proposal     — hasProposal, extractProposal
 //   Coherence    — checkCoherence

@@ -412,7 +412,6 @@ func (s *Server) settings(w http.ResponseWriter, _ *http.Request) {
 	}
 	writeJSON(w, map[string]any{
 		"defaultModel":  cfg.DefaultModel,
-		"plannerModel":  cfg.Agent.PlannerModel,
 		"providers":     providers,
 		"permissions": map[string]any{
 			"mode":  orDef(cfg.Permissions.Mode, "ask"),

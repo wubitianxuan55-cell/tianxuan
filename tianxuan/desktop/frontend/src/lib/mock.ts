@@ -140,8 +140,7 @@ export function makeMockApp(): AppBindings {
     ],
     permissions: { mode: "ask", allow: ["ls", "read_file"], ask: [], deny: ["bash(rm *)"] },
     sandbox: { bash: "enforce", network: true, workspaceRoot: "", allowWrite: [] },
-    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", plannerTemperature: 0, subagentTemperature: 0, effort: "", plannerEffort: "", subagentEffort: "", plannerMaxSteps: 0, maxSubagentDepth: 0, coldResumePrune: false, reasoningLanguage: "", autoPlan: "off", memoryCompilerEnabled: false, outputStyle: "" },
-    plannerModel: "",
+    agent: { temperature: 0.2, maxSteps: 0, systemPrompt: "You are tianxuan, a coding agent.", subagentTemperature: 0, effort: "", subagentEffort: "", maxSubagentDepth: 0, coldResumePrune: false, reasoningLanguage: "", autoPlan: "off", memoryCompilerEnabled: false, outputStyle: "" },
     subagentModel: "",
     subagentModels: {},
     subagentSkills: ["explore", "research", "review", "security-review"],
@@ -586,25 +585,15 @@ export function makeMockApp(): AppBindings {
       if (!settings.subagentModels) settings.subagentModels = {};
       settings.subagentModels[_skill] = ref;
     },
-    async SetPlannerModel(ref: string) {
-      settings.plannerModel = ref;
-    },
-    async SetPlannerTemperature(temp: number) {
-      settings.agent.plannerTemperature = temp;
-    },
     async SetSubagentTemperature(temp: number) {
       settings.agent.subagentTemperature = temp;
     },
     async SetEffort(effort: string) {
       settings.agent.effort = effort;
     },
-    async SetPlannerEffort(effort: string) {
-      settings.agent.plannerEffort = effort;
-    },
     async SetSubagentEffort(effort: string) {
       settings.agent.subagentEffort = effort;
     },
-    async SetPlannerMaxSteps(n: number) { settings.agent.plannerMaxSteps = n; },
     async SetMaxSubagentDepth(n: number) { settings.agent.maxSubagentDepth = n; },
     async SetColdResumePrune(on: boolean) { settings.agent.coldResumePrune = on; },
     async SetReasoningLanguage(lang: string) { settings.agent.reasoningLanguage = lang; },

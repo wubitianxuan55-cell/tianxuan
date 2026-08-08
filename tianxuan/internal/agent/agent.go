@@ -72,10 +72,10 @@ type StepResult struct {
 }
 
 // TurnResult is a structured result produced by an AgentRunner after one turn.
-// It lets upstream callers (e.g. Hermes) consume execution outcomes without
+// It lets upstream callers (e.g. PlannerHost) consume execution outcomes without
 // having to extract them post-hoc from the agent's session.
 type TurnResult struct {
-	Plan          string       // the plan that was executed (empty for non-Hermes turns)
+	Plan          string       // the plan that was executed (empty for direct turns)
 	FilesCreated  []string     // paths of files newly created this turn (vs. modified)
 	FilesModified []string     // paths of files written/edited/moved/deleted this turn
 	Summary       string       // agent's final conclusion (last assistant message)
@@ -447,6 +447,13 @@ func (a *AgentRunner) SetActiveSchemas(schemas []provider.ToolSchema) {
 // Ported from DeepSeek-Reasonix.
 func (a *AgentRunner) SetPlanMode(v bool) {
 	a.planModeGate.Store(v)
+}
+
+// setPlannerMode 临时切换 plannerMode（规划轮语义）：跳过 executor 专属
+// 逻辑与三闸门，使规划轮输出计划后自然停止。仅在 PlannerHost 的单轮
+// turn 内调用（同一 goroutine 串行），不做并发保护。
+func (a *AgentRunner) setPlannerMode(v bool) {
+	a.plannerMode = v
 }
 
 // SetPlanModePolicy installs the plan-mode tool safety policy.
@@ -949,7 +956,7 @@ func (a *AgentRunner) finalReadinessCheck(currentTodos []evidence.TodoItem) (blo
 	// Single-model mode (strictVerify=false): complete_step is optional — a
 	// todo_write "completed" is a sufficient host-observable state, and forcing
 	// a sign-off ceremony adds rounds with no partner to receive it. Dual-model
-	// mode keeps the check: Hermes depends on complete_step evidence to replan.
+	// mode keeps the check: the planner host depends on complete_step evidence to replan.
 	if !a.evidence.StrictVerification() {
 		return false, ""
 	}

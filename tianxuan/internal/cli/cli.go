@@ -85,7 +85,7 @@ func Run(args []string, version string) int {
 // setup builds a ready-to-drive Controller from config via boot.Build. It is a
 // thin adapter kept so the subcommands below read the same as before; the actual
 // assembly (model resolution, tool registry, permission gate, two-model
-// Hermes) lives in internal/boot, shared with the desktop frontend.
+// planner host) lives in internal/boot, shared with the desktop frontend.
 // requireKey forces the executor's API key to be present (used by run); chat
 // passes false so the session UI is reachable before a key is set. sink receives
 // the agent's typed event stream — runAgent passes a TextSink that renders to
@@ -481,7 +481,7 @@ func initHint() int {
 // keys entered). The wizard is intentionally minimal: pick language, pick
 // provider, enter API keys. Language is asked first so every subsequent prompt
 // is already in the user's language even when env auto-detection got it wrong.
-// Two-model collaboration is left as a manual config edit (planner_model) so
+// Single-model planning mode (auto_plan) is left as a manual config edit so
 // first-run never confronts newcomers with advanced choices.
 func interactiveSetup(path string) int {
 	// Seed from the existing config when reconfiguring, so a re-run to fix a key

@@ -511,10 +511,10 @@ export function StatsPanel({ data, clearData, turnSteps, subagentModel, toolCoun
         )}
 
         {/* ── 命中率趋势（规划）── */}
-        <HitRateTrend steps={plannerSteps} title="命中率趋势 · Hermes" color="var(--accent)" callCount={plannerSteps.length} />
+        <HitRateTrend steps={plannerSteps} title="命中率趋势 · 规划" color="var(--accent)" callCount={plannerSteps.length} />
 
         {/* ── 命中率趋势（执行）── */}
-        <HitRateTrend steps={executorSteps} title="命中率趋势 · Hephaestus" color="#3b82f6" callCount={executorSteps.length} />
+        <HitRateTrend steps={executorSteps} title="命中率趋势 · 执行" color="#3b82f6" callCount={executorSteps.length} />
 
         {/* ── 命中率趋势（子代理）── */}
         <HitRateTrend steps={subSteps} title={`命中率趋势 · ${subagentModel || "子代理"}`} color="var(--warn)" callCount={subSteps.length} />

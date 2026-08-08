@@ -36,20 +36,6 @@ func (c *Config) SetDefaultModel(name string) error {
 	return nil
 }
 
-// SetPlannerModel sets (or, with "", clears) agent.planner_model for two-model
-// collaboration. A non-empty name must be a configured provider.
-func (c *Config) SetPlannerModel(name string) error {
-	if name == "" {
-		c.Agent.PlannerModel = ""
-		return nil
-	}
-	if _, ok := c.ResolveModel(name); !ok {
-		return fmt.Errorf("set planner: no provider %q (configured: %s)", name, c.providerNames())
-	}
-	c.Agent.PlannerModel = name
-	return nil
-}
-
 // SetSubagentModel sets (or, with "", clears) agent.subagent_model — the default
 // model for sub-agents (task tool and runAs=subagent skills). An empty string
 // means the sub-agent inherits the parent's execution provider. A non-empty name
@@ -105,8 +91,7 @@ func (c *Config) UpsertProvider(e ProviderEntry) error {
 
 // RemoveProvider deletes the named provider. It refuses to remove the current
 // default_model (reassign it first, so the config never points at a missing
-// model); if the removed provider was the planner, planner_model is cleared as
-// a side effect since it is optional. Errors when the name isn't configured.
+// model). Errors when the name isn't configured.
 func (c *Config) RemoveProvider(name string) error {
 	idx := -1
 	for i := range c.Providers {
@@ -122,9 +107,6 @@ func (c *Config) RemoveProvider(name string) error {
 		return fmt.Errorf("remove provider: %q is the default model — set a different default_model first", name)
 	}
 	c.Providers = append(c.Providers[:idx], c.Providers[idx+1:]...)
-	if c.Agent.PlannerModel == name || strings.HasPrefix(c.Agent.PlannerModel, name+"/") {
-		c.Agent.PlannerModel = ""
-	}
 	return nil
 }
 
@@ -254,15 +236,6 @@ func validatePlugin(e PluginEntry) error {
 	default:
 		return fmt.Errorf("plugin %q: unknown type %q (want stdio|http|sse)", e.Name, e.Type)
 	}
-	return nil
-}
-
-// SetPlannerMaxSteps caps the planner's tool-call rounds per turn. 0 = unlimited.
-func (c *Config) SetPlannerMaxSteps(n int) error {
-	if n < 0 {
-		return fmt.Errorf("planner_max_steps must be >= 0, got %d", n)
-	}
-	c.Agent.PlannerMaxSteps = n
 	return nil
 }
 

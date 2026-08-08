@@ -86,18 +86,12 @@ type AgentView struct {
 	Temperature  float64 `json:"temperature"`
 	MaxSteps     int     `json:"maxSteps"`
 	SystemPrompt string  `json:"systemPrompt"`
-	// PlannerTemperature overrides Temperature for Hermes (0 = use Temperature).
-	PlannerTemperature float64 `json:"plannerTemperature"`
 	// SubagentTemperature overrides Temperature for task sub-agents (0 = use Temperature).
 	SubagentTemperature float64 `json:"subagentTemperature"`
 	// Effort overrides reasoning effort for the executor ("" = provider default).
 	Effort string `json:"effort"`
-	// PlannerEffort overrides reasoning effort for Hermes ("" = inherit Effort).
-	PlannerEffort string `json:"plannerEffort"`
 	// SubagentEffort overrides reasoning effort for sub-agents ("" = inherit Effort).
 	SubagentEffort string `json:"subagentEffort"`
-	// PlannerMaxSteps caps the planner's tool-call rounds per turn (0 = unlimited).
-	PlannerMaxSteps int `json:"plannerMaxSteps"`
 	// MaxSubagentDepth caps recursion depth for sub-agents (0 = unlimited).
 	MaxSubagentDepth int `json:"maxSubagentDepth"`
 	// ColdResumePrune trims expired tool results on cold resume.
@@ -115,7 +109,6 @@ type AgentView struct {
 // SettingsView is the whole Settings panel payload.
 type SettingsView struct {
 	DefaultModel     string            `json:"defaultModel"`
-	PlannerModel     string            `json:"plannerModel"`
 	SubagentModel    string            `json:"subagentModel"`
 	SubagentModels   map[string]string `json:"subagentModels"`
 	SubagentSkills   []string          `json:"subagentSkills"`
@@ -181,7 +174,6 @@ func (a *App) Settings() SettingsView {
 	}
 	v := SettingsView{
 		DefaultModel:  cfg.DefaultModel,
-		PlannerModel:  cfg.Agent.PlannerModel,
 		SubagentModel:  cfg.Agent.SubagentModel,
 		SubagentModels: copyMap(cfg.Agent.SubagentModels),
 		SubagentSkills: subagentSkillNames(),
@@ -196,7 +188,7 @@ func (a *App) Settings() SettingsView {
 			Bash: bash, Network: cfg.Sandbox.Network,
 			WorkspaceRoot: cfg.Sandbox.WorkspaceRoot, AllowWrite: nonNil(cfg.Sandbox.AllowWrite),
 		},
-		Agent:         AgentView{Temperature: cfg.Agent.Temperature, PlannerTemperature: cfg.Agent.PlannerTemperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, PlannerEffort: cfg.Agent.PlannerEffort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt, PlannerMaxSteps: cfg.Agent.PlannerMaxSteps, MaxSubagentDepth: cfg.Agent.MaxSubagentDepth, ColdResumePrune: cfg.Agent.ColdResumePrune != nil && *cfg.Agent.ColdResumePrune, ReasoningLanguage: cfg.Agent.ReasoningLanguage, AutoPlan: cfg.Agent.AutoPlan, MemoryCompilerEnabled: cfg.Agent.MemoryCompilerEnabled, OutputStyle: cfg.Agent.OutputStyle},
+		Agent:         AgentView{Temperature: cfg.Agent.Temperature, SubagentTemperature: cfg.Agent.SubagentTemperature, Effort: cfg.Agent.Effort, SubagentEffort: cfg.Agent.SubagentEffort, MaxSteps: cfg.Agent.MaxSteps, SystemPrompt: cfg.Agent.SystemPrompt, MaxSubagentDepth: cfg.Agent.MaxSubagentDepth, ColdResumePrune: cfg.Agent.ColdResumePrune != nil && *cfg.Agent.ColdResumePrune, ReasoningLanguage: cfg.Agent.ReasoningLanguage, AutoPlan: cfg.Agent.AutoPlan, MemoryCompilerEnabled: cfg.Agent.MemoryCompilerEnabled, OutputStyle: cfg.Agent.OutputStyle},
 		ConfigPath:    config.SourcePath(),
 		ProviderKinds: provider.Kinds(),
 		Bypass:        a.ctrl != nil && a.ctrl.PermLevel() != "ask",
@@ -513,15 +505,6 @@ func (a *App) SetAgentParams(temperature float64, maxSteps int, systemPrompt str
 	})
 }
 
-// SetPlannerTemperature sets the planner-specific temperature override.
-// 0 means "use the global temperature" (backward compatible).
-func (a *App) SetPlannerTemperature(temp float64) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		c.Agent.PlannerTemperature = temp
-		return nil
-	})
-}
-
 // SetSubagentTemperature sets the subagent-specific temperature override.
 // 0 means "use the global temperature" (backward compatible).
 func (a *App) SetSubagentTemperature(temp float64) error {
@@ -540,28 +523,12 @@ func (a *App) SetEffort(effort string) error {
 	})
 }
 
-// SetPlannerEffort sets the planner-specific reasoning effort override.
-// "" means inherit from Effort (or provider default).
-func (a *App) SetPlannerEffort(effort string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		c.Agent.PlannerEffort = effort
-		return nil
-	})
-}
-
 // SetSubagentEffort sets the subagent-specific reasoning effort override.
 // "" means inherit from Effort (or provider default).
 func (a *App) SetSubagentEffort(effort string) error {
 	return a.applyConfigChange(func(c *config.Config) error {
 		c.Agent.SubagentEffort = effort
 		return nil
-	})
-}
-
-// SetPlannerMaxSteps caps the planner's tool-call rounds per turn.
-func (a *App) SetPlannerMaxSteps(n int) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		return c.SetPlannerMaxSteps(n)
 	})
 }
 
@@ -734,13 +701,6 @@ func (a *App) SetSubagentModel(ref string) error {
 func (a *App) SetSubagentModelForSkill(skill, ref string) error {
 	return a.applyConfigChange(func(c *config.Config) error {
 		return c.SetSubagentModelForSkill(skill, ref)
-	})
-}
-
-// SetPlannerModel sets (or, with "", clears) the two-model planner.
-func (a *App) SetPlannerModel(ref string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		return c.SetPlannerModel(ref)
 	})
 }
 

@@ -2,14 +2,11 @@ package agent
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
-// ── shouldSkipPlanner ──────────────────────────────────────
+// ── shouldSkipPlanner ─────────────────────────────────────
 
 func TestShouldSkipPlanner_BangPrefix(t *testing.T) {
 	s, ok := shouldSkipPlanner("!build desktop")
@@ -76,7 +73,7 @@ func TestShouldSkipPlanner_NoBangWithBlocks(t *testing.T) {
 	}
 }
 
-// ── DecidePlannerRoute ─────────────────────────────────────
+// ── DecidePlannerRoute ────────────────────────────────────
 
 func TestDecidePlannerRoute_AtomicEdit(t *testing.T) {
 	for _, q := range []string{"fix typo in readme", "rename getCwd in main.go"} {
@@ -88,7 +85,7 @@ func TestDecidePlannerRoute_AtomicEdit(t *testing.T) {
 }
 
 func TestDecidePlannerRoute_HighRisk(t *testing.T) {
-	d := DecidePlannerRoute("修复并发竞态问题")
+	d := DecidePlannerRoute("修复并发竞争问题")
 	if d.Route != RoutePlanAndExec {
 		t.Fatalf("high risk should be plan_and_execute (got %s)", d.Route)
 	}
@@ -139,9 +136,9 @@ func TestDecidePlannerRoute_Directives(t *testing.T) {
 // and short inputs with high-risk/complex terms still go to planner.
 func TestDecidePlannerRoute_DirectiveBoundary(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   PlannerRoute
+		name  string
+		input string
+		want  PlannerRoute
 	}{
 		// ≤40 runes, work=true, no prior-match → directive
 		{"short mutation", "修改配置", RouteExecOnly},
@@ -169,7 +166,7 @@ func TestDecidePlannerRoute_DirectiveBoundary(t *testing.T) {
 	}
 }
 
-// ── isAnswerNotAction ──────────────────────────────────────
+// ── isAnswerNotAction ─────────────────────────────────────
 
 func TestIsAnswerNotAction_Short(t *testing.T) {
 	if !isAnswerNotAction("ok") {
@@ -200,87 +197,13 @@ func TestIsAnswerNotAction_WithPlan(t *testing.T) {
 
 func TestIsAnswerNotAction_LongWithoutPlan(t *testing.T) {
 	long := strings.Repeat("x", 150)
-	// Long text without <!--plan--> IS a direct answer (Hermes answered directly)
+	// Long text without <!--plan--> IS a direct answer
 	if !isAnswerNotAction(long) {
 		t.Fatal("long text without <!--plan--> should be treated as a direct answer")
 	}
 }
 
-// ── formatHandoff ─────────────────────────────────────────
-
-func TestFormatHandoff_Normal(t *testing.T) {
-	out := formatHandoff("build", "run wails build", "", "")
-	if !strings.Contains(out, hephaestusHandoffMarker) {
-		t.Fatal("handoff missing marker")
-	}
-	if !strings.Contains(out, "任务:\nbuild") {
-		t.Fatal("handoff missing original task")
-	}
-	if !strings.Contains(out, "计划:\nrun wails build") {
-		t.Fatal("handoff missing Hermes output")
-	}
-	if strings.Contains(out, "📌 用户备注") {
-	}
-	if strings.Contains(out, "📌 User note (written during plan confirmation)") {
-		t.Fatal("should not contain user note section when empty")
-	}
-}
-
-func TestFormatHandoff_WithUserNote(t *testing.T) {
-	out := formatHandoff("build", "run wails build", "also run tests first", "")
-	if !strings.Contains(out, "📌 用户备注:\nalso run tests first") {
-		t.Fatal("handoff missing user note")
-	}
-}
-
-func TestFormatHandoff_EmptyPlan(t *testing.T) {
-	out := formatHandoff("build", "", "", "")
-	if !strings.Contains(out, "计划:\n") {
-		t.Fatal("handoff should still have Hermes output section")
-	}
-}
-
-func TestFormatHandoff_SpecialChars(t *testing.T) {
-	out := formatHandoff(`test "quotes"`, `plan with <angle>`, "", "")
-	if !strings.Contains(out, `test "quotes"`) {
-		t.Fatal("handoff should preserve special chars in task")
-	}
-	if !strings.Contains(out, `plan with <angle>`) {
-		t.Fatal("handoff should preserve special chars in plan")
-	}
-}
-
-// ── HandoffTask ───────────────────────────────────────────
-
-func TestHandoffTask_ExtractsTask(t *testing.T) {
-	handoff := formatHandoff("build the app", "run wails build", "", "")
-	extracted := HandoffTask(handoff)
-	if extracted != "build the app" {
-		t.Fatalf("got %q, want %q", extracted, "build the app")
-	}
-}
-
-func TestHandoffTask_NonHandoffPassthrough(t *testing.T) {
-	plain := "just a regular message"
-	if HandoffTask(plain) != plain {
-		t.Fatal("non-handoff should pass through unchanged")
-	}
-}
-
-func TestHandoffTask_Empty(t *testing.T) {
-	if HandoffTask("") != "" {
-		t.Fatal("empty should return empty")
-	}
-}
-
-func TestHandoffTask_ShortMessage(t *testing.T) {
-	s := "hi"
-	if HandoffTask(s) != s {
-		t.Fatal("short message should pass through")
-	}
-}
-
-// ── Prompt constants validation ────────────────────────────
+// ── Prompt constants validation ───────────────────────────
 
 func TestSoloSystemPrompt_ContainsEssentials(t *testing.T) {
 	p := SoloSystemPrompt
@@ -304,90 +227,6 @@ func TestSoloSystemPrompt_ContainsEssentials(t *testing.T) {
 	}
 }
 
-func TestHephaestusSystemPrompt_ContainsEssentials(t *testing.T) {
-	p := HephaestusSystemPrompt
-	required := []string{
-		"Hephaestus",
-		"Hermes",
-		"complete_step",
-		"todo_write",
-		"parallel_tasks",
-		"GOAL",
-		"constraints",
-		"report ❌",
-		"Failure handling",
-	}
-	for _, kw := range required {
-		if !strings.Contains(p, kw) {
-			t.Errorf("HephaestusSystemPrompt missing keyword: %q", kw)
-		}
-	}
-}
-
-func TestHermesPrompt_ContainsEssentials(t *testing.T) {
-	p := HermesPrompt
-	required := []string{
-		"Hermes",
-		"planner",
-		"Hephaestus",
-		"<!--plan-->",
-		"read-only",
-		"1–8 steps",
-		"analysis",
-	}
-	for _, kw := range required {
-		if !strings.Contains(p, kw) {
-			t.Errorf("HermesPrompt missing keyword: %q", kw)
-		}
-	}
-}
-
-func TestHermesPrompt_PlanFormatHasFileAnchors(t *testing.T) {
-	p := HermesPrompt
-	// V10.112 P1: 主计划模板必须提供 File(s) 锚点（与修正计划格式对齐），
-	// 让执行者直接使用规划阶段已验证的文件路径，不再要求自行搜索定位。
-	if !strings.Contains(p, "- **File(s)**") {
-		t.Error("HermesPrompt plan format must include a File(s) anchor field")
-	}
-	if strings.Contains(p, "不需要指定 file paths") {
-		t.Error("HermesPrompt must not tell Hermes to omit file paths from plans")
-	}
-}
-
-func TestHephaestusSystemPrompt_FileAnchorsFirst(t *testing.T) {
-	p := HephaestusSystemPrompt
-	if !strings.Contains(p, "File(s)") {
-		t.Error("HephaestusSystemPrompt must reference plan File(s) anchors")
-	}
-	if strings.Contains(p, "find the right files and anchors yourself") {
-		t.Error("HephaestusSystemPrompt must not require self-locating anchors")
-	}
-}
-
-func TestPromptsAreDistinct(t *testing.T) {
-	if SoloSystemPrompt == HephaestusSystemPrompt {
-		t.Fatal("SoloSystemPrompt and HephaestusSystemPrompt must differ")
-	}
-	if SoloSystemPrompt == HermesPrompt {
-		t.Fatal("SoloSystemPrompt and HermesPrompt must differ")
-	}
-	if HephaestusSystemPrompt == HermesPrompt {
-		t.Fatal("HephaestusSystemPrompt and HermesPrompt must differ")
-	}
-}
-
-func TestPromptsAreNonEmpty(t *testing.T) {
-	if len(SoloSystemPrompt) == 0 {
-		t.Fatal("SoloSystemPrompt is empty")
-	}
-	if len(HephaestusSystemPrompt) == 0 {
-		t.Fatal("HephaestusSystemPrompt is empty")
-	}
-	if len(HermesPrompt) == 0 {
-		t.Fatal("HermesPrompt is empty")
-	}
-}
-
 func TestSoloPromptContainsTDD(t *testing.T) {
 	if !strings.Contains(SoloSystemPrompt, "TDD") {
 		t.Fatal("SoloSystemPrompt must reference TDD")
@@ -400,11 +239,9 @@ func TestSoloPromptContainsTDD(t *testing.T) {
 	}
 }
 
-// TestSoloPromptTestFirstExistingCode locks the deterministic test-first rule
-// (V10.152): modifying existing code requires test-first, bug fixes require a
-// reproducing test, while new files and config/docs changes are exempt. The
-// rule must be scenario-based — DeepSeek systematically skips "when it fits"
-// discretion, but must not be forced into ceremony for green-field work.
+// TestSoloPromptTestFirstExistingCode locks the deterministic test-first rule:
+// modifying existing code requires test-first, bug fixes require a
+// reproducing test, while new files and config/docs changes are exempt.
 func TestSoloPromptTestFirstExistingCode(t *testing.T) {
 	p := SoloSystemPrompt
 	for _, kw := range []string{
@@ -420,26 +257,8 @@ func TestSoloPromptTestFirstExistingCode(t *testing.T) {
 	}
 }
 
-// TestHephaestusPromptTestFirstExistingCode locks the same deterministic rule
-// for the dual-model executor: it also modifies existing code and needs the
-// test-first guard, not free discretion.
-func TestHephaestusPromptTestFirstExistingCode(t *testing.T) {
-	p := HephaestusSystemPrompt
-	for _, kw := range []string{
-		"modify existing code",
-		"confirm it fails",
-		"reproducing test",
-	} {
-		if !strings.Contains(p, kw) {
-			t.Errorf("HephaestusSystemPrompt missing test-first rule keyword %q", kw)
-		}
-	}
-}
-
-// TestSoloPromptWorkingDirectoryGuidance locks the cwd contract (V10.152):
-// the model must know that file/shell paths resolve against the project root
-// and must not prefix paths with the directory name — that mistake cost 3
-// probe rounds in the bug-fix benchmark.
+// TestSoloPromptWorkingDirectoryGuidance locks the cwd contract: the model
+// must know that file/shell paths resolve against the project root.
 func TestSoloPromptWorkingDirectoryGuidance(t *testing.T) {
 	p := SoloSystemPrompt
 	for _, kw := range []string{"working directory (cwd)", "project root", "never prefix"} {
@@ -449,16 +268,7 @@ func TestSoloPromptWorkingDirectoryGuidance(t *testing.T) {
 	}
 }
 
-func TestHephaestusPromptWorkingDirectoryGuidance(t *testing.T) {
-	p := HephaestusSystemPrompt
-	for _, kw := range []string{"working directory (cwd)", "project root", "never prefix"} {
-		if !strings.Contains(p, kw) {
-			t.Errorf("HephaestusSystemPrompt missing cwd-guidance keyword %q", kw)
-		}
-	}
-}
-
-// ── formatExecutionFeedback ────────────────────────────────
+// ── formatExecutionFeedback ───────────────────────────────
 
 func TestFormatExecutionFeedback_Success(t *testing.T) {
 	r := &TurnResult{
@@ -505,38 +315,6 @@ func TestFormatExecutionFeedback_EmptyResult(t *testing.T) {
 	}
 	if !strings.Contains(out, "execution produced no summary") {
 		t.Fatal("empty result should show actionable no-summary message")
-	}
-}
-
-// ── hasStructuralChange ────────────────────────────────────
-
-func TestHasStructuralChange_GoMod(t *testing.T) {
-	if !hasStructuralChange([]string{"go.mod"}, nil) {
-		t.Fatal("go.mod should be structural change")
-	}
-}
-
-func TestHasStructuralChange_PackageJSON(t *testing.T) {
-	if !hasStructuralChange(nil, []string{"package.json"}) {
-		t.Fatal("package.json should be structural change")
-	}
-}
-
-func TestHasStructuralChange_InternalGoFile(t *testing.T) {
-	if !hasStructuralChange([]string{"internal/agent/new.go"}, nil) {
-		t.Fatal("internal/*.go should be structural change")
-	}
-}
-
-func TestHasStructuralChange_NoChange(t *testing.T) {
-	if hasStructuralChange([]string{"main.go", "README.md"}, []string{"config.toml"}) {
-		t.Fatal("non-structural files should not trigger structural change")
-	}
-}
-
-func TestHasStructuralChange_Empty(t *testing.T) {
-	if hasStructuralChange(nil, nil) {
-		t.Fatal("empty should not trigger structural change")
 	}
 }
 
@@ -615,55 +393,10 @@ func TestShouldAutoConfirm_ThreeSteps(t *testing.T) {
 	}
 }
 
-// ── HermesPrompt tool alignment ──────────────────────────
-
-// TestHermesPromptToolsExist checks that every tool name mentioned in
-// HermesPrompt matches a known tool. When a tool is renamed in the registry,
-// this test catches the stale prompt entry by checking substring presence.
-func TestHermesPromptToolsExist(t *testing.T) {
-	tools := []struct {
-		name string
-		frag string // substring to search in HermesPrompt
-	}{
-		{"read_file", "read_file"},
-		{"grep", "grep"},
-		{"glob", "glob"},
-		{"ls", "ls"},
-		{"code_index", "code_index"},
-		{"lsp_definition", "lsp_definition"},
-		{"lsp_hover", "lsp_hover"},
-		{"lsp_references", "lsp_references"},
-		{"lsp_diagnostics", "lsp_diagnostics"},
-		{"mcp__codegraph__*", "mcp__codegraph__*"}, // wildcard in prompt
-		{"git_status", "git_status"},
-		{"git_diff", "git_diff"},
-		{"git_log", "git_log"},
-		{"web_search", "web_search"},
-		{"web_fetch", "web_fetch"},
-		{"memory_search", "memory_search"},
-		{"read_skill", "read_skill"},
-		{"explore", "explore"},
-		{"research", "research"},
-		{"review", "review"},
-		{"security_review", "security_review"},
-	}
-	prompt := HermesPrompt
-	var missing []string
-	for _, tt := range tools {
-		if !strings.Contains(prompt, tt.frag) {
-			missing = append(missing, tt.name)
-		}
-	}
-	if len(missing) > 0 {
-		t.Errorf("HermesPrompt missing references to these tools (may have been renamed): %v\n"+
-			"Update HermesPrompt or the tools list in TestHermesPromptToolsExist.", missing)
-	}
-}
-
-// ── formatSummary ──────────────────────────────────────────
+// ── formatSummary ─────────────────────────────────────────
 
 func TestFormatSummary_NilResultWithError(t *testing.T) {
-	out := (&Hermes{}).formatSummary(nil, fmt.Errorf("timeout"), false)
+	out := (&PlannerHost{}).formatSummary(nil, fmt.Errorf("timeout"), false)
 	if !strings.Contains(out, "❌ 执行失败") {
 		t.Fatalf("expected failure prefix, got: %s", out)
 	}
@@ -673,18 +406,15 @@ func TestFormatSummary_NilResultWithError(t *testing.T) {
 }
 
 func TestFormatSummary_NilResultNoError(t *testing.T) {
-	out := (&Hermes{}).formatSummary(nil, nil, false)
+	out := (&PlannerHost{}).formatSummary(nil, nil, false)
 	if out != "" {
 		t.Fatalf("expected empty string for nil result + nil error, got: %s", out)
 	}
 }
 
 func TestFormatSummary_SuccessNoDetails(t *testing.T) {
-	// Pure success with no files and no steps → no spurious "未记录步骤详情".
-	// Read-only tasks (e.g. "运行测试") produce no file changes, so the
-	// "未记录步骤详情" note would be misleading.
 	r := &TurnResult{Success: true}
-	out := (&Hermes{}).formatSummary(r, nil, false)
+	out := (&PlannerHost{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "✅ 任务完成") {
 		t.Fatalf("expected success prefix, got: %s", out)
 	}
@@ -694,9 +424,8 @@ func TestFormatSummary_SuccessNoDetails(t *testing.T) {
 }
 
 func TestFormatSummary_SuccessWithFilesNoDetails(t *testing.T) {
-	// Files changed but no step results → "未记录步骤详情" is correct.
 	r := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
-	out := (&Hermes{}).formatSummary(r, nil, false)
+	out := (&PlannerHost{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "新建 1 个文件") {
 		t.Fatalf("expected file count, got: %s", out)
 	}
@@ -711,7 +440,7 @@ func TestFormatSummary_SuccessWithFiles(t *testing.T) {
 		FilesCreated:  []string{"a.go", "b.go"},
 		FilesModified: []string{"c.go"},
 	}
-	out := (&Hermes{}).formatSummary(r, nil, false)
+	out := (&PlannerHost{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "新建 2 个文件") {
 		t.Fatalf("expected file creation count, got: %s", out)
 	}
@@ -725,7 +454,7 @@ func TestFormatSummary_PartialSuccess(t *testing.T) {
 		Success: false,
 		Errors:  []string{"e1", "e2", "e3"},
 	}
-	out := (&Hermes{}).formatSummary(r, nil, false)
+	out := (&PlannerHost{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "⚠️ 任务部分完成") {
 		t.Fatalf("expected partial prefix, got: %s", out)
 	}
@@ -743,7 +472,7 @@ func TestFormatSummary_WithStepResults(t *testing.T) {
 			{Step: "步骤3", Status: "success"},
 		},
 	}
-	out := (&Hermes{}).formatSummary(r, nil, false)
+	out := (&PlannerHost{}).formatSummary(r, nil, false)
 	if !strings.Contains(out, "✅ 步骤1") {
 		t.Fatalf("expected step1 success, got: %s", out)
 	}
@@ -754,23 +483,23 @@ func TestFormatSummary_WithStepResults(t *testing.T) {
 
 func TestFormatSummary_RetriesExhausted(t *testing.T) {
 	r := &TurnResult{Success: false, Errors: []string{"e1"}}
-	out := (&Hermes{}).formatSummary(r, nil, true)
+	out := (&PlannerHost{}).formatSummary(r, nil, true)
 	if !strings.Contains(out, "已尝试多轮自动修正") {
 		t.Fatalf("expected retries-exhausted note, got: %s", out)
 	}
 }
 
-// ── allStepsPassed ─────────────────────────────────────────
+// ── allStepsPassed ────────────────────────────────────────
 
 func TestAllStepsPassed_Nil(t *testing.T) {
-	if (&Hermes{}).allStepsPassed(nil, "") {
+	if (&PlannerHost{}).allStepsPassed(nil, "") {
 		t.Fatal("nil TurnResult should not pass")
 	}
 }
 
 func TestAllStepsPassed_NotSuccess(t *testing.T) {
 	r := &TurnResult{Success: false}
-	if (&Hermes{}).allStepsPassed(r, "") {
+	if (&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("!Success should not pass")
 	}
 }
@@ -783,7 +512,7 @@ func TestAllStepsPassed_FailedStep(t *testing.T) {
 			{Step: "step2", Status: "error"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r, "") {
+	if (&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("result with failed step should not pass")
 	}
 }
@@ -795,7 +524,7 @@ func TestAllStepsPassed_BlockedStep(t *testing.T) {
 			{Step: "step1", Status: "blocked"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r, "") {
+	if (&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("result with blocked step should not pass")
 	}
 }
@@ -808,43 +537,36 @@ func TestAllStepsPassed_AllSuccess(t *testing.T) {
 			{Step: "step2", Status: "success"},
 		},
 	}
-	if !(&Hermes{}).allStepsPassed(r, "") {
+	if !(&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("result with all-success steps should pass")
 	}
 }
 
 func TestAllStepsPassed_NoStepResults(t *testing.T) {
-	// Success=true, no step results, no files, no errors → pass.
-	// Read-only tasks (auto-skipped from planner) are valid successful runs.
 	r := &TurnResult{Success: true}
-	if !(&Hermes{}).allStepsPassed(r, "") {
+	if !(&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("Success=true with no errors should pass (read-only task)")
 	}
-	// Success=false, no step results, no files → fail (genuine failure).
 	rFail := &TurnResult{Success: false, Errors: []string{"build failed"}}
-	if (&Hermes{}).allStepsPassed(rFail, "") {
+	if (&PlannerHost{}).allStepsPassed(rFail, "") {
 		t.Fatal("Success=false with errors should NOT pass")
 	}
-	// No plan steps + file changes + no errors → pass (work was done).
 	r2 := &TurnResult{Success: true, FilesCreated: []string{"a.go"}}
-	if !(&Hermes{}).allStepsPassed(r2, "") {
+	if !(&PlannerHost{}).allStepsPassed(r2, "") {
 		t.Fatal("file changes with no plan steps should pass")
 	}
-	// O2: file changes + errors must NOT pass — errors signal unresolved
-	// work and should trigger the correction loop, not be masked.
 	r3 := &TurnResult{Success: true, FilesModified: []string{"b.go"},
 		Errors: []string{"paused after 5 tool-call rounds (agent.max_steps)"}}
-	if (&Hermes{}).allStepsPassed(r3, "") {
+	if (&PlannerHost{}).allStepsPassed(r3, "") {
 		t.Fatal("file changes with errors must NOT pass (O2)")
 	}
 }
 
 // TestAllStepsPassed_StepSuccessOverridesNonFatalErrors verifies
 // that allStepsPassed returns true when every step is "success"
-// even if TurnResult.Success is false due to non-fatal errors
-// (e.g. a tool blocked by loop guard, or maxSteps exhaustion).
-// Without this guard, the Hermes fix loop re-executes a plan whose
-// steps already all passed — the "perpetual correction loop" bug.
+// even if TurnResult.Success is false due to non-fatal errors.
+// Without this guard, the fix loop re-executes a plan whose steps
+// already all passed — the "perpetual correction loop" bug.
 func TestAllStepsPassed_StepSuccessOverridesNonFatalErrors(t *testing.T) {
 	r := &TurnResult{
 		Success: false,
@@ -855,7 +577,7 @@ func TestAllStepsPassed_StepSuccessOverridesNonFatalErrors(t *testing.T) {
 			{Step: "步骤3", Status: "success", Result: "完成"},
 		},
 	}
-	if !(&Hermes{}).allStepsPassed(r, "") {
+	if !(&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("all-success StepResults should pass even when Success=false due to non-fatal errors")
 	}
 }
@@ -872,7 +594,7 @@ func TestAllStepsPassed_StepSuccessButMixedWithMaxSteps(t *testing.T) {
 		},
 		FilesModified: []string{"a.go"},
 	}
-	if !(&Hermes{}).allStepsPassed(r, "") {
+	if !(&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("all-success steps with file changes should pass even with maxSteps exhaustion")
 	}
 }
@@ -888,12 +610,12 @@ func TestAllStepsPassed_PartialSuccessStillFails(t *testing.T) {
 			{Step: "步骤2", Status: "error", Result: "build failed"},
 		},
 	}
-	if (&Hermes{}).allStepsPassed(r, "") {
+	if (&PlannerHost{}).allStepsPassed(r, "") {
 		t.Fatal("mixed success/error StepResults should not pass")
 	}
 }
 
-// ── planFix prompt construction ────────────────────────────
+// ── planFix prompt construction ───────────────────────────
 
 func TestPlanFixPrompt_Round2(t *testing.T) {
 	failed := &TurnResult{
@@ -906,7 +628,6 @@ func TestPlanFixPrompt_Round2(t *testing.T) {
 	}
 	prompt := buildFixPrompt("修复所有bug", "步骤1: fix\n步骤2: test", failed, 2, nil)
 
-	// Round 2: targeted fix — should reference original task and plan.
 	if !strings.Contains(prompt, "修复所有bug") {
 		t.Fatal("round 2 prompt should include original task")
 	}
@@ -940,7 +661,6 @@ func TestPlanFixPrompt_Round3(t *testing.T) {
 	}
 	prompt := buildFixPrompt("原始任务", "原始计划", failed, 3, fixHistory)
 
-	// Round 3: reflection mode — should request rethinking.
 	if !strings.Contains(prompt, "反思") {
 		t.Fatal("round 3 prompt should request reflection")
 	}
@@ -956,16 +676,14 @@ func TestPlanFixPrompt_Round3(t *testing.T) {
 }
 
 func TestPlanFixPrompt_NoStepResults(t *testing.T) {
-	// Defensive: TurnResult.Errors is non-empty but StepResults is empty.
 	failed := &TurnResult{Success: false, Errors: []string{"unknown error"}}
 	prompt := buildFixPrompt("task", "plan", failed, 2, nil)
-
 	if !strings.Contains(prompt, "unknown error") {
 		t.Fatal("prompt should include error text even without step results")
 	}
 }
 
-// ── displayPlan ────────────────────────────────────────────
+// ── displayPlan ───────────────────────────────────────────
 
 func TestDisplayPlan_WithMarker(t *testing.T) {
 	full := `这是分析前言，包含了一些内部记忆和推理过程。
@@ -1020,7 +738,7 @@ func TestDisplayPlan_Empty(t *testing.T) {
 	}
 }
 
-// ── resolveConfirmChoice ───────────────────────────────────
+// ── resolveConfirmChoice ──────────────────────────────────
 
 func TestResolveConfirmChoice_Submit(t *testing.T) {
 	note, chatOnly, revise, err := resolveConfirmChoice("提交执行", nil)
@@ -1091,82 +809,5 @@ func TestResolveConfirmChoice_FreeText(t *testing.T) {
 	}
 	if note != "请添加更多测试" {
 		t.Fatalf("free text should become note, got %q", note)
-	}
-}
-
-// ── injectProjectMap 增量缓存 ─────────────────────────────
-
-func TestInjectProjectMap_DedupAndReinject(t *testing.T) {
-	dir := t.TempDir()
-	mustWriteFile(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.26\n")
-	pkgDir := filepath.Join(dir, "internal", "pkg")
-	mustMkdirAll(t, pkgDir)
-	mustWriteFile(t, filepath.Join(pkgDir, "x.go"), "package pkg\n\ntype Foo struct{}\n")
-
-	// 把 internal/ 目录 modtime 固定到过去，保证后续写入必然使其更新。
-	internalDir := filepath.Join(dir, "internal")
-	past := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(internalDir, past, past); err != nil {
-		t.Fatal(err)
-	}
-
-	h := &Hermes{wsRoot: dir, hermesSess: NewSession("")}
-
-	// 首次注入
-	h.injectProjectMap()
-	msgs := h.hermesSess.Snapshot()
-	if len(msgs) != 1 {
-		t.Fatalf("first injection should add 1 message, got %d", len(msgs))
-	}
-	if !strings.Contains(msgs[0].Content, "Project Map") {
-		t.Fatalf("injected message should contain Project Map, got %q", msgs[0].Content)
-	}
-
-	// 项目未变化 → 不重复注入
-	h.injectProjectMap()
-	if got := len(h.hermesSess.Snapshot()); got != 1 {
-		t.Fatalf("unchanged project must not re-inject, got %d messages", got)
-	}
-
-	// 结构变化（internal/ 下新增包）→ 重新注入
-	mustMkdirAll(t, filepath.Join(dir, "internal", "pkg2"))
-	mustWriteFile(t, filepath.Join(dir, "internal", "pkg2", "y.go"), "package pkg2\n\ntype Bar struct{}\n")
-	h.injectProjectMap()
-	msgs = h.hermesSess.Snapshot()
-	if len(msgs) != 2 {
-		t.Fatalf("structural change should re-inject, got %d messages", len(msgs))
-	}
-	if !strings.Contains(msgs[1].Content, "pkg2") {
-		t.Fatalf("re-injected map should include new package, got %q", msgs[1].Content)
-	}
-
-	// ResetSession 后新会话重新注入
-	h.ResetSession()
-	h.injectProjectMap()
-	msgs = h.hermesSess.Snapshot()
-	if len(msgs) != 1 {
-		t.Fatalf("fresh session should get exactly 1 map message, got %d", len(msgs))
-	}
-}
-
-func TestInjectProjectMap_EmptyRootSkips(t *testing.T) {
-	h := &Hermes{wsRoot: "", hermesSess: NewSession("")}
-	h.injectProjectMap()
-	if got := len(h.hermesSess.Snapshot()); got != 0 {
-		t.Fatalf("empty wsRoot must not inject a map, got %d messages", got)
-	}
-}
-
-func mustWriteFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatal(err)
 	}
 }

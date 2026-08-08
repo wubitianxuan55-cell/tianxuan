@@ -158,7 +158,6 @@ export interface PlanRecord {
 export interface Meta {
   label: string;
   subagentLabel?: string;
-  plannerLabel?: string;
   ready: boolean;
   startupErr?: string;
   eventChannel: string;
@@ -358,12 +357,9 @@ export interface AgentView {
   temperature: number;
   maxSteps: number;
   systemPrompt: string;
-  plannerTemperature: number;
   subagentTemperature: number;
   effort: string;
-  plannerEffort: string;
   subagentEffort: string;
-  plannerMaxSteps: number;
   maxSubagentDepth: number;
   coldResumePrune: boolean;
   reasoningLanguage: string;
@@ -402,7 +398,6 @@ export interface ToolsConfigView {
 }
 export interface SettingsView {
   defaultModel: string;
-  plannerModel: string;
   subagentModel: string;
   subagentModels: Record<string, string>; // per-skill overrides
   subagentSkills: string[]; // builtin subagent skill names

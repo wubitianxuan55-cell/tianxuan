@@ -1,6 +1,6 @@
 // Package schedule provides a desktop-session-local scheduler for timed AI agent
 // tasks. It persists schedules and results to JSON sidecar files and fires the
-// executor AgentRunner directly — no Hermes planner — for each due task.
+// executor AgentRunner directly — no separate planner — for each due task.
 package schedule
 
 import (

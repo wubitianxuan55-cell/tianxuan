@@ -2,7 +2,7 @@ package agent
 
 import "strings"
 
-// planparse.go 统一 Hermes 计划文本的行级解析。
+// planparse.go 统一计划文本的行级解析。
 //
 // isStepLine / extractStepTitle 曾是 hermes_confirm.go（isStepLine）与
 // hermes_sdd.go（planLineRE / extractStepTitle）各自实现的重复逻辑。

@@ -63,22 +63,21 @@ function NewSessionToast({ done }: { done: boolean }) {
   return null;
 }
 
-// ── RunStatus — 输入框上方的运行时状态行 ─────────────────────
+// ── RunStatus — 输入框上方的运行时状态行（单模型：规划 / 执行阶段）───
 
-function RunStatus({ running, turnStartAt, turnTokens, plannerLabel, phase }: {
+function RunStatus({ running, turnStartAt, turnTokens, phase }: {
   running: boolean;
   turnStartAt: number;
   turnTokens: number;
-  plannerLabel?: string;
-  phase: string; // "hermes" | "hephaestus" | ""
+  phase: string; // "plan" | "execute" | ""
 }) {
   const now = useNow();
   if (!running) return null;
   const elapsed = turnStartAt > 0 ? Math.max(0, now - Math.floor(turnStartAt / 1000)) : 0;
   const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
   const tokStr = turnTokens > 0 ? `↓${fmtTokens(turnTokens)}` : "";
-  const isPlanner = phase === "hermes";
-  const isExecutor = phase === "hephaestus";
+  const label = phase === "plan" ? "规划" : phase === "execute" ? "执行" : "";
+  const isPlan = phase === "plan";
   return (
     <div className="flex items-center justify-between px-4 py-1.5 text-[11px] select-none border-b border-border-soft/50 bg-bg-soft/30">
       <div className="flex items-center gap-2 text-fg-dim tabular-nums font-mono">
@@ -86,30 +85,16 @@ function RunStatus({ running, turnStartAt, turnTokens, plannerLabel, phase }: {
         {tokStr && <span className="text-fg-faint">{tokStr}</span>}
       </div>
       <div className="flex items-center gap-3">
-        {plannerLabel && (
-          <span className={`flex items-center gap-1.5 ${isPlanner ? "text-fg" : "text-fg-faint/60"}`}>
-            <Brain size={12} className={isPlanner ? "text-purple-400" : ""} />
-            <span className="font-medium">Hermes</span>
-            <span>规划</span>
-            {isPlanner && (
-              <span className="inline-flex items-center gap-1 ml-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                <span className="text-[10px] text-purple-400/70">中</span>
-              </span>
-            )}
+        {phase && (
+          <span className="flex items-center gap-1.5 text-fg">
+            <Brain size={12} className={isPlan ? "text-purple-400" : "text-cyan-400"} />
+            <span className="font-medium">{label}</span>
+            <span className="inline-flex items-center gap-1 ml-0.5">
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isPlan ? "bg-purple-400" : "bg-cyan-400"}`} />
+              <span className="text-[10px] opacity-70">中</span>
+            </span>
           </span>
         )}
-        <span className={`flex items-center gap-1.5 ${isExecutor ? "text-fg" : "text-fg-faint/60"}`}>
-          <Cpu size={12} className={isExecutor ? "text-cyan-400" : ""} />
-          <span className="font-medium">Hephaestus</span>
-          <span>执行</span>
-          {isExecutor && (
-            <span className="inline-flex items-center gap-1 ml-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-[10px] text-cyan-400/70">中</span>
-            </span>
-          )}
-        </span>
       </div>
     </div>
   );
@@ -153,6 +138,15 @@ const [scheduleOpen, setScheduleOpen] = useState(false);
   const [splashDone, setSplashDone] = useState(!shouldShowStartupSplash());
   const splashHold = useMemo(() => !splashDone && !(state.meta?.ready ?? false), [splashDone, state.meta?.ready]);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // V10.166: 单模型规划模式开关（默认 off = 直接执行；ask = 复杂任务先规划确认）。
+  const [autoPlan, setAutoPlan] = useState<string>("off");
+  useEffect(() => {
+    app.Settings().then((s) => setAutoPlan(s.agent?.autoPlan ?? "off")).catch(() => {});
+  }, []);
+  const toggleAutoPlan = useCallback(async () => {
+    const next = autoPlan === "off" ? "ask" : "off";
+    try { await app.SetAutoPlan(next); setAutoPlan(next); } catch { /* 配置写入失败保持现状 */ }
+  }, [autoPlan]);
 
   const {
     sidebarCollapsed, sidebarWidth, sidebarResizing, effectiveSidebarWidth,
@@ -392,8 +386,8 @@ if (settingsOpen) { ke.preventDefault(); setSettingsOpen(false); setSettingsTab(
       const item = state.items[i];
       if (item.kind === "phase") {
         const t = item.text.toLowerCase();
-        if (t.includes("hermes")) return "hermes";
-        if (t.includes("hephaestus")) return "hephaestus";
+        if (t.includes("规划")) return "plan";
+        if (t.includes("执行")) return "execute";
       }
     }
     return "";
@@ -502,7 +496,6 @@ onOpenSettings={() => setSettingsOpen(true)}
               running={state.running}
               turnStartAt={state.turnStartAt}
               turnTokens={state.turnTokens}
-              plannerLabel={state.meta?.plannerLabel}
               phase={activePhase}
             />
             <div className="composer-glow">
@@ -514,6 +507,8 @@ onOpenSettings={() => setSettingsOpen(true)}
               permLevel={permLevel}
               onSetPermLevel={setPermLevel}
               onPickFolder={switchFolder}
+              autoPlan={autoPlan}
+              onToggleAutoPlan={toggleAutoPlan}
               disabled={state.meta?.ready === false || state.approval != null}
               externalDraft={editDraft}
             />

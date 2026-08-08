@@ -15,7 +15,7 @@ import (
 )
 
 // ExecRunner executes schedules via an executor AgentRunner, creating a fresh
-// Session for each run. It skips the Hermes planner entirely — the prompt goes
+// Session for each run. It skips the planner stage entirely — the prompt goes
 // straight to the executor.
 type ExecRunner struct {
 	ExecProv   provider.Provider

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, Brain, Bot, ChevronDown, ChevronRight, Settings as SettingsIcon } from "lucide-react";
+import { Cpu, Bot, ChevronDown, ChevronRight, Settings as SettingsIcon } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { ModelPicker } from "./ModelPicker";
@@ -77,7 +77,7 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
         {/* ── 模型配置 ── */}
         <SettingsSection title={<span className="flex items-center gap-1.5"><Cpu size={14} className="text-accent" />模型配置</span>}>
           <div className="grid grid-cols-2 gap-3">
-            <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作。">
+            <ModelCard icon={<Cpu size={18} />} title="默认模型" desc="执行代码修改、运行命令等所有写操作。">
               <ModelPicker
                 s={s} refs={allRefs} value={defaultRef} disabled={busy}
                 onPick={(ref: string) => void apply(() => app.SetDefaultModel(ref))}
@@ -86,20 +86,6 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
                 <EffortSelect
                   value={s.agent.effort} busy={busy}
                   onChange={(e: string) => void apply(() => app.SetEffort(e))}
-                />
-              </div>
-            </ModelCard>
-
-            <ModelCard icon={<Brain size={18} />} title="规划模型 (Hermes)" desc="只读研究代码、制定执行计划。留空则使用单模型模式。">
-              <ModelPicker
-                s={s} refs={allRefs} value={s.plannerModel || ""} disabled={busy}
-                emptyOptionLabel={t("settings.plannerNone")}
-                onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
-              />
-              <div className="mt-2">
-                <EffortSelect
-                  value={s.agent.plannerEffort ?? s.agent.effort} busy={busy}
-                  onChange={(e: string) => void apply(() => app.SetPlannerEffort(e))}
                 />
               </div>
             </ModelCard>
@@ -157,14 +143,6 @@ export function AgentSection({ s, busy, apply }: SectionProps) {
 
         {/* ── 步数与推理 ── */}
         <SettingsSection title={<span className="flex items-center gap-1.5"><SettingsIcon size={14} className="text-accent" />步数与推理</span>}>
-          <SettingsField label="规划器步数" hint="规划阶段工具调用轮数上限。0 = 不限。">
-            <StepLimitControl
-              value={s.agent.plannerMaxSteps || 0}
-              presets={[6, 12, 25, 0]}
-              busy={busy}
-              onChange={(n) => void apply(() => app.SetPlannerMaxSteps(n))}
-            />
-          </SettingsField>
           <SettingsField label="执行器步数" hint="执行阶段工具调用轮数上限。0 = 不限。">
             <StepLimitControl
               value={s.agent.maxSteps || 0}

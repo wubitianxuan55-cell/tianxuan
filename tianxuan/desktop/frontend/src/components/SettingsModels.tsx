@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, Brain, Bot, ChevronDown, ChevronRight } from "lucide-react";
+import { Cpu, Bot, ChevronDown, ChevronRight } from "lucide-react";
 import { app } from "../lib/bridge";
 import { useT } from "../lib/i18n";
 import { ModelPicker } from "./ModelPicker";
@@ -61,7 +61,7 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
     <section className="mb-3">
       <div className="text-fg text-sm font-semibold px-1 pb-3">{t("settings.tab.models")}</div>
 
-      <ModelCard icon={<Cpu size={18} />} title="默认执行模型 (Hephaestus)" desc="执行代码修改、运行命令等所有写操作">
+      <ModelCard icon={<Cpu size={18} />} title="默认模型" desc="执行代码修改、运行命令等所有写操作">
         <ModelPicker
           s={s}
           refs={allRefs}
@@ -74,24 +74,6 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
             value={s.agent.effort}
             busy={busy}
             onChange={(e: string) => void apply(() => app.SetEffort(e))}
-          />
-        </div>
-      </ModelCard>
-
-      <ModelCard icon={<Brain size={18} />} title="规划模型 (Hermes)" desc="只读研究代码、制定执行计划。留空则使用单模型模式">
-        <ModelPicker
-          s={s}
-          refs={allRefs}
-          value={s.plannerModel || ""}
-          disabled={busy}
-          emptyOptionLabel={t("settings.plannerNone")}
-          onPick={(ref: string) => void apply(() => app.SetPlannerModel(ref))}
-        />
-        <div className="mt-2">
-          <EffortSelect
-            value={s.agent.plannerEffort ?? s.agent.effort}
-            busy={busy}
-            onChange={(e: string) => void apply(() => app.SetPlannerEffort(e))}
           />
         </div>
       </ModelCard>
@@ -153,15 +135,6 @@ export function ModelsSection({ s, busy, apply, onManageProviders }: SectionProp
       <div className="px-3 py-2 mb-3 border border-border-soft rounded-lg">
         <div className="text-fg-dim text-[11px] font-semibold uppercase tracking-wide mb-2">步数限制</div>
         <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <div className="text-fg-faint text-[11px] mb-1">规划器步数</div>
-            <StepLimitControl
-              value={s.agent.plannerMaxSteps || 0}
-              presets={[6, 12, 25, 0]}
-              busy={busy}
-              onChange={(n) => void apply(() => app.SetPlannerMaxSteps(n))}
-            />
-          </div>
           <div className="flex-1">
             <div className="text-fg-faint text-[11px] mb-1">执行器步数</div>
             <StepLimitControl

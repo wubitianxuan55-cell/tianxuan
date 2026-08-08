@@ -164,20 +164,13 @@ export interface AppBindings {
   RemovePermissionRule(list: string, rule: string): Promise<void>;
   SetSandbox(bash: string, network: boolean, workspaceRoot: string, allowWrite: string[]): Promise<void>;
   SetAgentParams(temperature: number, maxSteps: number, systemPrompt: string): Promise<void>;
-  // SetPlannerTemperature sets the planner-specific temperature override.
-  // 0 means "use the global temperature".
-  SetPlannerTemperature(temp: number): Promise<void>;
   // SetSubagentTemperature sets the subagent-specific temperature override.
   // 0 means "use the global temperature".
   SetSubagentTemperature(temp: number): Promise<void>;
   // SetEffort sets the reasoning effort for the executor. "" = provider default.
   SetEffort(effort: string): Promise<void>;
-  // SetPlannerEffort sets the reasoning effort for Hermes. "" = inherit from Effort.
-  SetPlannerEffort(effort: string): Promise<void>;
   // SetSubagentEffort sets the reasoning effort for sub-agents. "" = inherit from Effort.
   SetSubagentEffort(effort: string): Promise<void>;
-  // SetPlannerMaxSteps caps the planner's tool-call rounds per turn. 0 = unlimited.
-  SetPlannerMaxSteps(n: number): Promise<void>;
   // SetMaxSubagentDepth caps recursion depth for runAs=subagent skills. 0 = unlimited.
   SetMaxSubagentDepth(n: number): Promise<void>;
   // SetColdResumePrune enables or disables pruning of expired tool results on cold resume.
@@ -217,8 +210,6 @@ export interface AppBindings {
   // SetSubagentModelForSkill sets a per-skill sub-agent model override.
   // skill is one of explore|research|review|security-review. Empty ref = inherit.
   SetSubagentModelForSkill(skill: string, ref: string): Promise<void>;
-  // SetPlannerModel sets (or, with "", clears) the two-model planner.
-  SetPlannerModel(ref: string): Promise<void>;
   // SetPermLevel controls permission strictness: "ask" (default, prompt before writes),
   // "auto" (allow writes without asking), or "yolo" (skip all prompts).
   SetPermLevel(level: string): Promise<void>;
@@ -357,4 +348,4 @@ import {
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 
 type AssertNever<T extends never> = T;
-export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel">>;
+export type _CheckGenToApp = AssertNever<Exclude<keyof typeof GeneratedApp, keyof AppBindings | "QuitApp" | "ShowWindow" | "SetBypass" | "SetAgentMode" | "PermLevel" | "SetPlannerModel" | "SetPlannerTemperature" | "SetPlannerEffort" | "SetPlannerMaxSteps">>;

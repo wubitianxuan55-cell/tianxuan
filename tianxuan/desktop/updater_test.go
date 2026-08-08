@@ -4,11 +4,37 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"runtime"
 	"testing"
 
 	"tianxuan/desktop/internal/update"
 )
+
+// TestStripBOM guards the publish path: publish-desktop.ps1 fills latest.json
+// notes with PowerShell's Set-Content -Encoding utf8, which writes a UTF-8 BOM,
+// and Go's json.Unmarshal rejects a BOM ("invalid character 'ï'"). stripBOM
+// must remove it before decoding so an installed updater can read the manifest.
+func TestStripBOM(t *testing.T) {
+	raw := []byte(`{"version":"v10.160.0"}`)
+	withBOM := append([]byte{0xEF, 0xBB, 0xBF}, raw...)
+	got := stripBOM(withBOM)
+	if !bytes.Equal(got, raw) {
+		t.Fatalf("stripBOM = %q, want %q", got, raw)
+	}
+	var m update.Manifest
+	if err := json.Unmarshal(got, &m); err != nil {
+		t.Fatalf("json.Unmarshal after stripBOM: %v", err)
+	}
+	if m.Version != "v10.160.0" {
+		t.Fatalf("version = %q, want v10.160.0", m.Version)
+	}
+	// Without stripping, the same input must fail — proving the strip matters.
+	var m2 update.Manifest
+	if err := json.Unmarshal(withBOM, &m2); err == nil {
+		t.Fatal("expected json.Unmarshal to reject the raw BOM input")
+	}
+}
 
 func TestNormalizeVersion(t *testing.T) {
 	cases := []struct {

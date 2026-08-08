@@ -1,0 +1,14 @@
+{
+    "version":  "v10.160.0",
+    "notes":  "### 变更\n- 新增 `opencode` provider kind：按模型自动路由 Zen 三协议（chat/completions / messages / responses），免费模型匿名可用\n- Responses 流式客户端：工具调用、reasoning、usage 解析；config 放行无 key opencode\n- 真实 API 三协议端到端验证通过（deepseek free / gpt-5.4-nano / claude-haiku-4-5）",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.160.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.160.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10739266,
+                                            "sha256":  "01ea7085ed9c76d821157fc9255cf3bc51eaaa2e494c32bf8a9ce82c4cf5728f"
+                                        }
+                  }
+}

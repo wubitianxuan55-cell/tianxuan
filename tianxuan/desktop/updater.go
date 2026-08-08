@@ -95,13 +95,21 @@ func fetchManifest(ctx context.Context, c *http.Client) (*update.Manifest, error
 			continue
 		}
 		var m update.Manifest
-		if err := json.Unmarshal(b, &m); err != nil {
+		if err := json.Unmarshal(stripBOM(b), &m); err != nil {
 			lastErr = err
 			continue
 		}
 		return &m, nil
 	}
 	return nil, fmt.Errorf("update: fetch manifest: %w", lastErr)
+}
+
+// stripBOM removes a UTF-8 byte-order mark from the manifest. The publish
+// script writes latest.json notes with PowerShell's Set-Content -Encoding utf8
+// (Windows PowerShell 5.1 emits a BOM), which Go's json.Unmarshal rejects —
+// stripping it here keeps an installed updater robust to either encoding.
+func stripBOM(b []byte) []byte {
+	return bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
 }
 
 // evaluate compares the running version against the manifest and builds the

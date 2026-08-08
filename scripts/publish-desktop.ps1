@@ -157,9 +157,14 @@ if (Test-Path $changelogPath) {
     }
     if ($notes) {
         $manifestPath = Join-Path $ReleaseDir "latest.json"
-        $j = Get-Content $manifestPath -Raw | ConvertFrom-Json
+        # -Encoding UTF8 is required: Windows PowerShell 5.1's default reads
+        # no-BOM UTF-8 as ANSI, mangling the notes and breaking ConvertFrom-Json.
+        $j = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $j.notes = $notes
-        $j | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+        # No-BOM UTF-8: Windows PowerShell 5.1's Set-Content -Encoding utf8 emits
+        # a BOM, which Go's json.Unmarshal (the installed updater) rejects.
+        $jsonText = $j | ConvertTo-Json -Depth 6
+        [System.IO.File]::WriteAllText($manifestPath, $jsonText, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host "==> latest.json notes filled from release/CHANGELOG.md"
     } else {
         Write-Host "==> WARN: no release/CHANGELOG.md entry found; latest.json notes left empty"

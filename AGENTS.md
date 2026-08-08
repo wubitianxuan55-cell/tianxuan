@@ -137,6 +137,13 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.175.0** (2026-08-08): Codex 蒸馏能力级提升 + 过程卡工作流 —
+  write_stdin 交互式进程管理（bash interactive 参数 + 写 stdin 工具）、
+  会话级 token 预算渐进提醒（agent.token_budget_limit/reminders）、hook
+  超时递归杀进程树、bash PowerShell windows_shell_guidance、search_tool
+  工具目录搜索、precheck nearest line 诊断；桌面端每轮结束整轮折叠成
+  大过程卡（warm-turn）+ 输出强制简洁（3-10 行）。产物 release/v10.175.0/
+  tianxuan-desktop.exe · SHA256 27bb36ee...。详见 memory/v10-175-release-notes.md
 - **V10.166.0** (2026-08-08): **删除双模型架构（Hermes/Hephaestus）**，重回
   单模型 + 规划模式（`PlannerHost`）：同一模型/同一 session/同一工具列表，
   复杂任务先只读规划（planmode.Marker + 运行时只读门）→ 确认 → 执行 →

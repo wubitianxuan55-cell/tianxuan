@@ -376,7 +376,10 @@ func stderrFor(r SpawnResult, timeout time.Duration) string {
 
 // DefaultSpawner runs the command through the platform shell with the payload on
 // stdin, capping captured output and honoring both the per-hook timeout and the
-// parent context's cancellation.
+// parent context's cancellation. The command is started under a tracked process
+// tree (Windows Job Object + taskkill /T fallback via internal/proc) so a
+// timeout reaps the whole tree — a hook that spawned a grandchild (e.g. a lint
+// tool chain) used to orphan it holding file locks / ports / pipes.
 func DefaultSpawner(ctx context.Context, in SpawnInput) SpawnResult {
 	cctx, cancel := context.WithTimeout(ctx, in.Timeout)
 	defer cancel()
@@ -400,13 +403,28 @@ func DefaultSpawner(ctx context.Context, in SpawnInput) SpawnResult {
 	// shell is killed on timeout/cancel.
 	cmd.WaitDelay = 500 * time.Millisecond
 
-	err := cmd.Run()
+	job, err := proc.StartTracked(cmd)
+	if err != nil {
+		return SpawnResult{
+			ExitCode: -1,
+			Stdout:   strings.TrimSpace(outBuf.String()),
+			Stderr:   strings.TrimSpace(errBuf.String()),
+			SpawnErr: err,
+		}
+	}
+	// Timeout/cancel: terminate the whole tree. KillTracked closes the Job
+	// Object handle (kernel KILL_ON_JOB_CLOSE reaps the tree recursively) and
+	// falls back to taskkill /T — the direct child alone is not enough, a
+	// launcher's detached grandchild would otherwise survive the timeout.
+	defer proc.KillTracked(cmd, job)
+
 	res := SpawnResult{
 		ExitCode:  -1,
 		Stdout:    strings.TrimSpace(outBuf.String()),
 		Stderr:    strings.TrimSpace(errBuf.String()),
 		Truncated: outBuf.truncated || errBuf.truncated,
 	}
+	err = cmd.Wait()
 	switch {
 	case cctx.Err() == context.DeadlineExceeded:
 		res.TimedOut = true

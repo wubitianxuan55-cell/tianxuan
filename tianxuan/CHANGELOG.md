@@ -1,3 +1,31 @@
+## [10.162.0] — 2026-08-08
+
+### 👁️ 新增 vision 识图技能（OpenCode Zen 视觉模型）
+
+> 主模型 DeepSeek 无视觉输入能力，无法直接"看"图片。新技能通过
+> OpenCode Zen 的视觉模型（`mimo-v2.5-free`，已验证支持多模态）提供
+> "外挂眼睛"：脚本把图片 base64 后 POST 到 Zen 的 chat/completions，
+> 返回文字描述，主模型把描述当作看到的画面整合进回答。
+
+#### 变更
+- 新增内置技能 `.tianxuan/skills/vision/`（同步至 `internal/skill/bundled/vision/`）：
+  - `SKILL.md`：触发条件（用户发图/问图）、调用方式（bash 工具跑
+    `vision.ps1`）、模型/Key 配置、安全规则
+  - `scripts/vision.ps1`：零依赖 PowerShell 脚本（Windows 安装版无
+    node/python 也能跑），支持多图、`-Prompt`/`-Model`/`-Api` 参数
+- Key 复用现有 `OPENCODE_API_KEY`（tianxuan 已从 `.env` 加载，子进程继承）
+- 修两个 Windows PowerShell 5.1 编码坑：UTF-8 BOM 保证中文脚本可解析；
+  HttpWebRequest + 手动 UTF-8 解码绕开 Invoke-RestMethod 按 Latin-1 解码
+  无 charset JSON 响应的问题（否则中文输出双重编码乱码）
+
+#### 测试与验证
+- 真实 key + 真实截图端到端实测：mimo-v2.5-free 返回准确中文描述，
+  stdout 纯 UTF-8 字节、退出码 0
+- 错误路径验证：缺 key / 图片不存在 → 大声失败 + 非零退出
+- 临时冒烟测试确认 `Store.Read("vision")` 解析正确、脚本随
+  `EnsureBundled` 提取为真实文件（跑完已删）
+- `go test ./internal/skill/` 全绿
+
 ## [10.161.0] — 2026-08-08
 
 ### 🖥️ 桌面端设置面板支持 OpenCode Zen

@@ -1,3 +1,12 @@
+## V10.162.0 (2026-08-08) — 新增 vision 识图技能（OpenCode Zen 视觉模型）
+
+### 变更
+- 新增 `vision` 内置技能：无视觉模型（DeepSeek）通过 OpenCode Zen 视觉模型（mimo-v2.5-free）识图
+- `scripts/vision.ps1` 零依赖：图片 base64 → POST Zen chat/completions → 返回文字描述
+- 真实 API 实测通过：中文描述准确、UTF-8 输出正确、错误路径大声失败
+
+---
+
 ## V10.161.0 (2026-08-08) — 桌面端设置面板支持 OpenCode Zen
 
 ### 变更

@@ -71,6 +71,13 @@ type Job struct {
 	startedAt  int64
 	cancel     context.CancelFunc
 	done       chan struct{}
+
+	// stdin is an optional interactive input pipe (V10.174, distilled from
+	// codex CLI's write_stdin). Guarded by mu. Set by SetStdin before the
+	// job's run function starts consuming; WriteStdin delivers data to it.
+	// nil means the job has no stdin (writes fail loudly).
+	stdin    io.WriteCloser
+	stdinSet bool
 }
 
 // Manager is the session's background-job table. It is safe for concurrent use.
@@ -389,4 +396,48 @@ func (m *Manager) Pid(id string) int {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return j.Pid
+}
+
+// SetStdin attaches an interactive input pipe to a background job (V10.174,
+// distilled from codex CLI's write_stdin). Call it inside the job's run
+// function before the command consumes stdin; WriteStdin then delivers input
+// mid-run. Attaching after the job finished is a silent no-op (the run
+// function can no longer be reading it).
+func (m *Manager) SetStdin(id string, w io.WriteCloser) {
+	j := m.get(id)
+	if j == nil {
+		return
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.status != Running {
+		return // finished — nothing will read it
+	}
+	j.stdin = w
+	j.stdinSet = true
+}
+
+// WriteStdin delivers data to a running background job's interactive input
+// pipe (distilled from codex CLI's write_stdin). It fails loudly when the job
+// is unknown, finished, or was started without a stdin pipe — never silently
+// drops input.
+func (m *Manager) WriteStdin(id, data string) error {
+	j := m.get(id)
+	if j == nil {
+		return fmt.Errorf("no background job %q", id)
+	}
+	j.mu.Lock()
+	stdin, stdinSet := j.stdin, j.stdinSet
+	status := j.status
+	j.mu.Unlock()
+	if !stdinSet || stdin == nil {
+		return fmt.Errorf("job %q has no interactive stdin (start it with bash interactive=true)", id)
+	}
+	if status != Running {
+		return fmt.Errorf("job %q is not running (status %s); cannot write stdin", id, status)
+	}
+	if _, err := stdin.Write([]byte(data)); err != nil {
+		return fmt.Errorf("write stdin to job %q: %w", id, err)
+	}
+	return nil
 }

@@ -20,6 +20,7 @@ var compactDesc = map[string]string{
 	"ls":                  "列目录条目(子目录带/)",
 	"bash":                "执行shell命令(宿主配置超时;timeout参数非法;长跑用run_in_background)",
 	"bash_output":         "读取后台任务增量输出",
+	"write_stdin":         "向交互式后台任务写入stdin输入",
 	"kill_shell":          "终止后台任务",
 	"wait":                "阻塞等待后台任务结束",
 	"web_fetch":           "抓取URL纯文本(去标签,SSRF安全,支持重试)",

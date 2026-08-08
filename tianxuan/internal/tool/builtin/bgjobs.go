@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"tianxuan/internal/jobs"
 	"tianxuan/internal/tool"
@@ -27,6 +28,7 @@ func init() {
 	tool.RegisterBuiltin(bashOutput{})
 	tool.RegisterBuiltin(killShell{})
 	tool.RegisterBuiltin(waitJob{})
+	tool.RegisterBuiltin(writeStdin{})
 }
 
 // --- bash_output: poll a background job's new output (non-blocking) ---
@@ -232,4 +234,67 @@ func (waitJob) Execute(ctx context.Context, args json.RawMessage) (string, error
 		}
 	}
 	return b.String(), nil
+}
+
+// --- write_stdin: deliver input to a running interactive background job ---
+
+type writeStdin struct{}
+
+func (writeStdin) Name() string { return "write_stdin" }
+
+func (writeStdin) Description() string {
+	return "Write input to a running interactive background job's stdin (distilled from codex CLI). " +
+		"Use with a job started via bash(run_in_background=true, interactive=true) — REPLs, interactive CLIs, " +
+		"debuggers, or any program that reads input after launch. Returns the job's new output after writing, " +
+		"so a single call can drive a prompt/response exchange."
+}
+
+func (writeStdin) Schema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"The interactive background job id (e.g. \"bash-1\") returned when it was started."},"data":{"type":"string","description":"Input to write to the job's stdin (a line, a command, or a chunk of a script)."}},"required":["job_id","data"]}`)
+}
+
+func (writeStdin) ReadOnly() bool      { return false }
+func (writeStdin) Kind() tool.ToolKind { return tool.KindExecute }
+
+func (writeStdin) CompactDescription() string { return compactDesc["write_stdin"] }
+func (writeStdin) CompactSchema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"交互式后台任务 id（如 bash-1）"},"data":{"type":"string","description":"写入 stdin 的输入（一行/一条命令/一段脚本）"}},"required":["job_id","data"]}`)
+}
+
+func (writeStdin) Execute(ctx context.Context, args json.RawMessage) (string, error) {
+	var p struct {
+		JobID string `json:"job_id"`
+		Data  string `json:"data"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return "", fmt.Errorf("invalid args: %w", err)
+	}
+	if p.JobID == "" {
+		return "", fmt.Errorf("job_id is required")
+	}
+	jm, ok := jobs.FromContext(ctx)
+	if !ok {
+		return "", fmt.Errorf("background jobs are not available in this context")
+	}
+	if err := jm.WriteStdin(p.JobID, p.Data); err != nil {
+		return "", err
+	}
+	// The interactive program needs a moment to read the input and respond;
+	// poll briefly for new output so a single write_stdin call can drive a
+	// prompt/response exchange without a separate bash_output.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		text, status, found := jm.Output(p.JobID)
+		if !found {
+			return fmt.Sprintf("wrote %d bytes to %q (job gone)", len(p.Data), p.JobID), nil
+		}
+		if strings.TrimSpace(text) != "" || status != jobs.Running || time.Now().After(deadline) {
+			header := fmt.Sprintf("[%s] %s (wrote %d bytes)", p.JobID, status, len(p.Data))
+			if strings.TrimSpace(text) == "" {
+				return header + "\n(no new output)", nil
+			}
+			return header + "\n" + text, nil
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
 }

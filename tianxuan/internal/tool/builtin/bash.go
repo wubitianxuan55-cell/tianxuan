@@ -84,7 +84,7 @@ func (b bash) resolved() sandbox.Shell {
 }
 
 func (bash) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns. Use for persistent servers (dev/watch/serve/start), ngrok tunnels, docker compose up, and any command that does not exit on its own."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw merged output. json returns structured {ok, exit_code, duration_ms, stdout, stderr, command} with separated stdout/stderr fields."}},"required":["command"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"run_in_background":{"type":"boolean","description":"Run detached: returns a job id immediately and keeps running across turns. Use for persistent servers (dev/watch/serve/start), ngrok tunnels, docker compose up, and any command that does not exit on its own."},"output_format":{"type":"string","enum":["plain","json"],"description":"plain (default) returns raw merged output. json returns structured {ok, exit_code, duration_ms, stdout, stderr, command} with separated stdout/stderr fields."},"interactive":{"type":"boolean","description":"Give the background job an interactive stdin pipe so write_stdin can deliver input mid-run (REPLs, interactive CLIs, debuggers). Only meaningful with run_in_background=true. Default false."}},"required":["command"]}`)
 }
 
 // ReadOnly is false: bash's effect cannot be inferred from args (rm, curl,
@@ -101,6 +101,7 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 		Command         string `json:"command"`
 		RunInBackground bool   `json:"run_in_background"`
 		OutputFormat    string `json:"output_format"`
+		Interactive     bool   `json:"interactive"`
 	}
 	if err := decodeStrictArgs(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w (valid fields: command, run_in_background, output_format)", err)
@@ -170,6 +171,18 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			cmd.Env = b.commandEnv()
 			cmd.Stdout = out
 			cmd.Stderr = out
+			// V10.174: interactive mode (distilled from codex write_stdin) —
+			// the job gets an stdin pipe so write_stdin can deliver input
+			// mid-run (REPLs, interactive CLIs, debuggers). Non-interactive
+			// jobs keep stdin at the process default (no pipe), so a command
+			// that never reads stdin can't wedge on a never-drained pipe.
+			if p.Interactive {
+				pr, pw := io.Pipe()
+				cmd.Stdin = pr
+				if id, ok := jobs.JobIDFromContext(jobCtx); ok {
+					jm.SetStdin(id, pw)
+				}
+			}
 			if err := cmd.Start(); err != nil {
 				return "", err
 			}

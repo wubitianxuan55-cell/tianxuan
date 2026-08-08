@@ -1,0 +1,14 @@
+{
+    "version":  "v10.164.0",
+    "notes":  "### 变更\n- refs.go 图片附件提示改为明确指引 `run_skill vision`（原文案指向不存在的 \"vision MCP tool\"），截图/粘贴图片发送后模型会调用识图技能读图\n- vision 技能 description 增加触发条件：收到 `[image attachment]` 附件引用（`@.tianxuan/attachments/` 路径）时必须使用",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.164.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.164.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10759394,
+                                            "sha256":  "b4200fae3081949e4dd726cc2442d010668d73042297b0566e5c8a0cdc751510"
+                                        }
+                  }
+}

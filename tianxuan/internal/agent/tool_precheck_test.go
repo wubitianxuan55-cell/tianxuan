@@ -36,6 +36,30 @@ func TestPrecheckEditFileOldStringNotFound(t *testing.T) {
 	}
 }
 
+// TestPrecheckEditFileNotFoundHasNearestLine locks the diagnostics contract:
+// when the old_string misses but a similar line exists, the precheck block
+// message must point at the nearest line (like the Execute path already does
+// via nearestContentLine) — otherwise the model only sees "not found" and
+// guesses what differs.
+func TestPrecheckEditFileNotFoundHasNearestLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.ToSlash(filepath.Join(dir, "test.go"))
+	content := "package main\n\nfunc main() {\n\tprintln(\"hello\")\n}\n"
+	os.WriteFile(path, []byte(content), 0644)
+
+	a := &AgentRunner{}
+	msg := a.precheckEditFile([]byte(`{"path":"` + path + `","old_string":"func mainx() {","new_string":"func run() {"}`))
+	if msg == "" {
+		t.Fatal("old_string not in file, should block")
+	}
+	if !strings.Contains(msg, "nearest line 3") {
+		t.Errorf("block message should include nearest line 3, got: %s", msg)
+	}
+	if !strings.Contains(msg, "func main() {") {
+		t.Errorf("block message should include the nearest line text, got: %s", msg)
+	}
+}
+
 func TestPrecheckEditFileMissing(t *testing.T) {
 	a := &AgentRunner{}
 	msg := a.precheckEditFile([]byte(`{"path":"/nonexistent/file.go","old_string":"x","new_string":"y"}`))

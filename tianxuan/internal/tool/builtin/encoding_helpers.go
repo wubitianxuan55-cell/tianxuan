@@ -266,7 +266,7 @@ func replaceEditRanges(content string, ranges []editRange, replacement string) s
 
 func oldStringNotFoundError(path, oldString, content string) error {
 	hint := " Re-read the current file before retrying; if several related edits target the same area, combine the final replacements in one multi_edit call."
-	if line, text, ok := nearestContentLine(oldString, content); ok {
+	if line, text, ok := NearestContentLine(oldString, content); ok {
 		return fmt.Errorf("old_string not found in %s (nearest line %d: %q).%s", path, line, text, hint)
 	}
 	return fmt.Errorf("old_string not found in %s.%s", path, hint)
@@ -280,7 +280,11 @@ func oldStringNotUniqueError(path, oldString, content string, matches int, repla
 	return fmt.Errorf("old_string is not unique in %s (%d matches)%s; add nearby unique code, not just repeated separator lines", path, matches, lineHint)
 }
 
-func nearestContentLine(oldString, content string) (int, string, bool) {
+// NearestContentLine finds the content line most similar to the old_string's
+// first line, for diagnostics ("nearest line N: ..."). Exported so the agent
+// precheck can reuse the same hint the Execute path reports. ok=false when the
+// best similarity is too weak to be useful.
+func NearestContentLine(oldString, content string) (int, string, bool) {
 	oldLines := splitLineSegments(oldString)
 	if len(oldLines) == 0 {
 		return 0, "", false

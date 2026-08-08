@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"unicode/utf8"
+
+	"tianxuan/internal/tool/builtin"
 )
 
 // precheckTool runs a fast deterministic check before a writer tool executes.
@@ -65,12 +67,17 @@ func (a *AgentRunner) precheckEditFile(raw json.RawMessage) string {
 	if len([]rune(filePreview)) > 200 {
 		filePreview = truncateString(filePreview, 200) + "..."
 	}
+	nearest := ""
+	if line, text, ok := builtin.NearestContentLine(p.OldString, content); ok {
+		nearest = fmt.Sprintf("  nearest line %d: %q\n", line, text)
+	}
 	return fmt.Sprintf(
 		"precheck blocked: old_string not found in %s.\n"+
 			"  searched for: %q\n"+
+			"%s"+
 			"  file content (first 200 chars): %q\n"+
 			"  suggestion: use read_file to see the current content, then retry with the exact string.",
-		p.Path, preview, filePreview,
+		p.Path, preview, nearest, filePreview,
 	)
 }
 
@@ -99,10 +106,13 @@ func (a *AgentRunner) precheckMultiEdit(raw json.RawMessage) string {
 			if len([]rune(preview)) > 80 {
 				preview = truncateString(preview, 80) + "..."
 			}
+			nearest := ""
+			if line, text, ok := builtin.NearestContentLine(e.OldString, content); ok {
+				nearest = fmt.Sprintf(" nearest line %d: %q.", line, text)
+			}
 			return fmt.Sprintf(
-				"precheck blocked: multi_edit[%d] old_string not found in %s: %q. "+
-					"Re-read the file and retry.",
-				i, p.Path, preview,
+				"precheck blocked: multi_edit[%d] old_string not found in %s: %q.%s Re-read the file and retry.",
+				i, p.Path, preview, nearest,
 			)
 		}
 	}

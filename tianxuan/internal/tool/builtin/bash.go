@@ -318,16 +318,46 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 	}
 
 	// Plain mode: merged output — apply same truncation as JSON mode for safety.
-	out := stdoutBuf.String()
+	rawOut := stdoutBuf.String()
+	rawLines := lineCount(rawOut)
 	const plainMaxBytes = 48 * 1024
-	out, _ = truncateStream(out, plainMaxBytes)
+	out, truncated := truncateStream(rawOut, plainMaxBytes)
 	out = prefixWarning(out, envWarn)
 
 	if err != nil {
-		// Non-zero exit: feed output and error back so the model can self-correct.
-		return out, fmt.Errorf("command exited: %w", err)
+		// Non-zero exit: feed output and error back so the model can
+		// self-correct. V10.169: prepend a codex-style structured header
+		// (Exit code / Wall time / Output) so the model reads the failure
+		// status without parsing the raw error string.
+		var b strings.Builder
+		fmt.Fprintf(&b, "Exit code: %d\n", exitCodeOf(err))
+		fmt.Fprintf(&b, "Wall time: %.1f seconds\n", time.Since(start).Seconds())
+		if truncated {
+			fmt.Fprintf(&b, "Total output lines: %d\n", rawLines)
+		}
+		b.WriteString("Output:\n")
+		b.WriteString(out)
+		return b.String(), fmt.Errorf("command exited: %w", err)
 	}
 	return out, nil
+}
+
+// exitCodeOf extracts the process exit code from a command error. Non-ExitError
+// failures (context cancellation, spawn errors) report -1, matching JSON mode.
+func exitCodeOf(err error) int {
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	return -1
+}
+
+// lineCount counts newline-terminated lines in s (a trailing newline does not
+// add an extra empty line).
+func lineCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(s, "\n")
 }
 
 // foregroundTimeout returns the tool-local foreground cap; <=0 means no cap

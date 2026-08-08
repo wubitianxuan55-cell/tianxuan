@@ -1,3 +1,32 @@
+## [10.169.0] — 2026-08-08
+
+### ✨ bash 失败输出结构化头（对标 codex format_exec_output_for_model）
+
+> plain 模式命令失败（非零退出码）时，输出改为 codex 风格结构化头，
+> 模型无需解析裸错误串即可读取退出状态。
+
+#### 变更
+- plain 模式失败时输出：
+  ```
+  Exit code: 5
+  Wall time: 0.6 seconds
+  Total output lines: 3000   (仅截断时出现)
+  Output:
+  <命令自身输出>
+  ```
+- `Total output lines` 仅当输出被截断时出现（对齐 codex：模型看不到全部
+  行时才报行数），小输出不噪声
+- 成功路径保持裸输出不变（不破坏下游解析）；JSON 模式契约不变
+  （失败编码在 payload，nil error）；超时路径不变（数据竞争安全考虑）
+
+#### 验证（TDD）
+- 新增 `bash_header_test.go` 6 例：失败头/输出保留/成功裸输出/JSON 不变/
+  截断报行数/小输出不报行数
+- 真实输出核对：`Exit code: 9 / Wall time: 0.6s / Total output lines: 3000`
+- `go build`/`go vet` 干净；51 包全量测试全绿（仅预存 API 认证类失败）
+
+---
+
 ## [10.168.0] — 2026-08-08
 
 ### 🐛 修复：技能工具（explore/research/review 等）不并发 + 使用异常

@@ -1,0 +1,14 @@
+{
+    "version":  "v10.163.0",
+    "notes":  "### 变更\n- NSIS 安装器安装前终止并等待旧版 tianxuan-desktop.exe 退出（轮询最多 10 秒），解决覆盖 exe 被占用导致的更新失败\n- 实测验证：伪造旧版进程运行中执行静默安装 → 旧进程被终止、exe 成功覆盖（哈希一致）、退出码 0",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.163.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.163.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10759357,
+                                            "sha256":  "094289972151f59b80043e86191ab9b171e8ecd42b3d3f5205e47ecc94d8f969"
+                                        }
+                  }
+}

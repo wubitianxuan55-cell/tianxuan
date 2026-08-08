@@ -188,6 +188,16 @@ func ClassifyError(toolName, code, errMsg string) string {
 		if strings.Contains(msg, "not found") {
 			return "symbol_not_found"
 		}
+	case "apply_patch":
+		if strings.Contains(msg, "invalid patch") {
+			return "patch_parse_error"
+		}
+		if strings.Contains(msg, "not unique") {
+			return "block_not_unique"
+		}
+		if strings.Contains(msg, "not found") {
+			return "block_not_found"
+		}
 	case "bash":
 		if strings.Contains(msg, "timeout") || strings.Contains(msg, "timed out") {
 			return "bash_timeout"

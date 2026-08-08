@@ -21,7 +21,6 @@ const NOOP_SCROLL = () => {};
 type ToolItem = Extract<Item, { kind: "tool" }>;
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
-const HOT_TURNS = 30;
 const WARM_PAGE_SIZE = 20;
 const QUESTION_NAV_MIN_COUNT = 2;
 
@@ -349,9 +348,13 @@ export function Transcript({
 
   const [warmState, setWarmState] = useState<WarmLayerState>(() => createWarmLayerState(""));
   const turnCount = turnGroups.length;
+  // V10.175: 每轮结束后整轮折叠成一张大过程卡（蒸馏自用户偏好——"过程
+  // 卡"工作流）。running 时保留最新轮展开（生成中保持"文本↔过程卡"
+  // 交替展示），生成结束后全部轮收进折叠卡，只留最终正文在外面。
+  const hotTurns = running ? 1 : 0;
   const { warmStartTurn, warmEndTurn, coldTurnCount } = useMemo(
-    () => warmPagination({ turnCount, hotTurns: HOT_TURNS, pageSize: WARM_PAGE_SIZE, coldPage: warmState.coldPage }),
-    [turnCount, warmState.coldPage],
+    () => warmPagination({ turnCount, hotTurns, pageSize: WARM_PAGE_SIZE, coldPage: warmState.coldPage }),
+    [turnCount, hotTurns, warmState.coldPage],
   );
 
   const turnEls = useRef(new Map<number, HTMLElement>());

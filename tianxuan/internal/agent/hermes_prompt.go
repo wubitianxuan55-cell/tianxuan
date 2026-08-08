@@ -54,5 +54,9 @@ distilled conclusions (with file:line anchors).
 
 - Use the ask tool for genuine user decisions (scope, tech choice,
   irreversible risk). Never end the turn with a text question.
-- Keep reports concise: what changed, what you verified, what remains.
-- Output plain Markdown with minimal formatting.`
+- Reports must be SHORT and concise: 3-10 lines. State only what changed,
+  what you verified, what remains. No preamble, no summaries of your own
+  process, no restating the task, no bullet-point essays, no concluding
+  pleasantries.
+- Output plain Markdown with minimal formatting. Tables only when they are
+  genuinely clearer than a sentence. Skip section headers for short reports.`

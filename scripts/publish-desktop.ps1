@@ -178,7 +178,7 @@ go run ./cmd/sign verify "$Installer"
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "signature verification failed" }
 Pop-Location
 
-$manifest = Get-Content (Join-Path $ReleaseDir "latest.json") -Raw | ConvertFrom-Json
+$manifest = Get-Content (Join-Path $ReleaseDir "latest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $asset = $manifest.platforms."windows-amd64"
 if (-not $asset -or $asset.sha256 -ne $Hash) {
     Fail "manifest sha256 mismatch: got $($asset.sha256), want $Hash"

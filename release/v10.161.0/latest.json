@@ -1,0 +1,14 @@
+{
+    "version":  "v10.161.0",
+    "notes":  "### 变更\n- desktop 主程序注册 opencode provider kind（设置面板 kind 下拉可选）\n- 模型服务预设模板新增 OpenCode Zen（一键添加，OPENCODE_API_KEY）\n- 用户级 config.toml 预置 zen provider（deepseek-v4-flash-free / claude-haiku-4-5 / gpt-5.4-nano）",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.161.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.161.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10752411,
+                                            "sha256":  "c8e5a67dfde52159ccb139709ac96415d0008a444518541fa36b359b0f488748"
+                                        }
+                  }
+}

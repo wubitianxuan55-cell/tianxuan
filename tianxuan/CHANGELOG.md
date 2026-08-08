@@ -1,3 +1,22 @@
+## [10.161.0] — 2026-08-08
+
+### 🖥️ 桌面端设置面板支持 OpenCode Zen
+
+> 承接 [10.160.0]：CLI 已支持 zen，但桌面端"模型服务"面板看不到——desktop 主程序
+> 未注册 opencode provider kind，预设模板也没有 Zen 入口。
+
+#### 变更
+- `desktop/main.go` blank import `internal/provider/opencode`：桌面端
+  `provider.Kinds()` 现在包含 opencode，设置面板 kind 下拉可选
+- `SettingsProviders.tsx` 预设模板新增 OpenCode Zen（kind=opencode、
+  base_url=https://opencode.ai/zen/v1、deepseek-v4-flash-free、
+  OPENCODE_API_KEY），"+ 添加服务"一步建好
+- 用户级 `%APPDATA%/tianxuan/config.toml` 预置 zen provider（免费模型起步）
+
+#### 测试（TDD RED→GREEN）
+- `SettingsProviders.test.ts`：PROVIDER_PRESETS 含 opencode 预设且字段正确
+- 前端 vitest 15 文件 142 例全绿 · desktop `go build ./...` 通过
+
 ## [10.160.0] — 2026-08-08
 
 ### 🌐 OpenCode Zen 模型接入

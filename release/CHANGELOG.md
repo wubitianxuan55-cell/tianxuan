@@ -1,3 +1,12 @@
+## V10.161.0 (2026-08-08) — 桌面端设置面板支持 OpenCode Zen
+
+### 变更
+- desktop 主程序注册 opencode provider kind（设置面板 kind 下拉可选）
+- 模型服务预设模板新增 OpenCode Zen（一键添加，OPENCODE_API_KEY）
+- 用户级 config.toml 预置 zen provider（deepseek-v4-flash-free / claude-haiku-4-5 / gpt-5.4-nano）
+
+---
+
 ## V10.160.0 (2026-08-08) — OpenCode Zen 模型接入
 
 ### 变更

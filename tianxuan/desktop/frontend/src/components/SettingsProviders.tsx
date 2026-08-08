@@ -5,7 +5,7 @@ import { useT } from "../lib/i18n";
 import { toRef, type SectionProps } from "./SettingsShared";
 import { SettingsPageShell } from "./SettingsPageShell";
 
-const PROVIDER_PRESETS = [
+export const PROVIDER_PRESETS = [
   { name: "deepseek", kind: "openai", baseUrl: "https://api.deepseek.com", models: "deepseek-chat", apiEnv: "DEEPSEEK_API_KEY", ctx: 1000000 },
   { name: "openai", kind: "openai", baseUrl: "https://api.openai.com/v1", models: "gpt-4o", apiEnv: "OPENAI_API_KEY", ctx: 128000 },
   { name: "anthropic", kind: "openai", baseUrl: "https://api.anthropic.com/v1", models: "claude-sonnet-4-20250514", apiEnv: "ANTHROPIC_API_KEY", ctx: 200000 },
@@ -14,6 +14,7 @@ const PROVIDER_PRESETS = [
   { name: "qwen", kind: "openai", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", models: "qwen-plus", apiEnv: "DASHSCOPE_API_KEY", ctx: 131072 },
   { name: "glm", kind: "openai", baseUrl: "https://open.bigmodel.cn/api/paas/v4", models: "glm-4-plus", apiEnv: "ZHIPUAI_API_KEY", ctx: 128000 },
   { name: "ollama", kind: "openai", baseUrl: "http://localhost:11434/v1", models: "llama3.1", apiEnv: "", ctx: 128000 },
+  { name: "opencode", kind: "opencode", baseUrl: "https://opencode.ai/zen/v1", models: "deepseek-v4-flash-free", apiEnv: "OPENCODE_API_KEY", ctx: 1000000 },
 ];
 
 import type { ProviderView } from "../lib/types";

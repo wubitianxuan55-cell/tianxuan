@@ -7,6 +7,7 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.161.0 | 2026-08-08 | 桌面端设置面板支持 OpenCode Zen — desktop 注册 opencode kind、预设模板一键添加、用户级 config.toml 预置 zen |
 | V10.160.0 | 2026-08-08 | OpenCode Zen 模型接入 — opencode provider kind 按模型路由三协议（chat/completions/messages/responses），免费模型匿名可用，真实 API 三协议端到端验证通过 |
 | V10.159.0 | 2026-08-05 | read_file 按符号跳读 — symbol 参数定位定义行 + 未找到大声失败附附近符号名（SHA256 见 release） |
 | V10.158.0 | 2026-08-05 | todo_write blocked 状态 + edit_lines 多行锚点（外部依赖空转降噪、锚点可含换行） |

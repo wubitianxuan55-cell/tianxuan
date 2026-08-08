@@ -64,6 +64,33 @@
 
 ---
 
+## [10.167.0] — 2026-08-08
+
+### ✨ Codex 蒸馏 P2：get_context_remaining 工具 + ToolDispatchTrace 落盘
+
+> 对标 Codex CLI 继续优化编程能力（蒸馏报告 P2-8 完成 + 新差距覆盖）。
+
+#### get_context_remaining 工具（蒸馏 codex 同名工具）
+- 只读工具，模型可主动查询当前上下文窗口剩余 token，长任务在窗口
+  溢出前规划收敛（停止探索、收窄范围、wrap up）
+- executeOne 经 context 注入 tokensLeft 闭包（compaction.Window 减
+  chars*tokPerChar 估算），无窗口配置时友好提示，无注入大声失败
+
+#### ToolDispatchTrace 落盘（报告 P2-8）
+- `internal/tool/trace.go`: TraceStore JSONL 追加（ts/session/trace/call_id/
+  tool/read_only/args/outcome/error/output_len/duration_ms），参数与错误
+  截断（500/300），懒打开不持句柄（Windows 测试清理不卡）
+- executeOne 改命名返回值 + defer 统一记录所有 dispatch 路径（success/
+  error/blocked），trace_id 随每轮传播
+- boot.go 注入 TraceStore + 注册新工具；CLI 新增 `tianxuan tools trace [-n N]`
+
+#### 验证
+- TDD: trace_store 4 例 + context_remaining 4 例 + execute_trace 端到端 2 例
+  + cli trace 2 例全绿；go build/vet 干净；内部测试全绿（仅预存 API 认证
+  失败与本次无关）
+
+---
+
 ## [10.166.0] — 2026-08-08
 
 ### 🔄 架构回退：删除双模型（Hermes），重回单模型规划模式

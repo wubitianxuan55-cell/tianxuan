@@ -1,3 +1,25 @@
+## V10.170.0 (2026-08-08) — Codex 蒸馏 P2 + 技能并发修复 + bash 结构化头
+
+### 变更
+- **get_context_remaining 工具**（蒸馏 codex）：模型主动查询上下文剩余 token，
+  长任务在窗口溢出前规划收敛；executeOne 注入 tokensLeft 闭包（Window − chars×tokPerChar）
+- **ToolDispatchTrace 落盘**：每次工具调用结构化 JSONL（ts/session/trace/call_id/
+  tool/args/outcome/error/duration），参数截断 500/错误 300，懒打开不持句柄；
+  CLI 新增 `tianxuan tools trace [-n N]`
+- **修复技能工具不并发**：getConflictKey 增加 registry 感知，ReadOnly 技能工具
+  （explore/research/review 等）返回 ro: 共享键互相并行，与写工具 file:* 互斥
+  （保住写后读顺序）；V10.124→V10.147 技能工具化回归导致永久串行
+- **bash 失败输出结构化头**（对标 codex format_exec_output_for_model）：
+  plain 模式失败输出 `Exit code / Wall time / [Total output lines] / Output`，
+  成功路径与 JSON 模式契约不变
+
+### 发布产物
+- `release/v10.170.0/tianxuan-windows-amd64-installer.exe`
+- SHA256: 待打包后填写
+- 验证：`go test ./...` 48 包全绿（仅预存 API 认证类失败）· `go vet` 干净 · `wails build` EXIT 0
+
+---
+
 ## V10.166.0 (2026-08-08) — 删除双模型架构，重回单模型规划模式
 
 ### 变更

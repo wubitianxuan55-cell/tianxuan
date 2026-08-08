@@ -7,6 +7,15 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.170.0 | 2026-08-08 | Codex 蒸馏 P2 + 技能并发修复 + bash 结构化头 — get_context_remaining / ToolDispatchTrace / 技能工具并行 / bash 失败结构化头 |
+| V10.169.0 | 2026-08-08 | bash 失败输出结构化头 — plain 模式失败附 Exit code / Wall time / Total output lines（对标 codex） |
+| V10.168.0 | 2026-08-08 | 修复技能工具不并发 — getConflictKey registry 感知，ro: 键并行 + 与写工具互斥（V10.124→147 回归） |
+| V10.167.0 | 2026-08-08 | Codex 蒸馏 P2 — get_context_remaining 工具 + ToolDispatchTrace JSONL 落盘 + tools trace CLI |
+| V10.166.0 | 2026-08-08 | 删除双模型架构（Hermes/Hephaestus），重回单模型规划模式 PlannerHost（auto_plan 开关） |
+| V10.165.0 | 2026-08-08 | AI 自主截图工具 capture_screen — GDI 截主屏→附件→vision 技能识图闭环 |
+| V10.164.0 | 2026-08-08 | 截图→识图闭环 — 附件提示指向 vision 技能（refs.go + 技能 description） |
+| V10.163.0 | 2026-08-08 | 修复更新安装时旧版本未关闭 — NSIS taskkill + UTF-8 BOM 修复 |
+| V10.162.0 | 2026-08-08 | 新增 vision 识图技能 — OpenCode Zen 视觉模型，零依赖 PowerShell |
 | V10.161.0 | 2026-08-08 | 桌面端设置面板支持 OpenCode Zen — desktop 注册 opencode kind、预设模板一键添加、用户级 config.toml 预置 zen |
 | V10.160.0 | 2026-08-08 | OpenCode Zen 模型接入 — opencode provider kind 按模型路由三协议（chat/completions/messages/responses），免费模型匿名可用，真实 API 三协议端到端验证通过 |
 | V10.159.0 | 2026-08-05 | read_file 按符号跳读 — symbol 参数定位定义行 + 未找到大声失败附附近符号名（SHA256 见 release） |

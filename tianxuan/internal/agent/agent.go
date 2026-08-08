@@ -333,6 +333,9 @@ type AgentRunner struct {
 	// toolStats, when non-nil, aggregates per-tool failure modes across
 	// sessions (V10.154, distilled from codex ToolDispatchTrace).
 	toolStats *tool.Stats
+	// toolTrace, when non-nil, appends one structured JSONL record per tool
+	// dispatch for offline error-rate analysis (V10.167).
+	toolTrace *tool.TraceStore
 
 	// preOutcomes collects results of read-only tool calls that were pre-executed
 	// during stream() before the full batch. Keyed by tool call ID. executeBatch
@@ -737,6 +740,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		ctxMgr:        opts.CtxMgr,
 		auditFunc:     opts.AuditFunc,
 		toolStats:     opts.ToolStats,
+		toolTrace:     opts.ToolTrace,
 		tc:            cache.New(-1), // V5.8: session �����棬mtime У�������
 		goal:          opts.Goal,     // V6.0 P7: �ỰĿ��
 		disableVerify: opts.DisableVerify,
@@ -906,6 +910,22 @@ func (a *AgentRunner) tokPerChar() float64 {
 		}
 	}
 	return fallbackTokPerChar
+}
+
+// tokensLeft estimates the tokens remaining in the context window: window
+// minus the chars of the live session scaled by the observed chars/token
+// ratio. ok=false when no window is configured (compaction disabled), so no
+// budget can be reported. Backs the get_context_remaining tool.
+func (a *AgentRunner) tokensLeft() (int, bool) {
+	win := a.compaction.Window
+	if win <= 0 {
+		return 0, false
+	}
+	used := int(float64(charsOfMessages(a.session.Messages)) * a.tokPerChar())
+	if used >= win {
+		return 0, true
+	}
+	return win - used, true
 }
 
 // msgChars counts the characters sent to the provider for one message ��

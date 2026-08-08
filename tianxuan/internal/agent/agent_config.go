@@ -40,6 +40,10 @@ type Options struct {
 	// from codex CLI's ToolDispatchTrace) and persists them for cross-session
 	// error-rate queries. V10.154.
 	ToolStats *tool.Stats
+	// ToolTrace, when non-nil, appends one structured JSONL record per tool
+	// dispatch (args / outcome / error / duration) for offline error-rate and
+	// regression analysis. V10.167 (distilled from codex ToolDispatchTrace).
+	ToolTrace *tool.TraceStore
 
 	// ParamStorm enables parameter-level duplicate tool call detection (V5.13).
 	// nil disables; non-nil provides WindowSize/Threshold/ExemptTools.

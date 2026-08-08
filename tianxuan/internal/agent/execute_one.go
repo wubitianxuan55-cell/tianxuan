@@ -17,7 +17,7 @@ import (
 	"tianxuan/internal/tool"
 )
 
-func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) toolOutcome {
+func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) (out toolOutcome) {
 	t, ok := a.tools.Get(call.Name)
 	if !ok {
 		return toolOutcome{
@@ -25,6 +25,38 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			errMsg: fmt.Sprintf("unknown tool %q", call.Name),
 		}
 	}
+
+	// V10.167: record every dispatch (success / error / blocked) as one JSONL
+	// trace line so offline error-rate analysis sees the full picture, not
+	// just failures. The named return lets one defer cover all early-return
+	// paths (loop guard, failure guard, plan gate, permission, precheck…).
+	start := time.Now()
+	defer func() {
+		if a.toolTrace == nil {
+			return
+		}
+		outcome := "success"
+		if out.errMsg != "" {
+			if out.blocked {
+				outcome = "blocked"
+			} else {
+				outcome = "error"
+			}
+		}
+		a.toolTrace.Record(tool.TraceEntry{
+			Ts:         time.Now().Format(time.RFC3339),
+			SessionID:  a.sessionID,
+			TraceID:    TraceID(ctx),
+			CallID:     call.ID,
+			Tool:       call.Name,
+			ReadOnly:   t.ReadOnly(),
+			Args:       call.Arguments,
+			Outcome:    outcome,
+			Error:      out.errMsg,
+			OutputLen:  len(out.output),
+			DurationMs: time.Since(start).Milliseconds(),
+		})
+	}()
 
 	// V10.13: 成功循环检测 — 移植自 Reasonix repeatedSuccessBlock。
 	// 写工具在同一用户轮次中重复成功 ≥2 次即阻止，防止模型无意义循环。
@@ -216,6 +248,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	}
 
 	cctx := withCallContext(ctx, call.ID, a.sink, a.asker)
+	cctx = withTokensLeft(cctx, a.tokensLeft)
 	if a.evidence != nil {
 		cctx = evidence.WithLedger(cctx, a.evidence)
 	}
@@ -233,7 +266,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	}
 	var result string
 	var err error
-	start := time.Now()
+	execStart := time.Now()
 	if ct, ok := t.(tool.ContextualTool); ok {
 		tc := tool.ToolContext{
 			SessionID:  a.sessionID,
@@ -248,7 +281,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 	// Redact credential-like values from tool output before it enters model context.
 	// Ported from DeepSeek-Reasonix.
 	result = secrets.RedactToolOutput(result)
-	duration := time.Since(start).Milliseconds()
+	duration := time.Since(execStart).Milliseconds()
 
 	// Context offloading: if enabled and output exceeds threshold, save full
 	// output to disk and replace with compact reference (path + preview).

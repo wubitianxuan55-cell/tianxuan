@@ -248,6 +248,12 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// has none, so ask resolves to "decide for yourself".
 	reg.Add(agent.NewAskTool())
 
+	// The `get_context_remaining` tool reports the estimated tokens left in the
+	// context window (distilled from codex CLI). The runner injects the token
+	// provider through the call context, so long-running sessions can plan to
+	// converge before the window overflows.
+	reg.Add(agent.NewContextRemainingTool())
+
 	// Skill tools: run_skill / install_skill plus the dedicated subagent wrappers
 	// (explore / research / review / security_review). A subagent skill reuses the
 	// sub-agent machinery via this runner — an isolated loop with the skill body
@@ -347,6 +353,13 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// V10.154: cross-session per-tool error stats (distilled from codex CLI's
 	// ToolDispatchTrace) so the host can measure which tool/error dominates.
 	toolStats := tool.NewStats(tool.DefaultStatsPath(cwd))
+	// V10.167: per-dispatch JSONL trace (args / outcome / error / duration)
+	// for offline error-rate and regression analysis.
+	toolTrace, err := tool.NewTraceStore(tool.DefaultTracePath(cwd))
+	if err != nil {
+		fmt.Fprintf(stderr, "warning: tool trace disabled (%v)\n", err)
+		toolTrace = nil
+	}
 	executor := agent.New(execProv, reg, execSess, agent.Options{
 		MaxSteps:              maxSteps,
 		Temperature:           cfg.Agent.Temperature,
@@ -361,6 +374,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		OffloadDir:            offloadDir,
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 		ToolStats:             toolStats,
+		ToolTrace:             toolTrace,
 	}, sink)
 	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
 	// 匹配技能的 playbook（tdd/systematic-debugging 等）。规划轮

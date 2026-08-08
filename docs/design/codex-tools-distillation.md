@@ -1,7 +1,7 @@
 # Codex CLI 工具设计蒸馏报告
 
 > 目标：降低 tianxuan 工具调用出错率。
-> 参照源：OpenAI Codex CLI 开源版（`main` 分支，commit `6d4d944`，2026-08-04 克隆至 `D:\AI\refs\codex`）。
+> 参照源：OpenAI Codex CLI 开源版（`main` 分支，commit `3aae5d8`，2026-08-08 更新，2026-08-04 首次克隆至 `D:\AI\refs\codex`）。
 > 本文只做分析与方案设计；具体代码改动需另行批准后实施。
 
 ## 1. 结论速览
@@ -144,7 +144,7 @@ codex 用 freeform patch 消灭 JSON 编辑错误；tianxuan 的 `edit_file`/`mu
 
 - 仓库：`git@github.com:openai/codex.git`（国内环境经 `ghfast.top` 镜像克隆）
 - 本地路径：`D:\AI\refs\codex`
-- 版本：`main` @ `6d4d944` "Support leaf models in multi-agent v2 (#36892)"
+- 版本：`main` @ `3aae5d8` "Expose execution mode in hook listings (#37538)"（原 `6d4d944`，2026-08-08 更新；179 个新提交多为 code-mode gRPC/MCP 命名空间/approval 重构，无紧急蒸馏增量）
 - 关键文件：
   - `codex-rs/tools/src/tool_spec.rs`（工具形态）
   - `codex-rs/tools/src/json_schema.rs`（schema 校验）

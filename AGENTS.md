@@ -57,6 +57,12 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 - **默认分支**: `main`（本地 `master` 推送至远程 `main`）
 - **SSH 密钥**: `~/.ssh/id_ed25519` (ed25519, esengine@tianxuan.dev)
 - **首次推送**: 2026-06-21 · 46 提交
+- **桌面发布分支**: `release/v10.110.0`（所有 V10.16x 版本发布提交都在这条分支上，
+  直接 push 该分支；与仓库默认分支 `main/master` 长期不同步，属正常）
+- **发布 tag 约定**: `desktop-vX.Y.Z` 指向对应版本的发布提交（`gh release create`
+  默认以默认分支 HEAD 作 target，V10.162~165 曾因此把远端 tag 指向远古提交
+  V10.87，已 force 修正；`publish-desktop.ps1` 已加 `--target $(git rev-parse HEAD)`
+  根治）。发布后必须验证：`git ls-remote --tags origin desktop-vX.Y.Z` 指向当前提交
 
 ## 📐 架构文档
 
@@ -131,6 +137,11 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.165.0** (2026-08-08): AI 自主截图工具 `capture_screen`（GDI 截主屏→附件→
+  vision 技能识图闭环）。本轮视觉能力链路：V10.160 Zen 模型接入 → V10.161 设置面板
+  → V10.162 vision 识图技能 → V10.163 更新安装修复（旧进程未关闭）→ V10.164
+  截图→识图提示闭环 → V10.165 自主截图工具。**这是架构调整前的稳定基线**，回滚点见
+  [docs/2026-08-08-architecture-baseline.md](docs/2026-08-08-architecture-baseline.md)
 - **V10.154.0** (2026-08-04): Codex CLI 工具蒸馏 — 执行前 schema 校验（validation_error 大声失败+别名兼容）+ compact schema 保留参数描述（CanonicalizeSchemaVerbose）+ 工具错误统计（`tianxuan tools stats`）+ 修复 learning 链路 bug（Observe 合并计数）。详见 [codex-tools-distillation.md](docs/design/codex-tools-distillation.md) + CHANGELOG
 - **V10.147.0** (2026-08-02): 技能系统重构 — 探索类技能独立工具化 + 子代理化 + 工具压缩默认开启（可见 55→46，schema -17%）+ edit_lines 吞行修复 + DeepSeek 峰谷计价
 - **V10.95.0** (2026-07-24): 双模型架构 15 项逻辑修复 + 契约简化 + Hephaestus 上下文补齐

@@ -204,12 +204,19 @@ if (-not $SkipUpload) {
     Set-Content -LiteralPath $notesFile -Value $notes -Encoding utf8
 
     Write-Host "==> gh release create $Tag"
+    # Pin the release to the exact commit being published. gh defaults to the
+    # repository's default branch HEAD, which silently creates a wrong tag when
+    # releases ship from a feature/release branch (V10.162..165 tags pointed at
+    # an ancient V10.87 commit until manually force-fixed). The local tag is
+    # already at HEAD; passing --target makes the remote tag match it.
+    $TargetCommit = git rev-parse HEAD
     & $gh.Source release create $Tag `
         (Join-Path $ReleaseDir $InstallerName) `
         (Join-Path $ReleaseDir "$InstallerName.minisig") `
         (Join-Path $ReleaseDir "latest.json") `
         (Join-Path $ReleaseDir "SHA256SUMS") `
         --repo $GitHubRepo `
+        --target $TargetCommit `
         --title "Tianxuan Desktop $Version" `
         --notes-file $notesFile
     if ($LASTEXITCODE -ne 0) { Fail "gh release create failed" }

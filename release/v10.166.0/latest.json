@@ -1,0 +1,14 @@
+{
+    "version":  "v10.166.0",
+    "notes":  "### 变更\n- 删除双模型架构（Hermes 规划者 + Hephaestus 执行者，两个独立 session / 两套 L1 前缀）\n- 新增单模型规划模式 `PlannerHost`：同一模型、同一 session、同一工具列表，\n  复杂任务先只读规划（planmode.Marker + 运行时只读门）→ 确认 → 执行 →\n  自动修正（≤3 轮）；规划/执行阶段工具 schema 全程不变，遵守前缀缓存铁律\n- 规划模式开关 `agent.auto_plan`（默认 off = 直接执行；ask = 复杂任务先规划确认），\n  桌面端 Composer 底部新增\"规划\"按钮热切换\n- 删除 `planner_model` / `planner_temperature` / `planner_effort` /\n  `planner_max_steps` 配置与设置 UI；前端运行状态行改为单阶段\"规划/执行\"",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.166.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.166.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10730267,
+                                            "sha256":  "7a9fc7ff8a661a81a5a994e142d8b053b0025548edf65ffc6e570e14d360598a"
+                                        }
+                  }
+}

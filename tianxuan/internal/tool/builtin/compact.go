@@ -9,6 +9,7 @@ import "encoding/json"
 var compactDesc = map[string]string{
 	"read_file":           "读取文件(可选行范围/分页)",
 	"edit_file":           "精确替换字符串(replace_all可全部替换)",
+	"apply_patch":         "补丁文本批量编辑(多文件,行级匹配)",
 	"write_file":          "写入/覆盖文件(自动建父目录)",
 	"multi_edit":          "原子化批量编辑(单文件N步依次执行)",
 	"edit_lines":          "按行号替换连续行(起止行锚点校验,编辑后自动语法检查)",
@@ -46,6 +47,8 @@ var compactSchema = map[string]json.RawMessage{
 		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"offset":{"type":"integer","minimum":0,"description":"0-based line offset (default 0)"},"limit":{"type":"integer","minimum":1,"description":"Max lines to return (default 2000)"},"line_numbers":{"type":"boolean","description":"Prefix lines with 1-based numbers (default true)"}},"required":["path"]}`),
 	"edit_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace; must be unique unless replace_all"},"new_string":{"type":"string","description":"Replacement text (may be empty to delete)"},"replace_all":{"type":"boolean","description":"Replace every occurrence instead of requiring uniqueness"}},"required":["path","old_string","new_string"]}`),
+	"apply_patch": json.RawMessage(
+		`{"type":"object","properties":{"patch":{"type":"string","description":"Patch text (*** Begin Patch ... *** End Patch)"}},"required":["patch"]}`),
 	"write_file": json.RawMessage(
 		`{"type":"object","properties":{"path":{"type":"string","description":"File path (parent dirs auto-created)"},"content":{"type":"string","description":"Full file content to write"}},"required":["path","content"]}`),
 	"multi_edit": json.RawMessage(

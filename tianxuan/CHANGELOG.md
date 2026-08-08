@@ -1,23 +1,33 @@
 ## [10.171.0] — 2026-08-08
 
-### ✨ tools trace-report：从 JSONL trace 聚合每工具错误率
+### ✨ Codex 蒸馏 P2-7：apply_patch 补丁编辑工具 + tools trace-report
 
-> 蒸馏报告"先能度量，才能优化"闭环：V10.167 ToolDispatchTrace 落盘后，
-> 缺一个把 trace 变成可执行度量的视图。真实会话积累 tool-trace.jsonl 后，
-> 一条命令即可定位下一个优化目标。
+> 蒸馏报告两项收尾：编辑类最高频错误（old_string 精确匹配）由行级补丁
+> 文本根治；"先能度量，才能优化"由 trace 聚合表闭环。
 
-#### 变更
+#### apply_patch 工具（蒸馏 codex freeform 编辑，P2-7）
+- 新增内置工具 `apply_patch`：patch 文本（*** Begin Patch ... *** End Patch），
+  支持 Add File（+ 行）/ Delete File / Update File（@@ 锚点 + 上下文行 +
+  - 删 + 增 + *** End of File 钉尾）
+- **行级模糊匹配**：忽略行首尾空白（对标 codex seek_sequence），告别
+  old_string 大小写/空白/CRLF 精确重现；无 @@ 锚点时删除块必须唯一，
+  多处匹配大声报错附消歧指引
+- **跨文件原子**：全部 hunk 先在内存校验，任一失败则任何文件不被写入；
+  CRLF 保持、原权限保留、路径 confine 收进 ConfineWriters（workspace 安全）
+- 解析错误带 1-based 行号；应用错误附最近行提示
+
+#### tools trace-report：从 JSONL trace 聚合每工具错误率
 - `SummarizeTrace`（internal/tool/trace.go）：流式读 JSONL，按工具聚合
   calls/success/errors/blocked/error_rate/avg_ms/total_ms + top 3 错误文本
   （按频次去重）；坏行跳过不中断；排序 errors 降序 → calls 降序 → 工具名
 - CLI 新增 `tianxuan tools trace-report`：输出每工具错误率表（含 top_error），
-  一眼定位错误率最高 / 错误次数最多的工具
+  真实会话积累 tool-trace.jsonl 后一眼定位下一个优化目标
 
 #### 验证（TDD）
-- trace_report_test.go 5 例：空文件 / 聚合计数与错误率 / top errors 频次排序 /
-  坏行跳过 / 排序 tie-break
-- cli tools_trace_report_test.go 2 例：表格输出（含 100.0% 与 0.0%）+
-  空状态友好提示
+- applypatch_test.go 17 例：解析（add/delete/update/@@/EOF/边界/坏行/宽容
+  空白/无删行报错）+ 应用（增删改/CRLF 保持/原子性/唯一性/@@ 消歧/未找到
+  提示/权限保持[非 Windows]）
+- trace_report_test.go 5 例 + cli tools_trace_report_test.go 2 例全绿
 - go build/vet 干净；internal 测试全绿（仅预存 API 认证类失败与本次无关）
 
 ---

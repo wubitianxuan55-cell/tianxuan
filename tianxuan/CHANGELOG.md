@@ -1,3 +1,15 @@
+## [10.175.0] — 2026-08-08
+
+### ✨ 过程卡工作流 + 输出简洁
+
+- 每轮结束后整轮（提问+思考+工具+正文）折叠成一张大过程卡（warm-turn），
+  只留最新轮最终正文在外面；生成中保持"文本↔过程卡"交替展示
+- SoloSystemPrompt 加强简洁约束：报告 3-10 行，只写 changed/verified/
+  remains，禁前言/过程复述/要点论文/客套收尾
+- 验证：tsc 0 错误；vitest 142 全绿；go build/vet 干净
+
+---
+
 ## [10.172.0] — 2026-08-08
 
 ### ✨ Codex 蒸馏续篇：windows_shell_guidance + search_tool

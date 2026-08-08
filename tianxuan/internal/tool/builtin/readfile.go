@@ -30,15 +30,18 @@ func init() { tool.RegisterBuiltin(readFile{}) }
 type readFile struct{ workDir string }
 
 const (
-	readFileDefaultLimit  = 2000      // lines returned when limit is unset
-	readFileBinaryPeek    = 8 * 1024  // bytes scanned for a NUL to flag binary
-	readFileDetectSample  = 256 << 10 // bytes sampled for encoding detection
+	readFileDefaultLimit = 2000      // lines returned when limit is unset
+	readFileBinaryPeek   = 8 * 1024  // bytes scanned for a NUL to flag binary
+	readFileDetectSample = 256 << 10 // bytes sampled for encoding detection
+	// readFileSymbolLimit is the default read length after symbol jump — wide
+	// enough to cover most function/method bodies without re-reading 2000 lines.
+	readFileSymbolLimit = 200
 )
 
 func (readFile) Name() string { return "read_file" }
 
 func (readFile) Description() string {
-	return "Read a text file with optional line offset/limit. By default each line is prefixed with its 1-based number (e.g. `   42→...`). Set line_numbers=false to get raw text — useful when copying content for edit_file. Use `offset` and `limit` to page through large files."
+	return "Read a text file with optional line offset/limit, or jump straight to a named symbol: pass `symbol` to start reading at the definition line of a function/type (Go AST + multi-language regex, same as code_index). By default each line is prefixed with its 1-based number (e.g. `   42→...`). Set line_numbers=false to get raw text — useful when copying content for edit_file. Use `offset` and `limit` to page through large files."
 }
 
 func (readFile) Schema() json.RawMessage {
@@ -48,17 +51,18 @@ func (readFile) Schema() json.RawMessage {
   "path":{"type":"string","description":"File path"},
   "offset":{"type":"integer","description":"0-based line offset to start reading from (default 0)","minimum":0},
   "limit":{"type":"integer","description":"Maximum lines to return (default 2000)","minimum":1},
+  "symbol":{"type":"string","description":"Jump to the definition line of this symbol (function/method/type name) and start reading there. Default limit becomes 200 lines when set. Use for large files where paging blindly is expensive."},
   "line_numbers":{"type":"boolean","description":"Prefix each line with its 1-based line number (default true). Set false for raw text."}
 },
 "required":["path"]
 }`)
 }
 
-func (readFile) ReadOnly() bool { return true }
+func (readFile) ReadOnly() bool      { return true }
 func (readFile) Kind() tool.ToolKind { return tool.KindRead }
 
-func (readFile) CompactDescription() string { return compactDesc["read_file"] }
-func (readFile) CompactSchema() json.RawMessage   { return compactSchema["read_file"] }
+func (readFile) CompactDescription() string     { return compactDesc["read_file"] }
+func (readFile) CompactSchema() json.RawMessage { return compactSchema["read_file"] }
 
 func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -66,6 +70,7 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		File        string `json:"file"` // legacy alias: the model often emits "file"
 		Offset      int    `json:"offset,omitempty"`
 		Limit       int    `json:"limit,omitempty"`
+		Symbol      string `json:"symbol,omitempty"`
 		LineNumbers *bool  `json:"line_numbers,omitempty"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
@@ -80,6 +85,19 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	p.Path = resolveIn(r.workDir, p.Path)
 	if p.Offset < 0 {
 		p.Offset = 0
+	}
+	// V10.159: symbol 跳读 — 定位定义行并从此处读取，省去大文件盲读/分页。
+	symbolNote := ""
+	if p.Symbol != "" {
+		line, err := locateSymbolLine(p.Path, p.Symbol)
+		if err != nil {
+			return "", err
+		}
+		p.Offset = line - 1
+		if p.Limit <= 0 {
+			p.Limit = readFileSymbolLimit
+		}
+		symbolNote = fmt.Sprintf("[symbol %q at line %d]\n", p.Symbol, line)
 	}
 	if p.Limit <= 0 {
 		p.Limit = readFileDefaultLimit
@@ -246,9 +264,34 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		b.WriteString(strconv.Itoa(lineNo))
 		b.WriteString("+行)。下次优先: (1) lsp_definition/grep 定位目标 → (2) read_file(offset,limit) 精确片段读取。避免盲目全文件读取消耗 token。]\n")
 	}
-	return b.String(), nil
+	return symbolNote + b.String(), nil
 }
 
+// locateSymbolLine finds the 1-based definition line of a symbol in path,
+// reusing code_index's parser (Go AST + multi-language regex). Fails loudly
+// with nearby symbol names when nothing matches, instead of silently reading
+// from the top of the file.
+func locateSymbolLine(path, symbol string) (int, error) {
+	syms := (codeIndex{}).parseFile(path)
+	if len(syms) == 0 {
+		return 0, fmt.Errorf("symbol %q not found in %s (no symbols indexed for this file type)", symbol, path)
+	}
+	for _, s := range syms {
+		if s.Name == symbol {
+			return s.Line, nil
+		}
+	}
+	for _, s := range syms {
+		if strings.Contains(strings.ToLower(s.Name), strings.ToLower(symbol)) {
+			return s.Line, nil
+		}
+	}
+	names := make([]string, 0, 5)
+	for _, s := range syms[:min(len(syms), 5)] {
+		names = append(names, s.Name)
+	}
+	return 0, fmt.Errorf("symbol %q not found in %s; nearby symbols: %s", symbol, path, strings.Join(names, ", "))
+}
 
 // V5.9: markitdown 集成 —— 将二进制文档自动转为 Markdown
 

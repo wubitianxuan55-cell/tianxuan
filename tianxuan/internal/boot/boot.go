@@ -604,7 +604,83 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		CtxMgr:        ctxMgr,
 		WorkspaceRoot: cwd,
 	}
-	return control.New(ctrlOpts), nil
+	ctrl := control.New(ctrlOpts)
+	// V10.156: inherit_context (Qwen /fork semantics) — the task tool forks
+	// the parent conversation snapshot so a background/parallel sub-agent can
+	// start with the session's context instead of a blank slate.
+	taskTool.SetForkContext(func() string { return forkContextOf(ctrl) })
+	return ctrl, nil
+}
+
+// forkContextOf renders a compact snapshot of the parent conversation for the
+// task tool's inherit_context option: the last user input and the turns that
+// follow, truncated to a fixed budget. Read-only — it never mutates the parent
+// session, so the prefix cache is untouched.
+func forkContextOf(c *control.Controller) string {
+	ex := c.Executor()
+	if ex == nil {
+		return ""
+	}
+	s := ex.Session()
+	if s == nil {
+		return ""
+	}
+	return forkContextText(s.Snapshot())
+}
+
+// forkContextText renders a compact snapshot of a conversation for
+// inherit_context: the last user input and the turns that follow, truncated to
+// a fixed budget. Pure so the extraction is unit-tested without a controller.
+func forkContextText(msgs []provider.Message) string {
+	start := -1
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == provider.RoleUser {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+	const budget = 4000
+	// Reserve a floor for the turns after the user input so a very long user
+	// message cannot starve the follow-up context (assistant/tool turns).
+	const followBudget = 800
+	var follows []string
+	followUsed := 0
+	for i := start + 1; i < len(msgs) && followUsed < followBudget; i++ {
+		text := strings.TrimSpace(msgs[i].Content)
+		if text == "" {
+			continue
+		}
+		if len(text) > followBudget-followUsed {
+			text = text[:followBudget-followUsed]
+		}
+		follows = append(follows, renderForkRole(msgs[i].Role)+": "+text)
+		followUsed += len(text) + 3
+	}
+	userText := strings.TrimSpace(msgs[start].Content)
+	if len(userText) > budget-followUsed {
+		userText = userText[:budget-followUsed]
+	}
+	var b strings.Builder
+	b.WriteString("user: " + userText + "\n")
+	for _, f := range follows {
+		b.WriteString(f + "\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// renderForkRole maps a message role to its label in the fork snapshot.
+func renderForkRole(r provider.Role) string {
+	switch r {
+	case provider.RoleAssistant:
+		return "assistant"
+	case provider.RoleTool:
+		return "tool"
+	default:
+		return "user"
+	}
 }
 
 func subagentModelRef(cfg *config.Config, sk skill.Skill) string {

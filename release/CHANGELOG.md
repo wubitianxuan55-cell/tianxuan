@@ -1,3 +1,55 @@
+## V10.160.0 (2026-08-08) — OpenCode Zen 模型接入
+
+### 变更
+- 新增 `opencode` provider kind：按模型自动路由 Zen 三协议（chat/completions / messages / responses），免费模型匿名可用
+- Responses 流式客户端：工具调用、reasoning、usage 解析；config 放行无 key opencode
+- 真实 API 三协议端到端验证通过（deepseek free / gpt-5.4-nano / claude-haiku-4-5）
+
+---
+
+## V10.159.0 (2026-08-05) — 重度使用痛点修复（第三批）：read_file 按符号跳读
+
+### 变更
+- read_file 新增 `symbol` 参数：定位函数/方法/类型定义行并从此处读取；未找到时大声失败并附附近符号名
+
+---
+
+## V10.158.0 (2026-08-05) — 重度使用痛点修复（第二批）
+
+### 变更
+- todo_write 支持 blocked 状态（外部依赖空转降噪）；edit_lines 多行锚点（start/end_anchor 可含换行）
+
+---
+
+## V10.157.0 (2026-08-05) — 重度使用痛点修复（需求驱动，非蒸馏）
+
+### 变更
+- validation 错误附正确示例；bash chat 参数误用检测；stale 编辑守卫改软警告；offload 预览 200 → 800 字符
+
+---
+
+## V10.156.0 (2026-08-05) — 背景会话 fork（Qwen Code `/fork` 语义）
+
+### 变更
+- `task` 工具新增 `inherit_context` 参数：forkCtx 快照注入子代理首条；boot 注入 forkContextText
+
+---
+
+## V10.155.0 (2026-08-05) — Windows 安装包 + 自动更新链路打通
+
+### 变更
+- Windows NSIS 安装包：`wails build -nsis` 产出 per-user 免管理员安装器，完成页自动运行应用（自定义 `desktop/build/windows/installer/project.nsi`）
+- 自动更新发布目标修复：updater / cmd/sign / release-desktop.yml 从 Reasonix 残留（R2 bucket、`esengine/tianxuan`）切换到真实仓库 `wubitianxuan55-cell/tianxuan`；R2 镜像改为仓库变量配置，未配置时自动跳过
+- minisign 签名密钥轮换为新密钥对（key ID `154E38FBADA79807`，私钥加密存本机 `~/.tianxuan-release/`，不入 git）
+- 新增 `scripts/publish-desktop.ps1` 一键发布：构建 → 签名 → `latest.json`（含更新说明）→ GitHub Release
+
+### 发布产物
+- `release/v10.155.0/tianxuan-windows-amd64-installer.exe` · 10,731,509 bytes (~10.2 MB) · per-user NSIS 安装器
+- SHA256: `afb864475273053721d9bd48370f1f17b93d648ad6a244655081a76fccd55d19`
+- 验证：desktop `go test ./...` + `go vet` 全绿 · minisign 签名验证通过 · manifest sha256 一致
+
+---
+
 ## V10.154.0 (2026-08-04) — Codex CLI 工具蒸馏：降低工具出错率
 
 ### 变更

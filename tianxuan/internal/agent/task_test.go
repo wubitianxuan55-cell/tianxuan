@@ -108,6 +108,62 @@ func TestTaskToolReturnsSubAgentFinalAnswer(t *testing.T) {
 	}
 }
 
+// TestTaskForkInheritsContext verifies inherit_context (Qwen /fork semantics)
+// injects the parent conversation snapshot as the sub-agent's first user
+// message, so the sub-agent starts with context instead of a blank slate while
+// the task prompt stays the final user message.
+func TestTaskForkInheritsContext(t *testing.T) {
+	sub := &mockProvider{name: "sub", chunks: []provider.Chunk{
+		{Type: provider.ChunkText, Text: "forked work done"},
+		{Type: provider.ChunkDone},
+	}}
+	parentReg := tool.NewRegistry()
+	parentReg.Add(fakeTool{name: "bash", readOnly: false})
+	task := NewTaskTool(sub, nil, parentReg, 10, 0, 0.0, "", "sys", nil)
+	task.SetForkContext(func() string { return "parent context: fixing the auth flow" })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := task.Execute(ctx, []byte(`{"prompt":"continue the work","inherit_context":true}`))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "forked work done") {
+		t.Fatalf("unexpected output: %q", out)
+	}
+	found := false
+	for _, m := range sub.lastReq.Messages {
+		if strings.Contains(m.Content, forkContextHeader) && strings.Contains(m.Content, "fixing the auth flow") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("inherit_context did not inject the parent snapshot into the sub-agent request; last user message: %q", lastUser(sub.lastReq))
+	}
+	if got := lastUser(sub.lastReq); got != "continue the work" {
+		t.Fatalf("task prompt should be the last user message, got %q", got)
+	}
+}
+
+// TestTaskForkWithoutProviderFails verifies inherit_context without a wired
+// parent context provider fails loudly instead of silently ignoring the fork.
+func TestTaskForkWithoutProviderFails(t *testing.T) {
+	sub := &mockProvider{name: "sub", chunks: []provider.Chunk{
+		{Type: provider.ChunkText, Text: "x"},
+		{Type: provider.ChunkDone},
+	}}
+	parentReg := tool.NewRegistry()
+	parentReg.Add(fakeTool{name: "bash", readOnly: false})
+	task := NewTaskTool(sub, nil, parentReg, 10, 0, 0.0, "", "sys", nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err := task.Execute(ctx, []byte(`{"prompt":"continue","inherit_context":true}`))
+	if err == nil || !strings.Contains(err.Error(), "inherit_context") {
+		t.Fatalf("expected inherit_context wiring error, got %v", err)
+	}
+}
+
 // TestTaskToolFiltersTools verifies the whitelist behaviour: when the caller
 // names a subset of tools, the sub-agent's registry contains exactly that set
 // with subagent/skill meta-tools stripped to prevent recursive delegation.

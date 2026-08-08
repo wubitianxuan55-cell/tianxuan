@@ -84,6 +84,11 @@ func IsSubagentMetaTool(name string) bool {
 // tool (and therefore the whole turn) forever. Explicit values still win.
 const DefaultSubagentMaxSteps = 30
 
+// forkContextHeader marks the parent conversation snapshot injected by
+// inherit_context (Qwen /fork semantics) so the sub-agent can tell inherited
+// context apart from its own task prompt.
+const forkContextHeader = "<forked from parent conversation>\n"
+
 // TaskCompiler is the subset of cache.Compiler that TaskTool needs for
 // fork-based cache sharing. Defined here so the agent package doesn't
 // import the cache package. The Fork return is interface-typed because
@@ -102,25 +107,26 @@ type TaskCompiler interface {
 // parallel research across independent areas (the parallel-dispatch path picks
 // these up only when readOnly, which task is not).
 type TaskTool struct {
-	prov          provider.Provider
-	pricing       *provider.Pricing
-	parentReg     *tool.Registry
-	maxSteps      int
-	contextWindow int
-	temperature   float64
-	archiveDir    string
-	sysPrompt     string
-	gate          Gate
-	compiler      TaskCompiler // optional, for cache sharing via Fork
-	runtimePrompt string       // V5.25: L2 runtime context for sub-agents
-	templatePrefix string       // V5.30: 子代理模板前缀，同类子代理共享缓存
-	accumulatedUsage *provider.Usage // V5.30: 子代理累计 token 用量
-	activeSchemas []provider.ToolSchema // V5.30: 父代理过滤工具集，子代理继承以共享缓存
-	subagentProv provider.Provider // V10.22: optional subagent model provider (nil → use prov)
-	subagentPricing *provider.Pricing
-	subagentCtxWin  int
+	prov             provider.Provider
+	pricing          *provider.Pricing
+	parentReg        *tool.Registry
+	maxSteps         int
+	contextWindow    int
+	temperature      float64
+	archiveDir       string
+	sysPrompt        string
+	gate             Gate
+	compiler         TaskCompiler          // optional, for cache sharing via Fork
+	runtimePrompt    string                // V5.25: L2 runtime context for sub-agents
+	templatePrefix   string                // V5.30: 子代理模板前缀，同类子代理共享缓存
+	accumulatedUsage *provider.Usage       // V5.30: 子代理累计 token 用量
+	activeSchemas    []provider.ToolSchema // V5.30: 父代理过滤工具集，子代理继承以共享缓存
+	subagentProv     provider.Provider     // V10.22: optional subagent model provider (nil → use prov)
+	subagentPricing  *provider.Pricing
+	subagentCtxWin   int
 
 	transcripts *SubagentStore // V10.29: subagent transcript persistence (continue_from)
+	forkCtx     func() string  // V10.156: parent conversation snapshot for inherit_context
 }
 
 // NewTaskTool wires a task tool to the parent agent's environment so its
@@ -164,7 +170,8 @@ func (t *TaskTool) Schema() json.RawMessage {
   "run_in_background":{"type":"boolean","description":"Run the sub-agent asynchronously: returns a job id immediately and keeps working across turns. Collect its final answer with wait, and you'll be notified when it finishes. Use for long, independent sub-tasks you don't need to block on right now."},
   "output_schema":{"type":"object","description":"Optional JSON Schema the sub-agent MUST return its result in. If set, the parent will attempt to parse the final answer as JSON. If the result is valid JSON matching the expected shape, it is returned verbatim; otherwise a diagnostic note is prefixed. Use when the parent needs structured data from the sub-agent."},
   "retry_until":{"type":"object","properties":{"check":{"type":"string","description":"Shell command to verify success, e.g. 'go test ./...'. Non-zero exit = retry."},"max_retries":{"type":"integer","description":"Maximum retry attempts (default 3, max 10).","minimum":1,"maximum":10}},"required":["check"]},
-  "continue_from":{"type":"string","description":"Continue a prior compatible subagent transcript in the current conversation context. Pass only the 'sa_...' value from the prior result's 'Subagent reference: ...' line."}
+  "continue_from":{"type":"string","description":"Continue a prior compatible subagent transcript in the current conversation context. Pass only the 'sa_...' value from the prior result's 'Subagent reference: ...' line."},
+  "inherit_context":{"type":"boolean","description":"Fork the parent conversation: the sub-agent starts with a snapshot of the current session context (last user input and recent turns) instead of a blank slate. Use when the sub-task depends on what has already been discussed."}
 },
 "required":["prompt"]
 }`)
@@ -177,22 +184,23 @@ func (t *TaskTool) ReadOnly() bool { return false }
 
 // CompactDescriptor — V10.11: compact task description for prompt efficiency.
 func (t *TaskTool) CompactDescription() string {
-	return "派发隔离子代理执行子任务(可设置output_schema获取结构化JSON)"
+	return "派发隔离子代理执行子任务(output_schema结构化JSON; inherit_context继承父会话上下文)"
 }
 func (t *TaskTool) CompactSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"description":{"type":"string"},"tools":{"type":"array","items":{"type":"string"}},"max_steps":{"type":"integer"},"run_in_background":{"type":"boolean"},"output_schema":{"type":"object"},"retry_until":{"type":"object","properties":{"check":{"type":"string"},"max_retries":{"type":"integer"}},"required":["check"]},"continue_from":{"type":"string"}},"required":["prompt"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"description":{"type":"string"},"tools":{"type":"array","items":{"type":"string"}},"max_steps":{"type":"integer"},"run_in_background":{"type":"boolean"},"output_schema":{"type":"object"},"retry_until":{"type":"object","properties":{"check":{"type":"string"},"max_retries":{"type":"integer"}},"required":["check"]},"continue_from":{"type":"string"},"inherit_context":{"type":"boolean"}},"required":["prompt"]}`)
 }
 
 func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		Prompt          string          `json:"prompt"`
-		Description     string          `json:"description"`
-		Tools           []string        `json:"tools"`
-		MaxSteps        int             `json:"max_steps"`
-		RunInBackground bool            `json:"run_in_background"`
-		OutputSchema    json.RawMessage `json:"output_schema,omitempty"`
+		Prompt          string            `json:"prompt"`
+		Description     string            `json:"description"`
+		Tools           []string          `json:"tools"`
+		MaxSteps        int               `json:"max_steps"`
+		RunInBackground bool              `json:"run_in_background"`
+		OutputSchema    json.RawMessage   `json:"output_schema,omitempty"`
 		RetryUntil      *RetryUntilConfig `json:"retry_until,omitempty"`
-		ContinueFrom    string          `json:"continue_from,omitempty"`
+		ContinueFrom    string            `json:"continue_from,omitempty"`
+		InheritContext  bool              `json:"inherit_context"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -219,6 +227,25 @@ func (t *TaskTool) Execute(ctx context.Context, args json.RawMessage) (string, e
 	}
 	if run != nil {
 		defer run.Release()
+	}
+
+	// inherit_context (Qwen /fork semantics): start the sub-agent with a
+	// snapshot of the parent conversation instead of a blank slate. The
+	// snapshot is injected as the sub-agent's first user message; the task
+	// prompt stays the final user message. Fails loudly when no parent context
+	// provider is wired so a fork is never silently degraded to a cold start.
+	if p.InheritContext {
+		if t.forkCtx == nil {
+			return "", fmt.Errorf("inherit_context requires a parent context provider, which is not wired in this environment")
+		}
+		ctxText := strings.TrimSpace(t.forkCtx())
+		if ctxText == "" {
+			return "", fmt.Errorf("inherit_context: no parent conversation context available")
+		}
+		if run == nil {
+			run = EphemeralSubagentRun(t.sysPrompt)
+		}
+		run.Session.Add(provider.Message{Role: provider.RoleUser, Content: forkContextHeader + ctxText})
 	}
 
 	// retry_until: foreground only (background retry doesn't make sense across turns).
@@ -280,11 +307,11 @@ func FilterRegistry(parent *tool.Registry, names []string, exclude ...string) *t
 	return sub
 }
 
-func (t *TaskTool) SetCompiler(c TaskCompiler) { t.compiler = c }
-func (t *TaskTool) SetRuntimePrompt(p string)   { t.runtimePrompt = p }
-func (t *TaskTool) SetTemplatePrefix(prefix string) { t.templatePrefix = prefix }
+func (t *TaskTool) SetCompiler(c TaskCompiler)                     { t.compiler = c }
+func (t *TaskTool) SetRuntimePrompt(p string)                      { t.runtimePrompt = p }
+func (t *TaskTool) SetTemplatePrefix(prefix string)                { t.templatePrefix = prefix }
 func (t *TaskTool) SetActiveSchemas(schemas []provider.ToolSchema) { t.activeSchemas = schemas }
-func (t *TaskTool) SubUsage() *provider.Usage { return t.accumulatedUsage }
+func (t *TaskTool) SubUsage() *provider.Usage                      { return t.accumulatedUsage }
 
 // SetSubagentProvider installs an optional provider for sub-agents. When nil the
 // sub-agent falls back to the parent's execution provider (prov).
@@ -298,6 +325,14 @@ func (t *TaskTool) SetSubagentProvider(p provider.Provider, pricing *provider.Pr
 // When nil, sub-agents are ephemeral and cannot be continued across turns.
 func (t *TaskTool) WithTranscripts(store *SubagentStore) *TaskTool {
 	t.transcripts = store
+	return t
+}
+
+// SetForkContext wires the parent conversation snapshot provider used by the
+// inherit_context option (Qwen /fork semantics). When nil, inherit_context
+// fails loudly instead of silently running without inherited context.
+func (t *TaskTool) SetForkContext(f func() string) *TaskTool {
+	t.forkCtx = f
 	return t
 }
 
@@ -334,9 +369,9 @@ func (t *TaskTool) runSubSession(ctx context.Context, prompt string, subReg *too
 		Gate:           t.gate,
 		ContextWindow:  subCtxWin,
 		Compaction:     CompactionConfig{ArchiveDir: t.archiveDir},
-		ActiveSchemas:  t.parentReg.Schemas(),   // V10.36: align tools JSON with parent for cache
-		TemplatePrefix: t.templatePrefix,         // V10.57: 同类 task 子代理共享模板前缀
-		RuntimePrompt:  t.runtimePrompt,          // V10.57: 注入 L2 项目/工作区上下文
+		ActiveSchemas:  t.parentReg.Schemas(), // V10.36: align tools JSON with parent for cache
+		TemplatePrefix: t.templatePrefix,      // V10.57: 同类 task 子代理共享模板前缀
+		RuntimePrompt:  t.runtimePrompt,       // V10.57: 注入 L2 项目/工作区上下文
 	}
 
 	var subUsage provider.Usage
@@ -458,8 +493,8 @@ func (t *TaskTool) finalizeRun(result string, err error, run *SubagentRun) (stri
 	}
 	if err != nil {
 		if saveErr := t.transcripts.SaveFailed(run); saveErr != nil {
-		slog.Warn("subagent: save failed transcript", "ref", run.Ref, "err", saveErr)
-	}
+			slog.Warn("subagent: save failed transcript", "ref", run.Ref, "err", saveErr)
+		}
 		return result, err
 	}
 	if saveErr := t.transcripts.SaveCompleted(run); saveErr != nil {

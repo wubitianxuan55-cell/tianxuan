@@ -61,6 +61,31 @@ func TestMaybeOffload_AboveThreshold(t *testing.T) {
 	}
 }
 
+// TestPreviewTruncatesAtPreviewChars verifies the model-visible preview is
+// capped at PreviewChars even for much larger outputs.
+func TestPreviewTruncatesAtPreviewChars(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir, "preview-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := strings.Repeat("y", PreviewChars+500)
+	result := s.MaybeOffload("bash", raw, 100)
+	idx := strings.Index(result, "Preview: ")
+	if idx < 0 {
+		t.Fatalf("result should contain a preview, got: %s", result)
+	}
+	preview := result[idx+len("Preview: "):]
+	// The preview ends at the "..." separator before the search hint.
+	end := strings.Index(preview, "...\n")
+	if end < 0 {
+		t.Fatalf("preview should be followed by a separator, got: %q", preview[:min(len(preview), 40)])
+	}
+	if end > PreviewChars {
+		t.Fatalf("preview longer than PreviewChars: %d > %d", end, PreviewChars)
+	}
+}
+
 func TestList(t *testing.T) {
 	dir := t.TempDir()
 	s, err := NewStore(dir, "list-test")

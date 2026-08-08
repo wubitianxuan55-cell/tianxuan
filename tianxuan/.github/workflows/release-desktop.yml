@@ -145,7 +145,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.ver.outputs.tag }}" dist/* \
-            --title "Reasonix Desktop ${{ steps.ver.outputs.tag }}" \
+            --title "Tianxuan Desktop ${{ steps.ver.outputs.tag }}" \
             --generate-notes
 
   mirror:
@@ -153,9 +153,9 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     # Skip cleanly when R2 isn't configured; GitHub release still works as fallback.
-    if: ${{ github.repository_owner == 'esengine' }}
+    if: ${{ github.repository_owner == 'wubitianxuan55-cell' }}
     env:
-      HAS_R2: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' }}
+      HAS_R2: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' && vars.R2_PUBLIC_BASE != '' }}
     steps:
       - name: Resolve tag
         id: ver
@@ -176,7 +176,7 @@ jobs:
       - name: Rewrite latest.json URLs to R2
         if: env.HAS_R2 == 'true'
         env:
-          R2_PUBLIC_BASE: https://pub-147fb53b9c1e4bbf891a257968619ea7.r2.dev
+          R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE }}
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
           f=assets/latest.json

@@ -6,6 +6,34 @@ import (
 	"testing"
 )
 
+// TestIncompleteTodosExcludesBlocked verifies a blocked todo does not count as
+// incomplete, so the task gate stops nagging "please continue" while the model
+// waits on an external dependency.
+func TestIncompleteTodosExcludesBlocked(t *testing.T) {
+	todos := []TodoItem{
+		{Content: "wait for user test", Status: "blocked"},
+		{Content: "done", Status: "completed"},
+		{Content: "next", Status: "pending"},
+	}
+	incomplete := IncompleteTodos(todos)
+	if len(incomplete) != 1 || incomplete[0].Content != "next" {
+		t.Fatalf("blocked and completed should be excluded, got %+v", incomplete)
+	}
+}
+
+// TestValidateSerialTodosAcceptsBlocked verifies the serial todo state machine
+// accepts a blocked status alongside pending/in_progress/completed.
+func TestValidateSerialTodosAcceptsBlocked(t *testing.T) {
+	todos := []TodoItem{
+		{Content: "phase", Status: "in_progress", Level: 0},
+		{Content: "wait for user", Status: "blocked", Level: 1},
+		{Content: "next", Status: "pending", Level: 1},
+	}
+	if err := ValidateSerialTodos(todos); err != nil {
+		t.Fatalf("blocked status should validate, got %v", err)
+	}
+}
+
 func TestLedgerRecordsSuccessAndFailureReceipts(t *testing.T) {
 	ledger := NewLedger()
 	ledger.Record(Receipt{

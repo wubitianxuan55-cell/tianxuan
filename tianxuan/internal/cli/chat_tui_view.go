@@ -44,7 +44,12 @@ func (m chatTUI) View() tea.View {
 			status += fmt.Sprintf(" · ¥%.4f", m.turnCostUSD*7.25)
 		}
 	default:
-		status = "  " + modeTag + " · " + i18n.M.ChatStatusIdle
+		if m.sel.active && !m.sel.empty() {
+			start, end := m.sel.ordered()
+			status = "  " + modeTag + " · " + fmt.Sprintf(i18n.M.ChatSelectionHintFmt, end.line-start.line+1)
+		} else {
+			status = "  " + modeTag + " · " + i18n.M.ChatStatusIdle
+		}
 	}
 	// Second status row: the live data (context gauge, cache rates, jobs,
 	// balance). It lives on its own fixed row so it's always shown in full rather

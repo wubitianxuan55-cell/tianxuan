@@ -1,0 +1,14 @@
+﻿{
+    "version":  "v10.155.0",
+    "notes":  "### 变更\n- Windows NSIS 安装包：`wails build -nsis` 产出 per-user 免管理员安装器，完成页自动运行应用（自定义 `desktop/build/windows/installer/project.nsi`）\n- 自动更新发布目标修复：updater / cmd/sign / release-desktop.yml 从 Reasonix 残留（R2 bucket、`esengine/tianxuan`）切换到真实仓库 `wubitianxuan55-cell/tianxuan`；R2 镜像改为仓库变量配置，未配置时自动跳过\n- minisign 签名密钥轮换为新密钥对（key ID `154E38FBADA79807`，私钥加密存本机 `~/.tianxuan-release/`，不入 git）\n- 新增 `scripts/publish-desktop.ps1` 一键发布：构建 → 签名 → `latest.json`（含更新说明）→ GitHub Release\n\n### 发布产物\n- `release/v10.155.0/tianxuan-windows-amd64-installer.exe` · 10,731,509 bytes (~10.2 MB) · per-user NSIS 安装器\n- SHA256: `36fd92d1bd27cdada42a6c1c29d43ad44efc0a0cebf154334795c046833fff9e`\n- 验证：desktop `go test ./...` + `go vet` 全绿 · minisign 签名验证通过 · manifest sha256 一致",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.155.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.155.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10731532,
+                                            "sha256":  "afb864475273053721d9bd48370f1f17b93d648ad6a244655081a76fccd55d19"
+                                        }
+                  }
+}

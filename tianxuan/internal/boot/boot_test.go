@@ -16,6 +16,55 @@ import (
 	_ "tianxuan/internal/tool/builtin"
 )
 
+// TestForkContextText verifies forkContextText extracts the last user input and
+// the turns that follow (Qwen /fork semantics), ignoring anything before it.
+func TestForkContextText(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: "old unrelated request"},
+		{Role: provider.RoleAssistant, Content: "old answer"},
+		{Role: provider.RoleUser, Content: "fix the auth flow"},
+		{Role: provider.RoleTool, Content: "auth.go: 12 lines"},
+		{Role: provider.RoleAssistant, Content: "found the bug"},
+	}
+	got := forkContextText(msgs)
+	if strings.Contains(got, "old unrelated request") || strings.Contains(got, "old answer") {
+		t.Fatalf("fork context must start at the last user input, got:\n%s", got)
+	}
+	if !strings.Contains(got, "fix the auth flow") || !strings.Contains(got, "found the bug") {
+		t.Fatalf("fork context must include the last user input and following turns, got:\n%s", got)
+	}
+}
+
+// TestForkContextTextEmpty verifies an empty / system-only conversation yields
+// no fork context instead of garbage.
+func TestForkContextTextEmpty(t *testing.T) {
+	if got := forkContextText(nil); got != "" {
+		t.Fatalf("nil conversation should yield empty context, got %q", got)
+	}
+	if got := forkContextText([]provider.Message{
+		{Role: provider.RoleSystem, Content: "sys"},
+	}); got != "" {
+		t.Fatalf("system-only conversation should yield empty context, got %q", got)
+	}
+}
+
+// TestForkContextTextTruncates verifies the extraction honors the budget and
+// never returns content larger than it plus a small slack.
+func TestForkContextTextTruncates(t *testing.T) {
+	long := strings.Repeat("x", 10_000)
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: long},
+		{Role: provider.RoleAssistant, Content: long},
+	}
+	got := forkContextText(msgs)
+	if len(got) > 5000 {
+		t.Fatalf("fork context not truncated: %d bytes", len(got))
+	}
+	if !strings.Contains(got, "user: ") || !strings.Contains(got, "assistant: ") {
+		t.Fatalf("roles missing from fork context: %q", got[:40])
+	}
+}
+
 // TestBuildFoldsProjectMemoryIntoSystemPrompt is the end-to-end proof of the
 // cache-first wiring: a project TIANXUAN.md is discovered at boot and folded
 // into the session's system message (the cached prefix), and the `remember`

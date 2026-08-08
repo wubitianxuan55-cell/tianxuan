@@ -28,12 +28,14 @@ import (
 // has no Wails dependency so the logic is unit-tested directly; updater_app.go is
 // the thin Wails binding that wires these into App methods and progress events.
 
-// Manifest endpoints — R2 CDN first (fast, especially in CN), GitHub releases as
-// fallback. Mirrors the v1 desktop's two-endpoint scheme.
+// Manifest endpoints — GitHub releases first (the project's own release channel);
+// an R2 CDN mirror can be added as primary once a tianxuan R2 bucket exists (see
+// the mirror job in .github/workflows/release-desktop.yml), with this GitHub URL
+// kept as fallback. fetchManifest retries both entries in order.
 const (
-	manifestPrimary     = "https://pub-147fb53b9c1e4bbf891a257968619ea7.r2.dev/latest/latest.json"
-	manifestFallback    = "https://github.com/esengine/tianxuan/releases/latest/download/latest.json"
-	defaultDownloadPage = "https://github.com/esengine/tianxuan/releases/latest"
+	manifestPrimary     = "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest/download/latest.json"
+	manifestFallback    = "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest/download/latest.json"
+	defaultDownloadPage = "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest"
 	httpTimeout         = 15 * time.Second
 )
 

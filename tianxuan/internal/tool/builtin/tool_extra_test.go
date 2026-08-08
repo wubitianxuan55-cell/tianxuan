@@ -30,6 +30,54 @@ func TestReadFileMissingPath(t *testing.T) {
 	}
 }
 
+// TestReadFileSymbolLocatesFunction 大文件按符号跳读：symbol 参数定位函数定义行
+// 并从此处开始读取（复用 code_index 的符号解析），输出标注符号所在行。
+func TestReadFileSymbolLocatesFunction(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "sample.go")
+	content := "package sample\n\n" +
+		"func Helper() int { return 1 }\n\n" +
+		"func Target() string {\n\treturn \"x\"\n}\n\n" +
+		"func Other() {}\n"
+	if err := os.WriteFile(f, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := readFile{}.Execute(context.Background(), argsJSON(t, map[string]any{
+		"path":   f,
+		"symbol": "Target",
+		"limit":  5,
+	}))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, `symbol "Target" at line 5`) {
+		t.Fatalf("should annotate the symbol line, got: %q", out)
+	}
+	if !strings.Contains(out, "func Target() string") {
+		t.Fatalf("should start at the symbol definition, got: %q", out)
+	}
+	if strings.Contains(out, "func Helper") {
+		t.Fatalf("should not include lines before the symbol, got: %q", out)
+	}
+}
+
+// TestReadFileSymbolNotFound 未找到符号时大声失败并提示，而不是静默从文件头读取。
+func TestReadFileSymbolNotFound(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "sample.go")
+	if err := os.WriteFile(f, []byte("package sample\n\nfunc Helper() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := readFile{}.Execute(context.Background(), argsJSON(t, map[string]any{
+		"path":   f,
+		"symbol": "Nope",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("missing symbol should fail loudly, got %v", err)
+	}
+}
+
 func TestReadFileLargeFile(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "large.txt")

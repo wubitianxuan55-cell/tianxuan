@@ -66,6 +66,7 @@ type Messages struct {
 	ChatThoughtForFmt      string // collapsed reasoning summary, "%d" = elapsed s
 	ChatStatusThinkingFmt  string // "%s thinking… (%ds · <cancel hint>)" — %s = spinner, %d = elapsed s
 	ChatStatusIdle         string // shortcuts hint when idle
+	ChatSelectionHintFmt   string // transcript selection active — %d = selected lines, y/right-click copies
 	ChatStatusPlanApproval string // shortcuts hint while a plan is pending
 	PlanApprovalPrompt     string // one-line "plan above is ready" banner shown above the input
 	ChatStatusToolApproval string // shortcuts hint while a tool call awaits approval

@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func TestScrollbarThumb(t *testing.T) {
 	if _, size := scrollbarThumb(10, 0, 5); size != 0 {
@@ -61,5 +65,62 @@ func TestSelectedTextMultiLine(t *testing.T) {
 	m.sel = selection{active: true, anchor: selPos{line: 0, col: 3}, head: selPos{line: 0, col: 3}}
 	if got := m.selectedText(); got != "" {
 		t.Errorf("empty selection should yield no text, got %q", got)
+	}
+}
+
+// TestCopySelectionCopiesAndClears proves copySelection returns a clipboard
+// write command for the selected plain text and clears the highlight, so the
+// transcript returns to normal input afterwards.
+func TestCopySelectionCopiesAndClears(t *testing.T) {
+	m := newTestChatTUI()
+	m.wrappedLines = []string{"hello world", "second line"}
+	m.sel = selection{active: true, anchor: selPos{line: 0, col: 6}, head: selPos{line: 1, col: 6}}
+
+	got, cmd := m.copySelection()
+	if cmd == nil {
+		t.Fatal("copySelection should return a clipboard command")
+	}
+	if got.sel.active || !got.sel.empty() {
+		t.Errorf("selection should be cleared after copy, got %+v", got.sel)
+	}
+	if msg := cmd(); msg != nil {
+		t.Errorf("clipboard command should return nil msg, got %v", msg)
+	}
+
+	// An empty selection returns no command and stays cleared.
+	m.sel = selection{active: true, anchor: selPos{line: 0, col: 3}, head: selPos{line: 0, col: 3}}
+	got, cmd = m.copySelection()
+	if cmd != nil {
+		t.Errorf("empty selection should return no command, got %v", cmd)
+	}
+	if got.sel.active {
+		t.Errorf("empty selection should be cleared, got %+v", got.sel)
+	}
+}
+
+// TestYKeyCopiesSelectionAndClears proves pressing y while a transcript
+// selection is live copies it (vim-style yank) instead of dismissing the
+// selection or typing into the input.
+func TestYKeyCopiesSelectionAndClears(t *testing.T) {
+	m := newTestChatTUI()
+	m.wrappedLines = []string{"hello world", "second line"}
+	m.sel = selection{active: true, anchor: selPos{line: 0, col: 6}, head: selPos{line: 1, col: 6}}
+
+	model, cmd := m.update(tea.KeyPressMsg{Code: 'y'})
+	if cmd == nil {
+		t.Fatal("y on a live selection should copy")
+	}
+	if next := model.(chatTUI); next.sel.active || !next.sel.empty() {
+		t.Errorf("selection should be cleared after y, got %+v", next.sel)
+	}
+
+	// Any other key still dismisses the selection without copying.
+	m.sel = selection{active: true, anchor: selPos{line: 0, col: 0}, head: selPos{line: 0, col: 5}}
+	model, cmd = m.update(tea.KeyPressMsg{Code: 'x'})
+	if cmd != nil {
+		t.Errorf("non-copy key should not emit a command, got %v", cmd)
+	}
+	if next := model.(chatTUI); next.sel.active || !next.sel.empty() {
+		t.Errorf("non-copy key should dismiss the selection, got %+v", next.sel)
 	}
 }

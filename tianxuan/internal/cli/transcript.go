@@ -159,6 +159,19 @@ func (m chatTUI) selectedText() string {
 	return strings.Join(out, "\n")
 }
 
+// copySelection copies the active selection's plain text to the system
+// clipboard and clears the highlight so the transcript returns to normal
+// input. It returns nil when there is nothing to copy, so callers can always
+// run the returned command.
+func (m chatTUI) copySelection() (chatTUI, tea.Cmd) {
+	text := m.selectedText()
+	m.sel = selection{}
+	if text == "" {
+		return m, nil
+	}
+	return m, copyToClipboard(text)
+}
+
 // scrollbarThumb returns the thumb's [start, start+size) row span for a viewport
 // of `height` rows showing `total` content lines scrolled to `yoff`.
 func scrollbarThumb(height, yoff, total int) (start, size int) {

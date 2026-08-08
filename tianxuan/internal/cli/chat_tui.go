@@ -545,8 +545,15 @@ func (m chatTUI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyPressMsg:
-		// Any keystroke dismisses a finished selection (copy is a right-click).
-		m.sel = selection{}
+		// A keystroke on a live selection copies it (y = yank, mirroring the
+		// vim gesture; right-click also copies); any other key dismisses the
+		// finished selection and falls through to the input.
+		if m.sel.active && !m.sel.empty() {
+			if msg.String() == "y" {
+				return m.copySelection()
+			}
+			m.sel = selection{}
+		}
 		// Transcript scroll keys work in any state (PgUp/PgDn are never text).
 		switch msg.String() {
 		case "pgup":
@@ -1004,7 +1011,11 @@ func (m *chatTUI) commitReasoning() {
 // re-renders when a new paragraph actually closes.
 func (m *chatTUI) streamAnswer() {
 	prefix := flushableMarkdownPrefix(m.pending.String())
-	if len(prefix) <= m.answerFlushed {
+	// Throttle incremental re-renders: a flushed line grows token by token, so
+	// skip small growth to avoid re-parsing the whole answer on every event.
+	// The first flush always renders (opens the block) regardless of size.
+	if len(prefix) <= m.answerFlushed ||
+		(m.answerIdx >= 0 && len(prefix)-m.answerFlushed < minStreamIncrement) {
 		return
 	}
 	rendered := m.renderer.Render(prefix)
@@ -1049,10 +1060,24 @@ func (m *chatTUI) commitPending() {
 	m.answerFlushed = 0
 }
 
-// flushableMarkdownPrefix returns the longest prefix of buf made of complete
-// markdown blocks — text up to the last blank line outside any open fenced code
-// block. A blank line inside a ``` / ~~~ fence isn't a boundary, so a half-written
-// code block stays buffered until it closes.
+// minStreamFlushWidth is the visual width a still-streaming line must reach
+// before it flushes early without a blank-line boundary. Long prose paragraphs
+// stream as one line; without this the TUI would stay blank until the model
+// emits a paragraph break, which can be seconds into the reply.
+const minStreamFlushWidth = 80
+
+// minStreamIncrement is the minimum character growth a flushed prefix needs
+// before streamAnswer re-renders it. Lines now flush early, so without a floor
+// every token would re-parse the whole answer.
+const minStreamIncrement = 32
+
+// flushableMarkdownPrefix returns the longest prefix of buf that is safe to
+// render mid-stream. A blank line outside any open fenced code block is the
+// preferred boundary (whole completed blocks). Without one, completed lines
+// still flush so the reply appears to grow; a lone (or trailing) line is only
+// flushed once it reaches minStreamFlushWidth, and the renderer rewrites it in
+// place as it grows. A half-written ``` / ~~~ fence always stays buffered so a
+// code block never renders mangled.
 func flushableMarkdownPrefix(buf string) string {
 	lines := strings.Split(buf, "\n")
 	inFence := false
@@ -1067,10 +1092,27 @@ func flushableMarkdownPrefix(buf string) string {
 			boundary = i
 		}
 	}
-	if boundary <= 0 {
+	if boundary > 0 {
+		return strings.Join(lines[:boundary], "\n")
+	}
+	// No blank-line boundary yet. Keep a half-written fence buffered; outside a
+	// fence flush completed lines (or the trailing line once it is wide enough
+	// to feel live), so a long paragraph streams instead of staying blank.
+	if inFence || len(lines) == 0 {
 		return ""
 	}
-	return strings.Join(lines[:boundary], "\n")
+	last := strings.TrimRight(lines[len(lines)-1], "\n")
+	wideTail := visibleWidth(last) >= minStreamFlushWidth
+	if len(lines) == 1 {
+		if wideTail {
+			return strings.TrimRight(buf, "\n")
+		}
+		return ""
+	}
+	if wideTail {
+		return strings.TrimRight(buf, "\n")
+	}
+	return strings.Join(lines[:len(lines)-1], "\n")
 }
 
 // handleApprovalKey resolves a pending approval from a keystroke and re-arms the

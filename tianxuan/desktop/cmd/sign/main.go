@@ -167,7 +167,7 @@ func signFiles(files []string) error {
 func genManifest(dir, version, tag string) error {
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	if repo == "" {
-		repo = "esengine/tianxuan"
+		repo = "wubitianxuan55-cell/tianxuan"
 	}
 	m := update.Manifest{
 		Version:      version,

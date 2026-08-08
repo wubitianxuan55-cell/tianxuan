@@ -30,13 +30,15 @@ const DefaultThresholdChars = 10000
 
 // PreviewChars is the number of leading characters kept in the model-visible
 // reference so the agent can judge relevance before calling search_large_output.
-const PreviewChars = 200
+// V10.157: 200 was too short to judge a file (forced extra sed reads); 800 gives
+// enough signal for most code files while staying cheap.
+const PreviewChars = 800
 
 // Store manages offloaded tool outputs for one session.
 type Store struct {
-	mu   sync.Mutex
-	dir  string
-	seq  int
+	mu  sync.Mutex
+	dir string
+	seq int
 }
 
 // NewStore creates an offload store rooted at baseDir/<sessionID>/.

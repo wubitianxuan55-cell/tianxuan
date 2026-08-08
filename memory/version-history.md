@@ -7,6 +7,12 @@ metadata:
 ---
 
 | 版本 | 日期 | 主题 |
+| V10.160.0 | 2026-08-08 | OpenCode Zen 模型接入 — opencode provider kind 按模型路由三协议（chat/completions/messages/responses），免费模型匿名可用，真实 API 三协议端到端验证通过 |
+| V10.159.0 | 2026-08-05 | read_file 按符号跳读 — symbol 参数定位定义行 + 未找到大声失败附附近符号名（SHA256 见 release） |
+| V10.158.0 | 2026-08-05 | todo_write blocked 状态 + edit_lines 多行锚点（外部依赖空转降噪、锚点可含换行） |
+| V10.157.0 | 2026-08-05 | validation 错误附正确示例、bash chat 参数误用检测、stale 编辑守卫软警告、offload 预览 200→800 字符 |
+| V10.156.0 | 2026-08-05 | 背景会话 fork — task 工具 inherit_context 参数（Qwen Code /fork 语义），forkCtx 注入子代理 |
+| V10.155.0 | 2026-08-05 | Windows 安装包 + 自动更新链路打通 — NSIS per-user 安装器、发布目标修复（真实仓库）、minisign 密钥轮换、publish-desktop.ps1 一键发布 |
 | V10.154.0 | 2026-08-04 | Codex CLI 工具蒸馏 — 执行前 schema 校验（validation_error+别名兼容）、compact 参数描述保留（CanonicalizeSchemaVerbose）、工具错误统计（tools stats）、learning 链路修复（Observe），SHA256 90a0b4b9… |
 | V10.153.0 | 2026-08-03 | P0-P5 工程改进 — edit_lines 锚点校验+自动语法回滚、PowerShell heredoc/npx.cmd 适配、release 发布技能、L1 Git 工作流提示、DATABASE_URL 预警（SHA256 957ecce4…） |
 | V10.152.0 | 2026-08-02 | 编程能力强化 — 提示词重构（总开销 -79%）+回合减负+工具收敛+测试先行规则；实测对比 Codex：从零实现 71s/¥0.02，修 bug 测试先行 100% 遵守；桌面端打包发布（SHA256 8a3310ec…） |

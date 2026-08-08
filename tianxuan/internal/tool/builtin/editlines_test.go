@@ -325,11 +325,11 @@ func TestEditLinesStartAnchorMismatch(t *testing.T) {
 
 	el := editLines{roots: []string{dir}}
 	_, err := el.Execute(t.Context(), argsJSON(t, map[string]any{
-		"path":        path,
-		"start_line":  2,
-		"end_line":    2,
+		"path":         path,
+		"start_line":   2,
+		"end_line":     2,
 		"start_anchor": "line nope", // 与实际 "line two" 不一致
-		"new_content": "line TWO",
+		"new_content":  "line TWO",
 	}))
 	if err == nil {
 		t.Fatal("expected anchor mismatch error, got nil")
@@ -367,6 +367,57 @@ func TestEditLinesEndAnchorMismatch(t *testing.T) {
 	}
 	if got := readTestFile(t, path); got != orig {
 		t.Errorf("file modified on end_anchor mismatch:\n  got: %q\n want: %q", got, orig)
+	}
+}
+
+// TestEditLinesStartAnchorMultiline 多行锚点：start_anchor 可匹配 start_line
+// 起的连续多行（用户反馈：单行锚点 + 行号双约束导致频繁踩坑）。
+func TestEditLinesStartAnchorMultiline(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "multi_anchor.txt")
+	orig := "line one\nline two\nline three\nline four\n"
+	if err := os.WriteFile(path, []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	el := editLines{roots: []string{dir}}
+
+	if _, err := el.Execute(t.Context(), argsJSON(t, map[string]any{
+		"path":         path,
+		"start_line":   2,
+		"end_line":     3,
+		"start_anchor": "line two\nline three",
+		"end_anchor":   "line three",
+		"new_content":  "TWO THREE",
+	})); err != nil {
+		t.Fatalf("multi-line start_anchor should match: %v", err)
+	}
+	if got := readTestFile(t, path); got != "line one\nTWO THREE\nline four\n" {
+		t.Fatalf("unexpected result: %q", got)
+	}
+}
+
+// TestEditLinesStartAnchorMultilineMismatch 多行锚点任一行动不符即拒绝且不写文件。
+func TestEditLinesStartAnchorMultilineMismatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "multi_anchor_bad.txt")
+	orig := "line one\nline two\nline three\n"
+	if err := os.WriteFile(path, []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	el := editLines{roots: []string{dir}}
+
+	_, err := el.Execute(t.Context(), argsJSON(t, map[string]any{
+		"path":         path,
+		"start_line":   2,
+		"end_line":     2,
+		"start_anchor": "line two\nWRONG",
+		"new_content":  "nope",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "start_anchor") {
+		t.Fatalf("multi-line anchor mismatch should reject, got %v", err)
+	}
+	if got := readTestFile(t, path); got != orig {
+		t.Fatalf("file must stay untouched on anchor mismatch, got %q", got)
 	}
 }
 

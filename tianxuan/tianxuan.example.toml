@@ -76,6 +76,25 @@ price          = { cache_hit = 0.5, input = 5, output = 25, currency = "$" }   #
 thinking       = "adaptive"
 effort         = "high"
 
+# OpenCode Zen — one key, many vendors (https://opencode.ai). The "opencode"
+# kind routes each model to the protocol Zen serves it on:
+#   deepseek-* / kimi-* / glm-* / minimax-* / *-free  ->  /zen/v1/chat/completions (Bearer)
+#   claude-* / qwen*                                  ->  /zen/v1/messages (x-api-key)
+#   gpt-* / grok-*                                    ->  /zen/v1/responses (Bearer)
+# Free models (e.g. deepseek-v4-flash-free) work with NO key; paid models need
+# OPENCODE_API_KEY. base_url is optional (default https://opencode.ai/zen/v1);
+# OpenCode Go subscribers point it at https://opencode.ai/zen/go/v1 instead.
+# Gemini models are not supported yet (Google protocol).
+[[providers]]
+name        = "zen"
+kind        = "opencode"
+base_url    = "https://opencode.ai/zen/v1"   # optional; explicitly set so TOML index-merge never inherits another provider's endpoint
+models      = ["deepseek-v4-flash-free", "claude-haiku-4-5", "gpt-5.4-nano"]
+default     = "deepseek-v4-flash-free"   # optional; defaults to the first of `models`
+api_key_env = "OPENCODE_API_KEY"         # optional when only using free models
+context_window = 1000000
+# per-model pricing (optional): price = { cache_hit = 0, input = 0, output = 0, currency = "$" }
+
 [tools]
 enabled = []   # empty = all built-in tools. The shipped default is a compact
                 # core whitelist (18 tools) — see config.Default().

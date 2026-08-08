@@ -41,6 +41,7 @@ var Chinese = Messages{
 	ChatThoughtForFmt:      "思考了 %d 秒",
 	ChatStatusThinkingFmt:  "%s 思考中… (%d 秒 · Esc 取消)",
 	ChatStatusIdle:         "Tab 切换 plan · Ctrl-O 切换 verbose thinking · Enter 发送 · Esc 退出当前状态 · PgUp/PgDn 滚动 · Ctrl-D 退出",
+	ChatSelectionHintFmt:   "已选中 %d 行 · 按 y 或右键复制",
 	ChatStatusPlanApproval: "Enter/y 批准并执行 · n/Esc 继续规划 · PgUp/PgDn 滚动",
 	PlanApprovalPrompt:     "计划已生成（见上方）— Enter/y 批准执行,n/Esc 继续规划",
 	ChatStatusToolApproval: "1 本次允许 · 2 本会话允许 · 3 拒绝 · y/a/n 兼容 · Ctrl-C 取消本轮",

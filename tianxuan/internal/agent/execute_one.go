@@ -141,6 +141,17 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 			if len(unknown) > 0 {
 				detail += " (schema-unknown fields: " + strings.Join(unknown, ", ") + ")"
 			}
+			// V10.157: 附正确参数示例 + 跨工具误用提示，让模型一次修正，
+			// 而不是反复撞同一个 validation_error（loop guard 是兜底，不是首选）。
+			if ex := tool.ExampleFromSchema(t.Schema()); ex != "" {
+				detail += "; expected args like: " + ex
+			}
+			var argsObj map[string]any
+			if json.Unmarshal(json.RawMessage(call.Arguments), &argsObj) == nil {
+				if hint := tool.MisuseHint(call.Name, argsObj); hint != "" {
+					detail += "; " + hint
+				}
+			}
 			msg := tool.WrapError(tool.CodeValidationError, detail, map[string]any{
 				"tool":   call.Name,
 				"schema": string(t.Schema()),
@@ -164,14 +175,18 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 		}
 	}
 	// V10.28: stale anchor 守卫 — 同一轮内已编辑的文件必须先 read_file 才能再编辑
+	var staleWarn string
 	if !t.ReadOnly() && isFileWriter(call.Name) {
 		if path := extractFilePath(call.Name, call.Arguments); path != "" {
 			a.staleMu.Lock()
-			block := a.staleWrittenFiles != nil && a.staleWrittenFiles[path] && (a.staleReadFiles == nil || !a.staleReadFiles[path])
+			stale := a.staleWrittenFiles != nil && a.staleWrittenFiles[path] && (a.staleReadFiles == nil || !a.staleReadFiles[path])
 			a.staleMu.Unlock()
-			if block {
-				msg := fmt.Sprintf("blocked: [stale content] %q was already modified this turn. Re-read it with read_file first so your edit anchors (old_string/anchors) match the current file content.", path)
-				return toolOutcome{output: msg, blocked: true, errMsg: msg}
+			if stale {
+				// V10.157: 软警告而非硬拦截——写工具自身的锚点匹配
+				// （old_string/anchors 对照当前磁盘内容）才是真正的 stale 守卫；
+				// 同一轮连续编辑同一文件的不同区域是合法操作，不应被强制 read_file
+				// 往返。警告注入到该调用的结果前。
+				staleWarn = fmt.Sprintf("note: [stale content] %q was already modified this turn; anchors must match the current file content (re-read with read_file if they don't).", path)
 			}
 		}
 	}
@@ -237,6 +252,9 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) to
 
 	// Context offloading: if enabled and output exceeds threshold, save full
 	// output to disk and replace with compact reference (path + preview).
+	if staleWarn != "" {
+		result = staleWarn + "\n" + result
+	}
 	if err == nil && a.offloadStore != nil {
 		result = a.offloadStore.MaybeOffload(call.Name, result, a.offloadThresholdChars)
 	}

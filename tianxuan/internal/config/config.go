@@ -893,8 +893,8 @@ func (e *ProviderEntry) APIKey() string {
 // Validate enforces, so pickers can filter on it. OAuth providers (kind=xai)
 // are always considered configured (they manage credentials independently).
 func (e *ProviderEntry) Configured() bool {
-	if e.Kind == "xai" {
-		return true // OAuth manages its own credentials
+	if e.Kind == "xai" || e.Kind == "opencode" {
+		return true // OAuth manages its own credentials; Zen free tier works keyless
 	}
 	return e.APIKey() != ""
 }
@@ -926,7 +926,7 @@ func (c *Config) Validate(model string) error {
 	if e.BaseURL == "" {
 		return fmt.Errorf("provider %q: base_url is required", model)
 	}
-	if e.APIKey() == "" && e.Kind != "xai" {
+	if e.APIKey() == "" && e.Kind != "xai" && e.Kind != "opencode" {
 		return fmt.Errorf("provider %q: missing env %s", model, e.APIKeyEnv)
 	}
 	return nil

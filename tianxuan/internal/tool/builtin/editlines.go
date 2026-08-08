@@ -28,18 +28,18 @@ type editLines struct {
 func (editLines) Name() string { return "edit_lines" }
 
 func (editLines) Description() string {
-	return "Replace a range of lines in a file by 1-based line numbers. Use after read_file when you know the exact line range to replace (e.g. start_line=42, end_line=45). new_content becomes the replacement (may be empty to delete lines). The file's original line endings are preserved. start_anchor/end_anchor are the expected exact content of the start/end lines (without trailing newline); a mismatch rejects the edit without writing, protecting against stale line numbers after prior edits. After writing, .go files are syntax-checked with gofmt -e and .ts/.tsx files with a project-local tsc --noEmit --skipLibCheck; a failed check rolls the file back (set validate=false to skip). Prefer edit_file for single-string replacements - this tool is for line-range edits."
+	return "Replace a range of lines in a file by 1-based line numbers. Use after read_file when you know the exact line range to replace (e.g. start_line=42, end_line=45). new_content becomes the replacement (may be empty to delete lines). The file's original line endings are preserved. start_anchor/end_anchor are the expected exact content of the start/end lines (without trailing newline); a multi-line anchor (containing \\n) must match the consecutive lines starting there — useful when a single line is not unique. A mismatch rejects the edit without writing, protecting against stale line numbers after prior edits. After writing, .go files are syntax-checked with gofmt -e and .ts/.tsx files with a project-local tsc --noEmit --skipLibCheck; a failed check rolls the file back (set validate=false to skip). Prefer edit_file for single-string replacements - this tool is for line-range edits."
 }
 
 func (editLines) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"start_line":{"type":"integer","description":"1-based start line (inclusive)","minimum":1},"end_line":{"type":"integer","description":"1-based end line (inclusive)","minimum":1},"new_content":{"type":"string","description":"Replacement text for the line range (may be empty to delete lines). The file's original line endings are preserved."},"start_anchor":{"type":"string","description":"Expected exact content of the start_line (without trailing newline). A mismatch rejects the edit without writing."},"end_anchor":{"type":"string","description":"Expected exact content of the end_line (without trailing newline). A mismatch rejects the edit without writing."},"validate":{"type":"boolean","description":"Post-edit quick syntax/type check with automatic rollback on failure. Default true: .go is checked with gofmt -e, .ts/.tsx with a project-local tsc --noEmit --skipLibCheck."}},"required":["path","start_line","end_line","new_content"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"start_line":{"type":"integer","description":"1-based start line (inclusive)","minimum":1},"end_line":{"type":"integer","description":"1-based end line (inclusive)","minimum":1},"new_content":{"type":"string","description":"Replacement text for the line range (may be empty to delete lines). The file's original line endings are preserved."},"start_anchor":{"type":"string","description":"Expected exact content of the start_line (without trailing newline); may span consecutive lines when it contains \\n. A mismatch rejects the edit without writing."},"end_anchor":{"type":"string","description":"Expected exact content of the end_line (without trailing newline); may span consecutive lines when it contains \\n. A mismatch rejects the edit without writing."},"validate":{"type":"boolean","description":"Post-edit quick syntax/type check with automatic rollback on failure. Default true: .go is checked with gofmt -e, .ts/.tsx with a project-local tsc --noEmit --skipLibCheck."}},"required":["path","start_line","end_line","new_content"]}`)
 }
 
-func (editLines) ReadOnly() bool { return false }
+func (editLines) ReadOnly() bool      { return false }
 func (editLines) Kind() tool.ToolKind { return tool.KindEdit }
 
-func (editLines) CompactDescription() string { return compactDesc["edit_lines"] }
-func (editLines) CompactSchema() json.RawMessage   { return compactSchema["edit_lines"] }
+func (editLines) CompactDescription() string     { return compactDesc["edit_lines"] }
+func (editLines) CompactSchema() json.RawMessage { return compactSchema["edit_lines"] }
 
 func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -126,25 +126,19 @@ func (el editLines) Execute(ctx context.Context, args json.RawMessage) (string, 
 	// Content anchors: the model asserts what the start/end lines contain right
 	// now. A mismatch means the line numbers are stale (prior edits shifted the
 	// file), and proceeding would edit the wrong lines - reject without writing.
-	if p.StartAnchor != "" {
-		want := normalizeAnchorLine(p.StartAnchor)
+	if p.StartAnchor != "" && !matchAnchorMultiLine(p.StartAnchor, lines, p.StartLine) {
 		got := normalizeAnchorLine(lines[p.StartLine-1])
-		if want != got {
-			return "", fmt.Errorf(
-				"start_anchor does not match line %d (actual: %q); "+
-					"re-read the file with read_file and re-check start_line/end_line",
-				p.StartLine, got)
-		}
+		return "", fmt.Errorf(
+			"start_anchor does not match line %d (actual: %q); "+
+				"re-read the file with read_file and re-check start_line/end_line",
+			p.StartLine, got)
 	}
-	if p.EndAnchor != "" {
-		want := normalizeAnchorLine(p.EndAnchor)
+	if p.EndAnchor != "" && !matchAnchorMultiLine(p.EndAnchor, lines, p.EndLine) {
 		got := normalizeAnchorLine(lines[p.EndLine-1])
-		if want != got {
-			return "", fmt.Errorf(
-				"end_anchor does not match line %d (actual: %q); "+
-					"re-read the file with read_file and re-check start_line/end_line",
-				p.EndLine, got)
-		}
+		return "", fmt.Errorf(
+			"end_anchor does not match line %d (actual: %q); "+
+				"re-read the file with read_file and re-check start_line/end_line",
+			p.EndLine, got)
 	}
 
 	// Build the new file: lines before the range + new_content + lines after.
@@ -200,6 +194,23 @@ func normalizeAnchorLine(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.TrimSuffix(s, "\n")
 	return strings.TrimSuffix(s, "\r")
+}
+
+// matchAnchorMultiLine reports whether anchor matches the lines starting at
+// 1-based line idx. A multi-line anchor (containing \n) must match the
+// consecutive lines starting there; a single-line anchor matches just that
+// line. Both are normalised per line so CRLF files compare cleanly.
+func matchAnchorMultiLine(anchor string, lines []string, idx int) bool {
+	want := strings.Split(normalizeAnchorLine(anchor), "\n")
+	if idx-1+len(want) > len(lines) {
+		return false
+	}
+	for i, w := range want {
+		if normalizeAnchorLine(lines[idx-1+i]) != normalizeAnchorLine(w) {
+			return false
+		}
+	}
+	return true
 }
 
 // quickCheckTimeout caps post-edit validation so a slow tsc never blocks a turn

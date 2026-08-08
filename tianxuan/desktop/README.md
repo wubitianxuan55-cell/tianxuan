@@ -77,13 +77,29 @@ Desktop releases ride their own tag namespace, `desktop-v<semver>` (plain `v*`
 tags are the CLI release). Pushing one triggers `.github/workflows/release-desktop.yml`,
 which builds on a native runner per platform (Wails can't cross-compile a
 CGO/WebKit binary), packages each artifact, signs it with minisign, generates a
-`latest.json` manifest, publishes a GitHub release, and mirrors everything to R2.
+`latest.json` manifest, and publishes a GitHub release. If an R2 bucket is
+configured (repo vars/secrets), the mirror job also mirrors artifacts to the CDN.
 
 ```sh
 git tag desktop-v1.1.0 && git push origin desktop-v1.1.0
 ```
 
-The app checks `latest.json` on startup (R2 first, GitHub as fallback) and shows
+For a Windows-only local release (no CI needed) use the one-shot script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\publish-desktop.ps1 -Version v10.155.0
+```
+
+It runs the desktop tests, injects the version, builds the per-user NSIS
+installer (`wails build -nsis`), minisign-signs it, writes `latest.json` (notes
+from `release/CHANGELOG.md`), verifies the signature against the embedded public
+key, and publishes a GitHub release (`gh` must be authenticated; add `-SkipUpload`
+to stop after the local artifacts). The signing key lives at
+`%USERPROFILE%\.tianxuan-release\` (or `MINISIGN_PRIVATE_KEY` /
+`MINISIGN_PASSWORD` env vars).
+
+The app checks `latest.json` on startup (GitHub releases; the R2 mirror becomes
+the primary once configured) and shows
 an update banner when a newer version is published; **Settings → Software update**
 has a manual check. Self-update behavior by platform:
 
@@ -112,13 +128,13 @@ When Developer ID / Authenticode certificates are added, the release workflow's
 
 ### Verifying a download
 
-Artifacts are signed with minisign (public key ID `AF12CA46F4A9EBB0`). The `.minisig`
+Artifacts are signed with minisign (public key ID `154E38FBADA79807`). The `.minisig`
 signature sits next to each artifact in the release; verify with the
 [minisign](https://jedisct1.github.io/minisign/) CLI:
 
 ```sh
-minisign -Vm Tianxuan-darwin-arm64.zip \
-  -P RWSw66n0RsoSr6Zhh6qt5YO95YkpCayTOCMFVDNUQSjJYwxoYngNVBSq
+minisign -Vm tianxuan-windows-amd64-installer.exe \
+  -P RWQHmKet+zhOFeRnsWjrnW39xx4YV321Jgw1fbxD1zlVRZ5oVWs++pxV
 ```
 
 ## Editor seam (Monaco / CodeMirror)

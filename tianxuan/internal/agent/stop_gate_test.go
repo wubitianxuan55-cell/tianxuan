@@ -316,3 +316,16 @@ func TestFinalReadinessCheck_VerifiedTodos(t *testing.T) {
 		t.Fatal("verified todos should not block")
 	}
 }
+
+// TestTaskGateSkipsWhenBlockedOnly verifies a todo list whose remaining items
+// are blocked (waiting on an external dependency) does not trigger the
+// "please continue" nudge — no empty turns while the model waits on the user.
+func TestTaskGateSkipsWhenBlockedOnly(t *testing.T) {
+	s := NewSession("")
+	a := &AgentRunner{session: s}
+	blocked := []evidence.TodoItem{{Content: "wait for user test", Status: "blocked"}}
+	a.setTodoState(blocked)
+	if a.taskGate() {
+		t.Fatal("taskGate should skip when remaining items are blocked")
+	}
+}

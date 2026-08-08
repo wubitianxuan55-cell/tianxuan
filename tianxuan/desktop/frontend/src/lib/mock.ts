@@ -646,7 +646,7 @@ export function makeMockApp(): AppBindings {
         latest: "v1.1.0",
         notes: "- Mock release notes\n- The **Update now** button streams a fake download here.",
         canSelfUpdate: true,
-        downloadUrl: "https://github.com/esengine/tianxuan/releases/latest",
+        downloadUrl: "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
         assetSize: 12_345_678,
       };
     },
@@ -665,7 +665,7 @@ export function makeMockApp(): AppBindings {
     },
     async OpenDownloadPage() {
       if (typeof window !== "undefined") {
-        window.open("https://github.com/esengine/tianxuan/releases/latest", "_blank", "noopener");
+        window.open("https://github.com/wubitianxuan55-cell/tianxuan/releases/latest", "_blank", "noopener");
       }
     },
     async SaveWindowState(_state: {width:number;height:number;x:number;y:number;maximised:boolean}) {

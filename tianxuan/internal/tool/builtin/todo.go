@@ -33,7 +33,7 @@ type todoItem struct {
 func (todoWrite) Name() string { return "todo_write" }
 
 func (todoWrite) Description() string {
-	return "Record and update a structured task list for the current work. Send the COMPLETE list every call — it replaces the previous one. Use it to plan multi-step work and show progress: keep exactly one item in_progress at a time, and flip an item to completed the moment it's done (don't batch completions). Skip it for trivial single-step tasks. The list is two-level: a `level` 0 item is a PHASE (a milestone) and the `level` 1 items after it are its concrete sub-steps; omit `level` (0) for a flat list."
+	return "Record and update a structured task list for the current work. Send the COMPLETE list every call — it replaces the previous one. Use it to plan multi-step work and show progress: keep exactly one item in_progress at a time, and flip an item to completed the moment it's done (don't batch completions). Mark an item blocked when it waits on an external dependency (user testing, a service restart, an external API) — blocked items are excluded from the host's completion nagging. Skip it for trivial single-step tasks. The list is two-level: a `level` 0 item is a PHASE (a milestone) and the `level` 1 items after it are its concrete sub-steps; omit `level` (0) for a flat list."
 }
 
 func (todoWrite) Schema() json.RawMessage {
@@ -47,7 +47,7 @@ func (todoWrite) Schema() json.RawMessage {
       "type":"object",
       "properties":{
         "content":{"type":"string","description":"Imperative description of the task."},
-        "status":{"type":"string","enum":["pending","in_progress","completed"],"description":"Task state. Keep at most one in_progress."},
+        "status":{"type":"string","enum":["pending","in_progress","completed","blocked"],"description":"Task state. Keep at most one in_progress; blocked = waiting on an external dependency (host will not nag it as incomplete)."},
         "activeForm":{"type":"string","description":"Present-continuous form shown while the task is in progress (e.g. \"Running tests\")."},
         "level":{"type":"integer","enum":[0,1],"description":"Nesting level: 0 = phase/milestone, 1 = a sub-step of the phase above it. Omit for a flat list."}
       },
@@ -62,11 +62,11 @@ func (todoWrite) Schema() json.RawMessage {
 // ReadOnly is true: todo_write only records a list (no filesystem or process
 // effect), so it never needs approval and stays available in plan mode — where
 // laying out a plan as todos is exactly the point.
-func (todoWrite) ReadOnly() bool { return true }
+func (todoWrite) ReadOnly() bool      { return true }
 func (todoWrite) Kind() tool.ToolKind { return tool.KindOther }
 
-func (todoWrite) CompactDescription() string { return compactDesc["todo_write"] }
-func (todoWrite) CompactSchema() json.RawMessage   { return compactSchema["todo_write"] }
+func (todoWrite) CompactDescription() string     { return compactDesc["todo_write"] }
+func (todoWrite) CompactSchema() json.RawMessage { return compactSchema["todo_write"] }
 
 func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -75,7 +75,7 @@ func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, err
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
-	var done, active, pending int
+	var done, active, pending, blocked int
 	for i, t := range p.Todos {
 		if t.Content == "" {
 			return "", fmt.Errorf("todo %d: content is required", i+1)
@@ -88,10 +88,12 @@ func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, err
 			done++
 		case "in_progress":
 			active++
+		case "blocked":
+			blocked++
 		case "pending", "":
 			pending++
 		default:
-			return "", fmt.Errorf("todo %d: invalid status %q (want pending|in_progress|completed)", i+1, t.Status)
+			return "", fmt.Errorf("todo %d: invalid status %q (want pending|in_progress|completed|blocked)", i+1, t.Status)
 		}
 	}
 	// V10.99: 蒸馏自 Reasonix v1.17.21 — todo 状态机校验
@@ -109,8 +111,8 @@ func (todoWrite) Execute(ctx context.Context, args json.RawMessage) (string, err
 	// compaction 后丢失 todo 状态时，系统提示会引导 agent 读取此文件恢复进度
 	saveProgressMarkdown(p.Todos)
 
-	return fmt.Sprintf("Todos updated: %d total — %d completed, %d in progress, %d pending.",
-		len(p.Todos), done, active, pending), nil
+	return fmt.Sprintf("Todos updated: %d total — %d completed, %d in progress, %d pending, %d blocked.",
+		len(p.Todos), done, active, pending, blocked), nil
 }
 
 // saveProgressMarkdown writes the current todo list to .tianxuan/progress.md

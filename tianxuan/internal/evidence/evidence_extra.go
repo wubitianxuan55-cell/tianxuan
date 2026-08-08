@@ -8,7 +8,9 @@ func IncompleteTodos(todos []TodoItem) []TodoStepMatch {
 	incomplete := make([]TodoStepMatch, 0)
 	for j, t := range todos {
 		status := todoStatus(t.Status)
-		if status == "completed" {
+		// blocked 项等待外部依赖（用户实测/重启服务），不算"未完成"——
+		// 否则 taskGate 会反复注入"请继续执行"造成空转。
+		if status == "completed" || status == "blocked" {
 			continue
 		}
 		incomplete = append(incomplete, TodoStepMatch{
@@ -43,7 +45,7 @@ func ValidateSerialTodos(todos []TodoItem) error {
 	ipSeen := false
 	for i, todo := range todos {
 		switch todoStatus(todo.Status) {
-		case "completed", "pending":
+		case "completed", "pending", "blocked":
 		case "in_progress":
 			if ipSeen {
 				return fmt.Errorf("todo %d %q is a second in_progress item; serial task lists allow exactly one current item", i+1, todo.Content)

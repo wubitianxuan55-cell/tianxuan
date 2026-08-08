@@ -1,3 +1,139 @@
+## [10.160.0] — 2026-08-08
+
+### 🌐 OpenCode Zen 模型接入
+
+> 单一 API key 访问 DeepSeek / Kimi / GLM / MiniMax / Claude / Qwen / GPT / Grok，
+> kind=opencode 按模型自动路由到 Zen 的对应协议端点。
+
+#### 变更
+- 新增 `opencode` provider kind（`internal/provider/opencode/`）：`claude-*/qwen*` →
+  `/v1/messages`（复用 anthropic provider，剥掉重复 `/v1`）、`gpt-*/grok-*` →
+  `/v1/responses`（新 Responses 流式客户端）、其余 → `/v1/chat/completions`
+  （复用 openai provider）；`gemini-*` 明确报错暂不支持
+- Responses 客户端：chat 历史 → input 转换（assistant tool_calls 展开为
+  function_call / function_call_output）、工具参数流式累积、reasoning /
+  usage 解析、工具配对修复、空闲超时守卫
+- 免费模型（如 deepseek-v4-flash-free）**无需 API key 匿名可用**；
+  config.Validate/Configured 放行无 key 的 opencode provider
+- 示例配置：`tianxuan.example.toml` + `.env.example`（OPENCODE_API_KEY）
+
+#### 测试（TDD RED→GREEN）
+- `provider/opencode/`：协议路由 17 例、Responses 请求构建（含工具配对修复）、
+  SSE 文本/工具调用/reasoning/错误/401 解析
+- `config/configured_test.go`：opencode 无 key 放行
+- 真实 API 三协议端到端：deepseek-v4-flash-free（匿名）、gpt-5.4-nano
+  （responses）、claude-haiku-4-5（messages）全部打通，CLI `run -model zen/...`
+  验证通过 · 全量 `go test ./...` 通过
+
+## [10.159.0] — 2026-08-05
+
+### 🔧 重度使用痛点修复（第三批）：read_file 按符号跳读
+
+> 承接 [10.157.0]/[10.158.0]：大文件（oauth.go 等）不再需要盲读/分页——offload
+> 预览加长之外，增加"按符号定位"的轻量跳读接口。
+
+#### 变更
+- **read_file 新增 `symbol` 参数**：直接定位函数/方法/类型的定义行并从此处读取
+  （复用 code_index 的符号解析：Go AST + 多语言 regex）；未显式 limit 时默认读
+  200 行（覆盖大多数函数体）；输出标注 `[symbol "X" at line N]`
+- 未找到符号时大声失败并附附近符号名（5 个），而不是静默从文件头读取
+
+#### 测试（TDD RED→GREEN）
+- `builtin/tool_extra_test.go`：TestReadFileSymbolLocatesFunction（定位定义行 +
+  标注行号 + 不包含符号前内容）、TestReadFileSymbolNotFound（大声失败）
+- 全量 `go test ./...` 通过 · `go vet` 干净 · gofmt 干净
+
+## [10.158.0] — 2026-08-05
+
+### 🔧 重度使用痛点修复（第二批）
+
+> 承接 [10.157.0]：todo blocked 状态（外部依赖空转降噪）+ edit_lines 多行锚点。
+
+#### 变更
+- **todo_write 支持 blocked 状态**：schema/compact/状态机全部接受 `blocked`
+  （等待外部依赖：用户实测、服务重启、外部 API）；blocked 项从"未完成"中排除，
+  taskGate 不再对纯 blocked 清单注入"请继续执行"空转提示；todo ack 报 blocked 计数
+- **edit_lines 多行锚点**：`start_anchor`/`end_anchor` 可含 `\n` 匹配起始行起的
+  连续多行（单行不唯一时不再需要"单行锚点 + 行号"双约束踩坑）；任一行动不符
+  即拒绝且不写文件
+
+#### 测试（TDD RED→GREEN）
+- `evidence`：IncompleteTodos 排除 blocked、ValidateSerialTodos 接受 blocked
+- `builtin/todo_test.go`：todo_write 接受 blocked 并计数
+- `builtin/editlines_test.go`：多行锚点匹配成功 / 任一行动不符拒绝且文件不动
+- `agent/stop_gate_test.go`：纯 blocked 清单不触发 taskGate
+- 全量 `go test ./...` 通过 · `go vet` 干净 · 改动文件 gofmt 干净
+
+## [10.157.0] — 2026-08-05
+
+### 🔧 重度使用痛点修复（需求驱动，非蒸馏）
+
+> 基于重度使用者会话反馈（bash 连续 5-6 次 chat 参数误用、edit_file stale 硬拦截
+> 造成往返、offload 预览过短），逐项修复：
+
+#### 变更
+- **validation 错误附正确示例**：`tool.ExampleFromSchema` 从工具 schema 生成精简
+  示例（如 `{"command": "<command>"}`），validation_error 信息追加
+  "expected args like: ..."，模型一次修正，不再反复撞同一错误
+- **bash chat 参数误用检测**：`tool.MisuseHint` 识别传入 bash 的 chat-API 风格参数
+  （model/messages/max_tokens/temperature/top_p），错误信息直接提示
+  "bash 只接受 command 字段"
+- **stale 编辑守卫改软警告**：同一轮二次编辑同一文件不再硬拦截（原
+  "blocked: [stale content]"），改为放行并在结果前注入警告——写工具自身的锚点
+  匹配才是真正的 stale 守卫，连续编辑不同区域免去强制 read_file 往返
+- **offload 预览 200 → 800 字符**：大文件判断成本下降，减少被迫 sed 分块读
+
+#### 测试（TDD RED→GREEN）
+- `internal/tool/example_test.go`：ExampleFromSchema（required 字段/类型/退化）
+  + MisuseHint（bash chat 参数/正常调用/非 bash）
+- `internal/agent/stale_guard_test.go`：软警告放行 + 重读后清除警告
+- `internal/agent/validation_hint_test.go`：validation 错误附示例 + chat 误用提示
+- `internal/agent/offload/offload_test.go`：预览截断于 PreviewChars
+- 全量 `go test ./...` 通过 · `go vet` 干净 · `gofmt` 干净
+
+## [10.156.0] — 2026-08-05
+
+### 🍴 同类产品蒸馏阶段一：背景会话 fork（Qwen Code `/fork` 语义）
+
+> 蒸馏计划（docs/design/2026-08-05-peers-distillation-plan.md）P0-1 落地：
+> `task` 工具新增 `inherit_context`，子代理以父会话最近上下文快照启动
+> （Qwen `/fork` 继承上下文语义），而非空白会话；配合已有 `run_in_background`
+> 即"带上下文的后台 fork"。跨项目记忆（P0-2）经调研已被 GlobalDir/ScopeUser
+> 覆盖，按极简原则不实施。
+
+#### 变更
+- `internal/agent/task.go` — `inherit_context` 参数：forkCtx 快照注入子代理首条
+  user 消息（`<forked from parent conversation>` 标记），任务 prompt 保持末条；
+  无 provider 时大声失败（防御性）
+- `internal/boot/boot.go` — `taskTool.SetForkContext` 注入 + `forkContextText`
+  提取（末条 user 输入 + 后续 turns，4000 字符预算、follow 保底 800，只读 Snapshot
+  不触碰父会话前缀缓存）
+- 工具描述同步：Schema / CompactSchema / CompactDescription 增加 inherit_context
+
+#### 测试（TDD RED→GREEN）
+- `task_test.go`：TestTaskForkInheritsContext（注入生效 + prompt 保持末条）、
+  TestTaskForkWithoutProviderFails（无 provider 大声失败）
+- `boot_test.go`：TestForkContextText（从末条 user 开始）、
+  TestForkContextTextEmpty（空/纯 system 返回空）、TestForkContextTextTruncates
+  （预算截断 + follow 保底不饿死后续 turns）
+- 全量 `go test ./...` 通过 · `go vet` 干净
+
+## [10.155.0] — 2026-08-05
+
+### 📦 Windows 安装包与自动更新链路打通
+
+> 首个可推送更新的桌面端发布：NSIS per-user 安装器 + 修复后的 manifest/签名/发布管道。
+
+#### 变更
+- 新增自定义 NSIS 模板 `desktop/build/windows/installer/project.nsi`：per-user 安装（免管理员）、完成页自动运行应用
+- updater 端点修复：`esengine/tianxuan` → `wubitianxuan55-cell/tianxuan`，移除 Reasonix R2 bucket 引用
+- minisign 公钥轮换（key ID `154E38FBADA79807`），签名/校验工具同步更新
+- 新增 `scripts/publish-desktop.ps1` 本地一键发布脚本（构建 → 签名 → manifest → GitHub Release）
+
+#### 验证
+- desktop `go test ./...` 全绿 · `go vet` 干净
+- `scripts/publish-desktop.ps1 -Version v10.155.0` 构建安装包 + 签名 + manifest 校验通过
+
 ## [10.152.0] — 2026-08-02
 
 ### 🔀 回合循环减负：删除过时 nudge，工具反馈改为仅硬模式

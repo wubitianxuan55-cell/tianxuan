@@ -43,6 +43,21 @@ func TestTodoWriteRejectsNewCompletedWithoutCompleteStepReceipt(t *testing.T) {
 	}
 }
 
+// TestTodoWriteAcceptsBlocked verifies todo_write accepts a blocked status
+// (waiting on an external dependency) and reports it in the ack.
+func TestTodoWriteAcceptsBlocked(t *testing.T) {
+	args := json.RawMessage(`{"todos":[` +
+		`{"content":"wait for user test","status":"blocked"},` +
+		`{"content":"next","status":"pending"}]}`)
+	out, err := (todoWrite{}).Execute(context.Background(), args)
+	if err != nil {
+		t.Fatalf("blocked status should be accepted: %v", err)
+	}
+	if !strings.Contains(out, "1 blocked") {
+		t.Fatalf("ack should mention the blocked count, got %q", out)
+	}
+}
+
 func TestTodoWriteAcceptsNewCompletedWithCompleteStepReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
 	ledger.SetStrictVerification(true) // V10.8

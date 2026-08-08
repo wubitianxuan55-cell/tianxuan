@@ -146,3 +146,54 @@ func TestFlushableMarkdownPrefixKeepsOpenFence(t *testing.T) {
 		t.Errorf("no blank line should flush nothing, got %q", got)
 	}
 }
+
+// TestFlushableMarkdownPrefixFlushesLinesWithoutBlankLine proves a reply that
+// has not yet closed a paragraph (no blank line) still renders incrementally:
+// completed lines flush while the trailing half-written line stays buffered,
+// and a lone line flushes once it is wide enough to feel "live". A half-written
+// fence keeps its whole block buffered either way.
+func TestFlushableMarkdownPrefixFlushesLinesWithoutBlankLine(t *testing.T) {
+	multiShortTail := "- one\n- two\n- thr"
+	if got := flushableMarkdownPrefix(multiShortTail); got != "- one\n- two" {
+		t.Errorf("multi-line, short tail: flushable prefix = %q, want %q", got, "- one\n- two")
+	}
+
+	longTail := "- one\n- two\n" + strings.Repeat("x", 100)
+	if got := flushableMarkdownPrefix(longTail); got != longTail {
+		t.Errorf("multi-line, wide tail: flushable prefix = %q, want whole buffer", got)
+	}
+
+	loneLine := strings.Repeat("x", 100)
+	if got := flushableMarkdownPrefix(loneLine); got != loneLine {
+		t.Errorf("lone wide line: flushable prefix = %q, want the line", got)
+	}
+
+	fenced := "```go\n" + strings.Repeat("x", 100) + "\nstill open"
+	if got := flushableMarkdownPrefix(fenced); got != "" {
+		t.Errorf("open fence: flushable prefix = %q, want nothing", got)
+	}
+}
+
+// TestStreamAnswerThrottlesIncrementalRenders proves a flushed line that grows
+// token by token is not re-rendered on every event: small increments stay
+// buffered until the growth floor is crossed, so long replies don't re-parse
+// the whole answer on each token.
+func TestStreamAnswerThrottlesIncrementalRenders(t *testing.T) {
+	m := newTestChatTUI()
+
+	m.ingestEvent(event.Event{Kind: event.Text, Text: strings.Repeat("x", 100)})
+	if m.answerIdx < 0 {
+		t.Fatalf("lone wide line should open a streamed answer block")
+	}
+	flushed := m.answerFlushed
+
+	m.ingestEvent(event.Event{Kind: event.Text, Text: strings.Repeat("y", 10)})
+	if m.answerFlushed != flushed {
+		t.Errorf("small increment should stay buffered, flushed %d -> %d", flushed, m.answerFlushed)
+	}
+
+	m.ingestEvent(event.Event{Kind: event.Text, Text: strings.Repeat("z", 40)})
+	if m.answerFlushed != flushed+50 {
+		t.Errorf("growth past the floor should re-render, flushed %d -> %d", flushed, m.answerFlushed)
+	}
+}

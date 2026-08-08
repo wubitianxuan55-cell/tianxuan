@@ -1,3 +1,40 @@
+## [10.168.0] — 2026-08-08
+
+### 🐛 修复：技能工具（explore/research/review 等）不并发 + 使用异常
+
+> 用户报告"子代理不并发 + 使用技能有问题"。根因链（5 级追溯）：
+
+#### 根因
+- **表象**：explore/research 等技能工具永远单独串行执行，不与任何工具并行；
+  run_skill 调技能表现异常（被强制串行隔离）
+- **直接原因**：`getConflictKey` 不认识技能工具名 → default 分支返回 `""`
+- **本地根因**：`partitionToolCalls` 把 `key == ""` 当全局冲突
+  （`hasGlobal := key == "" || key[0] == '!'`）→ 强制串行批
+- **系统根因**：V10.124 从 `getConflictKey` 移除 explore/research/review
+  （当时还原为纯技能），V10.147 把它们工具化回来（`subagentSkillTool`
+  注释明确"可安全并行批处理"）但**没同步更新 `getConflictKey`**
+- **过程根因**：`partitionToolCalls`/`getConflictKey` **零测试覆盖**，
+  回归无人察觉
+
+#### 修复
+- `getConflictKey` 增加 registry 感知：default 分支查询 registry，
+  ReadOnly 工具（含技能工具、grep/glob/ls/web_fetch 等）返回 `ro:<name>`
+  共享键 → 互相并行 + 与 read_file 并行
+- `partitionToolCalls` 增加 `ro:*` 与 `file:*` 互斥规则：只读工具（可能
+  读全库的子代理）与写工具永不共享并行批，保住"写后读"顺序安全不变式
+- `!spawn`/`!bash`/`!ledger` 等全局串行键语义不变（run_skill/task 仍串行）
+
+#### 验证（TDD）
+- 新增 `batch_parallel_test.go` 3 例：技能+read_file+research → 1 并行批；
+  explore+read_file → 并行；writer 后技能串行（安全不变式）
+- 新增 `batch_concurrency_test.go` 2 例：端到端 3 只读工具 0.30s（并行，
+  修复前 0.90s 串行）；writer+skill 串行屏障 0.10s
+- `go build`/`go vet` 干净；51 包全量测试全绿（仅预存 API 认证类失败）
+- **缓存铁律**：改动仅限运行时调度（batch 分区），不触碰 L1/L2/tools
+  schema/消息数组字节序——消息按 calls 索引稳定填充，前缀缓存不受影响
+
+---
+
 ## [10.166.0] — 2026-08-08
 
 ### 🔄 架构回退：删除双模型（Hermes），重回单模型规划模式

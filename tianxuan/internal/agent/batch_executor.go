@@ -193,17 +193,32 @@ type toolCallBatch struct {
 func partitionToolCalls(r *tool.Registry, calls []provider.ToolCall) []toolCallBatch {
 	var batches []toolCallBatch
 	for i := 0; i < len(calls); {
-		key := getConflictKey(calls[i])
+		key := getConflictKey(r, calls[i])
 		hasGlobal := key == "" || key[0] == '!' // batch contains a globally-conflicting tool
+		hasSub := strings.HasPrefix(key, "ro:") // read-only tool (may spawn a read-only sub-agent)
+		hasWriter := strings.HasPrefix(key, "file:")
 		used := map[string]bool{key: true}
 		start := i
 		i++
 		for i < len(calls) {
-			k := getConflictKey(calls[i])
+			k := getConflictKey(r, calls[i])
+			// Read-only tools (ro:*) must never run in the same batch as a
+			// writer (file:*) — a sub-agent skill could read any file, so a
+			// half-written file would race with its reads. Writers batch only
+			// with other writers targeting different files.
 			if hasGlobal || k == "" || k[0] == '!' || used[k] {
 				break
 			}
+			if (hasSub && strings.HasPrefix(k, "file:")) || (hasWriter && strings.HasPrefix(k, "ro:")) {
+				break
+			}
 			used[k] = true
+			if strings.HasPrefix(k, "ro:") {
+				hasSub = true
+			}
+			if strings.HasPrefix(k, "file:") {
+				hasWriter = true
+			}
 			i++
 		}
 		batches = append(batches, toolCallBatch{
@@ -218,7 +233,13 @@ func partitionToolCalls(r *tool.Registry, calls []provider.ToolCall) []toolCallB
 // V6.0: getConflictKey returns a conflict key for a tool call.
 // Two calls with the same key cannot run in parallel.
 // Prefix ! marks global conflict keys (always serial).
-func getConflictKey(call provider.ToolCall) string {
+// V10.168: registry-aware — read-only tools (including subagent skill tools
+// like explore/research/review, which V10.147 re-registered as first-class
+// tools after V10.124 removed them from this switch) return a shared "ro:"
+// key so they batch in parallel with each other and with read_file, instead
+// of falling into the default "" branch which partitionToolCalls treats as a
+// global conflict (forced serial).
+func getConflictKey(r *tool.Registry, call provider.ToolCall) string {
 	switch call.Name {
 	case "task", "run_skill", "install_skill":
 		return "!spawn"
@@ -239,6 +260,14 @@ func getConflictKey(call provider.ToolCall) string {
 		}
 		return ""
 	default:
+		// V10.168: read-only tools (skill tools, grep, glob, ls, web_fetch, …)
+		// are safe to batch in parallel — they share a key so multiple of them
+		// coalesce, and partitionToolCalls keeps them out of writer batches.
+		if r != nil {
+			if t, ok := r.Get(call.Name); ok && t.ReadOnly() {
+				return "ro:" + call.Name
+			}
+		}
 		return ""
 	}
 }

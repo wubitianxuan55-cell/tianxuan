@@ -36,6 +36,14 @@
   超时 KillTracked（关闭 Job handle 触发内核递归回收 + taskkill /T fallback）
 - TDD：派生隐藏孙进程 + 写 PID 文件，超时后断言孙进程已被杀（先红后绿）
 
+#### 会话级 token 预算渐进提醒（蒸馏 codex rollout_budget）
+- 长会话中模型只看到当前窗口剩余，对会话累计 token 消耗趋势无感知；
+  TokenBudget 跨 turn 累计用量，剩余跨过配置阈值时注入渐进式 user 提醒，
+  让模型提前规划收敛（停止探索/收尾/拆分后续会话）
+- 配置 agent.token_budget_limit（0=关闭）+ agent.token_budget_reminders
+  （剩余阈值列表）；与成本 BudgetGate 硬门共存（软提醒不阻断）
+- TDD：4 例全绿（禁用/多阈值提醒/不重复/耗尽/降序）
+
 #### 验证（TDD）
 - bash_powershell_test.go 新增 1 例：描述含 Remove-Item / -LiteralPath /
   workspace / recursive / WindowStyle Hidden（先红后绿）

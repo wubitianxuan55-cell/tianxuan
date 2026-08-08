@@ -29,6 +29,13 @@
 - 导出 builtin.NearestContentLine（原 nearestContentLine），precheckEditFile /
   precheckMultiEdit 报错注入 "nearest line N: ..."，与 Execute 路径诊断对齐
 
+#### hook 超时递归杀进程树（蒸馏 codex dd91642）
+- hook 命令超时后残留孤儿孙进程（如 lint 工具链）的缺口：DefaultSpawner
+  原用 exec.CommandContext + WaitDelay，超时只杀直接子进程（shell）
+- 改用 proc.StartTracked（Windows Job Object KILL_ON_JOB_CLOSE）启动 +
+  超时 KillTracked（关闭 Job handle 触发内核递归回收 + taskkill /T fallback）
+- TDD：派生隐藏孙进程 + 写 PID 文件，超时后断言孙进程已被杀（先红后绿）
+
 #### 验证（TDD）
 - bash_powershell_test.go 新增 1 例：描述含 Remove-Item / -LiteralPath /
   workspace / recursive / WindowStyle Hidden（先红后绿）

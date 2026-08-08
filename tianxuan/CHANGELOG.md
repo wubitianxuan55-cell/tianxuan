@@ -44,6 +44,17 @@
   （剩余阈值列表）；与成本 BudgetGate 硬门共存（软提醒不阻断）
 - TDD：4 例全绿（禁用/多阈值提醒/不重复/耗尽/降序）
 
+#### write_stdin 交互式进程管理（蒸馏 codex 核心能力）
+- 能力级差距：此前 bash 只能一次性喂 stdin（heredoc），无法与运行中的
+  后台进程交互（交互式 CLI/REPL/调试器/需逐步输入的程序）
+- bash 增加 interactive 参数（仅 run_in_background 生效）：建 io.Pipe
+  接 cmd.Stdin，job 注册写端；非交互 job 不建管道（命令不读 stdin 不卡死）
+- 新增 write_stdin 工具 {job_id, data}：写 stdin 后轮询最多 500ms 返回
+  job 最新输出，单次调用驱动一次 prompt/response 交换（对齐 codex
+  yield_time_ms）；未知 job/未设管道/已结束一律大声报错
+- TDD：jobs 包 3 例 + builtin 端到端 2 例（python 读 stdin 回显 got:hello
+  驱动真实交互；非交互 job 报错提示 interactive=true）全绿
+
 #### 验证（TDD）
 - bash_powershell_test.go 新增 1 例：描述含 Remove-Item / -LiteralPath /
   workspace / recursive / WindowStyle Hidden（先红后绿）

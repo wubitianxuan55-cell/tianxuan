@@ -111,3 +111,23 @@ func TestBashDescriptionReflectsShell(t *testing.T) {
 		t.Errorf("bash description should not mention PowerShell: %q", sh.Description())
 	}
 }
+
+// TestBashPowerShellDescriptionHasWindowsSafetyRules verifies the PowerShell
+// description embeds codex's windows_shell_guidance (distilled from
+// codex-rs/core/src/tools/handlers/shell_spec.rs): one-shell end-to-end file
+// ops, workspace-checked recursive deletes, and hidden background processes.
+func TestBashPowerShellDescriptionHasWindowsSafetyRules(t *testing.T) {
+	ps := bash{shell: sandbox.Shell{Kind: sandbox.ShellPowerShell, Path: "powershell"}}
+	d := ps.Description()
+	for _, want := range []string{
+		"Remove-Item",        // native cmdlet preferred over cmd /c composition
+		"-LiteralPath",       // avoid string-built paths for file operations
+		"workspace",          // verify resolved absolute target stays in workspace
+		"recursive",          // recursive delete/move guard
+		"WindowStyle Hidden", // Start-Process background helpers hidden
+	} {
+		if !strings.Contains(d, want) {
+			t.Errorf("powershell description should contain %q for Windows safety, got: %q", want, d)
+		}
+	}
+}

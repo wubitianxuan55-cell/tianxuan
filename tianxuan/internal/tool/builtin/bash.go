@@ -57,7 +57,14 @@ func (b bash) Description() string {
 			"The foreground timeout is set by the host (default 120s) and cannot be changed via arguments: " +
 			"timeout/timeout_seconds/description/cwd are NOT valid fields and will be rejected. " +
 			"For long-running servers/tunnels/watchers, " +
-			"you MUST use run_in_background=true — otherwise the process will be killed."
+			"you MUST use run_in_background=true — otherwise the process will be killed. " +
+			"Windows safety rules: do not compose destructive file commands across shells " +
+			"(e.g. enumerate paths in PowerShell then delete via cmd /c) — use one shell end-to-end, " +
+			"prefer native Remove-Item / Move-Item with -LiteralPath, avoid string-built commands for file ops. " +
+			"Before any recursive delete or move, verify the resolved absolute target paths stay within " +
+			"the workspace or an explicitly named target directory. " +
+			"When using Start-Process for a background helper/service, pass -WindowStyle Hidden " +
+			"unless the user explicitly asked for a visible window."
 	}
 	return "Execute a shell command with a 2-minute timeout. " +
 		"For long-running servers, tunnels, watchers, or daemons, you MUST use run_in_background=true " +

@@ -322,6 +322,20 @@ type AgentConfig struct {
 	// are offloaded to disk. Zero means use the default
 	// (offload.DefaultThresholdChars = 10000).
 	OffloadThresholdChars int `toml:"offload_threshold_chars"`
+
+	// TokenBudgetLimit is the per-session cumulative token cap (V10.173,
+	// distilled from codex rollout_budget). 0 disables. When set with
+	// TokenBudgetReminders, progressive user-message reminders fire as the
+	// remaining budget crosses each threshold, prompting the model to plan
+	// convergence (stop exploring, wrap up, split into a later session)
+	// before exhausting the budget. Unlike a cost gate this is a soft
+	// planning signal — it never blocks.
+	TokenBudgetLimit int64 `toml:"token_budget_limit"`
+	// TokenBudgetReminders are remaining-token thresholds at which a reminder
+	// fires; any order accepted (sorted descending internally). Empty
+	// disables reminders even when the limit is set. Example:
+	// token_budget_reminders = [1000000, 500000, 100000]
+	TokenBudgetReminders []int64 `toml:"token_budget_reminders"`
 }
 
 // SubagentTemp returns the effective temperature for task-tool sub-agents.

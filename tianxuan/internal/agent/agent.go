@@ -321,6 +321,9 @@ type AgentRunner struct {
 
 	// V5.15: Ԥ���ſء���׷�ٻỰ�ۼƷ��ã�80%����/100%��ϡ�
 	budgetGate *BudgetGate
+	// V10.173: 会话级 token 预算渐进提醒（蒸馏 codex rollout_budget）。
+	// 软信号：跨阈值注入 user 消息提醒模型规划收敛；与成本 budgetGate 硬门共存。
+	tokenBudget *TokenBudget
 	// lspManager runs LSP diagnostics on files modified by writer tools
 	// and injects results so the model can fix compilation errors.
 	lspManager interface {
@@ -758,6 +761,10 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 	// V5.15: Ԥ���ſ�
 	if opts.BudgetLimit > 0 {
 		r.budgetGate = NewBudgetGate(opts.BudgetLimit)
+	}
+	// V10.173: 会话级 token 预算渐进提醒（蒸馏 codex rollout_budget）
+	if opts.TokenBudgetLimit > 0 {
+		r.tokenBudget = NewTokenBudget(opts.TokenBudgetLimit, opts.TokenBudgetReminders)
 	}
 	// V5.17: Ӧ��ģ�����ø���ѹ����ֵ
 	if opts.ModelProfile != nil {

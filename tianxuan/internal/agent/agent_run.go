@@ -256,6 +256,17 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 					return buildTurnResult(turnFilesCreated, turnFilesModified, turnToolErrors, turnLastSummary, turnStepResults), fmt.Errorf("budget exceeded: %s", a.budgetGate.StatusMessage())
 				}
 			}
+			// V10.173: session-level token budget — progressive convergence
+			// reminders (distilled from codex rollout_budget). Uses the
+			// provider's session-cumulative tokens when present, else this
+			// turn's total. The reminder is a soft user-message signal; the
+			// hard stop remains the cost BudgetGate above.
+			if a.tokenBudget != nil {
+				if msg, ok := a.tokenBudget.Check(int64(usage.TotalTokens), int64(usage.SessionCacheHitTokens+usage.SessionCacheMissTokens+usage.CompletionTokens)); ok {
+					a.sink.Emit(event.Event{Kind: event.Notice, Level: event.LevelWarn, Text: msg})
+					a.session.Add(provider.Message{Role: provider.RoleUser, Content: msg})
+				}
+			}
 		}
 		// Phase 3: compute cache-shape fingerprint for TCCA diagnostics
 		if a.prefixFingerprintSet {

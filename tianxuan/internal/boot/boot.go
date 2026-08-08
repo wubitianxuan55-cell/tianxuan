@@ -381,6 +381,8 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 		OffloadThresholdChars: cfg.Agent.OffloadThresholdChars,
 		ToolStats:             toolStats,
 		ToolTrace:             toolTrace,
+		TokenBudgetLimit:      cfg.Agent.TokenBudgetLimit,
+		TokenBudgetReminders:  cfg.Agent.TokenBudgetReminders,
 	}, sink)
 	// V10.122: 技能自动触发 — executor/solo 收到输入时按确定性规则注入
 	// 匹配技能的 playbook（tdd/systematic-debugging 等）。规划轮

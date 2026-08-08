@@ -53,6 +53,17 @@ type Options struct {
 	// and warns at 80% / blocks at 100%.
 	BudgetLimit float64
 
+	// TokenBudgetLimit is the per-session cumulative token cap (V10.173,
+	// distilled from codex rollout_budget). <=0 disables. When set with
+	// TokenBudgetReminders, the agent injects progressive user-message
+	// reminders as the remaining token budget crosses each threshold,
+	// prompting the model to plan convergence before exhausting the budget.
+	TokenBudgetLimit int64
+	// TokenBudgetReminders are remaining-token thresholds (any order) at
+	// which a reminder fires. Empty disables reminders even when the limit
+	// is set.
+	TokenBudgetReminders []int64
+
 	// ModelProfile overrides compaction thresholds for specific models (V5.17).
 	// nil means use defaults from CompactionConfig.
 	ModelProfile *ModelProfile

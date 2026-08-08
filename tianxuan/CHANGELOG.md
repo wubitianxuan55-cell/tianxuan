@@ -23,12 +23,23 @@
 - executeOne 注入 searchToolsProvider 闭包（对齐 get_context_remaining
   注入模式）；ReadOnly + KindRead，plan mode 可用
 
+#### precheck 编辑失败报错补 nearest line
+- edit_file 被 precheck 拦截（old_string not found）时，报错只有 searched-for
+  + 文件前 200 字符，缺 Execute 路径已有的最近行提示，模型只能猜差异
+- 导出 builtin.NearestContentLine（原 nearestContentLine），precheckEditFile /
+  precheckMultiEdit 报错注入 "nearest line N: ..."，与 Execute 路径诊断对齐
+
 #### 验证（TDD）
 - bash_powershell_test.go 新增 1 例：描述含 Remove-Item / -LiteralPath /
   workspace / recursive / WindowStyle Hidden（先红后绿）
 - search_tool_test.go 11 例全绿：名字/描述命中、大小写、limit、名字优先
   排序、MCP 可搜、无命中空、空 query 报错、无注入报错、格式化、默认 limit
+- tool_precheck_test.go 新增 1 例：近似 old_string 拦截报错含 nearest line 3
+  与最近行文本（先红后绿）
 - agent 包仅 3 个预存 API 401 失败；boot 测试绿；go build/vet 干净
+- **trace-report 真实数据验证**：124 行 trace 仅 2 error（read_file 路径猜错
+  1 + edit_lines 锚点不匹配 1），错误率 1.6%，均有清晰诊断且模型自愈——
+  V10.154-171 错误率优化已生效，无紧急优化目标
 
 ---
 

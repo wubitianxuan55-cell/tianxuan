@@ -249,6 +249,7 @@ func (a *AgentRunner) executeOne(ctx context.Context, call provider.ToolCall) (o
 
 	cctx := withCallContext(ctx, call.ID, a.sink, a.asker)
 	cctx = withTokensLeft(cctx, a.tokensLeft)
+	cctx = withSearchTools(cctx, a.searchToolsProvider)
 	if a.evidence != nil {
 		cctx = evidence.WithLedger(cctx, a.evidence)
 	}

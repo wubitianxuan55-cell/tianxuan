@@ -254,6 +254,12 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// converge before the window overflows.
 	reg.Add(agent.NewContextRemainingTool())
 
+	// The `search_tool` lets the model discover tool names/purposes by
+	// functionality keywords (distilled from codex CLI's tool_search). The
+	// runner injects a directory-search provider; the tools schema list is
+	// never mutated at runtime, so the prefix-cache invariant holds.
+	reg.Add(agent.NewSearchTool())
+
 	// Skill tools: run_skill / install_skill plus the dedicated subagent wrappers
 	// (explore / research / review / security_review). A subagent skill reuses the
 	// sub-agent machinery via this runner — an isolated loop with the skill body

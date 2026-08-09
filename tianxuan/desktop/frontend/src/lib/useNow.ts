@@ -22,9 +22,17 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** Returns the current Unix timestamp in seconds, refreshed every 1s. */
-export function useNow(): number {
+/**
+ * Returns the current Unix timestamp in seconds, refreshed every 1s while
+ * `active` (default true). Pass `active=false` to opt out of the shared
+ * interval — e.g. a running-state timer that should only tick while running,
+ * avoiding needless re-renders when idle.
+ */
+export function useNow(active = true): number {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
-  useEffect(() => subscribe(() => setNow(Math.floor(Date.now() / 1000))), []);
+  useEffect(() => {
+    if (!active) return;
+    return subscribe(() => setNow(Math.floor(Date.now() / 1000)));
+  }, [active]);
   return now;
 }

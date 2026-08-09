@@ -306,7 +306,8 @@ export function useController() {
 // useItems 订阅 items 数组，与 useController 分离。
 // 流式输出时 items 高频变化（每次 text/reasoning 事件），通过独立 hook 避免
 // useController 的 store(s=>s) 全量订阅导致 App 树全局重渲染。
-// 使用 useShallow 做浅比较：仅当 items 长度或元素引用变化时才触发重渲染，
+// selector 直接返回 items 数组引用（zustand 默认 Object.is 比较）：
+// 流式事件新建数组 → 引用变化 → 本 hook 重渲染（必要，新内容要显示）；
 // 非 items 字段（meta/context/balance 等）的变化不会影响此 hook。
 export function useItems(): Item[] {
   return useStore(s => s.items);

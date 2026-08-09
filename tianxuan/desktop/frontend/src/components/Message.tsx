@@ -8,6 +8,7 @@ import { useGSAPCollapse } from "../lib/useGSAPCollapse";
 import { useAutoCollapse } from "../lib/useAutoCollapse";
 import { displayReasoningText } from "../lib/reasoningDisplay";
 import { useTurnStartAt } from "../lib/store";
+import { useNow } from "../lib/useNow";
 import { ProcessBrainIcon } from "./ProcessCard";
 import { displayUserText } from "../lib/messageText";
 import type { Item } from "../lib/store";
@@ -54,7 +55,9 @@ export const UserMessage = memo(function UserMessage({
           } text-fg leading-relaxed`}>
             {displayText}
           </div>
-          <div className="flex justify-end items-center gap-1 mt-0.5">
+          {/* relative：让 rewind 下拉菜单（absolute bottom-full right-0）相对本行
+              定位，而不是相对 .transcript-shell（消息流区域）错位 */}
+          <div className="relative flex justify-end items-center gap-1 mt-0.5">
             <CopyButton
               text={displayText}
               showInlineLabel={false}
@@ -119,6 +122,8 @@ export function ReasoningProcess({
   const turnStartAt = useTurnStartAt();
   const reasoningBodyRef = useRef<HTMLDivElement>(null);
   const reasoningRunning = !!(item.streaming && !item.text);
+  // 运行中订阅共享时钟，驱动 elapsed 每秒刷新（不运行时零订阅开销）
+  const now = useNow(reasoningRunning);
   const finalElapsedRef = useRef(0);
   const prevRunningRef = useRef(reasoningRunning);
 
@@ -140,7 +145,7 @@ export function ReasoningProcess({
     ? item.reasoning.split("\n").filter((l) => l.trim()).length
     : 0;
   const elapsed = reasoningRunning
-    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
+    ? (turnStartAt > 0 ? Math.max(0, now * 1000 - turnStartAt) : 0)
     : finalElapsedRef.current;
   const elapsedStr = elapsed < 60000
     ? `${Math.round(elapsed / 1000)}s`

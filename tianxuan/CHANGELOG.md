@@ -1,3 +1,30 @@
+## [10.176.0] — 2026-08-09
+
+### ✨ 桌面端 UI 打磨：思考/过程计时实时刷新 + rewind 菜单定位修复
+
+#### 思考中/过程中耗时实时刷新（蒸馏自 useNow 共享时钟）
+- `ReasoningProcess`（思考卡）与 `TurnCollapse`（过程卡）运行中显示"已工作 Ns"，
+  但此前只在渲染时取 `Date.now()`，无刷新机制——流式思考阶段事件稀疏时
+  计时冻结在最后一次渲染时刻
+- `useNow` 新增 `active` 参数：`useNow(running)` 仅在运行中订阅全局共享 1s
+  时钟，驱动 elapsed 每秒刷新；不运行时零订阅开销（原有调用方不受影响）
+- ToolCard 保持"完成后才显示耗时"的设计不变（注释明确避免每秒重渲染）
+- 新增 `useNow.test.ts` 4 例（happy-dom）：tick / 不 tick / false→true 开始 /
+  true→false 停止；`vi.resetModules()` 隔离模块级 listeners 状态防跨测试泄漏
+
+#### rewind 下拉菜单定位修复
+- 回退菜单 `absolute bottom-full right-0` 的祖先链无 `relative`，实际相对
+  `.transcript-shell`（整个消息流区域）定位——菜单出现在消息流右上方而非
+  气泡上方，点击后几乎不可见
+- 修复：按钮行容器加 `relative`，菜单相对气泡右上角正上方弹出
+
+#### useItems 注释诚实化
+- `store.ts` 原注释声称"使用 useShallow 做浅比较"，实际是普通 selector
+  （zustand 默认 Object.is 比较数组引用）；修正注释如实描述订阅语义
+
+- 验证：vitest 156 例全绿（含新增 useNow 4 例）· `tsc --noEmit` 0 错误 ·
+  `vite build` 通过（8.3s）· 引入 happy-dom + @testing-library/react 测试基础设施
+
 ## [10.175.1] — 2026-08-08
 
 ### 🐛 修复：生成结束后输出和过程全部不可见

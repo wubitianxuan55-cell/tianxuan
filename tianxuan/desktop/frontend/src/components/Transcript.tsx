@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowDown, ChevronRight, Wrench } from "lucide-react";
 import type { Item } from "../lib/store";
 import { useItems, useTurnStartAt } from "../lib/store";
+import { useNow } from "../lib/useNow";
 import { AssistantMessage, UserMessage } from "./Message";
 import { StreamingIndicator } from "./StreamingIndicator";
 import { ToolCard } from "./ToolCard";
@@ -106,6 +107,8 @@ function TurnCollapse({ items, toolCount, thoughtCount, running = false }: { ite
   const bodyRef = useRef<HTMLDivElement>(null);
   const display = useMemo(() => collapseDisplayItems(items), [items]);
   const turnStartAt = useTurnStartAt();
+  // 运行中订阅共享时钟，驱动 elapsed 每秒刷新（不运行时零订阅开销）
+  const now = useNow(running);
   const finalElapsedRef = useRef(0);
 
   useGSAPCollapse(bodyRef, open);
@@ -173,7 +176,7 @@ type Segment = { kind: "thought"; nodes: React.ReactNode[] } | { kind: "tools"; 
   if (display.length === 0) return null;
 
   const elapsed = running
-    ? (turnStartAt > 0 ? Math.max(0, Date.now() - turnStartAt) : 0)
+    ? (turnStartAt > 0 ? Math.max(0, now * 1000 - turnStartAt) : 0)
     : finalElapsedRef.current;
   const elapsedStr = elapsed > 0 ? (elapsed < 60000 ? `${Math.round(elapsed / 1000)}s` : `${Math.floor(elapsed / 60000)}m${Math.round((elapsed % 60000) / 1000)}s`) : "";
 

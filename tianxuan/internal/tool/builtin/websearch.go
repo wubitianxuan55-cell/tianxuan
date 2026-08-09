@@ -9,7 +9,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	nethtml "golang.org/x/net/html"
 
 	"tianxuan/internal/tool"
 )
@@ -19,10 +24,10 @@ func init() { tool.RegisterBuiltin(webSearch{}) }
 type webSearch struct{}
 
 const (
-	webSearchTimeout    = 15 * time.Second  // per-engine HTTP timeout
-	webSearchMaxRetries = 1                 // retries per engine: 0, 1 (= 1 retry)
-	webSearchMaxRead    = 512 << 10         // 512 KB
-	webSearchTotalLimit = 20 * time.Second  // total execution deadline
+	webSearchTimeout    = 15 * time.Second // per-engine HTTP timeout
+	webSearchMaxRetries = 1                // retries per engine: 0, 1 (= 1 retry)
+	webSearchMaxRead    = 512 << 10        // 512 KB
+	webSearchTotalLimit = 20 * time.Second // total execution deadline
 )
 
 // --- search engine interface ---
@@ -59,8 +64,8 @@ func (webSearch) Schema() json.RawMessage {
 func (webSearch) ReadOnly() bool { return true }
 func (webSearch) Kind() tool.ToolKind { return tool.KindFetch }
 
-func (webSearch) CompactDescription() string { return compactDesc["web_search"] }
-func (webSearch) CompactSchema() json.RawMessage   { return compactSchema["web_search"] }
+func (webSearch) CompactDescription() string     { return compactDesc["web_search"] }
+func (webSearch) CompactSchema() json.RawMessage { return compactSchema["web_search"] }
 
 // engineError records a failed engine attempt for diagnostics.
 type engineError struct {
@@ -182,42 +187,237 @@ func (webSearch) buildEngines() []searchEngine {
 		engines = append(engines, &braveEngine{apiKey: cfg.BraveKey()})
 	}
 
-	// 4. Public SearXNG instances (always available as fallback)
+	// 4. Bing HTML — free fallback that works without an API key.
+	engines = append(engines, &bingEngine{})
+
+	// 5. Public SearXNG instances (last fallback)
 	engines = append(engines, &publicSearxNGEngine{})
 
 	return engines
 }
 
+// --- Bing HTML Engine (free fallback) ---
+
+type bingEngine struct{}
+
+func (e *bingEngine) Name() string    { return "bing" }
+func (e *bingEngine) Available() bool { return true }
+
+func (e *bingEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
+	searchURL := fmt.Sprintf("https://www.bing.com/search?q=%s&count=%d&setlang=zh-CN",
+		url.QueryEscape(query), limit)
+	body, err := doSearchRequest(ctx, searchHTTPClient(), func(reqCtx context.Context) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, searchURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+		req.Header.Set("Accept", "text/html,application/xhtml+xml")
+		return req, nil
+	}, webSearchMaxRetries)
+	if err != nil {
+		return nil, err
+	}
+	return parseBingResults(body, limit)
+}
+
+// parseBingResults extracts organic results (li.b_algo) from Bing HTML.
+func parseBingResults(body []byte, limit int) ([]searchResult, error) {
+	doc, err := nethtml.Parse(strings.NewReader(string(body)))
+	if err != nil {
+		return nil, fmt.Errorf("parse Bing response: %w", err)
+	}
+	var results []searchResult
+	var walk func(*nethtml.Node)
+	walk = func(n *nethtml.Node) {
+		if len(results) >= limit {
+			return
+		}
+		if n.Type == nethtml.ElementNode && n.Data == "li" && hasHTMLClass(n, "b_algo") {
+			if r, ok := extractBingResult(n); ok {
+				results = append(results, r)
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no organic results in Bing response")
+	}
+	return results, nil
+}
+
+// extractBingResult pulls title/url from the first h2>a and snippet from the
+// first <p> inside an organic result block.
+func extractBingResult(li *nethtml.Node) (searchResult, bool) {
+	var r searchResult
+	var walk func(*nethtml.Node)
+	walk = func(n *nethtml.Node) {
+		if n.Type == nethtml.ElementNode && n.Data == "a" && r.URL == "" {
+			if href := htmlAttrValue(n, "href"); strings.HasPrefix(href, "http") {
+				r.URL = href
+				r.Title = nodeText(n)
+				return
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(li)
+	if r.URL == "" || r.Title == "" {
+		return r, false
+	}
+
+	r.Source = "bing"
+	r.Title = strings.TrimSpace(r.Title)
+	for c := li.FirstChild; c != nil; c = c.NextSibling {
+		if txt := findSnippet(c); txt != "" {
+			r.Snippet = truncate(txt, 300)
+			break
+		}
+	}
+	return r, true
+}
+
+// findSnippet returns the first <p> text under a node, or "".
+func findSnippet(n *nethtml.Node) string {
+	if n.Type == nethtml.ElementNode && n.Data == "p" {
+		return strings.TrimSpace(nodeText(n))
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if txt := findSnippet(c); txt != "" {
+			return txt
+		}
+	}
+	return ""
+}
+
+// nodeText concatenates all text under a node.
+func nodeText(n *nethtml.Node) string {
+	var b strings.Builder
+	var walk func(*nethtml.Node)
+	walk = func(n *nethtml.Node) {
+		if n.Type == nethtml.TextNode {
+			b.WriteString(n.Data)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return strings.TrimSpace(b.String())
+}
+
+func hasHTMLClass(n *nethtml.Node, cls string) bool {
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, "class") {
+			for _, c := range strings.Fields(a.Val) {
+				if c == cls {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func htmlAttrValue(n *nethtml.Node, name string) string {
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, name) {
+			return a.Val
+		}
+	}
+	return ""
+}
+
 // --- HTTP client ---
+
+// sharedSearchTransport keeps a connection pool across search calls so DNS
+// lookups and TLS handshakes are reused instead of rebuilt per request.
+var (
+	searchTransportOnce   sync.Once
+	sharedSearchTransport *http.Transport
+)
 
 func searchHTTPClient() *http.Client {
 	timeout := webSearchTimeout
 	if searchCfg != nil {
 		timeout = searchCfg.SearchTimeout()
 	}
-	dialer := &net.Dialer{Timeout: timeout}
 	return &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, err := net.SplitHostPort(addr)
-				if err != nil {
-					return nil, err
-				}
-				ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-				if err != nil {
-					return nil, err
-				}
-				for _, ip := range ips {
-					if blockedFetchIP(ip.IP) {
-						return nil, fmt.Errorf("refusing to connect to internal address %s", host)
-					}
-				}
-				return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
-			},
-			ForceAttemptHTTP2: false,
-		},
+		Timeout:   timeout,
+		Transport: searchTransport(),
 	}
+}
+
+func searchTransport() *http.Transport {
+	searchTransportOnce.Do(func() {
+		sharedSearchTransport = buildSearchTransport()
+	})
+	return sharedSearchTransport
+}
+
+func buildSearchTransport() *http.Transport {
+	timeout := webSearchTimeout
+	if searchCfg != nil {
+		timeout = searchCfg.SearchTimeout()
+	}
+	dialer := &net.Dialer{Timeout: timeout}
+	return &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := resolveAllowedSearchIPs(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			var lastErr error
+			for _, ip := range ips {
+				conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+				if err == nil {
+					return conn, nil
+				}
+				lastErr = err
+			}
+			if lastErr == nil {
+				lastErr = fmt.Errorf("no reachable address for %s", host)
+			}
+			return nil, lastErr
+		},
+		ForceAttemptHTTP2: false,
+	}
+}
+
+// lookupSearchIPs resolves a host to IP addresses. A variable so tests can
+// substitute a deterministic resolver.
+var lookupSearchIPs = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+	return net.DefaultResolver.LookupIPAddr(ctx, host)
+}
+
+// resolveAllowedSearchIPs resolves host and returns only IPs web_search may
+// connect to. Private, link-local, unspecified and CGNAT addresses are refused
+// (SSRF guard); empty resolutions are an error, never an empty success.
+func resolveAllowedSearchIPs(ctx context.Context, host string) ([]net.IP, error) {
+	addrs, err := lookupSearchIPs(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no IP addresses found for %s", host)
+	}
+	out := make([]net.IP, 0, len(addrs))
+	for _, a := range addrs {
+		if blockedFetchIP(a.IP) {
+			return nil, fmt.Errorf("refusing to connect to internal address %s", host)
+		}
+		out = append(out, a.IP)
+	}
+	return out, nil
 }
 
 // --- Local SearXNG Engine ---
@@ -225,7 +425,7 @@ func searchHTTPClient() *http.Client {
 type localSearxNGEngine struct{ baseURL string }
 
 func (e *localSearxNGEngine) Name() string    { return "local-searxng" }
-func (e *localSearxNGEngine) Available() bool  { return e.baseURL != "" }
+func (e *localSearxNGEngine) Available() bool { return e.baseURL != "" }
 func (e *localSearxNGEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
 	return trySearXNG(ctx, e.baseURL, query, limit)
 }
@@ -244,26 +444,69 @@ var publicSearxNGInstances = []string{
 
 type publicSearxNGEngine struct{}
 
-func (e *publicSearxNGEngine) Name() string   { return "public-searxng" }
+func (e *publicSearxNGEngine) Name() string    { return "public-searxng" }
 func (e *publicSearxNGEngine) Available() bool { return true }
 func (e *publicSearxNGEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
-	var lastErr error
+	// Fire every public instance in parallel: the first instance with results
+	// wins, and the overall call stays within one engine timeout instead of
+	// serializing N timeouts (which would exceed the total execution limit).
+	type outcome struct {
+		results []searchResult
+		err     error
+	}
+	ch := make(chan outcome, len(publicSearxNGInstances))
+	ctx, cancel := context.WithTimeout(ctx, webSearchTimeout)
+	defer cancel()
+
 	for _, baseURL := range publicSearxNGInstances {
-		results, err := trySearXNG(ctx, baseURL, query, limit)
-		if err == nil && len(results) > 0 {
-			return results, nil
+		baseURL := baseURL
+		go func() {
+			results, err := trySearXNG(ctx, baseURL, query, limit)
+			ch <- outcome{results: results, err: err}
+		}()
+	}
+
+	var lastErr error
+	for i := 0; i < len(publicSearxNGInstances); i++ {
+		select {
+		case o := <-ch:
+			if o.err == nil && len(o.results) > 0 {
+				return o.results, nil
+			}
+			if o.err != nil {
+				lastErr = o.err
+			} else {
+				lastErr = fmt.Errorf("no results")
+			}
+		case <-ctx.Done():
+			if lastErr == nil {
+				lastErr = ctx.Err()
+			}
+			return nil, lastErr
 		}
-		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("all public SearXNG instances returned no results")
 	}
 	return nil, lastErr
 }
 
 // --- Tavily Search API Engine ---
 
-type tavilyEngine struct{ apiKey string }
+type tavilyEngine struct {
+	apiKey  string
+	baseURL string // test override; empty = official API
+}
 
-func (e *tavilyEngine) Name() string   { return "tavily" }
+func (e *tavilyEngine) Name() string    { return "tavily" }
 func (e *tavilyEngine) Available() bool { return e.apiKey != "" }
+
+func (e *tavilyEngine) endpoint() string {
+	if e.baseURL != "" {
+		return e.baseURL
+	}
+	return "https://api.tavily.com/search"
+}
 
 type tavilyRequest struct {
 	Query         string `json:"query"`
@@ -283,7 +526,7 @@ type tavilyResponse struct {
 }
 
 func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
-	body, err := json.Marshal(tavilyRequest{
+	payload, err := json.Marshal(tavilyRequest{
 		Query:      query,
 		MaxResults: limit,
 	})
@@ -291,35 +534,26 @@ func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]s
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.tavily.com/search", strings.NewReader(string(body)))
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+e.apiKey)
-	httpReq.Header.Set("User-Agent", "tianxuan/1.0")
-
-	resp, err := searchHTTPClient().Do(httpReq)
+	body, err := doSearchRequest(ctx, searchHTTPClient(), func(reqCtx context.Context) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, e.endpoint(), strings.NewReader(string(payload)))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+e.apiKey)
+		req.Header.Set("User-Agent", "tianxuan/1.0")
+		return req, nil
+	}, webSearchMaxRetries)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, webSearchMaxRead))
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var tr tavilyResponse
-	if err := json.Unmarshal(respBody, &tr); err != nil {
+	if err := json.Unmarshal(body, &tr); err != nil {
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
-// Tavily
+	// Tavily
 	results := make([]searchResult, 0, limit)
 	for _, r := range tr.Results {
 		if len(results) >= limit {
@@ -337,10 +571,20 @@ func (e *tavilyEngine) Search(ctx context.Context, query string, limit int) ([]s
 
 // --- Brave Search API Engine ---
 
-type braveEngine struct{ apiKey string }
+type braveEngine struct {
+	apiKey  string
+	baseURL string // test override; empty = official API
+}
 
-func (e *braveEngine) Name() string   { return "brave" }
+func (e *braveEngine) Name() string    { return "brave" }
 func (e *braveEngine) Available() bool { return e.apiKey != "" }
+
+func (e *braveEngine) endpoint() string {
+	if e.baseURL != "" {
+		return e.baseURL
+	}
+	return "https://api.search.brave.com/res/v1/web/search"
+}
 
 type braveResponse struct {
 	Web struct {
@@ -353,39 +597,29 @@ type braveResponse struct {
 }
 
 func (e *braveEngine) Search(ctx context.Context, query string, limit int) ([]searchResult, error) {
-	searchURL := fmt.Sprintf("https://api.search.brave.com/res/v1/web/search?q=%s&count=%d",
-		url.QueryEscape(query), limit)
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	httpReq.Header.Set("Accept", "application/json")
-	httpReq.Header.Set("Accept-Encoding", "gzip")
-	httpReq.Header.Set("X-Subscription-Token", e.apiKey)
-	httpReq.Header.Set("User-Agent", "tianxuan/1.0")
-
-	resp, err := searchHTTPClient().Do(httpReq)
+	// Accept-Encoding is intentionally left unset: Go's http.Transport then
+	// advertises gzip itself and transparently decompresses the response.
+	body, err := doSearchRequest(ctx, searchHTTPClient(), func(reqCtx context.Context) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+			fmt.Sprintf("%s?q=%s&count=%d", e.endpoint(), url.QueryEscape(query), limit), nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-Subscription-Token", e.apiKey)
+		req.Header.Set("User-Agent", "tianxuan/1.0")
+		return req, nil
+	}, webSearchMaxRetries)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, webSearchMaxRead))
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var br braveResponse
-	if err := json.Unmarshal(respBody, &br); err != nil {
+	if err := json.Unmarshal(body, &br); err != nil {
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
-// Brave
+	// Brave
 	results := make([]searchResult, 0, limit)
 	for _, r := range br.Web.Results {
 		if len(results) >= limit {
@@ -404,21 +638,38 @@ func (e *braveEngine) Search(ctx context.Context, query string, limit int) ([]se
 // --- shared SearXNG implementation ---
 
 func trySearXNG(ctx context.Context, baseURL, query string, limit int) ([]searchResult, error) {
-	searchURL := fmt.Sprintf("%s/search?%s", strings.TrimRight(baseURL, "/"),
-		"q="+url.QueryEscape(query)+"&format=json&language=zh-CN&safesearch=1")
+	params := url.Values{}
+	params.Set("q", query)
+	params.Set("format", "json")
+	params.Set("safesearch", "1")
+	if lang := searchLanguageParam(query); lang != "" {
+		params.Set("language", lang)
+	}
+	searchURL := fmt.Sprintf("%s/search?%s", strings.TrimRight(baseURL, "/"), params.Encode())
 
 	client := searchHTTPClient()
-	body, err := doSearchRequest(ctx, client, searchURL, webSearchMaxRetries)
+	body, err := doSearchRequest(ctx, client, func(reqCtx context.Context) (*http.Request, error) {
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, searchURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; tianxuan/1.0)")
+		req.Header.Set("Accept", "text/html,application/json")
+		return req, nil
+	}, webSearchMaxRetries)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp searxNGResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
+		if looksLikeHTML(string(body)) {
+			return nil, fmt.Errorf("instance blocked automated access (bot-protection page returned)")
+		}
 		return nil, fmt.Errorf("parse SearXNG response: %w", err)
 	}
 
-// SearXNG
+	// SearXNG
 	results := make([]searchResult, 0, limit)
 	for _, r := range resp.Results {
 		if len(results) >= limit {
@@ -444,7 +695,9 @@ type searxNGResponse struct {
 
 // --- shared HTTP ---
 
-func doSearchRequest(ctx context.Context, client *http.Client, urlStr string, maxRetries int) ([]byte, error) {
+// doSearchRequest runs an HTTP request with retries on transient failures.
+// buildReq is called per attempt so request bodies are fresh on retry.
+func doSearchRequest(ctx context.Context, client *http.Client, buildReq func(context.Context) (*http.Request, error), maxRetries int) ([]byte, error) {
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -457,35 +710,61 @@ func doSearchRequest(ctx context.Context, client *http.Client, urlStr string, ma
 		}
 
 		reqCtx, cancel := context.WithTimeout(ctx, webSearchTimeout)
-		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, urlStr, nil)
+		req, err := buildReq(reqCtx)
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("build request: %w", err)
 		}
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; tianxuan/1.0)")
-		req.Header.Set("Accept", "text/html,application/json")
 
 		resp, err := client.Do(req)
-		cancel()
 		if err != nil {
+			cancel()
 			lastErr = err
 			continue
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			// Rate limits do not clear within one retry window; retrying only
+			// burns time that other engines could use.
+			cancel()
+			resp.Body.Close()
+			return nil, fmt.Errorf("search engine rate-limited (HTTP 429)")
+		}
+		if resp.StatusCode == http.StatusServiceUnavailable ||
+			resp.StatusCode >= http.StatusInternalServerError {
+			cancel()
 			lastErr = fmt.Errorf("search engine returned %d", resp.StatusCode)
+			resp.Body.Close()
 			continue
 		}
 
 		body, err := io.ReadAll(io.LimitReader(resp.Body, webSearchMaxRead))
+		// Cancel only after the body is fully read: cancelling earlier aborts
+		// large responses mid-transfer.
+		cancel()
+		resp.Body.Close()
 		if err != nil {
 			lastErr = fmt.Errorf("read body: %w", err)
 			continue
 		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("search engine returned HTTP %d: %s", resp.StatusCode, truncate(string(body), 300))
+		}
 		return body, nil
 	}
-	return nil, fmt.Errorf("search failed after %d retries: %w", maxRetries+1, lastErr)
+	return nil, fmt.Errorf("search failed after %d attempts: %w", maxRetries+1, lastErr)
+}
+
+// searchLanguageParam picks a SearXNG language hint from the query. CJK
+// queries search zh-CN; Latin-only queries leave language unset so SearXNG
+// picks the best locale itself instead of forcing Chinese results.
+func searchLanguageParam(query string) string {
+	for _, r := range query {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+			return "zh-CN"
+		}
+	}
+	return ""
 }
 
 // --- formatting ---
@@ -503,10 +782,11 @@ func formatResults(results []searchResult) string {
 
 func truncate(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
-	if len(s) <= maxLen {
+	if maxLen <= 0 || utf8.RuneCountInString(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen]
+	runes := []rune(s)
+	return string(runes[:maxLen])
 }
 
 type searchResult struct {

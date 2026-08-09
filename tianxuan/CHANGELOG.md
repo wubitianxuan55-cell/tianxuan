@@ -1,3 +1,18 @@
+## [10.177.0] — 2026-08-09
+
+### 🔍 web_search 免费 Bing 引擎 fallback（国内可用，无需 API key）
+
+- **bingEngine**：解析 Bing HTML（li.b_algo）提取 title/url/snippet，无 key 免费可用，
+  引擎优先级调整为 local SearXNG → Tavily → Brave → **Bing** → public SearXNG
+- **searchLanguageParam**：CJK（中文/日文）查询自动附加 zh-CN 语言提示，拉丁查询不强制语言
+- **重构**：searchHTTPClient 共享连接池（sync.Once 复用 DNS/TLS）；
+  doSearchRequest 改为 buildReq 回调签名（支持自定义 User-Agent）
+- **SSRF 防护增强**：resolveAllowedSearchIPs 遍历全部解析 IP 逐个尝试连接，
+  私有/链路本地/CGNAT 地址拒绝，空解析报错而非静默成功
+- **测试**：新增 12 例（Bing 解析/限流/无结果、语言参数、UTF-8 截断、SSRF IP 过滤、
+  gzip 解码、Tavily 解析、SearXNG 重试/挑战页），builtin 包全绿
+
+
 ## [10.176.2] — 2026-08-09
 
 ### 🧪 核心交互组件测试覆盖（二）：Composer 输入区 + ToolCard 工具卡

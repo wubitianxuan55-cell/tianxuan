@@ -75,6 +75,10 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	}
 	protocol, _ := cfg.Extra["reasoning_protocol"].(string)
 	protocol = normalizeReasoningProtocol(protocol)
+	rateLimitRetry := true
+	if v, ok := cfg.Extra["rate_limit_retry"].(bool); ok {
+		rateLimitRetry = v
+	}
 	deepseek := protocol == "deepseek" || (protocol == "" && IsDeepSeek(cfg.BaseURL))
 	minimax := protocol == "" && IsMiniMax(cfg.BaseURL)
 	switch {
@@ -114,6 +118,7 @@ func New(cfg provider.Config) (provider.Provider, error) {
 		effort:   effort,
 		deepseek: deepseek,
 		minimax:  minimax,
+		rateLimitRetry: rateLimitRetry,
 		http:     getSharedClient(strings.TrimRight(cfg.BaseURL, "/")),
 	}, nil
 }
@@ -127,6 +132,12 @@ type client struct {
 	model    string
 	http     *http.Client
 	effort   string // reasoning_effort for OpenAI; thinking.type for MiniMax; "" = auto/provider default
+	// rateLimitRetry controls whether a 429 is retried inside the provider
+	// (Retry-After + backoff, up to RateLimitRetryPolicy.MaxAttempts). Gateways
+	// like OpenCode Zen return 429 for quota exhaustion (FreeUsageLimitError),
+	// where waiting out the header is pure waste — fail fast so an outer
+	// failover chain can switch candidates instead of hanging for minutes.
+	rateLimitRetry bool
 	deepseek bool   // auto-detected: api.deepseek.com or reasoning_protocol=deepseek
 	minimax  bool   // auto-detected: *.minimaxi.com (requires thinking.type, not reasoning_effort)
 }
@@ -178,7 +189,7 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 			var delay time.Duration
 			if isRateLimit(lastErr) {
 				rateLimitCount++
-				if rateLimitCount >= rlPolicy.MaxAttempts {
+				if rateLimitCount >= rlPolicy.MaxAttempts || !c.rateLimitRetry {
 					return nil, fmt.Errorf("%s: rate limited after %d attempts", c.name, rateLimitCount)
 				}
 				delay = rlPolicy.Backoff.Duration(rateLimitCount - 1)
@@ -231,6 +242,11 @@ func (c *client) sendWithRetry(ctx context.Context, body []byte) (*http.Response
 		}
 		statusErr := &httpStatusError{name: c.name, code: resp.StatusCode, body: strings.TrimSpace(string(msg))}
 		if !provider.IsRetryableStatus(resp.StatusCode) {
+			return nil, statusErr
+		}
+		if isRateLimit(statusErr) && !c.rateLimitRetry {
+			// Gateway quota exhaustion — don't wait out Retry-After/backoff.
+			// Return the 429 now so an outer failover chain switches candidate.
 			return nil, statusErr
 		}
 		if d := provider.ParseRetryAfter(resp, 120*time.Second); d > 0 {

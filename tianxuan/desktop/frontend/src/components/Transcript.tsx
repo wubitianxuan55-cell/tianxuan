@@ -14,7 +14,7 @@ import { ReadOnlyBatch } from "./ReadOnlyBatch";
 import { ProcessBrainIcon, ProcessPhaseIcon } from "./ProcessCard";
 import { displayReasoningText } from "../lib/reasoningDisplay";
 import { isNearBottom, shouldFollowAfterGrow } from "../lib/scrollFollow";
-import { buildTurnGroups, createWarmLayerState, warmPagination, warmUserPreview, warmLayerWithExpandedTurn, warmLayerWithNextColdPage, compactQuestionText, questionAnchorId, type WarmLayerState, type QuestionAnchor } from "../lib/transcriptGrouping";
+import { buildRenderSegments, buildTurnGroups, createWarmLayerState, warmPagination, warmUserPreview, warmLayerWithExpandedTurn, warmLayerWithNextColdPage, compactQuestionText, questionAnchorId, type WarmLayerState, type QuestionAnchor } from "../lib/transcriptGrouping";
 
 // ── Scroll helpers ──────────────────────────────────────────────────────
 const NOOP_SCROLL = () => {};
@@ -350,8 +350,11 @@ export function Transcript({
   const turnCount = turnGroups.length;
   // V10.175: 每轮结束后整轮折叠成一张大过程卡（蒸馏自用户偏好——"过程
   // 卡"工作流）。running 时保留最新轮展开（生成中保持"文本↔过程卡"
-  // 交替展示），生成结束后全部轮收进折叠卡，只留最终正文在外面。
-  const hotTurns = running ? 1 : 0;
+  // 交替展示），生成结束后旧轮收进折叠卡，最新轮（提问+思考+工具+最终
+  // 正文）始终留在外面。
+  // 修复：原实现 running ? 1 : 0 在生成结束后把最新一轮也收进折叠卡，
+  // 导致输出和过程全部不可见。
+  const hotTurns = 1;
   const { warmStartTurn, warmEndTurn, coldTurnCount } = useMemo(
     () => warmPagination({ turnCount, hotTurns, pageSize: WARM_PAGE_SIZE, coldPage: warmState.coldPage }),
     [turnCount, hotTurns, warmState.coldPage],
@@ -419,45 +422,7 @@ export function Transcript({
   const scrollDown = useCallback(() => { stick.current = true; setShowScrollDown(false); scrollToBottom(); }, [scrollToBottom]);
 
   const renderItems = useMemo(() => {
-    const segments: { processItems: Item[]; outsideItems: Item[] }[] = [];
-    let curProcess: Item[] = [];
-    let curOutside: Item[] = [];
-
-    const flush = () => {
-      if (curProcess.length > 0 || curOutside.length > 0) {
-        segments.push({ processItems: curProcess, outsideItems: curOutside });
-        curProcess = []; curOutside = [];
-      }
-    };
-
-    for (const it of items) {
-      if (it.kind === "user") {
-        flush();
-        segments.push({ processItems: [], outsideItems: [it] });
-        continue;
-      }
-      if (it.kind === "assistant") {
-        if (it.text) {
-          if (curOutside.length > 0) flush();
-          if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
-          curOutside.push({ ...it, reasoning: "" } as Item);
-        } else {
-          if (curOutside.length > 0) flush();
-          curProcess.push(it);
-        }
-        continue;
-      }
-      if (curOutside.length > 0) flush();
-      if (it.kind === "tool" || it.kind === "compaction" || it.kind === "notice") {
-        curProcess.push(it);
-      } else if (it.kind === "phase") {
-        curOutside.push(it);
-      } else {
-        curOutside.push(it);
-      }
-    }
-    flush();
-    return segments;
+    return buildRenderSegments(items);
   }, [items]);
 
   const renderSegmentGroups = useCallback((segItems: Item[]) => {

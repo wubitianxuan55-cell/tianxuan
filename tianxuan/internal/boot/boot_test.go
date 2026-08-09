@@ -65,6 +65,51 @@ func TestForkContextTextTruncates(t *testing.T) {
 	}
 }
 
+// captureProvider is a minimal Provider stub that records the Config it was
+// built with, letting tests assert what boot forwards to provider factories.
+type captureProvider struct{ cfg provider.Config }
+
+func (p *captureProvider) Name() string { return p.cfg.Name }
+
+func (p *captureProvider) Stream(ctx context.Context, _ provider.Request) (<-chan provider.Chunk, error) {
+	ch := make(chan provider.Chunk)
+	close(ch)
+	return ch, nil
+}
+
+// TestBuildProviderForwardsReasoningProtocol guards the config plumbing for the
+// DeepSeek thinking round-trip: a user-set reasoning_protocol must reach the
+// provider factory via Config.Extra (it previously silently died in boot, so
+// Zen deepseek models 400'd with "reasoning_content ... must be passed back").
+func TestBuildProviderForwardsReasoningProtocol(t *testing.T) {
+	kind := "capture-reasoning-__" + t.Name()
+	var got provider.Config
+	provider.Register(kind, func(cfg provider.Config) (provider.Provider, error) {
+		got = cfg
+		return &captureProvider{cfg: cfg}, nil
+	})
+
+	p, err := buildProvider(&config.ProviderEntry{
+		Kind:              kind,
+		Name:              "zen",
+		BaseURL:           "https://opencode.ai/zen/v1",
+		Model:             "deepseek-v4-flash-free",
+		ReasoningProtocol: "deepseek",
+	}, "deepseek-v4-flash-free")
+	if err != nil {
+		t.Fatalf("buildProvider: %v", err)
+	}
+	if got.Name != "zen" || got.Model != "deepseek-v4-flash-free" {
+		t.Fatalf("Config forwarded wrong identity: %+v", got)
+	}
+	if got.Extra["reasoning_protocol"] != "deepseek" {
+		t.Errorf("Extra[reasoning_protocol] = %v, want \"deepseek\"", got.Extra["reasoning_protocol"])
+	}
+	if p.Name() != "zen" {
+		t.Errorf("provider Name = %q, want zen", p.Name())
+	}
+}
+
 // TestBuildFoldsProjectMemoryIntoSystemPrompt is the end-to-end proof of the
 // cache-first wiring: a project TIANXUAN.md is discovered at boot and folded
 // into the session's system message (the cached prefix), and the `remember`

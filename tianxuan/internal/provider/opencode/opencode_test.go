@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -119,5 +120,99 @@ func TestNewAnthropicStripsZenV1(t *testing.T) {
 	})
 	if gotPath != "/zen/v1/messages" {
 		t.Fatalf("request path = %q, want %q", gotPath, "/zen/v1/messages")
+	}
+}
+
+// TestNewChatDeepSeekRoundTripsReasoning pins the Zen DeepSeek 400 regression:
+// Zen serves deepseek-* models on /chat/completions but its base URL is
+// opencode.ai, so the openai backend cannot detect DeepSeek by host. The
+// opencode factory must declare the deepseek reasoning protocol explicitly —
+// thinking.type=enabled in the request and reasoning_content round-tripped on
+// the assistant tool_calls turn (the upstream API otherwise rejects the history
+// with "The `reasoning_content` in the thinking mode must be passed back").
+func TestNewChatDeepSeekRoundTripsReasoning(t *testing.T) {
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	p, err := New(provider.Config{
+		Name:    "zen",
+		BaseURL: srv.URL,
+		Model:   "deepseek-v4-flash-free",
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ch, err := p.Stream(context.Background(), provider.Request{
+		Messages: []provider.Message{
+			{Role: provider.RoleUser, Content: "read the config"},
+			{Role: provider.RoleAssistant, Content: "", ReasoningContent: "REQUIRED-REASONING", ToolCalls: []provider.ToolCall{{ID: "call_1", Name: "read_file", Arguments: `{"path":"x"}`}}},
+			{Role: provider.RoleTool, Content: "ok", ToolCallID: "call_1", Name: "read_file"},
+			{Role: provider.RoleAssistant, Content: "plain answer", ReasoningContent: "PRIVATE-REASONING"},
+			{Role: provider.RoleUser, Content: "thanks"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	for range ch {
+	}
+	body := string(gotBody)
+	if !strings.Contains(body, `"thinking":{"type":"enabled"}`) {
+		t.Errorf("request must carry thinking.type=enabled for a Zen deepseek model:\n%s", body)
+	}
+	if !strings.Contains(body, "REQUIRED-REASONING") {
+		t.Errorf("assistant tool_calls turn must round-trip reasoning_content:\n%s", body)
+	}
+	if strings.Contains(body, "PRIVATE-REASONING") {
+		t.Errorf("plain assistant turn must not echo reasoning_content (billed prompt input):\n%s", body)
+	}
+}
+
+// TestNewChatDeepSeekExplicitProtocolWins verifies an explicit
+// reasoning_protocol from the provider config is respected instead of the
+// deepseek default — disabling thinking must disable the reasoning round-trip.
+func TestNewChatDeepSeekExplicitProtocolWins(t *testing.T) {
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"done\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	p, err := New(provider.Config{
+		Name:    "zen",
+		BaseURL: srv.URL,
+		Model:   "deepseek-v4-flash-free",
+		Extra:   map[string]any{"reasoning_protocol": "none"},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ch, err := p.Stream(context.Background(), provider.Request{
+		Messages: []provider.Message{
+			{Role: provider.RoleUser, Content: "list files"},
+			{Role: provider.RoleAssistant, Content: "", ReasoningContent: "SECRET-REASONING", ToolCalls: []provider.ToolCall{{ID: "call_1", Name: "ls", Arguments: `{}`}}},
+			{Role: provider.RoleTool, Content: "ok", ToolCallID: "call_1", Name: "ls"},
+			{Role: provider.RoleUser, Content: "thanks"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	for range ch {
+	}
+	body := string(gotBody)
+	if strings.Contains(body, "thinking") || strings.Contains(body, "SECRET-REASONING") {
+		t.Errorf("explicit reasoning_protocol=none must disable thinking and the reasoning round-trip:\n%s", body)
 	}
 }

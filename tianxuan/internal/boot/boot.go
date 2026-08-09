@@ -688,9 +688,10 @@ func buildProvider(e *config.ProviderEntry, model string) (provider.Provider, er
 		// provider-kind-specific knobs (the anthropic provider reads thinking/effort;
 		// the openai one ignores them).
 		Extra: map[string]any{
-			"api_key_env": entry.APIKeyEnv,
-			"thinking":    entry.Thinking,
-			"effort":      entry.Effort,
+			"api_key_env":        entry.APIKeyEnv,
+			"thinking":           entry.Thinking,
+			"effort":             entry.Effort,
+			"reasoning_protocol": entry.ReasoningProtocol,
 		},
 	})
 }

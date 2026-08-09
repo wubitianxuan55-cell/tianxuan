@@ -1,3 +1,20 @@
+## v10.175.1 (2026-08-09) — Zen reasoning_content 回传修复 + 过程卡/429 修复
+
+### 变更
+- **修复：Zen deepseek 模型 400 "reasoning_content must be passed back"**：
+  Zen chat/completions 上游是 DeepSeek thinking 模式，带 tool_calls 的
+  assistant 轮必须回传 `reasoning_content`。opencode 现对 `deepseek-*` 模型
+  默认声明 `reasoning_protocol=deepseek`（显式配置优先），并打通 boot 层
+  `reasoning_protocol` 配置转发，多轮工具调用不再 400
+- **修复：生成结束后输出和过程全部不可见**：`hotTurns` 恒为 1，最新轮始终
+  完整留在外面；warn notice（模型失败错误）不再被过程卡吞掉，直接可见
+- **修复：模型 429 限流挂起数分钟**：OpenCode Zen chat 协议模型关闭 provider
+  内部 429 重试，立即失败交给 failover 链切换备用模型
+- 验证：vitest 152 例全绿 · tsc 0 错误 · `go test ./...` 全绿 · `go vet`
+  干净 · 主模块与 desktop 模块 build 通过
+
+---
+
 ## V10.175.0 (2026-08-08) — Codex 蒸馏能力级提升 + 过程卡工作流
 
 ### 变更

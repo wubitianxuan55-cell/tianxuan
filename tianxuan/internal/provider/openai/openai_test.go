@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"tianxuan/internal/provider"
 )
@@ -78,6 +80,50 @@ func TestStreamAuthError(t *testing.T) {
 	}
 	if msg := authErr.Error(); !strings.Contains(msg, "DEEPSEEK_API_KEY") || strings.Contains(msg, "ae54") {
 		t.Errorf("message should name the env var and not dump the raw body: %q", msg)
+	}
+}
+
+// TestStreamRateLimitFastFail verifies that a provider with rate_limit_retry
+// disabled (OpenCode Zen free-tier quota errors) fails fast on a 429 instead of
+// waiting out Retry-After/backoff, so a failover chain can switch candidates
+// instead of hanging for minutes.
+func TestStreamRateLimitFastFail(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Retry-After", "120")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"FreeUsageLimitError: Rate limit exceeded"}}`))
+	}))
+	defer srv.Close()
+
+	p, err := New(provider.Config{
+		Name:    "zen",
+		BaseURL: srv.URL,
+		Model:   "deepseek-v4-flash-free",
+		APIKey:  "k",
+		Extra:   map[string]any{"rate_limit_retry": false},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	start := time.Now()
+	_, err = p.Stream(context.Background(), provider.Request{
+		Messages: []provider.Message{{Role: provider.RoleUser, Content: "hi"}},
+	})
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("want 429 error, got nil")
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("want exactly 1 request (fast fail, no retry), got %d", got)
+	}
+	if elapsed > 5*time.Second {
+		t.Errorf("fast fail should return immediately, took %v", elapsed)
+	}
+	if !strings.Contains(err.Error(), "429") {
+		t.Errorf("error should mention the 429 status, got: %q", err)
 	}
 }
 

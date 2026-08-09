@@ -1,3 +1,40 @@
+## [10.175.1] — 2026-08-08
+
+### 🐛 修复：生成结束后输出和过程全部不可见
+
+- V10.175 过程卡工作流把 `hotTurns` 设为 `running ? 1 : 0`：生成中保留最新轮
+  在外，但**生成结束（running=false）时 hotTurns=0，最新一轮（提问+思考+
+  工具+正文）也被收进 warm 折叠卡**，只留一行预览，正文和过程全部看不见
+- 修复：`hotTurns` 恒为 1，最新一轮始终完整留在外面，旧轮仍收进可展开的
+  大过程卡（warm-turn）
+- **修复：模型失败错误（warn notice）被过程卡吞掉**——`renderItems` 分段把
+  notice 全部归入 processItems，而 TurnCollapse 只渲染 tool/assistant/phase，
+  错误 notice 完全不显示。现在 warn notice 进 outsideItems（ErrorCard 直接
+  可见），info notice 保持进过程区
+- **修复：模型 429 限流时 tianxuan 挂起数分钟**——openai provider 对 429 做
+  内部重试（Retry-After 最长 120s × 最多 5 次），Zen 免费模型配额用尽
+  （FreeUsageLimitError）时整个 turn 挂住，failover 链迟迟无法切换。现在
+  OpenCode Zen chat 协议模型关闭 429 内部重试，立即失败交给 failover 链
+  切换备用模型（如 claude-haiku-4-5），并同步修正 opencode keyless 模型的
+  /model 列表测试
+- **修复：Zen deepseek 模型 400 "reasoning_content must be passed back"**——
+  Zen 的 chat/completions 上游是 DeepSeek thinking 模式，带 tool_calls 的
+  assistant 轮必须回传 `reasoning_content`，否则上游拒绝历史消息。此前
+  opencode 未按模型声明 deepseek 协议（base_url 是 opencode.ai，无法按域名
+  识别），且 `reasoning_protocol` 配置从未被 boot 层转发到 provider，导致
+  多轮工具调用必现 400。现在 opencode 对 `deepseek-*` chat 模型默认声明
+  `reasoning_protocol=deepseek`（显式配置优先），并打通 boot 层配置转发；
+  新增 3 个回归测试锁定 wire 请求行为
+- 分段逻辑提取为可测纯函数 `buildRenderSegments`，新增回归测试 10 例
+  （warmPagination 6 + buildRenderSegments 4），锁定"最新轮不折叠 /
+  旧轮分页 / 错误可见"行为，防止再次回归
+- 验证：vitest 152 例全绿 · tsc --noEmit 0 错误 · `go test ./...` 全绿
+  （含新增 TestStreamRateLimitFastFail）· `go vet` 干净 · 主模块与
+  desktop 模块 `go build ./...` 通过 · CLI 端到端验证：默认模型在
+  free 429 时 24s 内 failover 到 claude-haiku-4-5 正常输出
+
+---
+
 ## [10.175.0] — 2026-08-08
 
 ### ✨ 过程卡工作流 + 输出简洁

@@ -78,6 +78,26 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	case protocolGemini:
 		return nil, fmt.Errorf("opencode: model %q uses the Google (Gemini) protocol, which tianxuan does not support yet; pick a chat/completions, Anthropic, or Responses model from https://opencode.ai/zen/v1/models", cfg.Model)
 	default:
+		// Zen chat-protocol models (incl. the free tier) answer 429 with
+		// FreeUsageLimitError — quota exhaustion, not a transient blip.
+		// Skip the provider-internal 429 retry (Retry-After can be minutes)
+		// so an outer failover chain switches to a working model quickly.
+		if cfg.Extra == nil {
+			cfg.Extra = make(map[string]any)
+		}
+		cfg.Extra["rate_limit_retry"] = false
+		// Zen serves deepseek-* models on /chat/completions with DeepSeek's own
+		// thinking semantics: an assistant tool_calls turn MUST carry its
+		// reasoning_content back, or the upstream rejects the history with 400
+		// ("The `reasoning_content` in the thinking mode must be passed back").
+		// The base URL is opencode.ai, which the openai backend cannot recognize
+		// as DeepSeek, so declare the protocol by model prefix here. An explicit
+		// reasoning_protocol from config (e.g. "none" to disable thinking) wins.
+		if v, _ := cfg.Extra["reasoning_protocol"].(string); v == "" {
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(cfg.Model)), "deepseek-") {
+				cfg.Extra["reasoning_protocol"] = "deepseek"
+			}
+		}
 		return openai.New(cfg)
 	}
 }

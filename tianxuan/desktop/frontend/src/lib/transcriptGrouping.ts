@@ -16,6 +16,11 @@ export interface StepGroup {
   isComplete: boolean;
 }
 
+export interface RenderSegment {
+  processItems: Item[];
+  outsideItems: Item[];
+}
+
 export type WarmLayerState = {
   sessionKey: string;
   expandedWarmTurns: ReadonlySet<number>;
@@ -100,6 +105,50 @@ export function scrollVersion(items: Item[]): string {
 export function warmUserPreview(text: string): string {
   const cleaned = stripAttachmentRefs(text).replace(/\s+/g, " ").trim();
   return cleaned.length <= 80 ? cleaned : cleaned.slice(0, 77) + "...";
+}
+
+// 把 items 分段为「过程（思考/工具/折叠区）+ 外部（正文/错误/用户消息）」。
+// warn notice（模型失败等错误）必须进 outside，否则会被过程卡折叠吞掉，
+// 用户看不到失败原因。
+export function buildRenderSegments(items: Item[]): RenderSegment[] {
+  const segments: RenderSegment[] = [];
+  let curProcess: Item[] = [];
+  let curOutside: Item[] = [];
+
+  const flush = () => {
+    if (curProcess.length > 0 || curOutside.length > 0) {
+      segments.push({ processItems: curProcess, outsideItems: curOutside });
+      curProcess = [];
+      curOutside = [];
+    }
+  };
+
+  for (const it of items) {
+    if (it.kind === "user") {
+      flush();
+      segments.push({ processItems: [], outsideItems: [it] });
+      continue;
+    }
+    if (it.kind === "assistant") {
+      if (it.text) {
+        if (curOutside.length > 0) flush();
+        if (it.reasoning) curProcess.push({ ...it, text: "" } as Item);
+        curOutside.push({ ...it, reasoning: "" } as Item);
+      } else {
+        if (curOutside.length > 0) flush();
+        curProcess.push(it);
+      }
+      continue;
+    }
+    if (curOutside.length > 0) flush();
+    if (it.kind === "tool" || it.kind === "compaction" || (it.kind === "notice" && it.level !== "warn")) {
+      curProcess.push(it);
+    } else {
+      curOutside.push(it);
+    }
+  }
+  flush();
+  return segments;
 }
 
 export function buildTurnGroups(items: Item[]): TurnGroup[] {

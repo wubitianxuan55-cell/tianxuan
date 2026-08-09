@@ -1,3 +1,24 @@
+## [10.176.1] — 2026-08-09
+
+### 🧪 核心交互组件测试覆盖 + 测试基础设施修复
+
+#### 新增组件交互测试（happy-dom + @testing-library/react）
+- `Message.test.tsx` 5 例：rewind 下拉菜单交互（点菜单项调 onRewind(turn, scope)）、
+  rewind 定位修复回归保护（按钮行 `relative` class）、思考中 elapsed 每秒刷新
+  （V10.176 实时计时回归保护）、结束后 elapsed 显示、思考折叠/展开交互
+- `Transcript.test.tsx` 4 例：warm-turn 过程卡折叠列表（旧轮收进、最新轮留在外面）、
+  点击展开单轮、warm 预览不含最新轮、TurnCollapse running 自动展开/结束后自动折叠
+  （V10.175 过程卡工作流核心交互回归保护）
+
+#### 修复测试基础设施 bug：vitest globals:true 缺失导致 RTL auto-cleanup 失效
+- 根因：`@testing-library/react` 的 auto-cleanup 依赖全局 `afterEach`，vitest 默认
+  `globals:false` 时检测不到 → 组件测试结束后 DOM 不清理，下一个测试渲染残留
+  （实测 `warm-turn__head` 从期望 2 个变 4 个，测试间互相污染）
+- 修复：`vitest.config.ts` 加 `globals: true`（现有纯函数测试显式 import，不受影响）
+- 排查过程：单独跑测试通过、加 debug 打印发现 DOM 数量翻倍，对照实验定位到 cleanup 缺失
+
+- 验证：vitest 165 例全绿（新增 9 例）· `tsc --noEmit` 0 错误 · `vite build` 通过
+
 ## [10.176.0] — 2026-08-09
 
 ### ✨ 桌面端 UI 打磨：思考/过程计时实时刷新 + rewind 菜单定位修复

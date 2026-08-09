@@ -1,3 +1,16 @@
+## [10.176.2] — 2026-08-09
+
+### 🧪 核心交互组件测试覆盖（二）：Composer 输入区 + ToolCard 工具卡
+
+- `Composer.test.tsx` 6 例：非运行 Enter 直接发送、空白不发送、运行中 Enter 只排队
+  不发送（队列显示 "Queued (n)"）、排队 2 条后取消第一条、Shift+Enter 纠偏
+  （取消当前轮 + correctionRef）、Escape 取消清空队列
+- `ToolCard.test.tsx` 5 例：运行中不显示耗时（有意设计，避免每秒重渲染）、完成后
+  显示耗时（startedAtRef 记录起点）、默认折叠点击展开、done ✓ / running 无状态图标
+- 测试写法：bridge 全 mock（app 方法 vi.fn()）、挂载异步 effect 用 `await act(async () => {})`
+  flush 微任务消除 act 警告
+- 验证：vitest 176 例全绿（新增 11 例）· `tsc --noEmit` 0 错误 · `vite build` 通过
+
 ## [10.176.1] — 2026-08-09
 
 ### 🧪 核心交互组件测试覆盖 + 测试基础设施修复

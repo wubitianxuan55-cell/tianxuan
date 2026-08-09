@@ -13,6 +13,12 @@
 - 验证：vitest 152 例全绿 · tsc 0 错误 · `go test ./...` 全绿 · `go vet`
   干净 · 主模块与 desktop 模块 build 通过
 
+### 发布产物
+- `release/v10.175.1/tianxuan-windows-amd64-installer.exe` · 10763297 bytes (~10.3 MB)
+- SHA256: `4d5ccd06d53c90242dedb9c03e2b461458babd65478c13b433d69badcad233df`
+- minisign 签名验证 OK · latest.json manifest sha256 匹配 · 远端 tag
+  `desktop-v10.175.1` 指向发布提交 a8c378a
+
 ---
 
 ## V10.175.0 (2026-08-08) — Codex 蒸馏能力级提升 + 过程卡工作流

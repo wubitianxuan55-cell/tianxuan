@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,6 +22,25 @@ defaults:
     working-directory: tianxuan
 
 jobs:
+  golangci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tianxuan/go.mod
+          cache: true
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: tianxuan
+          only-new-issues: true
+
   test:
     strategy:
       fail-fast: false
@@ -60,3 +80,35 @@ jobs:
 
       - name: test
         run: go test ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: tianxuan/desktop/frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: tianxuan/desktop/frontend
+
+      - name: Frontend tests
+        run: pnpm test
+        working-directory: tianxuan/desktop/frontend
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tianxuan/go.mod
+          cache: true
+
+      - name: Desktop module tests
+        run: go test ./...
+        working-directory: tianxuan/desktop

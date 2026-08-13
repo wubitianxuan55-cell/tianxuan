@@ -47,6 +47,14 @@
 - 23 个函数体逐字节验证零改动（纯移动）
 - 验证：`go vet` / `go build` / boot 包测试全绿
 
+### 🧩 agent.go 拆分（P2.5）
+
+- `agent.go` 1005 行拆至 629 行：接口/调用上下文/结果类型 → `types.go`
+  （125 行）、AgentRunner 配置注入与状态查询 setter/getter → `setters.go`
+  （277 行）；`New`/`filteredSchemas`/`Steer` 等核心逻辑保留原位
+- 48 个函数体逐字节验证零改动（纯移动，缓存铁律相关代码未触碰）
+- 验证：`go vet` / `go build` / agent 包 -short 测试全绿
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

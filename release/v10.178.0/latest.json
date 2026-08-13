@@ -1,0 +1,14 @@
+{
+    "version":  "v10.178.0",
+    "notes":  "### 变更\n- **CI/CD 修复**：`.github` 从 `tianxuan/` 子目录移到仓库根（此前所有 workflow\n  从未被 GitHub 识别执行）；cacheguard 静态缓存守卫加入 ci.yml 硬门禁；\n  e2e-bot 清理 reasonix 时代遗留；release/release-desktop workflow 修复嵌套路径\n- **gofmt 治理**：124 个真实格式差异文件统一格式化\n- **文档对齐**：README/AGENTS 版本号统一到 V10.177，活跃文档清理 reasonix 命名\n- **分支治理**：default branch 对齐 main，main 与 release/v10.110.0 同步，\n  删除遗留 master 及历史分支（tag 归档保历史）\n- **代码梳理**：删除死变量、`hermes_prompt.go`→`solo_prompt.go`、4 处 `main-v2`\n  残留清零、`chat_tui.go` 拆分渲染函数到 `render.go`\n- **Bug 修复**：`PruneOld` 补全 `maxAgeDays` 按天数过期（原为死参数）；\n  `update` 回滚失败不再谎报\"已恢复原二进制\"\n- 验证：`go build` / `go vet` / `go test` 全绿\n\n### 发布产物\n- 待构建（CLI + 桌面端）\n\n## v10.175.1 (2026-08-09) — Zen reasoning_content 回传修复 + 过程卡/429 修复\n\n### 变更\n- **修复：Zen deepseek 模型 400 \"reasoning_content must be passed back\"**：\n  Zen chat/completions 上游是 DeepSeek thinking 模式，带 tool_calls 的\n  assistant 轮必须回传 `reasoning_content`。opencode 现对 `deepseek-*` 模型\n  默认声明 `reasoning_protocol=deepseek`（显式配置优先），并打通 boot 层\n  `reasoning_protocol` 配置转发，多轮工具调用不再 400\n- **修复：生成结束后输出和过程全部不可见**：`hotTurns` 恒为 1，最新轮始终\n  完整留在外面；warn notice（模型失败错误）不再被过程卡吞掉，直接可见\n- **修复：模型 429 限流挂起数分钟**：OpenCode Zen chat 协议模型关闭 provider\n  内部 429 重试，立即失败交给 failover 链切换备用模型\n- 验证：vitest 152 例全绿 · tsc 0 错误 · `go test ./...` 全绿 · `go vet`\n  干净 · 主模块与 desktop 模块 build 通过\n\n### 发布产物\n- `release/v10.175.1/tianxuan-windows-amd64-installer.exe` · 10763297 bytes (~10.3 MB)\n- SHA256: `4d5ccd06d53c90242dedb9c03e2b461458babd65478c13b433d69badcad233df`\n- minisign 签名验证 OK · latest.json manifest sha256 匹配 · 远端 tag\n  `desktop-v10.175.1` 指向发布提交 a8c378a",
+    "pub_date":  "",
+    "download_page":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/latest",
+    "platforms":  {
+                      "windows-amd64":  {
+                                            "url":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.178.0/tianxuan-windows-amd64-installer.exe",
+                                            "sig":  "https://github.com/wubitianxuan55-cell/tianxuan/releases/download/desktop-v10.178.0/tianxuan-windows-amd64-installer.exe.minisig",
+                                            "size":  10769941,
+                                            "sha256":  "4da0d5dee912838daa2ad5ce82fa31b2f5434ed617a414a4fa3f3be2fd91bca0"
+                                        }
+                  }
+}

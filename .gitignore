@@ -21,9 +21,6 @@ mem.prof
 /stage/
 /build/
 
-# Desktop release artifacts (version dirs under release/; keep release/CHANGELOG.md)
-release/v*/
-
 # Project runtime directories
 .tianxuan/
 .codegraph/

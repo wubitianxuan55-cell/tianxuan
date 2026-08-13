@@ -15,7 +15,10 @@
 - 验证：`go build` / `go vet` / `go test` 全绿
 
 ### 发布产物
-- 待构建（CLI + 桌面端）
+- `release/v10.178.0/tianxuan-windows-amd64-installer.exe` · 10769941 bytes (~10.3 MB)
+- SHA256: `4da0d5dee912838daa2ad5ce82fa31b2f5434ed617a414a4fa3f3be2fd91bca0`
+- minisign 签名验证 OK · latest.json manifest sha256 匹配 · 远端 tag
+  `desktop-v10.178.0` 指向发布提交
 
 ## v10.175.1 (2026-08-09) — Zen reasoning_content 回传修复 + 过程卡/429 修复
 

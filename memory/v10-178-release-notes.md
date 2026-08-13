@@ -44,7 +44,10 @@
 - workflow YAML 结构解析正确
 
 ## 发布产物
-- 待构建
+- `release/v10.178.0/tianxuan-windows-amd64-installer.exe` · 10769941 bytes (~10.3 MB)
+- SHA256: `4da0d5dee912838daa2ad5ce82fa31b2f5434ed617a414a4fa3f3be2fd91bca0`
+- minisign 签名验证 OK · latest.json 匹配 · 远端 tag `desktop-v10.178.0`
+- GitHub release: https://github.com/wubitianxuan55-cell/tianxuan/releases/tag/desktop-v10.178.0
 
 ## 相关提交
 - 分支：release/v10.110.0（与 main 同步）

@@ -43,7 +43,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version-file: tianxuan/go.mod
           cache: true
 
       - uses: actions/setup-python@v5
@@ -54,8 +54,9 @@ jobs:
         # The PR head may predate the bot (no cmd/e2ebench, no `run --metrics`), so
         # build both here and stash them + the suite outside the tree before the
         # working tree is switched to the PR head.
+        working-directory: tianxuan
         run: |
-          go build -o "$RUNNER_TEMP/reasonix" ./cmd/reasonix
+          go build -o "$RUNNER_TEMP/tianxuan" ./cmd/tianxuan
           go build -o "$RUNNER_TEMP/e2ebench" ./cmd/e2ebench
           cp -r benchmarks/e2e "$RUNNER_TEMP/suite"
 
@@ -68,23 +69,23 @@ jobs:
         # User config covers suite tasks (they run in temp dirs); the repo-root copy
         # covers diff mode (the agent runs in the repo root, where project config wins).
         run: |
-          mkdir -p ~/.config/reasonix
-          cat > /tmp/reasonix-e2e.toml <<EOF
+          mkdir -p ~/.config/tianxuan
+          cat > /tmp/tianxuan-e2e.toml <<EOF
           default_model = "e2e"
 
           [[providers]]
           name = "e2e"
           kind = "openai"
-          base_url = "${{ vars.REASONIX_E2E_BASE_URL || 'https://api.deepseek.com' }}"
-          model = "${{ vars.REASONIX_E2E_MODEL || 'deepseek-v4-flash' }}"
+          base_url = "${{ vars.TIANXUAN_E2E_BASE_URL || 'https://api.deepseek.com' }}"
+          model = "${{ vars.TIANXUAN_E2E_MODEL || 'deepseek-v4-flash' }}"
           api_key_env = "DEEPSEEK_API_KEY"
           context_window = 65536
 
           [providers.price]
-          cache_hit = ${{ vars.REASONIX_E2E_PRICE_CACHE_HIT || '0.02' }}
-          input = ${{ vars.REASONIX_E2E_PRICE_INPUT || '1' }}
-          output = ${{ vars.REASONIX_E2E_PRICE_OUTPUT || '2' }}
-          currency = "${{ vars.REASONIX_E2E_PRICE_CURRENCY || '¥' }}"
+          cache_hit = ${{ vars.TIANXUAN_E2E_PRICE_CACHE_HIT || '0.02' }}
+          input = ${{ vars.TIANXUAN_E2E_PRICE_INPUT || '1' }}
+          output = ${{ vars.TIANXUAN_E2E_PRICE_OUTPUT || '2' }}
+          currency = "${{ vars.TIANXUAN_E2E_PRICE_CURRENCY || '¥' }}"
 
           [permissions]
           mode = "allow"
@@ -92,8 +93,8 @@ jobs:
           [codegraph]
           enabled = false
           EOF
-          cp /tmp/reasonix-e2e.toml ~/.config/reasonix/config.toml
-          cp /tmp/reasonix-e2e.toml ./reasonix.toml
+          cp /tmp/tianxuan-e2e.toml ~/.config/tianxuan/config.toml
+          cp /tmp/tianxuan-e2e.toml ./tianxuan.toml
 
       - name: Run e2e
         env:
@@ -112,9 +113,9 @@ jobs:
             BASE_REF=$(gh pr view ${{ github.event.issue.number }} --json baseRefName -q .baseRefName)
             git fetch -q origin "$BASE_REF"
             BASE=$(git merge-base "origin/$BASE_REF" HEAD)
-            "$RUNNER_TEMP/e2ebench" -mode diff -bin "$RUNNER_TEMP/reasonix" -repo . -base "$BASE" -model e2e -attempts "$ATTEMPTS" -out report.md
+            "$RUNNER_TEMP/e2ebench" -mode diff -bin "$RUNNER_TEMP/tianxuan" -repo . -base "$BASE" -model e2e -attempts "$ATTEMPTS" -out report.md
           else
-            "$RUNNER_TEMP/e2ebench" -bin "$RUNNER_TEMP/reasonix" -suite "$RUNNER_TEMP/suite" -model e2e -out report.md -json report.json -budget 400000
+            "$RUNNER_TEMP/e2ebench" -bin "$RUNNER_TEMP/tianxuan" -suite "$RUNNER_TEMP/suite" -model e2e -out report.md -json report.json -budget 400000
           fi
 
       - name: Post report
@@ -122,7 +123,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER_USER: ${{ github.event.comment.user.login }}
         run: |
-          printf '\n> agent built from main-v2 · PR head %s · triggered by @%s\n' "$(git rev-parse --short HEAD)" "$TRIGGER_USER" >> report.md
+          printf '\n> agent built from the default branch · PR head %s · triggered by @%s\n' "$(git rev-parse --short HEAD)" "$TRIGGER_USER" >> report.md
           gh pr comment ${{ github.event.issue.number }} --body-file report.md
 
       - name: Report failure

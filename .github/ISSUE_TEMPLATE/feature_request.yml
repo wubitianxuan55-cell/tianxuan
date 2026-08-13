@@ -3,16 +3,6 @@ description: Suggest an idea or improvement
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
-  - type: dropdown
-    id: version-line
-    attributes:
-      label: Version line
-      description: Which line is this for?
-      options:
-        - "v2 — Go rewrite (main, active development)"
-        - "v1 — Legacy TypeScript (0.x), maintenance only"
-    validations:
-      required: true
   - type: textarea
     id: problem
     attributes:

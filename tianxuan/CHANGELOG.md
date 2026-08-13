@@ -19,6 +19,12 @@
   `replaySectionsFor` 孤儿注释归位
 - 验证：`go vet` / `go build` / cli 包测试全绿
 
+### 🧹 ISSUE_TEMPLATE v1/v2 清理（P4.8）
+
+- bug/feature 模板删除 Version line dropdown（v1 遗留选项）及自动打标签提示
+- 删除 `issue-version-label.yml` / `pr-version-label.yml` 两个 workflow
+  （v1/v2 标签体系无下游消费，彻底清理）
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

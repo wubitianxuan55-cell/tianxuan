@@ -54,6 +54,9 @@
 
 ### 8. ISSUE_TEMPLATE v1/v2 彻底清理
 - version-line dropdown 仍留 v1 选项，删 dropdown + 删 label workflow 的 v1 分支
+- 状态：✅ 已完成（2026-08-13）— bug/feature template 删 Version line
+  dropdown 及 v1/v2 提示，issue-version-label.yml 与 pr-version-label.yml
+  两个 workflow 删除（v1/v2 标签体系无下游消费）
 
 ### 9. 剩余静默吞错保持现状
 - 62 处已修 2 处真实 bug，其余为有意尽力而为（os.Remove 清理/杀进程/探测解析），建议不改

@@ -1,0 +1,382 @@
+package cli
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"golang.org/x/term"
+
+	"tianxuan/internal/agent"
+	"tianxuan/internal/config"
+	"tianxuan/internal/i18n"
+)
+
+// setupConfig runs the configuration wizard (the `tianxuan setup` command),
+// writing tianxuan.toml (+ .env). Project memory is a separate concern — the
+// in-session `/init` skill generates AGENTS.md (see initHint).
+func setupConfig(args []string) int {
+	path := "tianxuan.toml"
+	if len(args) > 0 {
+		path = args[0]
+	}
+	if _, err := os.Stat(path); err == nil {
+		// Non-interactive must not clobber an existing config silently.
+		if !isInteractive() {
+			fmt.Fprintf(os.Stderr, i18n.M.NotOverwritingFmt+"\n", path)
+			return 1
+		}
+		in := bufio.NewScanner(os.Stdin)
+		ans := ask(in, os.Stdout, fmt.Sprintf(i18n.M.ConfirmReconfigureFmt, path), "N")
+		if ans != "y" && ans != "Y" {
+			fmt.Println(i18n.M.KeepingExisting)
+			return 0
+		}
+	}
+
+	// Interactive wizard on a TTY; fall back to the annotated default when piped.
+	if isInteractive() {
+		rc := interactiveSetup(path)
+		if rc == 0 {
+			fmt.Printf(i18n.M.TryHintFmt+"\n", bold("tianxuan chat"))
+		}
+		return rc
+	}
+	return writeDefaultConfig(path)
+}
+
+func writeDefaultConfig(path string) int {
+	if err := config.Default().WriteFile(path); err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.WriteConfigErr, err)
+		return 1
+	}
+	fmt.Printf(i18n.M.WroteFileFmt+"\n", path)
+	fmt.Println(i18n.M.NextHint)
+	return 0
+}
+
+// interactiveSetup runs the setup wizard, then writes tianxuan.toml (plus .env for any
+// keys entered). The wizard is intentionally minimal: pick language, pick
+// provider, enter API keys. Language is asked first so every subsequent prompt
+// is already in the user's language even when env auto-detection got it wrong.
+// Single-model planning mode (auto_plan) is left as a manual config edit so
+// first-run never confronts newcomers with advanced choices.
+func interactiveSetup(path string) int {
+	// Seed from the existing config when reconfiguring, so a re-run to fix a key
+	// preserves the user's providers / agent settings instead of resetting to
+	// defaults. First run (no file) falls back to the built-in defaults.
+	cfg := config.LoadForEdit(path)
+	prevDefault := cfg.DefaultModel
+
+	lang, err := selectLanguage()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "\nsetup cancelled.")
+		return 1
+	}
+	cfg.Language = lang
+	i18n.DetectLanguage(lang)
+
+	// Now that the catalogue matches the user's choice, show the welcome banner
+	// in their language before any substantive prompt.
+	fmt.Println()
+	fmt.Print(boxed([]string{
+		accent("◆") + " " + fmt.Sprintf(i18n.M.WelcomeTitleFmt, bold("tianxuan")),
+		"",
+		dim(i18n.M.NoConfigYet),
+	}))
+	fmt.Println()
+
+	enabled, err := selectEnabledProviders(cfg.Providers)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "\n"+i18n.M.SetupCancelled)
+		return 1
+	}
+
+	envLines := configureKeys(enabled, os.Stdin, os.Stdout)
+
+	cfg.Providers = enabled
+	// Keep the previous default model if it's still enabled; otherwise fall back
+	// to the first selected provider.
+	cfg.DefaultModel = enabled[0].Name
+	for _, p := range enabled {
+		if p.Name == prevDefault {
+			cfg.DefaultModel = prevDefault
+			break
+		}
+	}
+
+	if err := cfg.WriteFile(path); err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.WriteConfigErr, err)
+		return 1
+	}
+	fmt.Printf("\n%s %s\n", green("✓"), fmt.Sprintf(i18n.M.WroteFileFmt, path))
+
+	if len(envLines) > 0 {
+		if err := appendEnv(".env", envLines); err != nil {
+			fmt.Fprintln(os.Stderr, i18n.M.WriteEnvErr, err)
+			return 1
+		}
+		fmt.Printf("%s %s\n", green("✓"), fmt.Sprintf(i18n.M.WroteFileFmt, ".env"))
+	}
+
+	fmt.Printf("\n%s %s\n", accent("◆"), i18n.M.SetupComplete)
+	return 0
+}
+
+// pickSessionToResume scans the session dir, takes the 10 most recent, and
+// shows a single-choice menu with timestamp + turn count + first user
+// message so the user can pick one. Returns the chosen path and a process
+// exit code (non-zero when there's nothing to pick or the user cancelled).
+func pickSessionToResume() (string, int) {
+	sessions, err := agent.ListSessions(config.SessionDir())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.ErrorPrefix, err)
+		return "", 1
+	}
+	if len(sessions) == 0 {
+		fmt.Fprintln(os.Stderr, i18n.M.NoSessionToResume)
+		return "", 1
+	}
+	if !isInteractive() {
+		fmt.Fprintln(os.Stderr, i18n.M.ResumeRequiresTTY)
+		return "", 1
+	}
+	const cap = 10
+	if len(sessions) > cap {
+		sessions = sessions[:cap]
+	}
+	items := make([]menuItem, len(sessions))
+	for i, s := range sessions {
+		when := s.ModTime.Local().Format("01-02 15:04")
+		preview := s.Preview
+		if preview == "" {
+			preview = "(no user message yet)"
+		}
+		items[i] = menuItem{
+			name: when,
+			desc: fmt.Sprintf("%d turns · %s", s.Turns, preview),
+		}
+	}
+	idx, err := selectOne(i18n.M.PickSessionLabel, items)
+	if err != nil {
+		return "", 1
+	}
+	return sessions[idx].Path, 0
+}
+
+// selectLanguage is the wizard's first prompt: it shows the two UI languages
+// in their native form and pre-selects the env-detected one (so a single Enter
+// confirms the auto-detection, a single arrow + Enter picks the other). The
+// label is bilingual because we don't yet know which catalogue to trust.
+func selectLanguage() (string, error) {
+	detected := i18n.DetectLanguage("")
+	items := []menuItem{{name: "English"}, {name: "中文 (简体)"}}
+	tags := []string{"en", "zh"}
+	if detected == "zh" {
+		items[0], items[1] = items[1], items[0]
+		tags[0], tags[1] = tags[1], tags[0]
+	}
+	idx, err := selectOne("Language · 语言", items)
+	if err != nil {
+		return "", err
+	}
+	return tags[idx], nil
+}
+
+// selectEnabledProviders prompts a single multi-select of provider families
+// (DeepSeek / MiMo / …) and returns every SKU of every chosen family. Picking
+// a family enables all of its SKUs; users who want to exclude a specific SKU
+// edit tianxuan.toml afterward — keeping first-run a single decision instead of two.
+func selectEnabledProviders(providers []config.ProviderEntry) ([]config.ProviderEntry, error) {
+	famOrder, famMembers, famInfo := groupByFamily(providers)
+
+	famItems := make([]menuItem, len(famOrder))
+	for i, k := range famOrder {
+		famItems[i] = menuItem{name: famInfo[k].name, desc: famInfo[k].desc}
+	}
+	famIdxs, err := selectMany(i18n.M.SelectProvidersLabel, famItems)
+	if err != nil {
+		return nil, err
+	}
+
+	var enabled []config.ProviderEntry
+	for _, fi := range famIdxs {
+		for _, mi := range famMembers[famOrder[fi]] {
+			enabled = append(enabled, providers[mi])
+		}
+	}
+	return enabled, nil
+}
+
+// providerFamily is a wizard-only grouping of provider SKUs by vendor; it does
+// not exist in config because users editing tianxuan.toml deal with SKU names
+// directly. Keys mirror the SKU name prefix (deepseek-*, mimo) so adding a new
+// preset only requires a familyOf case.
+type providerFamily struct {
+	key  string
+	name string
+	desc string
+}
+
+func familyOf(name string) providerFamily {
+	switch {
+	case strings.HasPrefix(name, "deepseek"):
+		return providerFamily{key: "deepseek", name: "DeepSeek", desc: "fast & cheap, plus a stronger Pro SKU"}
+	case strings.HasPrefix(name, "mimo"):
+		return providerFamily{key: "mimo", name: "MiMo (Xiaomi)", desc: "long-horizon agentic"}
+	default:
+		return providerFamily{key: name, name: name}
+	}
+}
+
+func groupByFamily(providers []config.ProviderEntry) ([]string, map[string][]int, map[string]providerFamily) {
+	var order []string
+	members := map[string][]int{}
+	info := map[string]providerFamily{}
+	for i, p := range providers {
+		f := familyOf(p.Name)
+		if _, seen := members[f.key]; !seen {
+			order = append(order, f.key)
+			info[f.key] = f
+		}
+		members[f.key] = append(members[f.key], i)
+	}
+	return order, members, info
+}
+
+// promptMissingKeys re-runs the wizard's key-entry step for any enabled
+// provider whose api_key_env is unset. Newly entered values are appended to
+// .env so the chat session that follows picks them up via config.Load. The
+// user can hit Enter to skip — the chat banner falls back to a one-line
+// warning so they still see what's missing. Returns a non-zero exit code only
+// when writing .env fails.
+func promptMissingKeys(cfg *config.Config) int {
+	missing := providersWithMissingKeys(cfg)
+	if len(missing) == 0 {
+		return 0
+	}
+	fmt.Println()
+	fmt.Println(dim("  " + i18n.M.MissingKeyIntro))
+	envLines := configureKeys(missing, os.Stdin, os.Stdout)
+	if len(envLines) == 0 {
+		return 0
+	}
+	if err := appendEnv(".env", envLines); err != nil {
+		fmt.Fprintln(os.Stderr, i18n.M.WriteEnvErr, err)
+		return 1
+	}
+	fmt.Printf("%s %s\n", green("✓"), fmt.Sprintf(i18n.M.WroteFileFmt, ".env"))
+	return 0
+}
+
+// providersWithMissingKeys returns the subset of cfg.Providers whose api_key_env
+// is declared but not currently set in the environment. configureKeys dedupes
+// shared envs, so duplicates are fine to leave in.
+func providersWithMissingKeys(cfg *config.Config) []config.ProviderEntry {
+	var out []config.ProviderEntry
+	for _, p := range cfg.Providers {
+		if p.APIKeyEnv != "" && os.Getenv(p.APIKeyEnv) == "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// configureKeys asks for the API key of each distinct api_key_env among the
+// selected providers — shared keys (e.g. both DeepSeek models) are asked once.
+// Reads answers from r, writes prompts to w; returns KEY=value lines entered.
+func configureKeys(selected []config.ProviderEntry, r io.Reader, w io.Writer) []string {
+	in := bufio.NewScanner(r)
+	fmt.Fprintln(w, "\n"+i18n.M.EnterAPIKeysHeader)
+
+	seen := map[string]bool{}
+	var envLines []string
+	for _, p := range selected {
+		if p.APIKeyEnv == "" || seen[p.APIKeyEnv] {
+			continue
+		}
+		seen[p.APIKeyEnv] = true
+		if key := ask(in, w, "  "+p.APIKeyEnv, ""); key != "" {
+			envLines = append(envLines, p.APIKeyEnv+"="+key)
+		}
+	}
+	return envLines
+}
+
+// ask prints a prompt to w and returns the entered line, or def if input is empty.
+func ask(in *bufio.Scanner, w io.Writer, label, def string) string {
+	if def != "" {
+		fmt.Fprintf(w, "%s [%s]: ", label, def)
+	} else {
+		fmt.Fprintf(w, "%s: ", label)
+	}
+	if !in.Scan() {
+		return def
+	}
+	if v := strings.TrimSpace(in.Text()); v != "" {
+		return v
+	}
+	return def
+}
+
+// isInteractive reports whether we're attached to a real terminal on both
+// stdin and stdout — required for prompting. Redirected or piped I/O is not
+// interactive, so wizards never block or auto-default in scripts and CI.
+func isInteractive() bool {
+	return isTTY(os.Stdin) && isTTY(os.Stdout)
+}
+
+func isTTY(f *os.File) bool {
+	return term.IsTerminal(int(f.Fd()))
+}
+
+// appendEnv merges KEY=value lines into a .env file. Existing assignments of
+// any key that's about to be written are dropped first, then the new values
+// are appended — so re-running `tianxuan setup` with a corrected key replaces the
+// stale one instead of stacking duplicates (loadDotEnv is first-wins, so a
+// naive append would leave the old key in effect). The new values are also
+// pinned into the current process env so a chat session started right after
+// init picks up the fresh keys without a restart.
+func appendEnv(path string, lines []string) error {
+	target := map[string]bool{}
+	for _, l := range lines {
+		if k, _, ok := strings.Cut(l, "="); ok {
+			target[strings.TrimSpace(k)] = true
+		}
+	}
+
+	var kept []string
+	if data, err := os.ReadFile(path); err == nil {
+		for _, raw := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(raw)
+			check := strings.TrimPrefix(trimmed, "export ")
+			if k, _, ok := strings.Cut(check, "="); ok && target[strings.TrimSpace(k)] {
+				continue
+			}
+			kept = append(kept, raw)
+		}
+		// strings.Split on a string ending with \n leaves a trailing empty
+		// element; trim it so we don't grow a blank line on every rewrite.
+		if n := len(kept); n > 0 && kept[n-1] == "" {
+			kept = kept[:n-1]
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	var b strings.Builder
+	for _, l := range kept {
+		b.WriteString(l)
+		b.WriteByte('\n')
+	}
+	for _, l := range lines {
+		b.WriteString(l)
+		b.WriteByte('\n')
+		if k, v, ok := strings.Cut(l, "="); ok {
+			os.Setenv(strings.TrimSpace(k), v)
+		}
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o600)
+}

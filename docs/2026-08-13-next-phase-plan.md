@@ -37,6 +37,10 @@
 - serve_handlers.go(969)、boot.go(960)、agent.go(872)、controller.go(851)、config.go(831)、cli.go(830)
 - 逐个理解边界再拆，禁止机械移动
 - 风险：中高
+- 状态：cli.go ✅（2026-08-13）— 907 行拆至 371 行：设置向导 →
+  `setup_interactive.go`（378 行）、REPL 启动 → `chat_repl.go`（189 行）；
+  25 个函数体逐字节验证零改动，vet/build/cli 测试全绿。其余 5 个文件
+  （serve_handlers/boot/agent/controller/config）待续
 
 ## P3 高风险涉及缓存铁律
 

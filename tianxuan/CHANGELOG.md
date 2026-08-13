@@ -25,6 +25,14 @@
 - 删除 `issue-version-label.yml` / `pr-version-label.yml` 两个 workflow
   （v1/v2 标签体系无下游消费，彻底清理）
 
+### 🧩 cli.go 拆分（P2.5 首块）
+
+- `cli.go` 907 行拆至 371 行：首次设置向导（setupConfig/interactiveSetup/
+  密钥配置等）→ `setup_interactive.go`（378 行）、REPL 启动 → `chat_repl.go`
+  （189 行）；`Run`/`setup`/`runAgent`/`runServe`/`welcome` 等主路由保留
+- 25 个函数体逐字节验证零改动（纯移动）
+- 验证：`go vet` / `go build` / cli 包测试全绿
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

@@ -47,7 +47,8 @@
   Runner 配置 setter/getter → `setters.go`（277 行）。函数体逐字节验证零改动、
   vet/build/包测试全绿。controller.go ✅ — 934 行拆至 641 行：
   公开审批命令并入已有 `controller_approval.go`，会话生命周期 → `controller_session.go`。
-  其余 1 个文件（config）待续
+  config.go ✅ — 907 行拆至 683 行：路径辅助 → `paths.go`，provider 解析 → `provider.go`。
+  P2.5 六个 800+ 行文件全部完成；全量 `go test -short ./...` 通过。
 
 ## P3 高风险涉及缓存铁律
 

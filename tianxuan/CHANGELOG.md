@@ -64,6 +64,14 @@
 - 54 个函数体逐字节验证零改动（纯移动）
 - 验证：`go vet` / `go build` / control 包测试全绿
 
+### 🧩 config.go 拆分（P2.5 收官）
+
+- `config.go` 907 行拆至 683 行：目录/路径辅助 → `paths.go`（117 行）、
+  provider 解析（Provider/ResolveModel/APIKey 等）→ `provider.go`（122 行）
+- 36 个函数体逐字节验证零改动（纯移动）
+- 验证：`go vet` / `go build` / config 包测试全绿；全量 `go test -short ./...`
+  通过。P2.5 六个 800+ 行文件全部完成拆分
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

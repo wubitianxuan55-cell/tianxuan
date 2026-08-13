@@ -215,9 +215,7 @@ func findEntryGo(root string) string {
 		entries, _ := os.ReadDir(cmdDir)
 		for _, e := range entries {
 			if e.IsDir() {
-				mainGo := filepath.Join(cmdDir, e.Name(), "main.go")
 				if hasFile(filepath.Join(cmdDir, e.Name()), "main.go") {
-					_ = mainGo
 					return "cmd/" + e.Name() + "/main.go"
 				}
 			}

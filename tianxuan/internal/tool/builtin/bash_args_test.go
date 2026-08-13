@@ -42,6 +42,9 @@ func TestBashConfiguredTimeoutApplies(t *testing.T) {
 // TestBashZeroTimeoutNoLocalCap locks timeout=0 semantics: no tool-local cap,
 // only the parent context can cancel (aligned with Reasonix).
 func TestBashZeroTimeoutNoLocalCap(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a real shell; skipped under -short")
+	}
 	sh := resolvedTestShell(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

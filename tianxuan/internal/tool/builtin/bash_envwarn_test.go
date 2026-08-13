@@ -18,6 +18,9 @@ func writeDotEnv(t *testing.T, dir, content string) {
 // TestEnvWarningPrismaMismatch: 命令涉及数据库且用户级 DATABASE_URL 与项目
 // .env 不一致时,执行结果必须带预警(主动检查项,不依赖记忆兜底)。
 func TestEnvWarningPrismaMismatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real npx; skipped under -short")
+	}
 	dir := t.TempDir()
 	writeDotEnv(t, dir, "DATABASE_URL=\"postgresql://proj@proj-host/db\"\n")
 	t.Setenv("DATABASE_URL", "postgresql://user@user-host/db")
@@ -34,6 +37,9 @@ func TestEnvWarningPrismaMismatch(t *testing.T) {
 
 // TestEnvWarningPrismaMatch: 用户级与项目 .env 一致时不预警。
 func TestEnvWarningPrismaMatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real npx; skipped under -short")
+	}
 	dir := t.TempDir()
 	writeDotEnv(t, dir, "DATABASE_URL=\"postgresql://proj@proj-host/db\"\n")
 	t.Setenv("DATABASE_URL", "postgresql://proj@proj-host/db")
@@ -48,6 +54,9 @@ func TestEnvWarningPrismaMatch(t *testing.T) {
 
 // TestEnvWarningIrrelevantCommand: 无关命令即使有环境差异也不预警(避免噪音)。
 func TestEnvWarningIrrelevantCommand(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real npx; skipped under -short")
+	}
 	dir := t.TempDir()
 	writeDotEnv(t, dir, "DATABASE_URL=\"postgresql://proj@proj-host/db\"\n")
 	t.Setenv("DATABASE_URL", "postgresql://user@user-host/db")
@@ -62,6 +71,9 @@ func TestEnvWarningIrrelevantCommand(t *testing.T) {
 
 // TestEnvWarningNoUserVar: 用户级未设置时不预警(无对比对象)。
 func TestEnvWarningNoUserVar(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real npx; skipped under -short")
+	}
 	dir := t.TempDir()
 	writeDotEnv(t, dir, "DATABASE_URL=\"postgresql://proj@proj-host/db\"\n")
 	t.Setenv("DATABASE_URL", "")
@@ -76,6 +88,9 @@ func TestEnvWarningNoUserVar(t *testing.T) {
 
 // TestEnvWarningJsonMode: JSON 输出模式下预警进入 warning 字段。
 func TestEnvWarningJsonMode(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real npx; skipped under -short")
+	}
 	dir := t.TempDir()
 	writeDotEnv(t, dir, "DATABASE_URL=\"postgresql://proj@proj-host/db\"\n")
 	t.Setenv("DATABASE_URL", "postgresql://user@user-host/db")

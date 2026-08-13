@@ -150,6 +150,9 @@ func TestAdaptPowerShellHeredocThenShims(t *testing.T) {
 // TestBashPowerShellHeredocWritesFile e2e：翻译后的 heredoc 写文件在真实
 // PowerShell 下工作（Windows only）。
 func TestBashPowerShellHeredocWritesFile(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns real powershell; skipped under -short")
+	}
 	if runtime.GOOS != "windows" {
 		t.Skip("powershell e2e is windows-only")
 	}

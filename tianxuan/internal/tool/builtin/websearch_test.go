@@ -110,6 +110,9 @@ func TestTavilyEngineParsesResults(t *testing.T) {
 }
 
 func TestSearXNGEngineRetriesOnServerError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("retry backoff; skipped under -short")
+	}
 	attempts := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++

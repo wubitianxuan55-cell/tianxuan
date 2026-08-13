@@ -12,6 +12,9 @@ import (
 // goroutine. Snapshot must copy under the lock; before it, an append racing the
 // copy could tear the slice header and crash.
 func TestSessionConcurrentAddAndRead(t *testing.T) {
+	if testing.Short() {
+		t.Skip("5000-iteration stress; skipped under -short")
+	}
 	s := NewSession("sys")
 
 	var wg sync.WaitGroup

@@ -33,6 +33,9 @@ func TestLiveChatFree(t *testing.T) {
 // TestLiveResponses exercises the Responses protocol (GPT class) against the
 // real Zen gateway. Needs OPENCODE_API_KEY.
 func TestLiveResponses(t *testing.T) {
+	if testing.Short() {
+		t.Skip("live network call; skipped under -short")
+	}
 	apiKey := os.Getenv("OPENCODE_API_KEY")
 	if apiKey == "" {
 		t.Skip("OPENCODE_API_KEY not set — skipping live test")
@@ -58,6 +61,9 @@ func TestLiveResponses(t *testing.T) {
 // TestLiveMessages exercises the Anthropic protocol (Claude class) against the
 // real Zen gateway. Needs OPENCODE_API_KEY.
 func TestLiveMessages(t *testing.T) {
+	if testing.Short() {
+		t.Skip("live network call; skipped under -short")
+	}
 	apiKey := os.Getenv("OPENCODE_API_KEY")
 	if apiKey == "" {
 		t.Skip("OPENCODE_API_KEY not set — skipping live test")

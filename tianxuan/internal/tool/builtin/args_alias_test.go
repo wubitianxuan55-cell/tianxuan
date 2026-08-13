@@ -64,6 +64,9 @@ func TestWaitAcceptsJobIDSingular(t *testing.T) {
 // TestWaitAcceptsTimeoutMs: the model sometimes emits timeout_ms; it must be
 // converted to seconds and actually bound the wait.
 func TestWaitAcceptsTimeoutMs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits on a real job; skipped under -short")
+	}
 	m := jobs.NewManager(event.Discard)
 	defer m.Close()
 	ctx := jobs.WithManager(context.Background(), m)

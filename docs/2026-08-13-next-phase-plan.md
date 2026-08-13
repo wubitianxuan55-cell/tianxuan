@@ -18,6 +18,9 @@
 - builtin 单包 47s、boot 7.5s、hook 6.5s，全量约 1 分钟
 - 方案：拆短测试（默认跑）和慢测试（tag/夜间跑）
 - 风险：低
+- 状态：✅ 已完成（2026-08-13）— 慢测试（npx/网络/进程树/压力）加
+  `testing.Short()` 守卫，CI 门禁改 `go test -short ./...`（Windows 本机全量
+  48s → 23s，builtin 40s → 13.6s），新增 nightly job 每夜跑全量含慢测试
 
 ## P2 中风险需逐块理解
 

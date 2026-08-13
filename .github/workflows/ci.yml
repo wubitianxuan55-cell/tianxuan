@@ -5,6 +5,9 @@ on:
     branches: [main, master, release/v10.110.0]
   pull_request:
     branches: [main, master, release/v10.110.0]
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -79,6 +82,22 @@ jobs:
         run: go build ./...
 
       - name: test
+        # Fast gate: -short skips slow external-dependency tests (npx, live
+        # network, process trees). The nightly job below runs the full suite.
+        run: go test -short ./...
+
+  nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tianxuan/go.mod
+          cache: true
+
+      - name: Full tests (including slow)
         run: go test ./...
 
   frontend:

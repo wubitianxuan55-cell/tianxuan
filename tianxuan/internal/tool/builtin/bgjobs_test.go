@@ -13,6 +13,9 @@ import (
 // injected on the context, the wait tool collects its output, and bash_output
 // reads it — the same path the agent drives.
 func TestBackgroundBashWaitAndOutput(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a real background process; skipped under -short")
+	}
 	m := jobs.NewManager(event.Discard)
 	defer m.Close()
 	ctx := jobs.WithManager(context.Background(), m)

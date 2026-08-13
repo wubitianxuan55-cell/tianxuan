@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write # create the release and upload archives
 
+# Go module, scripts, and dist/ all live under tianxuan/.
+defaults:
+  run:
+    working-directory: tianxuan
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -18,7 +23,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: tianxuan/go.mod
           cache: true
 
       - name: Cache hit guard

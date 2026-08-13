@@ -26,12 +26,15 @@ jobs:
   cache-guard:
     name: cache hit guard
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tianxuan
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: tianxuan/go.mod
           cache: true
 
       - name: Cache hit guard
@@ -57,9 +60,9 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: desktop/go.mod
+          go-version-file: tianxuan/desktop/go.mod
           cache: true
-          cache-dependency-path: desktop/go.sum
+          cache-dependency-path: tianxuan/desktop/go.sum
 
       - uses: actions/setup-node@v4
         with:
@@ -93,10 +96,10 @@ jobs:
           echo "version=${TAG#desktop-}" >> "$GITHUB_OUTPUT"
 
       - name: Build and package
-        run: scripts/desktop-build.sh "${{ matrix.platform }}" "${{ steps.ver.outputs.version }}"
+        run: tianxuan/scripts/desktop-build.sh "${{ matrix.platform }}" "${{ steps.ver.outputs.version }}"
 
       - name: Sign artifacts (minisign)
-        working-directory: desktop
+        working-directory: tianxuan/desktop
         env:
           MINISIGN_PRIVATE_KEY: ${{ secrets.MINISIGN_PRIVATE_KEY }}
           MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
@@ -105,7 +108,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.name }}
-          path: dist/*
+          path: tianxuan/dist/*
           if-no-files-found: error
 
   publish:
@@ -117,13 +120,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: desktop/go.mod
+          go-version-file: tianxuan/desktop/go.mod
           cache: true
-          cache-dependency-path: desktop/go.sum
+          cache-dependency-path: tianxuan/desktop/go.sum
 
       - uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: tianxuan/dist
           pattern: dist-*
           merge-multiple: true
 
@@ -137,14 +140,14 @@ jobs:
       # Generate latest.json with GitHub release download URLs; the mirror step
       # rewrites them to R2 afterwards. GITHUB_REPOSITORY is provided by the runner.
       - name: Generate manifest
-        working-directory: desktop
+        working-directory: tianxuan/desktop
         run: go run ./cmd/sign manifest ../dist "${{ steps.ver.outputs.version }}" "${{ steps.ver.outputs.tag }}"
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.ver.outputs.tag }}" dist/* \
+          gh release create "${{ steps.ver.outputs.tag }}" tianxuan/dist/* \
             --title "Tianxuan Desktop ${{ steps.ver.outputs.tag }}" \
             --generate-notes
 

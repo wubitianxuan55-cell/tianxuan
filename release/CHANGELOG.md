@@ -1,3 +1,22 @@
+## v10.178.0 (2026-08-13) — 工程治理与代码质量梳理
+
+### 变更
+- **CI/CD 修复**：`.github` 从 `tianxuan/` 子目录移到仓库根（此前所有 workflow
+  从未被 GitHub 识别执行）；cacheguard 静态缓存守卫加入 ci.yml 硬门禁；
+  e2e-bot 清理 reasonix 时代遗留；release/release-desktop workflow 修复嵌套路径
+- **gofmt 治理**：124 个真实格式差异文件统一格式化
+- **文档对齐**：README/AGENTS 版本号统一到 V10.177，活跃文档清理 reasonix 命名
+- **分支治理**：default branch 对齐 main，main 与 release/v10.110.0 同步，
+  删除遗留 master 及历史分支（tag 归档保历史）
+- **代码梳理**：删除死变量、`hermes_prompt.go`→`solo_prompt.go`、4 处 `main-v2`
+  残留清零、`chat_tui.go` 拆分渲染函数到 `render.go`
+- **Bug 修复**：`PruneOld` 补全 `maxAgeDays` 按天数过期（原为死参数）；
+  `update` 回滚失败不再谎报"已恢复原二进制"
+- 验证：`go build` / `go vet` / `go test` 全绿
+
+### 发布产物
+- 待构建（CLI + 桌面端）
+
 ## v10.175.1 (2026-08-09) — Zen reasoning_content 回传修复 + 过程卡/429 修复
 
 ### 变更

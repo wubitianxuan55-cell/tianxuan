@@ -1,3 +1,31 @@
+## [10.178.0] — 2026-08-13
+
+### 🧹 工程治理与代码质量梳理（历史债清理）
+
+- **CI/CD 修复**：`.github` 从 `tianxuan/` 子目录移到仓库根（此前所有 workflow
+  从未被 GitHub 识别执行）；`ci.yml` 触发分支 `main-v2` → `main/master/release/v10.110.0`，
+  cacheguard 静态缓存守卫加入硬门禁；e2e-bot 清理 reasonix 时代遗留；
+  release / release-desktop workflow 修复嵌套路径
+- **gofmt 治理**：124 个真实格式差异文件（import 排序 + struct 注释对齐）统一格式化
+- **文档对齐**：README/AGENTS 版本号统一到 V10.177；tianxuan.example.toml 等
+  活跃文档清理 reasonix 命名残留
+- **分支治理**：default branch 对齐到 main，main 与 release/v10.110.0 同步，
+  删除遗留 master 及历史分支（tag 归档保历史）
+- **代码梳理**：删除 `findEntryGo` 死变量；`hermes_prompt.go` → `solo_prompt.go`
+  改名；4 处 `main-v2` 残留清零；`chat_tui.go` 拆分渲染辅助函数到 `render.go`
+- **Bug 修复**：`PruneOld` 补全 `maxAgeDays` 按天数过期逻辑（原为死参数）；
+  `update` 回滚失败不再谎报"已恢复原二进制"
+- **工作空间**：清理约 1GB 构建产物与索引（release 产物、.codegraph），
+  发布产物目录加入 .gitignore
+
+### 🧰 技术细节
+
+- `learning.PruneOld`：`LastSeen` 早于 N 天的 pattern 删除、空 `LastSeen`
+  保守保留、`maxAgeDays <= 0` 不按天数过期
+- `update`：Windows 更新回滚失败时错误信息区分"已恢复"与"回滚也失败"
+- CI 硬门禁：cacheguard / go vet / go build / go test；gofmt 因历史格式债
+  暂时 `continue-on-error`
+
 ## [10.177.0] — 2026-08-09
 
 ### 🔍 web_search 免费 Bing 引擎 fallback（国内可用，无需 API key）

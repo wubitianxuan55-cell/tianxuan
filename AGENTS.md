@@ -137,6 +137,13 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.178.0** (2026-08-13): 工程治理与代码质量梳理 — CI/CD 修复（`.github`
+  从子目录移到仓库根、cacheguard 进门禁、e2e-bot reasonix 清理、release
+  workflow 嵌套路径修复）、gofmt 124 文件、文档与分支治理（版本号统一到
+  V10.177、default branch 对齐 main、删除遗留 master 及历史分支）、后端梳理
+  （死变量清理、hermes_prompt 改名、chat_tui.go 拆分 render.go）、Bug 修复
+  （PruneOld 补全 maxAgeDays 按天数过期、update 回滚失败不再谎报）。
+  详见 memory/v10-178-release-notes.md
 - **V10.177.0** (2026-08-09): web_search 免费 Bing 引擎 fallback（国内可用无需
   API key）— bingEngine 解析 Bing HTML、CJK 查询自动附 zh-CN、searchHTTPClient
   共享连接池、SSRF 防护增强（拒绝私有/链路本地/CGNAT）。详见 CHANGELOG

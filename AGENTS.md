@@ -137,6 +137,14 @@ DeepSeek 前缀缓存是项目成本命脉。**缓存匹配的是整个 API 请�
 
 ## 📦 最新版本
 
+- **V10.177.0** (2026-08-09): web_search 免费 Bing 引擎 fallback（国内可用无需
+  API key）— bingEngine 解析 Bing HTML、CJK 查询自动附 zh-CN、searchHTTPClient
+  共享连接池、SSRF 防护增强（拒绝私有/链路本地/CGNAT）。详见 CHANGELOG
+- **V10.176.0~V10.176.2** (2026-08-09): 桌面端 UI 打磨 + 核心交互组件测试覆盖
+  （Composer/ToolCard/Message/Transcript，vitest 156→187 例，引入 happy-dom +
+  RTL 测试基础设施，修复 vitest globals 缺失导致的 auto-cleanup 失效）
+- **V10.175.1** (2026-08-08): 过程卡可见性修复（hotTurns 恒为 1）+ Zen 429
+  快速失败（关闭内部重试交 failover 链）+ deepseek reasoning_content 回传修复
 - **V10.175.0** (2026-08-08): Codex 蒸馏能力级提升 + 过程卡工作流 —
   write_stdin 交互式进程管理（bash interactive 参数 + 写 stdin 工具）、
   会话级 token 预算渐进提醒（agent.token_budget_limit/reminders）、hook

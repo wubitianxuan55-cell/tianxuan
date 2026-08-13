@@ -1,7 +1,7 @@
 # 上下文管理三层升级 — 设计蓝图
 
 > **蒸馏来源**: MiMoCode (OpenCode fork) 的三层上下文管理
-> **目标项目**: Tianxuan (Reasonix) V10.x
+> **目标项目**: Tianxuan V10.x
 > **语言**: 全部 Go（集成到 `tianxuan/internal/`）
 > **日期**: 2026-07-15
 > **状态**: 设计蓝图 — 待审批后编码

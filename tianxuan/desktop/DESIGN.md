@@ -16,7 +16,7 @@
 
 ## 1. 项目概况
 
-tianxuan 是基于 Reasonix 的 AI 编程助手桌面端。Wails v2 + React 18 + TailwindCSS 4。
+tianxuan 是面向 DeepSeek 的 AI 编程助手桌面端。Wails v2 + React 18 + TailwindCSS 4。
 终端风格暗色 UI，单栏聊天布局，侧栏 + 主画布 + Workspace 面板三区。
 
 **设计基调**: 全息科技感 AI 编程助手。深空黑底 + 霓虹青紫渐变，神经节点图标。终端风格保持，但融入未来科技美学。

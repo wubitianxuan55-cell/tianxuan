@@ -62,7 +62,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
 ## Version
 
-Current **V10.147.0** — see [CHANGELOG.md](CHANGELOG.md).
+Current **V10.177.0** — see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

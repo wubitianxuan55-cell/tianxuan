@@ -61,7 +61,7 @@ _archive/           → 历史架构文档
 
 ## 版本
 
-当前 **V10.147.0** — 详见 [CHANGELOG.md](CHANGELOG.md)。
+当前 **V10.177.0** — 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可
 

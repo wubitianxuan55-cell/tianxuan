@@ -11,6 +11,14 @@
   手动触发）跑完整 `go test ./...`，慢测试不丢失覆盖
 - **验证**：`go test -short ./...` 与 `go test ./...` 双路径全绿
 
+### 🧩 chat_tui.go 拆分（P2.4）
+
+- `chat_tui.go` 1990 行拆至 1435 行：粘贴处理 → `paste.go`（313 行）、
+  斜杠命令/MCP → `slash.go`（233 行）、状态行 → `statusline.go`（48 行）
+- 62 个函数体逐字节验证零改动（纯移动）；render.go 拆分遗留的
+  `replaySectionsFor` 孤儿注释归位
+- 验证：`go vet` / `go build` / cli 包测试全绿
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

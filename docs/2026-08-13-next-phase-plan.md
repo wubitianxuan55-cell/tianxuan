@@ -40,8 +40,10 @@
 - 状态：cli.go ✅（2026-08-13）— 907 行拆至 371 行：设置向导 →
   `setup_interactive.go`（378 行）、REPL 启动 → `chat_repl.go`（189 行）；
   serve_handlers.go ✅ — 1021 行拆至 565 行：设置/权限/MCP handler →
-  `serve_handlers_settings.go`（470 行）。两轮均函数体逐字节验证零改动，
-  vet/build/包测试全绿。其余 4 个文件（boot/agent/controller/config）待续
+  `serve_handlers_settings.go`（470 行）；boot.go ✅ — 1031 行拆至 807 行：
+  子代理引导（fork 上下文/子代理模型/技能模板/compact 工具集）→
+  `subagent.go`（255 行）。均函数体逐字节验证零改动、vet/build/包测试全绿。
+  其余 3 个文件（agent/controller/config）待续
 
 ## P3 高风险涉及缓存铁律
 

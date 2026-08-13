@@ -39,8 +39,9 @@
 - 风险：中高
 - 状态：cli.go ✅（2026-08-13）— 907 行拆至 371 行：设置向导 →
   `setup_interactive.go`（378 行）、REPL 启动 → `chat_repl.go`（189 行）；
-  25 个函数体逐字节验证零改动，vet/build/cli 测试全绿。其余 5 个文件
-  （serve_handlers/boot/agent/controller/config）待续
+  serve_handlers.go ✅ — 1021 行拆至 565 行：设置/权限/MCP handler →
+  `serve_handlers_settings.go`（470 行）。两轮均函数体逐字节验证零改动，
+  vet/build/包测试全绿。其余 4 个文件（boot/agent/controller/config）待续
 
 ## P3 高风险涉及缓存铁律
 

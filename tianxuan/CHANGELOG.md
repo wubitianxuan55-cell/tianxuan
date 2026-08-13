@@ -33,6 +33,13 @@
 - 25 个函数体逐字节验证零改动（纯移动）
 - 验证：`go vet` / `go build` / cli 包测试全绿
 
+### 🧩 serve_handlers.go 拆分（P2.5）
+
+- `serve_handlers.go` 1021 行拆至 565 行：设置/权限规则/MCP handler 组 →
+  `serve_handlers_settings.go`（470 行），按文件自带分区头（Settings）切分
+- 44 个函数体逐字节验证零改动（纯移动）
+- 验证：`go vet` / `go build` / serve 包测试全绿
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

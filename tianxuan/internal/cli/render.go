@@ -14,6 +14,9 @@ import (
 	"tianxuan/internal/provider"
 )
 
+// replaySectionsFor turns a loaded session into scrollback blocks: user bubbles
+// and assistant markdown. Tool messages are dropped — needed in session state
+// but noise in the visible transcript on resume.
 func replaySectionsFor(history []provider.Message, width int, renderer *mdRenderer) []string {
 	var out []string
 	for _, m := range history {

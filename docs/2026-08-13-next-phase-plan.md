@@ -28,6 +28,10 @@
 - 已拆 render.go，待拆 paste.go（约 288 行）、slash.go（约 220 行）、statusline.go（约 100 行）
 - 难点：类型定义与函数交织，需按函数边界切分
 - 风险：中
+- 状态：✅ 已完成（2026-08-13）— chat_tui.go 1990 行拆至 1435 行：
+  paste.go（313 行）、slash.go（233 行）、statusline.go（48 行），62 个函数体
+  逐字节验证零改动，render.go 拆分遗留的孤儿注释归位；go vet / go build /
+  cli 测试全绿
 
 ### 5. 800+ 行文件拆分
 - serve_handlers.go(969)、boot.go(960)、agent.go(872)、controller.go(851)、config.go(831)、cli.go(830)

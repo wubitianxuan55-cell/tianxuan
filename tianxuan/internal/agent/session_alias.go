@@ -18,17 +18,17 @@ type BranchInfo = session.BranchInfo
 
 // Re-exported functions from session sub-package for internal use.
 var (
-	NewSession        = session.New
-	LoadSession       = session.Load
-	ListSessions      = session.List
-	ArchiveSession    = session.Archive
-	UnarchiveSession  = session.Unarchive
-	NewSessionPath    = session.NewPath
-	BranchID          = session.BranchID
-	BranchMetaPath    = session.BranchMetaPath
-	LoadBranchMeta    = session.LoadBranchMeta
-	SaveBranchMeta    = session.SaveBranchMeta
-	EnsureBranchMeta  = session.EnsureBranchMeta
-	TouchBranchMeta   = session.TouchBranchMeta
-	ListBranches      = session.ListBranches
+	NewSession       = session.New
+	LoadSession      = session.Load
+	ListSessions     = session.List
+	ArchiveSession   = session.Archive
+	UnarchiveSession = session.Unarchive
+	NewSessionPath   = session.NewPath
+	BranchID         = session.BranchID
+	BranchMetaPath   = session.BranchMetaPath
+	LoadBranchMeta   = session.LoadBranchMeta
+	SaveBranchMeta   = session.SaveBranchMeta
+	EnsureBranchMeta = session.EnsureBranchMeta
+	TouchBranchMeta  = session.TouchBranchMeta
+	ListBranches     = session.ListBranches
 )

@@ -17,12 +17,12 @@ type readSkill struct {
 	resolve func(name string) (string, error)
 }
 
-func (readSkill) Name() string        { return "read_skill" }
+func (readSkill) Name() string { return "read_skill" }
 func (readSkill) Description() string {
 	return "Read the full body (frontmatter + content) of a skill by name. The skill index lists one-line summaries; load the body when you need the full playbook before running it (run_skill) or to inspect a mentioned skill."
 }
 func (readSkill) ReadOnly() bool      { return true }
-func (readSkill) Kind() tool.ToolKind  { return tool.KindRead }
+func (readSkill) Kind() tool.ToolKind { return tool.KindRead }
 
 func (readSkill) Schema() json.RawMessage {
 	return json.RawMessage(`{
@@ -54,8 +54,8 @@ func (r readSkill) Execute(_ context.Context, args json.RawMessage) (string, err
 	return content, nil
 }
 
-func (readSkill) CompactDescription() string { return compactDesc["read_skill"] }
-func (readSkill) CompactSchema() json.RawMessage   { return compactSchema["read_skill"] }
+func (readSkill) CompactDescription() string     { return compactDesc["read_skill"] }
+func (readSkill) CompactSchema() json.RawMessage { return compactSchema["read_skill"] }
 
 func init() {
 	tool.RegisterBuiltin(&readSkill{})

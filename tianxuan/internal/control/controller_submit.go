@@ -82,7 +82,9 @@ func (c *Controller) Submit(input string) {
 			var sb strings.Builder
 			sb.WriteString(fmt.Sprintf("memories (%d found):\n", len(matches)))
 			limit := 8
-			if len(matches) < limit { limit = len(matches) }
+			if len(matches) < limit {
+				limit = len(matches)
+			}
 			for i, m := range matches[:limit] {
 				sb.WriteString(fmt.Sprintf("  %d. [%.0f] %s\n", i+1, m.Score, m.Name))
 			}

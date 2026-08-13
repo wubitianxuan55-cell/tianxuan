@@ -7,7 +7,7 @@ import "testing"
 
 func TestIsAnswerNotAction_PlanStructureWithoutMarker(t *testing.T) {
 	cases := []struct {
-		text    string
+		text     string
 		isAnswer bool // true = 当作直接回答（不执行）
 	}{
 		// 计划结构但缺标记 → 视为计划（走确认，用户可"仅聊天"取消）

@@ -30,11 +30,11 @@ func (editFile) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"File path"},"old_string":{"type":"string","description":"Exact text to replace. Without replace_all, must be unique in the file. Line endings auto-adapted."},"new_string":{"type":"string","description":"Replacement text (may be empty to delete). Line endings auto-adapted."},"replace_all":{"type":"boolean","description":"Replace every occurrence instead of requiring uniqueness."}},"required":["path","old_string","new_string"]}`)
 }
 
-func (editFile) ReadOnly() bool { return false }
+func (editFile) ReadOnly() bool      { return false }
 func (editFile) Kind() tool.ToolKind { return tool.KindEdit }
 
-func (editFile) CompactDescription() string { return compactDesc["edit_file"] }
-func (editFile) CompactSchema() json.RawMessage   { return compactSchema["edit_file"] }
+func (editFile) CompactDescription() string     { return compactDesc["edit_file"] }
+func (editFile) CompactSchema() json.RawMessage { return compactSchema["edit_file"] }
 
 // detectLineEnding reports the dominant line-ending style in content.
 // Returns "\r\n" for CRLF, "\n" for LF, "" for no-newlines.
@@ -70,10 +70,10 @@ func adaptLineEndings(s string, target string) string {
 
 func (e editFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
-		Path      string `json:"path"`
-		OldString string `json:"old_string"`
-		NewString string `json:"new_string"`
-		ReplaceAll bool  `json:"replace_all"`
+		Path       string `json:"path"`
+		OldString  string `json:"old_string"`
+		NewString  string `json:"new_string"`
+		ReplaceAll bool   `json:"replace_all"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)

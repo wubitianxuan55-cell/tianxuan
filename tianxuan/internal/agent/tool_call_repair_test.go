@@ -102,8 +102,8 @@ func TestRepairDispatchToolArguments_PreserveFileChange(t *testing.T) {
 		"content": string(big),
 	}
 	result := RepairDispatchToolArguments(raw, ToolArgumentRepairOptions{
-		MaxStringBytes:        1024,
-		PreserveLongStrings:   true, // file_change 类工具
+		MaxStringBytes:      1024,
+		PreserveLongStrings: true, // file_change 类工具
 	})
 	content, ok := result.Arguments["content"].(string)
 	if !ok {

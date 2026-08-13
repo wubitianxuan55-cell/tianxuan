@@ -60,7 +60,7 @@ func TestValidateArgsTypeMismatch(t *testing.T) {
 	cases := []struct {
 		name string
 		args string
-	want string
+		want string
 	}{
 		{"integer from string", `{"path":"a.go","mode":"fast","count":"2"}`, "count"},
 		{"boolean from string", `{"path":"a.go","mode":"fast","enabled":"yes"}`, "enabled"},

@@ -118,14 +118,14 @@ func (*AskTool) Execute(ctx context.Context, args json.RawMessage) (string, erro
 	if !ok || asker == nil {
 		// Headless / no interactive user: don't block an autonomous run.
 		return "[Never-Ask] No interactive user is available to answer (headless/CI mode). " +
-		"Re-evaluate the options you just proposed for unattended execution — " +
-		"prefer text-only, non-interactive, minimal-scope paths and avoid anything " +
-		"that needs a GUI or the user present. Pick the best option yourself and " +
-		"continue. " +
-		"IMPORTANT: You MUST explicitly state which option you chose and why in " +
-		"your response text (not just in thinking) — the user will review the " +
-		"conversation history later and needs to see what you decided. " +
-		"State your assumption clearly so the user can correct it later if needed.", nil
+			"Re-evaluate the options you just proposed for unattended execution — " +
+			"prefer text-only, non-interactive, minimal-scope paths and avoid anything " +
+			"that needs a GUI or the user present. Pick the best option yourself and " +
+			"continue. " +
+			"IMPORTANT: You MUST explicitly state which option you chose and why in " +
+			"your response text (not just in thinking) — the user will review the " +
+			"conversation history later and needs to see what you decided. " +
+			"State your assumption clearly so the user can correct it later if needed.", nil
 	}
 
 	answers, err := asker.Ask(ctx, qs)

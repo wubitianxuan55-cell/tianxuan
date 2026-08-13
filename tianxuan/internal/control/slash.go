@@ -293,7 +293,6 @@ func (c *Controller) mcpListText() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-
 // goalText returns a structured assessment of the current task's completion status.
 func (c *Controller) goalText() string {
 	// Check the agent's session for the last user message (the goal)
@@ -311,16 +310,26 @@ func (c *Controller) goalText() string {
 	incomplete := 0
 	for i := len(msgs) - 1; i >= 0; i-- {
 		m := msgs[i]
-		if m.Role != "assistant" { continue }
+		if m.Role != "assistant" {
+			continue
+		}
 		for _, tc := range m.ToolCalls {
-			if tc.Name != "todo_write" { continue }
-			var p struct {
-				Todos []struct { Status string `json:"status"` } `json:"todos"`
+			if tc.Name != "todo_write" {
+				continue
 			}
-			if err := json.Unmarshal([]byte(tc.Arguments), &p); err != nil { continue }
+			var p struct {
+				Todos []struct {
+					Status string `json:"status"`
+				} `json:"todos"`
+			}
+			if err := json.Unmarshal([]byte(tc.Arguments), &p); err != nil {
+				continue
+			}
 			incomplete = 0
 			for _, t := range p.Todos {
-				if t.Status != "completed" { incomplete++ }
+				if t.Status != "completed" {
+					incomplete++
+				}
 			}
 		}
 	}
@@ -329,7 +338,9 @@ func (c *Controller) goalText() string {
 	b.WriteString("🎯 Goal status")
 	if lastUserMsg != "" {
 		capped := lastUserMsg
-		if len([]rune(capped)) > 200 { capped = string([]rune(capped)[:200]) + "…" }
+		if len([]rune(capped)) > 200 {
+			capped = string([]rune(capped)[:200]) + "…"
+		}
 		b.WriteString("\n  Request: " + strings.ReplaceAll(capped, "\n", " "))
 	}
 	if incomplete > 0 {

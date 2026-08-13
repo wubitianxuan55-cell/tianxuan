@@ -205,7 +205,6 @@ func TestCompleteStepRejectsManualOnly(t *testing.T) {
 	}
 }
 
-
 func TestCompleteStepMatchesTodoReceipt(t *testing.T) {
 	ledger := evidence.NewLedger()
 	ledger.SetStrictVerification(true) // V10.8: 严格验证模式
@@ -328,6 +327,7 @@ func TestCompleteStepReadOnly(t *testing.T) {
 		t.Fatal("complete_step must be ReadOnly so it stays available and needs no approval")
 	}
 }
+
 // ── V10.8: 非严格模式测试 ──────────────────────────────────────────
 
 // TestCompleteStepAcceptsUnverifiedEvidenceInNonStrictMode verifies that

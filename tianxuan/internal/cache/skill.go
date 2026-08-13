@@ -21,14 +21,14 @@ type VerificationPolicy struct {
 }
 
 type SkillProfile struct {
-	Kind              TaskKind
-	Tools             []string
-	PromptHint        string
-	Temperature       float64
-	MaxSteps          int
-	CompactThreshold  float64
-	RetryLimit        int
-	Verification      VerificationPolicy
+	Kind             TaskKind
+	Tools            []string
+	PromptHint       string
+	Temperature      float64
+	MaxSteps         int
+	CompactThreshold float64
+	RetryLimit       int
+	Verification     VerificationPolicy
 }
 
 // SkillLayer is the L3 cache domain — intent classification with adaptive
@@ -44,7 +44,7 @@ type SkillProfile struct {
 type SkillLayer struct {
 	current    SkillProfile
 	version    int
-	lockedVer  int  // V3.3: 0 = unlocked; >0 = locked to this version
+	lockedVer  int // V3.3: 0 = unlocked; >0 = locked to this version
 	lockedKind TaskKind
 }
 
@@ -53,7 +53,7 @@ type SkillLayer struct {
 type FailReason int
 
 const (
-	FailUnknown    FailReason = iota // uncategorized (default)
+	FailUnknown     FailReason = iota // uncategorized (default)
 	FailToolBug                       // tool returned an error (retryable, may need upgrade)
 	FailLogicError                    // tool returned wrong result (retryable)
 	FailPermission                    // permission denied (do NOT upgrade — env issue)

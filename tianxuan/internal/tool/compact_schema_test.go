@@ -13,9 +13,9 @@ type fakeCompactTool struct {
 	name string
 }
 
-func (f fakeCompactTool) Name() string        { return f.name }
-func (fakeCompactTool) Description() string   { return "fake tool" }
-func (fakeCompactTool) ReadOnly() bool        { return true }
+func (f fakeCompactTool) Name() string          { return f.name }
+func (fakeCompactTool) Description() string     { return "fake tool" }
+func (fakeCompactTool) ReadOnly() bool          { return true }
 func (fakeCompactTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
 func (fakeCompactTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	return "", nil

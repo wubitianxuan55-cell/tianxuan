@@ -20,7 +20,7 @@ func loadConstitution() string {
 
 	var cfg struct {
 		AuthorityChain []string `toml:"authority_chain"`
-		Constitution  struct {
+		Constitution   struct {
 			ProtectedInvariants []string `toml:"protected_invariants"`
 		} `toml:"constitution"`
 		VerificationPolicy string `toml:"verification_policy"`

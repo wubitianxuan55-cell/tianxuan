@@ -13,8 +13,8 @@ func TestDecidePlannerRoute_ChatInputsArePlannerChat(t *testing.T) {
 		"什么是缓存", "怎么用这个工具", "how does this work", // low_risk_question
 		"hello", "今天天气", // no_work
 		"保存会话", "提交代码", // "保存"/"提交" 不在 work 词表 → no_work，规划者处理（与历史运行行为一致）
-		"",          // empty
-		"/unknown",  // slash_command（headless 防御，planner 处理保持原行为）
+		"",         // empty
+		"/unknown", // slash_command（headless 防御，planner 处理保持原行为）
 	}
 	for _, q := range inputs {
 		d := DecidePlannerRoute(q)

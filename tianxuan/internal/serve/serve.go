@@ -6,8 +6,8 @@
 package serve
 
 import (
-	"embed"
 	"context"
+	"embed"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -355,7 +355,6 @@ func (s *Server) approve(w http.ResponseWriter, r *http.Request) {
 	s.ctrl.Approve(body.ID, body.Allow, body.Session)
 	w.WriteHeader(http.StatusNoContent)
 }
-
 
 func (s *Server) compact(w http.ResponseWriter, r *http.Request) {
 	if err := s.ctrl.Compact(r.Context(), ""); err != nil {

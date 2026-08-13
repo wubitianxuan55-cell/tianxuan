@@ -15,8 +15,8 @@ func TestPostBatchCoherenceCheck_ReadFailBlocksWrite(t *testing.T) {
 		{ID: "c2", Name: "edit_file", Arguments: `{"path":"foo.go","old_string":"x","new_string":"y"}`},
 	}
 	results := []string{
-		"error: file not found",  // read_file failed
-		"",                        // edit_file hasn't run yet (would fail anyway)
+		"error: file not found", // read_file failed
+		"",                      // edit_file hasn't run yet (would fail anyway)
 	}
 
 	a.postBatchCoherenceCheck(calls, results)
@@ -38,7 +38,7 @@ func TestPostBatchCoherenceCheck_WriteFailWarnsRead(t *testing.T) {
 	}
 	results := []string{
 		"blocked: permission denied", // write_file failed
-		"package bar\n...",            // read_file succeeded (but data may be stale)
+		"package bar\n...",           // read_file succeeded (but data may be stale)
 	}
 
 	a.postBatchCoherenceCheck(calls, results)

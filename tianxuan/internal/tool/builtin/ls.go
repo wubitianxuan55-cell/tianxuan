@@ -26,11 +26,11 @@ func (listDir) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","description":"Directory path (default \".\")"}}}`)
 }
 
-func (listDir) ReadOnly() bool { return true }
+func (listDir) ReadOnly() bool      { return true }
 func (listDir) Kind() tool.ToolKind { return tool.KindRead }
 
-func (listDir) CompactDescription() string { return compactDesc["ls"] }
-func (listDir) CompactSchema() json.RawMessage   { return compactSchema["ls"] }
+func (listDir) CompactDescription() string     { return compactDesc["ls"] }
+func (listDir) CompactSchema() json.RawMessage { return compactSchema["ls"] }
 
 func (l listDir) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	p := struct {

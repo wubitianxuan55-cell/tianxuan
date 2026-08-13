@@ -25,12 +25,12 @@ type VerificationPolicy = cache.VerificationPolicy
 type TaskKind = cache.TaskKind
 
 const (
-	KindFixBug      = cache.KindFixBug
+	KindFixBug       = cache.KindFixBug
 	KindWriteFeature = cache.KindWriteFeature
-	KindReview      = cache.KindReview
-	KindExplain     = cache.KindExplain
-	KindResearch    = cache.KindResearch
-	KindDefault     = cache.KindDefault
+	KindReview       = cache.KindReview
+	KindExplain      = cache.KindExplain
+	KindResearch     = cache.KindResearch
+	KindDefault      = cache.KindDefault
 )
 
 // V5.0: Learner removed.

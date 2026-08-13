@@ -29,10 +29,10 @@ const (
 
 // Item is one diagnostic check result.
 type Item struct {
-	Name    string `json:"name"`
-	Status  Status `json:"status"`
-	Detail  string `json:"detail"`
-	Advice  string `json:"advice,omitempty"`
+	Name   string `json:"name"`
+	Status Status `json:"status"`
+	Detail string `json:"detail"`
+	Advice string `json:"advice,omitempty"`
 }
 
 // Report is the full diagnostic output.
@@ -47,7 +47,7 @@ type Report struct {
 // Deps are the external dependencies the checker needs. All are optional —
 // a nil value skips the corresponding check.
 type Deps struct {
-	Cfg        *config.Config
+	Cfg          *config.Config
 	ProviderName string // e.g. "deepseek-v4-pro"
 	APIKey       string // bearer token for connectivity check
 	BalanceURL   string // e.g. "https://api.deepseek.com/user/balance"
@@ -64,7 +64,7 @@ type Deps struct {
 	TokenStats func() (hitTokens, missTokens int64, ok bool)
 
 	CWD         string
-	GoModExists bool   // go.mod found in CWD?
+	GoModExists bool // go.mod found in CWD?
 }
 
 // Run executes all checks and returns a report.

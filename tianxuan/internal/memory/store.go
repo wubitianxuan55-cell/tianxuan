@@ -254,7 +254,6 @@ func (s Store) Archive(name string) (string, error) {
 	return dest, nil
 }
 
-
 // Delete removes a memory — it archives first, then removes the index line.
 // Uses Archive internally so wrong memories remain traceable in .archive/.
 func (s Store) Delete(name string) error {

@@ -12,8 +12,8 @@ import (
 type Batcher struct {
 	sink event.Sink
 
-	textBuf    strings.Builder
-	textLast   time.Time
+	textBuf  strings.Builder
+	textLast time.Time
 
 	reasoningBuf  strings.Builder
 	reasoningLast time.Time

@@ -41,9 +41,9 @@ func (codeIndex) Schema() json.RawMessage {
 }`)
 }
 
-func (codeIndex) ReadOnly() bool { return true }
-func (codeIndex) Kind() tool.ToolKind { return tool.KindSearch }
-func (codeIndex) CompactDescription() string { return compactDesc["code_index"] }
+func (codeIndex) ReadOnly() bool                 { return true }
+func (codeIndex) Kind() tool.ToolKind            { return tool.KindSearch }
+func (codeIndex) CompactDescription() string     { return compactDesc["code_index"] }
 func (codeIndex) CompactSchema() json.RawMessage { return compactSchema["code_index"] }
 
 const (

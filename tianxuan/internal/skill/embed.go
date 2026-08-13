@@ -13,7 +13,6 @@ import (
 // data files are accessible as real files.
 //
 //go:generate cmd /c robocopy ..\..\..\..\.tianxuan\skills bundled /MIR /NJH /NJS /NFL
-//
 //go:embed all:bundled
 var BundledSkills embed.FS
 

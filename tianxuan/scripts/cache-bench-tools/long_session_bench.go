@@ -16,10 +16,10 @@ import (
 )
 
 type perTurn struct {
-	Total     int // total tokens
-	PromptIn  int // prompt tokens
-	Cached    int // cached tokens
-	New       int // new/miss tokens
+	Total      int // total tokens
+	PromptIn   int // prompt tokens
+	Cached     int // cached tokens
+	New        int // new/miss tokens
 	Completion int
 }
 

@@ -46,10 +46,10 @@ type tfEntry struct {
 type SearchMatch struct {
 	Name    string // memory slug
 	Score   float64
-	Preview string // one-line description for display (from frontmatter)
-	Body    string     // full memory body (for auto-recall injection)
-	Mtime   time.Time  // file mtime (for freshness caveats)
-	Kind    Kind   // semantic / episodic / procedural
+	Preview string    // one-line description for display (from frontmatter)
+	Body    string    // full memory body (for auto-recall injection)
+	Mtime   time.Time // file mtime (for freshness caveats)
+	Kind    Kind      // semantic / episodic / procedural
 }
 
 // BuildSearchIndex reads all memory files in the store and docs from the

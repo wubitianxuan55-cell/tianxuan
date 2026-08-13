@@ -28,7 +28,7 @@ const (
 	maxGoalAutoTurns = 50
 	maxGoalIdleTurns = 2
 
-	goalContinueTurn  = "Continue pursuing the active goal under its task contract. If it is complete, provide the concise final result and end with [goal:complete]. If progress genuinely requires user-only information, an irreversible or externally visible operation, or a changed scope, end with [goal:blocked:<short reason>]. Otherwise use sensible defaults, do the next useful work, and end with [goal:continue]."
+	goalContinueTurn   = "Continue pursuing the active goal under its task contract. If it is complete, provide the concise final result and end with [goal:complete]. If progress genuinely requires user-only information, an irreversible or externally visible operation, or a changed scope, end with [goal:blocked:<short reason>]. Otherwise use sensible defaults, do the next useful work, and end with [goal:continue]."
 	goalSelfCheckTurn  = "The agent signaled goal completion and all tasks are marked done. Before finalizing, perform a brief quality self-check:\n1. Verify any changed files compile or parse correctly\n2. Run the relevant tests if applicable\n3. Confirm the original request, output format, constraints, and success criteria are met\nIf everything checks out, signal [goal:complete]. If issues are found, fix them and signal [goal:complete] when done."
 	goalCompleteNotice = "goal complete"
 )
@@ -56,13 +56,13 @@ type Machine struct {
 
 // State is the serializable form of a goal state.
 type State struct {
-	Goal    string              `json:"goal,omitempty"`
-	Status  string              `json:"status,omitempty"`
-	Turns   int                 `json:"turns,omitempty"`
-	Blocks  int                 `json:"blocks,omitempty"`
-	Block   string              `json:"block,omitempty"`
-	Strict  bool                `json:"strict,omitempty"`
-	Todos   []evidence.TodoItem `json:"todos,omitempty"`
+	Goal   string              `json:"goal,omitempty"`
+	Status string              `json:"status,omitempty"`
+	Turns  int                 `json:"turns,omitempty"`
+	Blocks int                 `json:"blocks,omitempty"`
+	Block  string              `json:"block,omitempty"`
+	Strict bool                `json:"strict,omitempty"`
+	Todos  []evidence.TodoItem `json:"todos,omitempty"`
 }
 
 // AdvanceInput carries everything the FSM needs for one continuation step.

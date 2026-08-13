@@ -11,15 +11,14 @@ import (
 	"net"
 	"net/http"
 	"sort"
-	"sync"
 	"strings"
+	"sync"
 	"time"
 
+	"sync/atomic"
 	"tianxuan/internal/crash"
 	"tianxuan/internal/provider"
-	"sync/atomic"
 )
-
 
 // clientPool 按 baseURL 共享 HTTP 连接池，减少 TCP 建连开销。
 var (
@@ -54,7 +53,6 @@ func getSharedClient(baseURL string) *http.Client {
 func init() {
 	provider.Register("openai", New)
 }
-
 
 func New(cfg provider.Config) (provider.Provider, error) {
 	if cfg.BaseURL == "" {
@@ -110,36 +108,36 @@ func New(cfg provider.Config) (provider.Provider, error) {
 		}
 	}
 	return &client{
-		name:     name,
-		apiKey:   cfg.APIKey,
-		keyEnv:   keyEnv,
-		baseURL:  strings.TrimRight(cfg.BaseURL, "/"),
-		model:    cfg.Model,
-		effort:   effort,
-		deepseek: deepseek,
-		minimax:  minimax,
+		name:           name,
+		apiKey:         cfg.APIKey,
+		keyEnv:         keyEnv,
+		baseURL:        strings.TrimRight(cfg.BaseURL, "/"),
+		model:          cfg.Model,
+		effort:         effort,
+		deepseek:       deepseek,
+		minimax:        minimax,
 		rateLimitRetry: rateLimitRetry,
-		http:     getSharedClient(strings.TrimRight(cfg.BaseURL, "/")),
+		http:           getSharedClient(strings.TrimRight(cfg.BaseURL, "/")),
 	}, nil
 }
 
 type client struct {
-	name     string
-	apiKey   string
-	keyEnv   string // api_key_env name, surfaced in auth errors
-	authed   atomic.Bool // V10.0: a request has succeeded — gate transient-401 retry
-	baseURL  string
-	model    string
-	http     *http.Client
-	effort   string // reasoning_effort for OpenAI; thinking.type for MiniMax; "" = auto/provider default
+	name    string
+	apiKey  string
+	keyEnv  string      // api_key_env name, surfaced in auth errors
+	authed  atomic.Bool // V10.0: a request has succeeded — gate transient-401 retry
+	baseURL string
+	model   string
+	http    *http.Client
+	effort  string // reasoning_effort for OpenAI; thinking.type for MiniMax; "" = auto/provider default
 	// rateLimitRetry controls whether a 429 is retried inside the provider
 	// (Retry-After + backoff, up to RateLimitRetryPolicy.MaxAttempts). Gateways
 	// like OpenCode Zen return 429 for quota exhaustion (FreeUsageLimitError),
 	// where waiting out the header is pure waste — fail fast so an outer
 	// failover chain can switch candidates instead of hanging for minutes.
 	rateLimitRetry bool
-	deepseek bool   // auto-detected: api.deepseek.com or reasoning_protocol=deepseek
-	minimax  bool   // auto-detected: *.minimaxi.com (requires thinking.type, not reasoning_effort)
+	deepseek       bool // auto-detected: api.deepseek.com or reasoning_protocol=deepseek
+	minimax        bool // auto-detected: *.minimaxi.com (requires thinking.type, not reasoning_effort)
 }
 
 func (c *client) Name() string { return c.name }
@@ -392,7 +390,7 @@ func (c *client) readStream(ctx context.Context, resp *http.Response, out chan<-
 	//   - at 60s idle: emit a keepalive notice so the user knows reasoning is in progress
 	//   - at 120s idle: forcibly close the body (hard timeout for true disconnects)
 	const idleNoticeTimeout = 60 * time.Second
-	const idleHardTimeout   = 120 * time.Second
+	const idleHardTimeout = 120 * time.Second
 	var lastDataNano atomic.Int64
 	lastDataNano.Store(time.Now().UnixNano())
 	keepaliveSent := false

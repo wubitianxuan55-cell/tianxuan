@@ -90,11 +90,11 @@ func (bash) Schema() json.RawMessage {
 // ReadOnly is false: bash's effect cannot be inferred from args (rm, curl,
 // git commit, etc. are all reachable). Conservative even when a particular
 // command happens to be read-only — the agent batch decision can't tell.
-func (bash) ReadOnly() bool { return false }
+func (bash) ReadOnly() bool      { return false }
 func (bash) Kind() tool.ToolKind { return tool.KindExecute }
 
-func (bash) CompactDescription() string { return compactDesc["bash"] }
-func (bash) CompactSchema() json.RawMessage   { return compactSchema["bash"] }
+func (bash) CompactDescription() string     { return compactDesc["bash"] }
+func (bash) CompactSchema() json.RawMessage { return compactSchema["bash"] }
 
 func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {

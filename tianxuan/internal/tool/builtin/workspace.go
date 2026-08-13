@@ -77,7 +77,9 @@ func (w Workspace) Tools(enabled ...string) []tool.Tool {
 // defaulted "." (ls/grep) targets the workspace root.
 func resolveIn(workDir, p string) string {
 	if workDir == "" {
-		if p == "" { return p }
+		if p == "" {
+			return p
+		}
 		return filepath.Clean(p)
 	}
 	if p == "" || p == "." {

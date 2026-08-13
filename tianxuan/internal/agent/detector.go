@@ -6,10 +6,10 @@ import "strings"
 type FailureKind string
 
 const (
-	KindNone               FailureKind = ""
+	KindNone                FailureKind = ""
 	KindDependencyBlindspot FailureKind = "dependency-blindspot"
-	KindToolMisuse         FailureKind = "tool-misuse"
-	KindScopeCreep         FailureKind = "scope-creep"
+	KindToolMisuse          FailureKind = "tool-misuse"
+	KindScopeCreep          FailureKind = "scope-creep"
 )
 
 // FailureReport describes a detected failure pattern and the corrective action.

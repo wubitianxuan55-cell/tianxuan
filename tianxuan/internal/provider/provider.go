@@ -1,4 +1,4 @@
-﻿// Package provider defines the model-backend abstraction and a registry mapping
+// Package provider defines the model-backend abstraction and a registry mapping
 // a provider "kind" to a factory. Concrete implementations live in subpackages
 // (e.g. provider/openai) and self-register via init(). The core resolves
 // providers by kind from config and never hardcodes a specific model.
@@ -231,15 +231,15 @@ const (
 // the model's last reported choices[0].finish_reason so the agent can surface
 // abnormal terminations ("length", "content_filter", "repetition_truncation").
 type Usage struct {
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
-	CacheHitTokens   int    // prompt tokens served from cache
-	CacheMissTokens  int    // prompt tokens not cached
+	PromptTokens           int
+	CompletionTokens       int
+	TotalTokens            int
+	CacheHitTokens         int    // prompt tokens served from cache
+	CacheMissTokens        int    // prompt tokens not cached
 	ReasoningTokens        int    // subset of CompletionTokens spent on chain-of-thought
 	SessionCacheHitTokens  int    // cumulative cache hit tokens across the session
 	SessionCacheMissTokens int    // cumulative cache miss tokens across the session
-	FinishReason     string // "stop", "tool_calls", "length", "content_filter", "repetition_truncation", 鈥?
+	FinishReason           string // "stop", "tool_calls", "length", "content_filter", "repetition_truncation", 鈥?
 }
 
 // Pricing is a provider's per-1M-token rates, used to estimate spend. Currency

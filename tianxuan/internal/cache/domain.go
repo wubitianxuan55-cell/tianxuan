@@ -7,12 +7,12 @@ import "strings"
 type TaskKind string
 
 const (
-	KindFixBug      TaskKind = "fix_bug"
+	KindFixBug       TaskKind = "fix_bug"
 	KindWriteFeature TaskKind = "write_feature"
-	KindReview      TaskKind = "review"
-	KindExplain     TaskKind = "explain"
-	KindResearch    TaskKind = "research"
-	KindDefault     TaskKind = "default"
+	KindReview       TaskKind = "review"
+	KindExplain      TaskKind = "explain"
+	KindResearch     TaskKind = "research"
+	KindDefault      TaskKind = "default"
 	// V4.0: non-code task kinds
 	KindDataAnalysis TaskKind = "data_analysis"
 	KindWriting      TaskKind = "writing"

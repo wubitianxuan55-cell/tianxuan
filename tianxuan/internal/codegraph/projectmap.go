@@ -19,12 +19,12 @@ import (
 
 // ProjectInfo carries the extracted project structure.
 type ProjectInfo struct {
-	Language   string   // "Go", "TypeScript", "Rust", etc.
-	EntryPoint string   // main.go / index.ts / src/main.rs
-	Packages   []string // key packages (internal/ names)
-	CoreTypes  []string // important struct/interface names
-	DepsShort  []string // <= 10 key dependencies from go.mod
-	FileCount  int      // total source files (.go / .ts/.tsx / .rs) in the project
+	Language     string    // "Go", "TypeScript", "Rust", etc.
+	EntryPoint   string    // main.go / index.ts / src/main.rs
+	Packages     []string  // key packages (internal/ names)
+	CoreTypes    []string  // important struct/interface names
+	DepsShort    []string  // <= 10 key dependencies from go.mod
+	FileCount    int       // total source files (.go / .ts/.tsx / .rs) in the project
 	LastModified time.Time // latest modtime across scanned files
 }
 

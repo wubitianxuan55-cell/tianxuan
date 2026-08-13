@@ -15,8 +15,8 @@ func TestIsDeepSeek(t *testing.T) {
 		{"https://api.deepseek.com", true},
 		{"https://eu.deepseek.com/v1", true},
 		{"https://us.deepseek.com", true},
-		{"https://deepseek.com/v1", false},       // bare apex
-		{"https://deepseek.com", false},           // bare apex
+		{"https://deepseek.com/v1", false}, // bare apex
+		{"https://deepseek.com", false},    // bare apex
 		{"https://api.openai.com/v1", false},
 		{"https://api.minimaxi.com/v1", false},
 	}
@@ -36,7 +36,7 @@ func TestIsMiniMax(t *testing.T) {
 		{"https://api.minimaxi.com/v1", true},
 		{"https://api.minimaxi.com", true},
 		{"https://eu.minimaxi.com/v1", true},
-		{"https://minimaxi.com/v1", false},       // bare apex
+		{"https://minimaxi.com/v1", false}, // bare apex
 		{"https://api.deepseek.com/v1", false},
 		{"https://api.openai.com/v1", false},
 	}

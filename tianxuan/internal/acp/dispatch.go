@@ -248,6 +248,7 @@ func unwrapToolResult(output string) string {
 	}
 	return env.Data.Result
 }
+
 // rawInput field is omitted rather than carrying a malformed payload.
 func rawJSON(args string) json.RawMessage {
 	if args == "" || !json.Valid([]byte(args)) {

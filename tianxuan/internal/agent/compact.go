@@ -15,31 +15,31 @@ import (
 // Compact 生成不可变的摘要 digest，旧摘要原样保留，只有 digest 之后到最近 tail
 // 之间的内容被折叠。这样 [system + firstUser + digest1...N] 作为固定前缀全量 cache hit。
 type CompactionConfig struct {
-	Window          int     // context window in tokens (0 = disabled)
-	Ratio           float64 // trigger ratio (default 0.8)
-	ForceRatio      float64 // force compaction at this high-water mark
-	SoftRatio       float64 // send a one-time notice when reaching this ratio
-	TailTokens      int     // verbatim recent-tail budget in tokens
-	RecentKeep      int     // min recent messages to keep verbatim (fallback)
-	ArchiveDir      string  // archive directory for saved sessions
+	Window     int     // context window in tokens (0 = disabled)
+	Ratio      float64 // trigger ratio (default 0.8)
+	ForceRatio float64 // force compaction at this high-water mark
+	SoftRatio  float64 // send a one-time notice when reaching this ratio
+	TailTokens int     // verbatim recent-tail budget in tokens
+	RecentKeep int     // min recent messages to keep verbatim (fallback)
+	ArchiveDir string  // archive directory for saved sessions
 
 	// Internal state
-	LastPrompt   int  // prompt tokens from last turn
-	CompactCount int  // how many times we've compacted this session
-	softNoticed  bool // one-shot soft-ratio notice
-	KeepPolicy KeepPolicy // V10.0: messages to retain verbatim during compaction (0=none)
+	LastPrompt   int        // prompt tokens from last turn
+	CompactCount int        // how many times we've compacted this session
+	softNoticed  bool       // one-shot soft-ratio notice
+	KeepPolicy   KeepPolicy // V10.0: messages to retain verbatim during compaction (0=none)
 }
 
 const (
-	defaultSoftCompactRatio  = 0.5   // ~50% — emit a growing-context notice
-	defaultCompactRatio      = 0.8   // ~80% — trigger compaction
-	defaultCompactForceRatio = 0.9   // ~90% — force compaction
-	defaultCompactTarget     = 0.5   // kept tail never exceeds this fraction
-	defaultTailTokens        = 16384 // verbatim recent-tail budget
-	minCompactMessages       = 2     // skip compaction below this many compactable messages
-	maxPinnedFirstUserTokens = 1500  // cap on pinning the first user turn verbatim
-	pinnedFirstUserWindowFrac = 0.15 // and never pin >15% of the window
-	minRecentKeep            = 5     // never keep fewer recent messages (used in tailFloor + checkpoint)
+	defaultSoftCompactRatio   = 0.5   // ~50% — emit a growing-context notice
+	defaultCompactRatio       = 0.8   // ~80% — trigger compaction
+	defaultCompactForceRatio  = 0.9   // ~90% — force compaction
+	defaultCompactTarget      = 0.5   // kept tail never exceeds this fraction
+	defaultTailTokens         = 16384 // verbatim recent-tail budget
+	minCompactMessages        = 2     // skip compaction below this many compactable messages
+	maxPinnedFirstUserTokens  = 1500  // cap on pinning the first user turn verbatim
+	pinnedFirstUserWindowFrac = 0.15  // and never pin >15% of the window
+	minRecentKeep             = 5     // never keep fewer recent messages (used in tailFloor + checkpoint)
 )
 
 // summaryTag wraps the compaction summary so the model can distinguish it from
@@ -415,9 +415,9 @@ func (a *AgentRunner) partitionFold(region []provider.Message) (kept, fold []pro
 // should never be pruned or summarized away during compaction. Pattern borrowed
 // from opencode (PRUNE_PROTECTED_TOOLS).
 var protectedTools = map[string]bool{
-	"read_skill":   true, // skill definitions must persist
+	"read_skill":    true, // skill definitions must persist
 	"memory_search": true, // memory search results are foundational context
-	"remember":     true, // memory facts should survive compaction
+	"remember":      true, // memory facts should survive compaction
 }
 
 func isProtectedToolResult(m provider.Message) bool {
@@ -595,7 +595,6 @@ func (a *AgentRunner) summarize(ctx context.Context, fold []provider.Message, in
 		}
 	}
 }
-
 
 func (a *AgentRunner) ratio() float64 {
 	if a.compaction.Ratio > 0 {

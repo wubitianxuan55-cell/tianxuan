@@ -91,7 +91,7 @@ func TestJSONModeUnchanged(t *testing.T) {
 	b := bash{shell: sh}
 
 	out, err := b.Execute(context.Background(), argsJSON(t, map[string]any{
-		"command":     "false",
+		"command":       "false",
 		"output_format": "json",
 	}))
 	if err != nil {

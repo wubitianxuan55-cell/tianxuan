@@ -15,12 +15,12 @@ import (
 // UserDir are retained so the controller can resolve quick-add targets without
 // re-deriving discovery context.
 type Set struct {
-	Docs    []Source      // TIANXUAN.md / AGENTS.md, ascending precedence
-	Store   Store         // auto-memory store (may be a zero/disabled Store)
-	Index   string        // MEMORY.md contents at load time
-	Search  *SearchIndex  // V5.31: in-memory inverted index for memory_search
-	CWD     string        // project working dir used for discovery
-	UserDir string        // user config root (may be "")
+	Docs    []Source     // TIANXUAN.md / AGENTS.md, ascending precedence
+	Store   Store        // auto-memory store (may be a zero/disabled Store)
+	Index   string       // MEMORY.md contents at load time
+	Search  *SearchIndex // V5.31: in-memory inverted index for memory_search
+	CWD     string       // project working dir used for discovery
+	UserDir string       // user config root (may be "")
 }
 
 // Options configures discovery. CWD defaults to "." and UserDir is the user
@@ -151,7 +151,6 @@ func (s *Set) Block() string {
 	return s.buildCompactBlock()
 }
 
-
 // DocBlock returns just the doc bodies for turn-tail injection (V5.30).
 // The controller calls this in the first turn to give the model full doc content
 // without expanding the cache-stable prefix.
@@ -221,6 +220,7 @@ func (s *Set) buildCompactBlock() string {
 	}
 	return b.String()
 }
+
 // Compose folds the memory block onto the base system prompt and returns the
 // durable cached-prefix string. Base stays first (it is the most stable text, so
 // it remains a valid cache prefix even when memory changes between sessions);

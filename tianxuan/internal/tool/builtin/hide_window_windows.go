@@ -23,8 +23,8 @@ func hideBashWindow(cmd *exec.Cmd) {
 // Windows Job Object 常量
 const (
 	jobObjectInfoClassExtendedLimitInformation = 9
-	jobObjectLimitKillOnJobClose              = 0x2000
-	processAllAccess                          = 0x1FFFFF // PROCESS_ALL_ACCESS
+	jobObjectLimitKillOnJobClose               = 0x2000
+	processAllAccess                           = 0x1FFFFF // PROCESS_ALL_ACCESS
 )
 
 // JOBOBJECT_BASIC_LIMIT_INFORMATION 对应 Windows
@@ -53,11 +53,11 @@ type jobObjectExtendedLimitInformation struct {
 }
 
 var (
-	modKernel32                       = syscall.NewLazyDLL("kernel32.dll")
-	procCreateJobObjectW              = modKernel32.NewProc("CreateJobObjectW")
-	procSetInformationJobObject       = modKernel32.NewProc("SetInformationJobObject")
-	procAssignProcessToJobObject      = modKernel32.NewProc("AssignProcessToJobObject")
-	procCloseHandle                   = modKernel32.NewProc("CloseHandle")
+	modKernel32                  = syscall.NewLazyDLL("kernel32.dll")
+	procCreateJobObjectW         = modKernel32.NewProc("CreateJobObjectW")
+	procSetInformationJobObject  = modKernel32.NewProc("SetInformationJobObject")
+	procAssignProcessToJobObject = modKernel32.NewProc("AssignProcessToJobObject")
+	procCloseHandle              = modKernel32.NewProc("CloseHandle")
 )
 
 // createJobObject 创建或打开一个 Windows Job Object。

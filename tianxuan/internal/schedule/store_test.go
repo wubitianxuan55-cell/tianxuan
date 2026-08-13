@@ -106,7 +106,7 @@ func TestDueDaily(t *testing.T) {
 
 func TestDueWeekly(t *testing.T) {
 	s := &Schedule{Frequency: Weekly, Time: "09:00", DayOfWeek: 3, Enabled: true} // Wed
-	now := time.Date(2026, 7, 8, 9, 0, 0, 0, time.UTC) // 2026-07-08 is a Wednesday
+	now := time.Date(2026, 7, 8, 9, 0, 0, 0, time.UTC)                            // 2026-07-08 is a Wednesday
 	if !s.Due(now) {
 		t.Error("weekly should be due on correct day at correct time")
 	}

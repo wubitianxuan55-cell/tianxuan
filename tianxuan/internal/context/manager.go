@@ -128,11 +128,11 @@ func (cm *ContextManager) RecordFork(savedTokens int64, pricePerToken float64) {
 
 // === Query methods ===
 
-func (cm *ContextManager) Identity() *IdentityLayer   { return cm.identity }
-func (cm *ContextManager) Runtime() *RuntimeLayer      { return cm.runtime }
-func (cm *ContextManager) Skill() *SkillLayer          { return cm.skill }
-func (cm *ContextManager) Flow() *FlowLayer            { return cm.flow }
-func (cm *ContextManager) Metrics() CacheReport        { return cm.metrics.Report() }
+func (cm *ContextManager) Identity() *IdentityLayer { return cm.identity }
+func (cm *ContextManager) Runtime() *RuntimeLayer   { return cm.runtime }
+func (cm *ContextManager) Skill() *SkillLayer       { return cm.skill }
+func (cm *ContextManager) Flow() *FlowLayer         { return cm.flow }
+func (cm *ContextManager) Metrics() CacheReport     { return cm.metrics.Report() }
 
 func (cm *ContextManager) ActiveTools() []provider.ToolSchema {
 	return cm.identity.FilteredSchemas(cm.skill.CurrentProfile().Tools)

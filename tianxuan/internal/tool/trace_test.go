@@ -117,7 +117,7 @@ func TestTraceStoreTruncatesLongFields(t *testing.T) {
 func TestTraceStoreNilSafe(t *testing.T) {
 	var s *TraceStore
 	s.Record(TraceEntry{Tool: "x"}) // must not panic
-	s.Close()                        // must not panic
+	s.Close()                       // must not panic
 }
 
 // TestDefaultTracePath returns the canonical per-workspace trace file path

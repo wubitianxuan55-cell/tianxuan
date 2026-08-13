@@ -1,9 +1,9 @@
-﻿package cache
+package cache
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	
+
 	"strings"
 	"sync"
 	"time"
@@ -142,14 +142,18 @@ func NewSpawnPolicy() *SpawnPolicy {
 
 func (p *SpawnPolicy) ShouldFork(task string) bool {
 	trimmed := strings.TrimSpace(task)
-	if len(trimmed) < p.minTaskLen { return false }
+	if len(trimmed) < p.minTaskLen {
+		return false
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.forkCount < p.maxForks
 }
 
 func (p *SpawnPolicy) Fork(compiler *Compiler, config ForkConfig) *Compiler {
-	if compiler == nil { return nil }
+	if compiler == nil {
+		return nil
+	}
 	child := compiler.Fork()
 	domain := p.buildSpawnDomain(config)
 	p.mu.Lock()
@@ -197,9 +201,12 @@ func (p *SpawnPolicy) buildSpawnDomain(config ForkConfig) string {
 	parts = append(parts, "## Spawn Domain")
 	parts = append(parts, "- kind: "+string(config.TaskKind))
 	switch config.Mode {
-	case ForkLight: parts = append(parts, "- mode: light")
-	case ForkWarm:  parts = append(parts, "- mode: warm")
-	default:        parts = append(parts, "- mode: default")
+	case ForkLight:
+		parts = append(parts, "- mode: light")
+	case ForkWarm:
+		parts = append(parts, "- mode: warm")
+	default:
+		parts = append(parts, "- mode: default")
 	}
 	if len(config.SkillNames) > 0 {
 		parts = append(parts, "- skills: "+strings.Join(config.SkillNames, ", "))
@@ -237,7 +244,9 @@ func (p *SpawnPolicy) RecordForkSavings(savedTokens int64, pricePerToken float64
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.savedTokens += savedTokens
-	if pricePerToken > 0 { p.savedUSD += float64(savedTokens) * pricePerToken }
+	if pricePerToken > 0 {
+		p.savedUSD += float64(savedTokens) * pricePerToken
+	}
 }
 
 func (p *SpawnPolicy) ForkMetrics() (active, max int, savedTokens int64, savedUSD float64) {
@@ -250,7 +259,9 @@ func (p *SpawnPolicy) DomainReuseRate() (distinct, total int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	distinct = len(p.domainCache)
-	for _, e := range p.domainCache { total += e.HitCount }
+	for _, e := range p.domainCache {
+		total += e.HitCount
+	}
 	return distinct, total
 }
 

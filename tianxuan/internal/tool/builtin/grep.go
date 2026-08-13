@@ -40,11 +40,11 @@ func (grepTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Regular expression (RE2 syntax)"},"path":{"type":"string","description":"File or directory (default \".\")"},"max_matches":{"type":"integer","description":"Maximum matches (default 500, max 2000)"},"sort_by":{"type":"string","enum":["path","relevance"],"description":"Sort: path (default) or relevance (match density)"},"context_lines":{"type":"integer","description":"Context lines around each match (default 0, max 5)"},"highlight":{"type":"boolean","description":"Wrap matches with >>> and <<< (default true)"}},"required":["pattern"]}`)
 }
 
-func (grepTool) ReadOnly() bool { return true }
+func (grepTool) ReadOnly() bool      { return true }
 func (grepTool) Kind() tool.ToolKind { return tool.KindSearch }
 
-func (grepTool) CompactDescription() string { return compactDesc["grep"] }
-func (grepTool) CompactSchema() json.RawMessage   { return compactSchema["grep"] }
+func (grepTool) CompactDescription() string     { return compactDesc["grep"] }
+func (grepTool) CompactSchema() json.RawMessage { return compactSchema["grep"] }
 
 type grepMatch struct {
 	file string
@@ -154,7 +154,7 @@ func (g grepTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 		// When context_lines > 0, maintain a ring buffer of recent lines.
 		var ringBuf []string
 		ringPos := 0
-		var pendingAfter int // context lines to emit after the last match
+		var pendingAfter int           // context lines to emit after the last match
 		emittedLines := map[int]bool{} // tracks emitted line numbers for O(1) dedup
 
 		for sc.Scan() {

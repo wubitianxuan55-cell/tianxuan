@@ -27,9 +27,9 @@ func BuildCompactSummary(truncated []provider.Message) string {
 	seenFiles := make(map[string]bool)
 	toolCounts := make(map[string]int)
 	turnCount := 0
-	var recentUserReqs []string    // 最近 3 条用户请求
-	var pendingItems []string      // 待办项（含 todo/next/pending/follow up）
-	var keyFiles []string          // 引用到的关键文件
+	var recentUserReqs []string // 最近 3 条用户请求
+	var pendingItems []string   // 待办项（含 todo/next/pending/follow up）
+	var keyFiles []string       // 引用到的关键文件
 	seenKeyFiles := make(map[string]bool)
 
 	for _, msg := range truncated {
@@ -215,12 +215,12 @@ func extractKeyFiles(msg provider.Message) []string {
 	seen := make(map[string]bool)
 	for _, text := range texts {
 		for _, token := range strings.Fields(text) {
-			token = strings.Trim(token, `,.:;()"'` + "`")
+			token = strings.Trim(token, `,.:;()"'`+"`")
 			if !strings.Contains(token, "/") {
 				continue
 			}
 			// 		// 检查是否有已知代码文件扩展名
-		if codeExts[filepath.Ext(token)] && !seen[token] {
+			if codeExts[filepath.Ext(token)] && !seen[token] {
 				files = append(files, token)
 				seen[token] = true
 			}

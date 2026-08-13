@@ -54,8 +54,8 @@ type EditEntry struct {
 
 // SessionState holds per-session dynamic state that can change across turns.
 type SessionState struct {
-	RecentEdits   []EditEntry    // V3.4: files edited this session, with version tracking
-	ActiveModule  string         // currently active module
+	RecentEdits   []EditEntry // V3.4: files edited this session, with version tracking
+	ActiveModule  string      // currently active module
 	CurrentBranch string
 	ShellInfo     string
 	Execution     ExecutionState // short-term working memory
@@ -360,6 +360,7 @@ func (rc *RuntimeLayer) verboseSystemPrompt() string {
 	// Controller 通过 TurnTailHints() 在 turn-tail 注入。
 	return strings.Join(parts, "\n\n")
 }
+
 // compactSystemPrompt 是紧凑格式 L2 系统提示（V5.30+）。
 // 使用 @p/@w/@g 前缀的 KV 行替代 Markdown 列表，token 减少约 60%。
 // 完全确定性——相同输入→相同输出，不破坏前缀缓存稳定性。

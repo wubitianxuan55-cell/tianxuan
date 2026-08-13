@@ -37,7 +37,6 @@ func newMarkdownRenderer(width int) *mdRenderer {
 	}
 }
 
-
 // SetDiffFold controls whether diff fenced code blocks fold their context lines
 // (showing only +/− hunks). Called by the /diff-fold slash command.
 func (r *mdRenderer) SetDiffFold(fold bool) { r.diffFold = fold }

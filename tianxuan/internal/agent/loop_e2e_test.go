@@ -15,12 +15,16 @@ import (
 
 type echoTool struct{}
 
-func (echoTool) Name() string            { return "echo" }
-func (echoTool) Description() string     { return "echoes the input text" }
-func (echoTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object","properties":{"text":{"type":"string"}}}`) }
-func (echoTool) ReadOnly() bool          { return true }
+func (echoTool) Name() string        { return "echo" }
+func (echoTool) Description() string { return "echoes the input text" }
+func (echoTool) Schema() json.RawMessage {
+	return json.RawMessage(`{"type":"object","properties":{"text":{"type":"string"}}}`)
+}
+func (echoTool) ReadOnly() bool { return true }
 func (echoTool) Execute(_ context.Context, args json.RawMessage) (string, error) {
-	var p struct{ Text string `json:"text"` }
+	var p struct {
+		Text string `json:"text"`
+	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return "", err
 	}

@@ -10,39 +10,39 @@ import (
 	"strings"
 	"time"
 
-	"tianxuan/internal/strutil"
 	"tianxuan/internal/agent"
+	"tianxuan/internal/strutil"
 )
 
 // DreamResult holds the output of a dream analysis pass.
 type DreamResult struct {
-	SessionCount   int      `json:"session_count"`
-	TotalMessages  int      `json:"total_messages"`
-	RecentTopics   []string `json:"recent_topics"`
-	ToolUsage      map[string]int `json:"tool_usage"`
-	CommonPatterns []Pattern `json:"common_patterns"`
-	KnowledgeCandidates []string `json:"knowledge_candidates"`
+	SessionCount        int            `json:"session_count"`
+	TotalMessages       int            `json:"total_messages"`
+	RecentTopics        []string       `json:"recent_topics"`
+	ToolUsage           map[string]int `json:"tool_usage"`
+	CommonPatterns      []Pattern      `json:"common_patterns"`
+	KnowledgeCandidates []string       `json:"knowledge_candidates"`
 }
 
 // Pattern describes a repeated workflow sequence found across sessions.
 type Pattern struct {
 	Sequence  []string `json:"sequence"` // tool names in order
-	Frequency int     `json:"frequency"`
-	Example   string  `json:"example"`   // first user request that triggered it
+	Frequency int      `json:"frequency"`
+	Example   string   `json:"example"` // first user request that triggered it
 }
 
 // DistillResult holds the distillation analysis output.
 type DistillResult struct {
-	Patterns      []Pattern `json:"patterns"`
-	TopTools      []ToolStat `json:"top_tools"`
-	SkillCandidates []string `json:"skill_candidates"`
+	Patterns        []Pattern  `json:"patterns"`
+	TopTools        []ToolStat `json:"top_tools"`
+	SkillCandidates []string   `json:"skill_candidates"`
 }
 
 // ToolStat aggregates usage stats for a single tool.
 type ToolStat struct {
 	Name     string `json:"name"`
-	Count    int   `json:"count"`
-	Sessions int   `json:"sessions"` // how many distinct sessions used it
+	Count    int    `json:"count"`
+	Sessions int    `json:"sessions"` // how many distinct sessions used it
 }
 
 // sessionMeta is the on-disk format for a session file header.
@@ -146,7 +146,10 @@ func (c *Controller) dreamText(dir string) string {
 	}
 	if len(result.ToolUsage) > 0 {
 		b.WriteString("\n\nTool usage:")
-		type kv struct{ k string; v int }
+		type kv struct {
+			k string
+			v int
+		}
 		var sorted []kv
 		for k, v := range result.ToolUsage {
 			sorted = append(sorted, kv{k, v})

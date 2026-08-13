@@ -15,10 +15,10 @@ import (
 // fakeEchoTool 是一个只读工具，返回 args 的 JSON。
 type fakeEchoTool struct{ name string }
 
-func (f fakeEchoTool) Name() string                 { return f.name }
-func (f fakeEchoTool) Description() string           { return "echo tool" }
-func (f fakeEchoTool) Schema() json.RawMessage       { return json.RawMessage(`{"type":"object"}`) }
-func (f fakeEchoTool) ReadOnly() bool                { return true }
+func (f fakeEchoTool) Name() string            { return f.name }
+func (f fakeEchoTool) Description() string     { return "echo tool" }
+func (f fakeEchoTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
+func (f fakeEchoTool) ReadOnly() bool          { return true }
 func (f fakeEchoTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	return string(args), nil
 }
@@ -26,10 +26,10 @@ func (f fakeEchoTool) Execute(ctx context.Context, args json.RawMessage) (string
 // fakeWriteTool 是一个写入工具。
 type fakeWriteTool struct{ name string }
 
-func (f fakeWriteTool) Name() string       { return f.name }
-func (f fakeWriteTool) Description() string { return "write tool" }
+func (f fakeWriteTool) Name() string            { return f.name }
+func (f fakeWriteTool) Description() string     { return "write tool" }
 func (f fakeWriteTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
-func (f fakeWriteTool) ReadOnly() bool      { return false }
+func (f fakeWriteTool) ReadOnly() bool          { return false }
 func (f fakeWriteTool) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	return "ok", nil
 }
@@ -131,9 +131,9 @@ func TestParamStormBreakerCanonicalArgs(t *testing.T) {
 // TestParamStormBreakerExemptTools 验证豁免工具不触发抑制。
 func TestParamStormBreakerExemptTools(t *testing.T) {
 	psb := NewParamStormBreaker(ParamStormOptions{
-		WindowSize:   8,
-		Threshold:    3,
-		ExemptTools:  []string{"ask", "todo_write"},
+		WindowSize:  8,
+		Threshold:   3,
+		ExemptTools: []string{"ask", "todo_write"},
 	})
 
 	for i := 0; i < 5; i++ {

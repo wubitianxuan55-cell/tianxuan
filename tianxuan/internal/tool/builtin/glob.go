@@ -28,11 +28,11 @@ func (globTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern (supports ** for recursive matching)"}},"required":["pattern"]}`)
 }
 
-func (globTool) ReadOnly() bool { return true }
+func (globTool) ReadOnly() bool      { return true }
 func (globTool) Kind() tool.ToolKind { return tool.KindSearch }
 
-func (globTool) CompactDescription() string { return compactDesc["glob"] }
-func (globTool) CompactSchema() json.RawMessage   { return compactSchema["glob"] }
+func (globTool) CompactDescription() string     { return compactDesc["glob"] }
+func (globTool) CompactSchema() json.RawMessage { return compactSchema["glob"] }
 
 const globMaxResults = 1000
 

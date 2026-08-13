@@ -187,11 +187,11 @@ func TestLoadBuildsSearchIndex(t *testing.T) {
 
 	store := Store{Dir: storeDir}
 	store.Save(Memory{
-		Name: "test-memory",
-		Title: "Test Memory",
+		Name:        "test-memory",
+		Title:       "Test Memory",
 		Description: "A test memory entry",
-		Type: TypeProject,
-		Body: "This is a test memory for search index verification.",
+		Type:        TypeProject,
+		Body:        "This is a test memory for search index verification.",
 	})
 
 	// Can't easily test Load() because it depends on global config paths,

@@ -51,25 +51,25 @@ type wireAsk struct {
 }
 
 type wireTool struct {
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name"`
-	Args      string `json:"args,omitempty"`
-	Output    string `json:"output,omitempty"`
-	Err        string `json:"err,omitempty"`
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name"`
+	Args        string `json:"args,omitempty"`
+	Output      string `json:"output,omitempty"`
+	Err         string `json:"err,omitempty"`
 	Recoverable bool   `json:"recoverable,omitempty"`
-	ReadOnly   bool   `json:"readOnly"`
-	Truncated bool   `json:"truncated,omitempty"`
-	Partial   bool   `json:"partial,omitempty"`
-	ParentID  string `json:"parentId,omitempty"`
+	ReadOnly    bool   `json:"readOnly"`
+	Truncated   bool   `json:"truncated,omitempty"`
+	Partial     bool   `json:"partial,omitempty"`
+	ParentID    string `json:"parentId,omitempty"`
 }
 
 type wireUsage struct {
-	PromptTokens     int     `json:"promptTokens"`
-	CompletionTokens int     `json:"completionTokens"`
-	TotalTokens      int     `json:"totalTokens"`
-	CacheHitTokens   int     `json:"cacheHitTokens"`
-	CacheMissTokens  int     `json:"cacheMissTokens"`
-	ReasoningTokens  int     `json:"reasoningTokens,omitempty"`
+	PromptTokens     int `json:"promptTokens"`
+	CompletionTokens int `json:"completionTokens"`
+	TotalTokens      int `json:"totalTokens"`
+	CacheHitTokens   int `json:"cacheHitTokens"`
+	CacheMissTokens  int `json:"cacheMissTokens"`
+	ReasoningTokens  int `json:"reasoningTokens,omitempty"`
 	// Session-cumulative cache tokens — the status line shows the aggregate
 	// hit-rate Σhit/Σ(hit+miss), steadier than the single-turn CacheHitTokens.
 	SessionCacheHitTokens  int     `json:"sessionCacheHitTokens"`
@@ -141,7 +141,7 @@ func toWire(e event.Event) wireEvent {
 			ID: e.Tool.ID, Name: e.Tool.Name, Args: e.Tool.Args,
 			Output: e.Tool.Output, Err: e.Tool.Err,
 			Recoverable: e.Tool.Recoverable,
-			ReadOnly: e.Tool.ReadOnly, Truncated: e.Tool.Truncated,
+			ReadOnly:    e.Tool.ReadOnly, Truncated: e.Tool.Truncated,
 			Partial: e.Tool.Partial, ParentID: e.Tool.ParentID,
 		}
 	case event.Usage:

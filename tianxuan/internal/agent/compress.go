@@ -17,10 +17,10 @@ type grepMatch struct {
 }
 
 const (
-	grepMaxMatches   = 30 // 全局匹配数上限
-	grepMaxFiles     = 15 // 全局文件数上限
-	grepPerFile      = 5  // 每文件最多保留
-	grepNoCap        = 30 // 不超过此数不压缩
+	grepMaxMatches = 30 // 全局匹配数上限
+	grepMaxFiles   = 15 // 全局文件数上限
+	grepPerFile    = 5  // 每文件最多保留
+	grepNoCap      = 30 // 不超过此数不压缩
 )
 
 // 错误模式关键词——匹配这些的行加权保留。
@@ -392,19 +392,19 @@ type toolCompressLimit struct {
 }
 
 var toolCompressLimits = map[string]toolCompressLimit{
-	"bash":            {180, 24 * 1024},  // shell 输出
-	"run_command":     {180, 24 * 1024},
-	"run_background":  {180, 24 * 1024},
-	"read_file":       {320, 32 * 1024},  // 文件内容
-	"glob":            {160, 24 * 1024},  // 文件列表
-	"search_files":    {160, 24 * 1024},
-	"ls":              {120, 24 * 1024},  // 目录列表
-	"list_directory":  {120, 24 * 1024},
-	"web_fetch":       {320, 32 * 1024},  // 网页内容
-	"web_search":      {160, 24 * 1024},  // 搜索结果
-	"grep":            {0, 0},            // 走 compressGrep
-	"search_content":  {0, 0},            // 走 compressGrep
-	"directory_tree":  {0, 0},            // 走 compressTree
+	"bash":           {180, 24 * 1024}, // shell 输出
+	"run_command":    {180, 24 * 1024},
+	"run_background": {180, 24 * 1024},
+	"read_file":      {320, 32 * 1024}, // 文件内容
+	"glob":           {160, 24 * 1024}, // 文件列表
+	"search_files":   {160, 24 * 1024},
+	"ls":             {120, 24 * 1024}, // 目录列表
+	"list_directory": {120, 24 * 1024},
+	"web_fetch":      {320, 32 * 1024}, // 网页内容
+	"web_search":     {160, 24 * 1024}, // 搜索结果
+	"grep":           {0, 0},           // 走 compressGrep
+	"search_content": {0, 0},           // 走 compressGrep
+	"directory_tree": {0, 0},           // 走 compressTree
 }
 
 // SmartCompress V5.10: 根据工具名称路由到对应的压缩策略。

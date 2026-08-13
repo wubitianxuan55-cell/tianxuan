@@ -85,9 +85,9 @@ func TestSanitizeBridgeWithMultiBlock(t *testing.T) {
 		{Role: RoleAssistant, ToolCalls: []ToolCall{
 			{ID: "c1", Name: "read_file"},
 		}},
-		{Role: RoleAssistant, Content: "Reading the file..."},          // 桥接
+		{Role: RoleAssistant, Content: "Reading the file..."}, // 桥接
 		{Role: RoleTool, ToolCallID: "c1", Name: "read_file", Content: "content1"},
-		{Role: RoleAssistant, Content: "Now searching..."},              // 桥接
+		{Role: RoleAssistant, Content: "Now searching..."}, // 桥接
 		// 第二组
 		{Role: RoleAssistant, ToolCalls: []ToolCall{
 			{ID: "c2", Name: "grep"},

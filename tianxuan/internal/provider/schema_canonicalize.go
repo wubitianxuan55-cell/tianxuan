@@ -8,6 +8,7 @@ import (
 // compressSchemaMaxDepth limits recursion when stripping redundant fields from
 // deeply nested schemas (multi_edit / complete_step have nested arrays).
 const compressSchemaMaxDepth = 5
+
 // compressSchema strips redundant fields from a JSON Schema to reduce prompt
 // token count. When stripDescriptions is true, description fields are removed
 // at every nesting level (they are redundant with the tool-level description);

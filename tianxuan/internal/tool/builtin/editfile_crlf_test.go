@@ -86,11 +86,11 @@ func TestAdaptLineEndings(t *testing.T) {
 	}{
 		{"hello\nworld\n", "\r\n", "hello\r\nworld\r\n"},
 		{"hello\r\nworld\r\n", "\r\n", "hello\r\nworld\r\n"}, // already CRLF
-		{"hello\nworld\n", "\n", "hello\nworld\n"},             // LF target = no change
-		{"hello\nworld\n", "", "hello\nworld\n"},                // no target = no change
-		{"no newlines", "\r\n", "no newlines"},                  // no newlines
-		{"line\n", "\r\n", "line\r\n"},                          // single line
-		{"", "\r\n", ""},                                        // empty
+		{"hello\nworld\n", "\n", "hello\nworld\n"},           // LF target = no change
+		{"hello\nworld\n", "", "hello\nworld\n"},             // no target = no change
+		{"no newlines", "\r\n", "no newlines"},               // no newlines
+		{"line\n", "\r\n", "line\r\n"},                       // single line
+		{"", "\r\n", ""},                                     // empty
 	}
 	for _, tt := range tests {
 		got := adaptLineEndings(tt.input, tt.target)

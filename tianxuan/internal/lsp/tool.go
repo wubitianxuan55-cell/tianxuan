@@ -89,8 +89,8 @@ func (t diagTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 type completionTool struct{ m *Manager }
 
-func (completionTool) Name() string        { return "lsp_completion" }
-func (completionTool) ReadOnly() bool      { return true }
+func (completionTool) Name() string   { return "lsp_completion" }
+func (completionTool) ReadOnly() bool { return true }
 func (completionTool) Description() string {
 	return "Get code completion suggestions at a cursor position. Give the file, the 1-based line, and the symbol text to locate the cursor."
 }
@@ -128,8 +128,8 @@ type renameArgs struct {
 
 type renameTool struct{ m *Manager }
 
-func (renameTool) Name() string        { return "lsp_rename" }
-func (renameTool) ReadOnly() bool      { return false }
+func (renameTool) Name() string   { return "lsp_rename" }
+func (renameTool) ReadOnly() bool { return false }
 func (renameTool) Description() string {
 	return "Rename a symbol across the workspace. Specify the file, line, symbol text, and the new name. WARNING: modifies files."
 }

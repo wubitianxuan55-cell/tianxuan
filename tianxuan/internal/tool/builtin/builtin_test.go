@@ -405,7 +405,6 @@ func TestGlobNoMatches(t *testing.T) {
 	}
 }
 
-
 func TestTruncateStream(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -441,7 +440,7 @@ func TestTruncateStream(t *testing.T) {
 		{
 			"half preserves odd maxBytes byte",
 			strings.Repeat("0123456789", 5), // 50 bytes
-			15,                               // half=8 each side (ceil of 15/2)
+			15,                              // half=8 each side (ceil of 15/2)
 			true,
 			func(t *testing.T, got string) {
 				if !strings.HasPrefix(got, "01234567") {

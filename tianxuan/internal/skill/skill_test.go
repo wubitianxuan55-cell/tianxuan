@@ -132,10 +132,10 @@ func TestBundledCoreWorkflowSkills(t *testing.T) {
 		byName[s.Name] = s
 	}
 	for name, trigger := range map[string]string{
-		"tdd":                     "必须",
-		"systematic-debugging":    "必须",
-		"requesting-code-review":  "必须",
-		"receiving-code-review":   "必须",
+		"tdd":                    "必须",
+		"systematic-debugging":   "必须",
+		"requesting-code-review": "必须",
+		"receiving-code-review":  "必须",
 	} {
 		sk, ok := byName[name]
 		if !ok {

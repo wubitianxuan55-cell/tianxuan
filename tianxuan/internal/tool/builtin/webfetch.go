@@ -20,8 +20,8 @@ import (
 
 	"tianxuan/internal/tool"
 
-	"tianxuan/internal/netclient"
 	"golang.org/x/net/proxy"
+	"tianxuan/internal/netclient"
 )
 
 func init() { tool.RegisterBuiltin(webFetch{}) }
@@ -31,8 +31,8 @@ type webFetch struct {
 }
 
 const (
-	webFetchTimeout       = 15 * time.Second
-	webFetchMaxRead       = 1 << 20 // 1 MiB cap before extraction
+	webFetchTimeout        = 15 * time.Second
+	webFetchMaxRead        = 1 << 20 // 1 MiB cap before extraction
 	webFetchDefaultRetries = 2       // V10.5: 默认重试次数
 )
 
@@ -53,11 +53,11 @@ func (webFetch) Schema() json.RawMessage {
 }`)
 }
 
-func (webFetch) ReadOnly() bool { return true }
+func (webFetch) ReadOnly() bool      { return true }
 func (webFetch) Kind() tool.ToolKind { return tool.KindFetch }
 
-func (webFetch) CompactDescription() string { return compactDesc["web_fetch"] }
-func (webFetch) CompactSchema() json.RawMessage   { return compactSchema["web_fetch"] }
+func (webFetch) CompactDescription() string     { return compactDesc["web_fetch"] }
+func (webFetch) CompactSchema() json.RawMessage { return compactSchema["web_fetch"] }
 
 // ssrfGuardedClient is an HTTP client whose dialer refuses to connect to private,
 // link-local, or unspecified addresses — the SSRF surface a prompt-injected fetch

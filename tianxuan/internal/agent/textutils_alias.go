@@ -11,5 +11,5 @@ var (
 	hasSignalKeyword       = textutils.HasSignalKeyword
 )
 
-func visibleWidth(s string) int   { return textutils.VisibleWidth(s) }
+func visibleWidth(s string) int        { return textutils.VisibleWidth(s) }
 func streamedRows(s string, w int) int { return textutils.StreamedRows(s, w) }

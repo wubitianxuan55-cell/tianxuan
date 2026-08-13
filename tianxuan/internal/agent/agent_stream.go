@@ -103,8 +103,10 @@ func (a *AgentRunner) stream(ctx context.Context, turn int) (string, string, str
 		case provider.ChunkUsage:
 			usage = chunk.Usage
 			a.lastUsage.Store(chunk.Usage)
-			a.sessCacheHit.Add(int64(chunk.Usage.CacheHitTokens)); chunk.Usage.SessionCacheHitTokens = int(a.sessCacheHit.Load())
-			a.sessCacheMiss.Add(int64(chunk.Usage.CacheMissTokens)); chunk.Usage.SessionCacheMissTokens = int(a.sessCacheMiss.Load())
+			a.sessCacheHit.Add(int64(chunk.Usage.CacheHitTokens))
+			chunk.Usage.SessionCacheHitTokens = int(a.sessCacheHit.Load())
+			a.sessCacheMiss.Add(int64(chunk.Usage.CacheMissTokens))
+			chunk.Usage.SessionCacheMissTokens = int(a.sessCacheMiss.Load())
 			batcher.FlushNow()
 			// Phase 3: CompareShape diagnostics — explain cache behaviour
 			if chunk.Usage != nil {

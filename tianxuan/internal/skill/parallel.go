@@ -11,9 +11,9 @@ import (
 
 // ParallelTask 描述一个要并行执行的子代理任务。
 type ParallelTask struct {
-	Skill     string   `json:"skill"`               // 技能名称
-	Arguments string   `json:"arguments"`           // 传给技能的任务描述
-	ID        string   `json:"id,omitempty"`        // 可选标识，用于 depends_on 引用
+	Skill     string   `json:"skill"`                // 技能名称
+	Arguments string   `json:"arguments"`            // 传给技能的任务描述
+	ID        string   `json:"id,omitempty"`         // 可选标识，用于 depends_on 引用
 	DependsOn []string `json:"depends_on,omitempty"` // 依赖的任务 ID 列表
 }
 

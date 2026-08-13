@@ -18,7 +18,10 @@ import (
 // observable signal.
 type fakeRunner struct{ got chan string }
 
-func (f fakeRunner) Run(_ context.Context, input string) (*agent.TurnResult, error) { f.got <- input; return nil, nil }
+func (f fakeRunner) Run(_ context.Context, input string) (*agent.TurnResult, error) {
+	f.got <- input
+	return nil, nil
+}
 
 func TestServeSubmitRunsAndBroadcastsTurnDone(t *testing.T) {
 	bc := NewBroadcaster()
@@ -76,7 +79,6 @@ func TestServeEndpoints(t *testing.T) {
 	if resp, _ := http.Get(srv.URL + "/context"); resp.StatusCode != 200 {
 		t.Errorf("context status = %d", resp.StatusCode)
 	}
-
 
 	if resp, _ := http.Post(srv.URL+"/submit", "application/json", strings.NewReader(`{}`)); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("empty submit should be 400, got %d", resp.StatusCode)
@@ -193,7 +195,6 @@ func TestServeSubmitMalformedJSON(t *testing.T) {
 		t.Errorf("malformed submit = %d, want 400", resp.StatusCode)
 	}
 }
-
 
 func TestServeContextEndpoint(t *testing.T) {
 	bc := NewBroadcaster()

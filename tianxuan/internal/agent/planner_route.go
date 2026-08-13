@@ -12,7 +12,6 @@ import (
 // no model calls, no I/O. Used by the planner host to decide whether a
 // turn needs planning; never changes system prompts.
 
-
 // PlannerRoute is the decision. Three-way semantics (O5):
 //   - executor_only:   skip the planner, execute directly
 //   - planner_chat:    planner answers directly — no plan, no executor
@@ -20,9 +19,9 @@ import (
 type PlannerRoute string
 
 const (
-	RouteExecOnly      PlannerRoute = "executor_only"
-	RoutePlannerChat   PlannerRoute = "planner_chat"
-	RoutePlanAndExec   PlannerRoute = "plan_and_execute"
+	RouteExecOnly    PlannerRoute = "executor_only"
+	RoutePlannerChat PlannerRoute = "planner_chat"
+	RoutePlanAndExec PlannerRoute = "plan_and_execute"
 )
 
 // PlannerDecision is the deterministic routing result for one turn.

@@ -46,9 +46,9 @@ type Receipt struct {
 
 // Ledger stores the receipts available to complete_step for the current turn.
 type Ledger struct {
-	mu             sync.Mutex
-	receipts       []Receipt
-	strictVerify   bool // V10.8: only enforce complete_step evidence in Plan Mode
+	mu           sync.Mutex
+	receipts     []Receipt
+	strictVerify bool // V10.8: only enforce complete_step evidence in Plan Mode
 }
 
 func NewLedger() *Ledger { return &Ledger{} }

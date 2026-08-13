@@ -47,9 +47,9 @@ func (applyPatch) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"patch":{"type":"string","description":"Patch text in apply_patch format: *** Begin Patch ... *** End Patch. Hunks: *** Add File: <path> (+ lines), *** Delete File: <path>, *** Update File: <path> (@@ anchor, - removed, + added, ' ' context, *** End of File)."}},"required":["patch"]}`)
 }
 
-func (applyPatch) ReadOnly() bool         { return false }
-func (applyPatch) Kind() tool.ToolKind    { return tool.KindEdit }
-func (applyPatch) CompactDescription() string { return compactDesc["apply_patch"] }
+func (applyPatch) ReadOnly() bool                 { return false }
+func (applyPatch) Kind() tool.ToolKind            { return tool.KindEdit }
+func (applyPatch) CompactDescription() string     { return compactDesc["apply_patch"] }
 func (applyPatch) CompactSchema() json.RawMessage { return compactSchema["apply_patch"] }
 
 // patchHunk is one parsed hunk of an apply_patch payload.

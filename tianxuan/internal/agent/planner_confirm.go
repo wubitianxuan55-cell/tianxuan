@@ -12,10 +12,11 @@ import (
 // 是否按意见修改（revise），以及取消错误。headless（asker==nil）自动确认。
 //
 // 确认卡选项：
-//   提交执行          — 同意计划，直接执行
-//   仅聊天            — 计划误触发，仅作对话回复，不派发执行
-//   按用户意见修改计划 — 将修改意见送回重新规划
-//   取消              — 放弃本次任务
+//
+//	提交执行          — 同意计划，直接执行
+//	仅聊天            — 计划误触发，仅作对话回复，不派发执行
+//	按用户意见修改计划 — 将修改意见送回重新规划
+//	取消              — 放弃本次任务
 func (h *PlannerHost) confirmPlan(ctx context.Context, task, plan string) (note string, chatOnly bool, revise bool, err error) {
 	if h.asker == nil {
 		return "", false, false, nil // headless: auto-confirm

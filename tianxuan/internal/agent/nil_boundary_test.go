@@ -21,7 +21,6 @@ func (*typedNilGate) Check(context.Context, string, json.RawMessage, bool) (bool
 
 type typedNilHooks struct{}
 
-
 func (*typedNilHooks) PermissionRequest(context.Context, string, json.RawMessage) (bool, json.RawMessage, string) {
 	return true, nil, ""
 }

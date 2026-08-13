@@ -3,8 +3,8 @@
 package proc
 
 import (
-	"os/exec"
 	"log/slog"
+	"os/exec"
 	"strconv"
 	"syscall"
 	"unsafe"

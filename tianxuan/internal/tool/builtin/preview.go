@@ -79,9 +79,13 @@ func (e editFile) Preview(args json.RawMessage) (diff.Change, error) {
 			lineType = "no-newlines"
 		}
 		oldPreview := p.OldString
-		if len(oldPreview) > 80 { oldPreview = oldPreview[:80] + "..." }
+		if len(oldPreview) > 80 {
+			oldPreview = oldPreview[:80] + "..."
+		}
 		filePreview := content
-		if len(filePreview) > 120 { filePreview = filePreview[:120] + "..." }
+		if len(filePreview) > 120 {
+			filePreview = filePreview[:120] + "..."
+		}
 		return diff.Change{}, fmt.Errorf("old_string not found in %s (line endings: %s).\n  old_string: %q\n  file head: %q\n  Check whitespace, indentation, line endings (CRLF vs LF).", p.Path, lineType, oldPreview, filePreview)
 	case 1:
 		// ok

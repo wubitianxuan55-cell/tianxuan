@@ -36,7 +36,13 @@ func TestCanonicalizeSchemaStable(t *testing.T) {
 	t.Logf("10 calls all identical: OK")
 }
 
-func keys(m map[string]int) string { var s []string; for k := range m { s = append(s, k) }; return strings.Join(s, " | ") }
+func keys(m map[string]int) string {
+	var s []string
+	for k := range m {
+		s = append(s, k)
+	}
+	return strings.Join(s, " | ")
+}
 
 func TestCanonicalizeSchemaStripsDescriptions(t *testing.T) {
 	// MCP tools often include "description" on the schema object and

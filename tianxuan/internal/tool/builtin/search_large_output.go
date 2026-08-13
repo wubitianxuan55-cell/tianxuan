@@ -22,10 +22,12 @@ type searchLargeOutput struct {
 	store *offload.Store
 }
 
-func (t *searchLargeOutput) Name() string        { return "search_large_output" }
-func (t *searchLargeOutput) Description() string { return "Query large tool outputs offloaded to disk. list shows all offloaded files; read returns one file’s content; search finds matching lines across files." }
-func (t *searchLargeOutput) ReadOnly() bool       { return true }
-func (t *searchLargeOutput) Kind() tool.ToolKind   { return tool.KindSearch }
+func (t *searchLargeOutput) Name() string { return "search_large_output" }
+func (t *searchLargeOutput) Description() string {
+	return "Query large tool outputs offloaded to disk. list shows all offloaded files; read returns one file’s content; search finds matching lines across files."
+}
+func (t *searchLargeOutput) ReadOnly() bool      { return true }
+func (t *searchLargeOutput) Kind() tool.ToolKind { return tool.KindSearch }
 
 func (t *searchLargeOutput) Schema() json.RawMessage {
 	return json.RawMessage(`{

@@ -110,9 +110,9 @@ func (b *SubagentBuilder) BuildRegistry(def SubagentDefinition) *tool.Registry {
 // BuildOptions constructs Agent Options from the definition.
 func (b *SubagentBuilder) BuildOptions(def SubagentDefinition) Options {
 	return Options{
-		MaxSteps:    def.MaxSteps,
-		Gate:        b.gate,
-		Compaction:  CompactionConfig{},
+		MaxSteps:   def.MaxSteps,
+		Gate:       b.gate,
+		Compaction: CompactionConfig{},
 	}
 }
 

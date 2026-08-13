@@ -9,8 +9,8 @@ type CacheMetrics struct {
 	mu sync.Mutex
 
 	// Layer sizes (bytes)
-	L1Size int
-	L2Size int
+	L1Size     int
+	L2Size     int
 	L4Messages int
 
 	// Token savings
@@ -173,7 +173,7 @@ type CacheReport struct {
 	SavedLatencyMs  int64   `json:"savedLatencyMs"`
 	CompactionCount int     `json:"compactionCount"`
 	// V5.30: 全会话缓存命中统计
-	CacheHitTokens  int64   `json:"cacheHitTokens"`
-	CacheMissTokens int64   `json:"cacheMissTokens"`
-	BreakCount      int     `json:"breakCount"`
+	CacheHitTokens  int64 `json:"cacheHitTokens"`
+	CacheMissTokens int64 `json:"cacheMissTokens"`
+	BreakCount      int   `json:"breakCount"`
 }

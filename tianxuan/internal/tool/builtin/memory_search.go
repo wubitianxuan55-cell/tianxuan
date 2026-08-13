@@ -39,11 +39,11 @@ func (memorySearch) Schema() json.RawMessage {
 }`)
 }
 
-func (memorySearch) ReadOnly() bool { return true }
+func (memorySearch) ReadOnly() bool      { return true }
 func (memorySearch) Kind() tool.ToolKind { return tool.KindSearch }
 
-func (memorySearch) CompactDescription() string { return compactDesc["memory_search"] }
-func (memorySearch) CompactSchema() json.RawMessage   { return compactSchema["memory_search"] }
+func (memorySearch) CompactDescription() string     { return compactDesc["memory_search"] }
+func (memorySearch) CompactSchema() json.RawMessage { return compactSchema["memory_search"] }
 
 func (memorySearch) Execute(_ context.Context, args json.RawMessage) (string, error) {
 	idx := memorySearchIndex

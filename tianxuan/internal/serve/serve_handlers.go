@@ -411,8 +411,8 @@ func (s *Server) settings(w http.ResponseWriter, _ *http.Request) {
 		})
 	}
 	writeJSON(w, map[string]any{
-		"defaultModel":  cfg.DefaultModel,
-		"providers":     providers,
+		"defaultModel": cfg.DefaultModel,
+		"providers":    providers,
 		"permissions": map[string]any{
 			"mode":  orDef(cfg.Permissions.Mode, "ask"),
 			"allow": nonEmpty(cfg.Permissions.Allow),
@@ -437,7 +437,9 @@ func (s *Server) settings(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) setBypass(w http.ResponseWriter, r *http.Request) {
-	var body struct{ On bool `json:"on"` }
+	var body struct {
+		On bool `json:"on"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -451,7 +453,9 @@ func (s *Server) setBypass(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setModel(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Ref string `json:"ref"` }
+	var body struct {
+		Ref string `json:"ref"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -475,7 +479,9 @@ func (s *Server) setModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setDefaultModel(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Ref string `json:"ref"` }
+	var body struct {
+		Ref string `json:"ref"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -536,7 +542,9 @@ func (s *Server) saveProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteProvider(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Name string `json:"name"` }
+	var body struct {
+		Name string `json:"name"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -657,7 +665,9 @@ func (s *Server) setSandbox(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setPermissionMode(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Mode string `json:"mode"` }
+	var body struct {
+		Mode string `json:"mode"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -767,7 +777,9 @@ func (s *Server) addMCPServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) removeMCPServer(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Name string `json:"name"` }
+	var body struct {
+		Name string `json:"name"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -781,7 +793,9 @@ func (s *Server) removeMCPServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) retryMCPServer(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Name string `json:"name"` }
+	var body struct {
+		Name string `json:"name"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -857,7 +871,9 @@ func (s *Server) rewindCheckpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) forkCheckpoint(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Turn int `json:"turn"` }
+	var body struct {
+		Turn int `json:"turn"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -871,7 +887,9 @@ func (s *Server) forkCheckpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) summarizeFrom(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Turn int `json:"turn"` }
+	var body struct {
+		Turn int `json:"turn"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -884,7 +902,9 @@ func (s *Server) summarizeFrom(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) summarizeUpTo(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Turn int `json:"turn"` }
+	var body struct {
+		Turn int `json:"turn"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad body", 400)
 		return
@@ -973,7 +993,7 @@ func (s *Server) tccaReport(w http.ResponseWriter, _ *http.Request) {
 		"cacheHitTokens":  r.CacheHitTokens,
 		"cacheMissTokens": r.CacheMissTokens,
 		"breakCount":      r.BreakCount,
-}
+	}
 	writeJSON(w, resp)
 }
 

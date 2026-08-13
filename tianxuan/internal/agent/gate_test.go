@@ -3,9 +3,9 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"tianxuan/internal/event"
 	"strings"
 	"testing"
+	"tianxuan/internal/event"
 
 	"tianxuan/internal/provider"
 	"tianxuan/internal/tool"

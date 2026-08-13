@@ -41,7 +41,6 @@ func requiresFreshHumanApprovalTool(tool string) bool {
 	}
 }
 
-
 // requestApproval emits an ApprovalRequest and blocks until Approve(ID, …)
 // answers or ctx is cancelled. A prior session grant for the same tool+subject
 // short-circuits. promptMu serialises outstanding prompts.

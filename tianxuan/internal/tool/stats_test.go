@@ -9,10 +9,10 @@ import (
 
 func TestClassifyError(t *testing.T) {
 	cases := []struct {
-		tool    string
-		code    string
-		errMsg  string
-		want    string
+		tool   string
+		code   string
+		errMsg string
+		want   string
 	}{
 		{"edit_file", CodeValidationError, `field "path" must be a string`, "validation_error"},
 		{"edit_file", CodeExecError, "old_string not found in x.go", "old_string_not_found"},

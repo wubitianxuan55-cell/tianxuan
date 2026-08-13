@@ -1,4 +1,4 @@
-﻿// Package control is the transport-agnostic session driver. A Controller owns
+// Package control is the transport-agnostic session driver. A Controller owns
 // the agent run loop and session lifecycle, takes commands (Send/Cancel/Approve/
 // Compact/NewSession/…), and emits everything that happens —
 // reasoning, tool calls, approvals, turn completion — as a typed event stream to
@@ -80,7 +80,7 @@ type Controller struct {
 	bgCtx    context.Context
 	bgCancel context.CancelFunc
 
-	ctxMgr            *tiancontext.ContextManager     // V3.0 Phase 5
+	ctxMgr *tiancontext.ContextManager // V3.0 Phase 5
 
 	// Checkpoints (snapshot-based rewind). cp is the per-session store rebound when
 	// the session path changes; cpRoot is the workspace root used to guard restore
@@ -112,9 +112,8 @@ type Controller struct {
 	asks        map[string]chan []event.AskAnswer
 	granted     map[string]bool
 	nextID      int
-	turn int
+	turn        int
 	autoApprove bool
-
 
 	// permLevel controls permission strictness: "ask" (prompt before writes, default),
 	// "auto" (allow writes without asking), or "yolo" (skip all prompts).
@@ -166,7 +165,7 @@ type Options struct {
 	// context; both are needed for hot-adding MCP servers via AddMCPServer.
 	Registry  *tool.Registry
 	PluginCtx context.Context
-	CtxMgr         *tiancontext.ContextManager     // V3.0 Phase 5
+	CtxMgr    *tiancontext.ContextManager // V3.0 Phase 5
 	// WorkspaceRoot is the project root checkpoint restores are confined to ("" =
 	// no confinement). Frontends pass the cwd they launched the session in.
 	WorkspaceRoot string
@@ -202,8 +201,8 @@ func New(opts Options) *Controller {
 		jobs:         opts.Jobs,
 		reg:          opts.Registry,
 		pluginCtx:    pluginCtx,
-		ctxMgr:           opts.CtxMgr,
-		cpRoot:           opts.WorkspaceRoot,
+		ctxMgr:       opts.CtxMgr,
+		cpRoot:       opts.WorkspaceRoot,
 		permLevel:    "ask",
 		approvals:    map[string]chan approvalReply{},
 		asks:         map[string]chan []event.AskAnswer{},
@@ -225,6 +224,7 @@ func New(opts Options) *Controller {
 	}
 	return c
 }
+
 // rebindCheckpoints points the store at the (possibly new) session, loading any
 // checkpoints already on disk, and resets the turn boundaries. Called on
 // construction and whenever the session path changes (NewSession/Resume/SetSessionPath).
@@ -329,6 +329,7 @@ func (c *Controller) Steer(input string) {
 	}
 	c.Send(input)
 }
+
 // runTurn runs one model turn.
 
 func (c *Controller) runTurn(ctx context.Context, input string) error {
@@ -546,11 +547,11 @@ func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
 	}
 }
 
-
 // SetPermLevel sets the permission strictness and immediately updates the gate:
-//   "ask"  — prompt before writes (default), interactive gate active
-//   "auto" — allow writes without asking, deny rules still block
-//   "yolo" — skip all gating (nil gate = every tool auto-approved)
+//
+//	"ask"  — prompt before writes (default), interactive gate active
+//	"auto" — allow writes without asking, deny rules still block
+//	"yolo" — skip all gating (nil gate = every tool auto-approved)
 func (c *Controller) SetPermLevel(level string) {
 	c.mu.Lock()
 	c.permLevel = level
@@ -598,7 +599,6 @@ func (c *Controller) PermLevel() string {
 	defer c.mu.Unlock()
 	return c.permLevel
 }
-
 
 // SetGoal sets the session goal (set via /goal) and propagates it to the
 // SetGoal sets the session goal (set via /goal) and propagates it to the

@@ -292,7 +292,6 @@ func (c *Config) SetLanguage(lang string) error {
 	return nil
 }
 
-
 // SetDesktopLayoutStyle sets the desktop layout: "classic" | "workbench" | "creation".
 func (c *Config) SetDesktopLayoutStyle(style string) error {
 	style = strings.TrimSpace(style)

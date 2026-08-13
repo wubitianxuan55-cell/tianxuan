@@ -133,6 +133,7 @@ func ResolveToolsets(names []string, custom map[string]Toolset) []string {
 	sort.Strings(out)
 	return out
 }
+
 // ToolKind classifies a tool by the nature of its operation, enabling
 // fine-grained policy decisions beyond the boolean ReadOnly flag. Inspired by
 // Gemini CLI's Kind enum (Read/Edit/Delete/Move/Search/Execute/Think/Agent/
@@ -325,9 +326,9 @@ func LookupBuiltin(name string) (Tool, bool) {
 // Registry is a per-run set of tools: enabled built-ins plus plugin tools.
 // V6.0 P8: supports hiding tools from the model schema while keeping them callable.
 type Registry struct {
-	tools  map[string]Tool
-	order  []string
-	hidden map[string]bool            // V6.0 P8: hidden from schema but still callable
+	tools     map[string]Tool
+	order     []string
+	hidden    map[string]bool            // V6.0 P8: hidden from schema but still callable
 	canon     map[string]json.RawMessage // V10.0: schema canonicalized once on Add, reused by Schemas()
 	suspended map[string]bool            // V10.0: MCP prefixes temporarily disabled per-session
 }

@@ -65,7 +65,7 @@ type chatTUI struct {
 	elapsed  int
 	// turnTokens accumulates this turn's output tokens (summed from per-step Usage
 	// events) for the live "↓N" readout in the running status line.
-	turnTokens int
+	turnTokens  int
 	turnCostUSD float64
 
 	// balance is the last-fetched wallet-balance readout (e.g. "¥110.00"), "" when
@@ -78,7 +78,6 @@ type chatTUI struct {
 	// pinned just above the input (see renderTodoPanel). "" when there's no list.
 	// Persists across turns until the work completes or a new session starts.
 	todoArgs string
-
 
 	// history is a resumed session's messages, committed to scrollback once on
 
@@ -1145,7 +1144,6 @@ func (m chatTUI) handleApprovalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil // ignore anything else while awaiting a decision
 }
 
-
 // compactionCardLines renders a finished compaction as a titled card: a header
 // with the message count and trigger, then the structured summary under a dim
 // gutter so it reads as one block in scrollback. The summary is also the new
@@ -1202,7 +1200,6 @@ const todoPanelMaxRows = 8
 // dimmed/checked, the in-progress one highlighted (its activeForm if given),
 // pending ones muted. It returns "" when there's no list or every item is done,
 // so the panel appears while work is outstanding and clears itself when finished.
-
 
 // truncateSubject trims a tool subject so the approval banner fits one line.
 

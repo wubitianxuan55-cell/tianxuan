@@ -13,12 +13,12 @@ func TestSoloSystemPrompt_AdaptiveExecution(t *testing.T) {
 	p := SoloSystemPrompt
 	required := []string{
 		"Adaptive execution",
-		"living document",             // todo 活文档
-		"plan-mode directive",         // 规划指令存在时先规划等待确认
-		"adapt",                       // 执行中调整计划
-		"switch approach",             // 3 次同方案失败换方案
-		"diagnose the root cause",     // 根因诊断
-		"deliverable subset",          // 收敛策略
+		"living document",         // todo 活文档
+		"plan-mode directive",     // 规划指令存在时先规划等待确认
+		"adapt",                   // 执行中调整计划
+		"switch approach",         // 3 次同方案失败换方案
+		"diagnose the root cause", // 根因诊断
+		"deliverable subset",      // 收敛策略
 	}
 	for _, kw := range required {
 		if !strings.Contains(p, kw) {

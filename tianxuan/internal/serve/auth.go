@@ -5,9 +5,10 @@
 // query parameter.
 //
 // Exempt paths (no auth required):
-//   GET /            — landing page
-//   GET /health      — health check
-//   GET /assets/*    — static assets (CSS, JS, fonts)
+//
+//	GET /            — landing page
+//	GET /health      — health check
+//	GET /assets/*    — static assets (CSS, JS, fonts)
 //
 // The query-parameter channel exists because EventSource (SSE) does not
 // support custom headers — clients pass the token as ?token=... on

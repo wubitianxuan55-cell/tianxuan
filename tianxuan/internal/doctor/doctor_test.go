@@ -99,7 +99,7 @@ func TestConfigCheckFailsWithoutModel(t *testing.T) {
 
 func TestSummaryFormatting(t *testing.T) {
 	r := &Report{
-		Items:  []Item{
+		Items: []Item{
 			{Name: "a", Status: Pass},
 			{Name: "b", Status: Pass},
 			{Name: "c", Status: Warn},

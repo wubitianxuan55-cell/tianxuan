@@ -150,5 +150,3 @@ func canonicalizeArgs(raw string) string {
 	}
 	return string(out)
 }
-
-

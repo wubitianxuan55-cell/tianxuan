@@ -64,10 +64,10 @@ func TestRealAPICache10Rounds(t *testing.T) {
 	fmt.Println(strings.Repeat("─", 65))
 
 	var (
-		totalHit   int64
-		totalMiss  int64
-		totalOut   int64
-		totalMS    int64
+		totalHit  int64
+		totalMiss int64
+		totalOut  int64
+		totalMS   int64
 	)
 
 	for i, q := range questions {

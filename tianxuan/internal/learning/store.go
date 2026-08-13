@@ -49,7 +49,7 @@ func PruneOld(s *Store, maxAgeDays int, maxPatterns int) {
 		return
 	}
 	var kept []Pattern
-_ = maxAgeDays
+	_ = maxAgeDays
 	for _, p := range s.Patterns {
 		if p.Skipped {
 			continue

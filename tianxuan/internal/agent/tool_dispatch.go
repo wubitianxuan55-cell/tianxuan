@@ -13,6 +13,7 @@ import (
 type EditObserver interface {
 	OnFileEdited(path string)
 }
+
 // ToolDispatcher centralizes the pre-execution checks that every tool call must
 // pass through. It sits between the agent's run loop and individual tool execution.
 type ToolDispatcher struct {

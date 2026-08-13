@@ -126,7 +126,7 @@ func (a *AgentRunner) runDirect(ctx context.Context, input string) (*TurnResult,
 	a.bgJobStartedThisTurn = false // 每轮重置启停标志
 	a.bgOutputReadThisTurn = false
 	a.bgJobKilledThisTurn = false
-	a.bgStartKillStreak = 0   // 新用户轮次重置循环计数
+	a.bgStartKillStreak = 0 // 新用户轮次重置循环计数
 	a.pendingDiffs = nil
 	a.preMu.Unlock()
 	a.staleMu.Lock()

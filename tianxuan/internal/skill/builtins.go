@@ -161,7 +161,6 @@ Your final answer:
 
 The 'task' names what to review. Stay on it; don't redesign the feature.`
 
-
 // builtinSkills returns the shipped skills. A fresh slice each call so callers
 // can't mutate the shared set.
 func builtinSkills() []Skill {

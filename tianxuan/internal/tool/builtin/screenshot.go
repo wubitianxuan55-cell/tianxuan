@@ -34,7 +34,9 @@ func (captureScreen) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`)
 }
 
-func (captureScreen) CompactDescription() string { return "截取主屏幕存为附件，返回 @路径（配合 vision 技能识图）" }
+func (captureScreen) CompactDescription() string {
+	return "截取主屏幕存为附件，返回 @路径（配合 vision 技能识图）"
+}
 func (captureScreen) CompactSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object"}`)
 }

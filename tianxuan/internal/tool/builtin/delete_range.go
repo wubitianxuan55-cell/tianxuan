@@ -37,11 +37,11 @@ func (deleteRange) Schema() json.RawMessage {
 	}`)
 }
 
-func (deleteRange) ReadOnly() bool { return false }
+func (deleteRange) ReadOnly() bool      { return false }
 func (deleteRange) Kind() tool.ToolKind { return tool.KindDelete }
 
-func (deleteRange) CompactDescription() string { return compactDesc["delete_range"] }
-func (deleteRange) CompactSchema() json.RawMessage   { return compactSchema["delete_range"] }
+func (deleteRange) CompactDescription() string     { return compactDesc["delete_range"] }
+func (deleteRange) CompactSchema() json.RawMessage { return compactSchema["delete_range"] }
 
 func (d deleteRange) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	change, err := d.preview(args)

@@ -44,7 +44,6 @@ func (s *Session) PrependSystem(content string) {
 	s.Messages = append([]provider.Message{{Role: provider.RoleSystem, Content: content}}, s.Messages...)
 }
 
-
 // Replace swaps the whole message log — used by compaction, which rewrites the
 // middle of the history.
 func (s *Session) Replace(msgs []provider.Message) {

@@ -45,11 +45,11 @@ func (bashOutput) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"The background job id (e.g. \"bash-1\") returned when it was started."},"filter":{"type":"string","description":"Optional regular expression; only matching lines of the new output are returned."},"tail_lines":{"type":"integer","description":"Return only the last N lines of new output (default 0 = all lines, max 500)."}},"required":["job_id"]}`)
 }
 
-func (bashOutput) ReadOnly() bool { return true }
+func (bashOutput) ReadOnly() bool      { return true }
 func (bashOutput) Kind() tool.ToolKind { return tool.KindRead }
 
-func (bashOutput) CompactDescription() string { return compactDesc["bash_output"] }
-func (bashOutput) CompactSchema() json.RawMessage   { return compactSchema["bash_output"] }
+func (bashOutput) CompactDescription() string     { return compactDesc["bash_output"] }
+func (bashOutput) CompactSchema() json.RawMessage { return compactSchema["bash_output"] }
 
 func (bashOutput) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -126,11 +126,11 @@ func (killShell) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"job_id":{"type":"string","description":"The background job id to terminate (e.g. \"bash-1\")."}},"required":["job_id"]}`)
 }
 
-func (killShell) ReadOnly() bool { return false }
+func (killShell) ReadOnly() bool      { return false }
 func (killShell) Kind() tool.ToolKind { return tool.KindExecute }
 
-func (killShell) CompactDescription() string { return compactDesc["kill_shell"] }
-func (killShell) CompactSchema() json.RawMessage   { return compactSchema["kill_shell"] }
+func (killShell) CompactDescription() string     { return compactDesc["kill_shell"] }
+func (killShell) CompactSchema() json.RawMessage { return compactSchema["kill_shell"] }
 
 func (killShell) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {
@@ -180,11 +180,11 @@ func (waitJob) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"job_ids":{"type":"array","items":{"type":"string"},"description":"Background job ids to wait for. Omit to wait for every currently-running job."},"timeout_seconds":{"type":"integer","description":"Optional maximum seconds to block before returning current progress. Omit to wait until the jobs finish.","minimum":1}}}`)
 }
 
-func (waitJob) ReadOnly() bool { return true }
+func (waitJob) ReadOnly() bool      { return true }
 func (waitJob) Kind() tool.ToolKind { return tool.KindRead }
 
-func (waitJob) CompactDescription() string { return compactDesc["wait"] }
-func (waitJob) CompactSchema() json.RawMessage   { return compactSchema["wait"] }
+func (waitJob) CompactDescription() string     { return compactDesc["wait"] }
+func (waitJob) CompactSchema() json.RawMessage { return compactSchema["wait"] }
 
 func (waitJob) Execute(ctx context.Context, args json.RawMessage) (string, error) {
 	var p struct {

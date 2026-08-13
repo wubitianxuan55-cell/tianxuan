@@ -24,14 +24,14 @@ type AuditLogger struct {
 
 // AuditEntry is one row in the audit log.
 type AuditEntry struct {
-	Timestamp  string `json:"timestamp"`   // ISO-8601
-	Tool       string `json:"tool"`        // tool name, e.g. "edit_file"
-	TaskKind   string `json:"task_kind"`   // classifyIntent result, e.g. "fix_bug"
-	ReadOnly   bool   `json:"read_only"`   // was this a read-only tool?
-	Outcome    string `json:"outcome"`      // "success" | "error" | "blocked"
+	Timestamp  string `json:"timestamp"`       // ISO-8601
+	Tool       string `json:"tool"`            // tool name, e.g. "edit_file"
+	TaskKind   string `json:"task_kind"`       // classifyIntent result, e.g. "fix_bug"
+	ReadOnly   bool   `json:"read_only"`       // was this a read-only tool?
+	Outcome    string `json:"outcome"`         // "success" | "error" | "blocked"
 	Error      string `json:"error,omitempty"` // error message, if any
-	OutputLen  int    `json:"output_len"`    // length of tool output in chars
-	DurationMs int64  `json:"duration_ms"`  // wall-clock execution time
+	OutputLen  int    `json:"output_len"`      // length of tool output in chars
+	DurationMs int64  `json:"duration_ms"`     // wall-clock execution time
 }
 
 // NewAuditLogger opens or creates the JSONL audit file under the given directory.

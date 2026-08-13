@@ -55,6 +55,15 @@
 - 48 个函数体逐字节验证零改动（纯移动，缓存铁律相关代码未触碰）
 - 验证：`go vet` / `go build` / agent 包 -short 测试全绿
 
+### 🧩 controller.go 拆分（P2.5）
+
+- `controller.go` 934 行拆至 641 行：公开审批命令（Approve/Ask/
+  EnableInteractiveApproval 等）并入既有 `controller_approval.go`（审批桥
+  gateApprover 同主题），会话生命周期（NewSession/Resume/Snapshot/History
+  等）→ `controller_session.go`（187 行）
+- 54 个函数体逐字节验证零改动（纯移动）
+- 验证：`go vet` / `go build` / control 包测试全绿
+
 ## [10.178.0] — 2026-08-13
 
 ### 🧹 工程治理与代码质量梳理（历史债清理）

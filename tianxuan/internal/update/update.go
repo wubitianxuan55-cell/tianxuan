@@ -116,7 +116,10 @@ func Self(ctx context.Context, repo, currentVersion, releaseTag string) error {
 		}
 		if err := os.Rename(tmp, exe); err != nil {
 			// Attempt rollback
-			_ = os.Rename(old, exe)
+			if rerr := os.Rename(old, exe); rerr != nil {
+				_ = os.Remove(tmp)
+				return fmt.Errorf("update: rename new → current: %w; rollback to .old also failed: %v", err, rerr)
+			}
 			_ = os.Remove(tmp)
 			return fmt.Errorf("update: rename new → current: %w; original binary restored", err)
 		}

@@ -3,6 +3,7 @@ package learning
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -48,10 +49,16 @@ func PruneOld(s *Store, maxAgeDays int, maxPatterns int) {
 	if s == nil {
 		return
 	}
+	cutoff := ""
+	if maxAgeDays > 0 {
+		cutoff = time.Now().AddDate(0, 0, -maxAgeDays).Format("2006-01-02")
+	}
 	var kept []Pattern
-	_ = maxAgeDays
 	for _, p := range s.Patterns {
 		if p.Skipped {
+			continue
+		}
+		if cutoff != "" && p.LastSeen != "" && p.LastSeen < cutoff {
 			continue
 		}
 		kept = append(kept, p)

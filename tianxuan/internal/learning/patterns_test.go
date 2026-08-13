@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsErrorResult(t *testing.T) {
@@ -250,6 +251,24 @@ func TestPruneOld(t *testing.T) {
 	for _, p := range s.Patterns {
 		if p.Skipped {
 			t.Errorf("expected no skipped patterns, got: %+v", p)
+		}
+	}
+
+	// maxAgeDays 过期删除：LastSeen 早于 N 天的 pattern 应被移除；空 LastSeen 保守保留。
+	staleDate := time.Now().AddDate(0, 0, -60).Format("2006-01-02")
+	recentDate := time.Now().Format("2006-01-02")
+	sAge := &Store{Patterns: []Pattern{
+		{Sig: "recent", Count: 5, LastSeen: recentDate},
+		{Sig: "stale", Count: 5, LastSeen: staleDate},
+		{Sig: "no-date", Count: 5},
+	}}
+	PruneOld(sAge, 30, 100)
+	if len(sAge.Patterns) != 2 {
+		t.Fatalf("expected 2 patterns after age prune (stale removed), got %d", len(sAge.Patterns))
+	}
+	for _, p := range sAge.Patterns {
+		if p.Sig == "stale" {
+			t.Errorf("expected stale pattern removed by maxAgeDays, got %+v", p)
 		}
 	}
 
